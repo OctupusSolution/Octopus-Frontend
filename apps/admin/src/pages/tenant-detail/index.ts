@@ -1,0 +1,4 @@
+// pages/tenant-detail
+// Route-level screen.
+// This index.ts is the ONLY file other slices/layers may import from.
+export {};

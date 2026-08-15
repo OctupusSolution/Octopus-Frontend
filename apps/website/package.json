@@ -1,0 +1,10 @@
+{
+  "name": "@octopus/website",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "",
+    "build": "",
+    "lint": ""
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "merchant",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/merchant", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "customer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/customer", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

@@ -1,0 +1,171 @@
+@import "../../../packages/ui/src/tokens/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens — every surface/text colour used across the console resolves
+ * through these variables. `:root` holds the light palette; `[data-theme=dark]`
+ * swaps the values so components (which only ever reference the var) adapt
+ * automatically. Set by app/providers/theme-provider.tsx on <html>.
+ */
+:root {
+  color-scheme: light;
+
+  --octo-page-bg: #e9eaec;
+  --octo-shell: #f4f4f5;
+  --octo-card: #ffffff;
+  --octo-border-card: #ececf0;
+  --octo-border-input: #e8e8ec;
+  --octo-divider: #f0f0f2;
+  --octo-hover: #f8f8fa;
+  --octo-track: #f2f2f4;
+  --octo-seg-bg: #f3f3f5;
+  --octo-soft-bg: #fbfbfc;
+  --octo-row-border: #f5f5f7;
+  --octo-row-hover: #fafafb;
+  --octo-selected: #eef4ff;
+  --octo-warning-bg: #fef9ee;
+  --octo-ai-border: #ece7fb;
+  --octo-ai-cta-hover: #faf9ff;
+  --octo-ai-gradient: linear-gradient(140deg, #f6f3ff, #fdfcff);
+  --octo-track-ring: #eceaf8;
+  --octo-track-ring-2: #eaeaee;
+  --octo-switch-off: #e2e2e8;
+  --octo-crumb: #d4d4da;
+  --octo-knob: #ffffff;
+
+  --octo-text-primary: #16161d;
+  --octo-text-secondary: #6b6b74;
+  --octo-text-muted: #8b8b93;
+  --octo-text-faint: #a9a9b2;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --octo-page-bg: #0d1017;
+  --octo-shell: #131722;
+  --octo-card: #1a1f2b;
+  --octo-border-card: #2a3140;
+  --octo-border-input: #333b4d;
+  --octo-divider: #232a37;
+  --octo-hover: #222936;
+  --octo-track: #262d3a;
+  --octo-seg-bg: #232937;
+  --octo-soft-bg: #202631;
+  --octo-row-border: #242b39;
+  --octo-row-hover: #212836;
+  --octo-selected: #142a4a;
+  --octo-warning-bg: #2b2414;
+  --octo-ai-border: #2f2942;
+  --octo-ai-cta-hover: #262133;
+  --octo-ai-gradient: linear-gradient(140deg, #1b1830, #171a24);
+  --octo-track-ring: #2a2f3d;
+  --octo-track-ring-2: #2a2f3d;
+  --octo-switch-off: #39404f;
+  --octo-crumb: #3a4152;
+  --octo-knob: #ffffff;
+
+  --octo-text-primary: #e9ebf2;
+  --octo-text-secondary: #a7adbb;
+  --octo-text-muted: #8b93a3;
+  --octo-text-faint: #6b7384;
+}
+
+body {
+  @apply bg-[var(--octo-page-bg)] text-[var(--octo-text-primary)] antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Custom scrollbar for the dashboard body — rounded pill track/thumb with
+   arrow buttons, matching the reference. WebKit + Firefox fallback. */
+.octo-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #a6a6b0 #f1f1f4;
+}
+
+[data-theme="dark"] .octo-scroll {
+  scrollbar-color: #3a4152 #1c212d;
+}
+
+.octo-scroll::-webkit-scrollbar {
+  width: 14px;
+}
+
+.octo-scroll::-webkit-scrollbar-track {
+  background: #f1f1f4;
+  border-radius: 999px;
+  margin: 14px 0;
+}
+
+[data-theme="dark"] .octo-scroll::-webkit-scrollbar-track {
+  background: #1c212d;
+}
+
+.octo-scroll::-webkit-scrollbar-thumb {
+  background-color: #a6a6b0;
+  border-radius: 999px;
+  border: 3px solid #f1f1f4;
+}
+
+[data-theme="dark"] .octo-scroll::-webkit-scrollbar-thumb {
+  background-color: #3a4152;
+  border: 3px solid #1c212d;
+}
+
+.octo-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #8b8b96;
+}
+
+[data-theme="dark"] .octo-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #4a5266;
+}
+
+.octo-scroll::-webkit-scrollbar-button {
+  display: block;
+  height: 14px;
+  background-color: #f1f1f4;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+[data-theme="dark"] .octo-scroll::-webkit-scrollbar-button {
+  background-color: #1c212d;
+}
+
+.octo-scroll::-webkit-scrollbar-button:single-button:vertical:decrement {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M5 0 L10 6 L0 6 Z' fill='%238b8b96'/%3E%3C/svg%3E");
+}
+
+.octo-scroll::-webkit-scrollbar-button:single-button:vertical:increment {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0 L10 0 L5 6 Z' fill='%238b8b96'/%3E%3C/svg%3E");
+}
+
+/* Leaflet zoom control, themed to match the dashboard surfaces instead of
+   its default stark-white boxes (jarring on the dark map background). */
+.leaflet-control-zoom a {
+  background-color: var(--octo-card) !important;
+  border-color: var(--octo-border-card) !important;
+  color: var(--octo-text-primary) !important;
+}
+.leaflet-control-zoom a:hover {
+  background-color: var(--octo-hover) !important;
+}
+.leaflet-control-attribution {
+  background-color: var(--octo-card) !important;
+  color: var(--octo-text-muted) !important;
+}
+.leaflet-control-attribution a {
+  color: var(--octo-text-secondary) !important;
+}
+
+/* Centered logo pulse shown by PageTransition while routes swap. */
+@keyframes octo-pulse {
+  0%, 100% { transform: scale(0.85); opacity: 0.55; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+.animate-octo-pulse {
+  animation: octo-pulse 0.75s ease-in-out infinite;
+}

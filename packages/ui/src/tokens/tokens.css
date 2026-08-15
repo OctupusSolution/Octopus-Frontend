@@ -1,0 +1,101 @@
+/*
+ * OCTOPUS design tokens as CSS custom properties.
+ * Mirrors colors.ts / typography.ts exactly — if you change a value, change
+ * it in both places (or generate this file from the .ts source later).
+ *
+ * Import once, globally, in each app's root layout:
+ *   apps/website  -> src/app/layout.tsx
+ *   apps/customer -> src/app/layout.tsx
+ *   apps/merchant -> src/app.tsx
+ *   apps/admin    -> src/app.tsx
+ *
+ * Font files are NOT bundled here. Self-host both families (do not rely on
+ * a runtime Google Fonts request in production, for both perf and KSA
+ * data-residency hygiene) — see the TODO at the bottom of this file.
+ */
+
+:root {
+  /* Primary */
+  --color-ocean-blue: #0D6EFD;
+  --color-octopus-violet: #6C4DFF;
+  --color-deep-navy: #081026;
+
+  /* Secondary */
+  --color-teal: #008849;
+  --color-coral: #FF6B6B;
+  --color-amber: #FFB020;
+  --color-mint: #6EDBA3;
+  --color-sky-blue: #4DB8FF;
+  --color-lilac: #C9B6FF;
+
+  /* Neutral */
+  --color-white: #FFFFFF;
+  --color-gray-50: #FBFAFC;
+  --color-gray-100: #F1F5F9;
+  --color-gray-200: #E2E8F0;
+  --color-gray-300: #CBD5E1;
+  --color-gray-500: #64748B;
+  --color-gray-700: #334155;
+  --color-gray-900: #0F172A;
+
+  /* Semantic */
+  --color-success: #22C55E;
+  --color-info: #3B82F6;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-accent: #885CF6;
+  --color-alt-success: #14B8A6;
+
+  /* Background */
+  --bg-solid-white: #FFFFFF;
+  --bg-light-gray: #F7F8FA;
+  --bg-soft-blue: #F0F4FF;
+  --bg-soft-violet: #F5F0FF;
+  --bg-dark-surface: #081026;
+
+  /* Gradients */
+  --gradient-ocean-violet: linear-gradient(135deg, var(--color-ocean-blue), var(--color-octopus-violet));
+  --gradient-violet-pink: linear-gradient(135deg, var(--color-octopus-violet), var(--color-coral));
+  --gradient-purple-violet: linear-gradient(135deg, var(--color-accent), var(--color-octopus-violet));
+  --gradient-blue-cyan: linear-gradient(135deg, var(--color-ocean-blue), var(--color-sky-blue));
+
+  /* Typography — font families */
+  --font-latin: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-arabic: "Readex Pro", "Inter", -apple-system, "Segoe UI", sans-serif;
+
+  /* Active family: resolved per-document by [dir]/[lang], defaults to Latin */
+  --font-family-active: var(--font-latin);
+
+  /* Type scale — size / line-height, px */
+  --text-display-1: 64px;      --leading-display-1: 72px;
+  --text-display-2: 48px;      --leading-display-2: 56px;
+  --text-h1: 32px;             --leading-h1: 40px;
+  --text-h2: 24px;             --leading-h2: 32px;
+  --text-h3: 20px;             --leading-h3: 28px;
+  --text-body-lg: 16px;        --leading-body-lg: 24px;
+  --text-body: 14px;           --leading-body: 20px;
+  --text-body-sm: 12px;        --leading-body-sm: 16px;
+  --text-caption: 11px;        --leading-caption: 16px;
+}
+
+/*
+ * Arabic content switches the active family automatically. Applied at the
+ * document root by the i18n provider (see packages/i18n) via `dir`/`lang`,
+ * so components never branch on locale themselves — they just use
+ * var(--font-family-active).
+ */
+[dir="rtl"],
+:lang(ar) {
+  --font-family-active: var(--font-arabic);
+}
+
+body {
+  font-family: var(--font-family-active);
+}
+
+/* TODO: self-host font files.
+ *   Inter:      https://fonts.google.com/specimen/Inter       (weights 100-900, variable)
+ *   Readex Pro: https://fonts.google.com/specimen/Readex+Pro  (weights 200-700, variable)
+ * Add @font-face rules here once the .woff2 files are vendored into
+ * packages/ui/src/fonts/, instead of loading from Google Fonts at runtime.
+ */

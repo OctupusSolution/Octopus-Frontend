@@ -25,11 +25,8 @@ import {
   DEFAULT_SECURITY,
   type GoalId, type IntegrationId, type SecuritySettings, type TeamInvite, type WorkflowId,
 } from "./_shared/extras-catalog";
-import { VerticalStep } from "./steps/vertical-step";
-import { TypeStep } from "./steps/type-step";
+import { VerticalStep, TypeStep, QuestionsStep, ModulesStep, type Answers } from "@/widgets/business-wizard";
 import { GoalsStep } from "./steps/goals-step";
-import { QuestionsStep, type Answers } from "./steps/questions-step";
-import { ModulesStep } from "./steps/modules-step";
 import { IntegrationsStep } from "./steps/integrations-step";
 import { DataSecurityStep } from "./steps/data-security-step";
 import { TeamWorkflowsStep } from "./steps/team-workflows-step";

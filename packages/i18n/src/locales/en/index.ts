@@ -819,6 +819,22 @@ export const en = {
   "settings.branches.added": "Branch added",
   "settings.branches.editNote": "Editing branches is coming soon in the demo",
 
+  /* settings — businesses (multi-business switcher) */
+  "settings.businesses.title": "My Businesses",
+  "settings.businesses.subtitle": "Every business you run under this account, and which one is active right now",
+  "settings.businesses.create": "Create New Business",
+  "settings.businesses.active": "Active",
+  "settings.businesses.switch": "Switch to this business",
+  "settings.businesses.switched": "Switched to {name}",
+  "settings.businesses.branchCount": "{n} branches",
+  "settings.businesses.emptyTitle": "No businesses yet",
+  "settings.businesses.emptyBody": "Create your first business to start using OCTOPUS",
+  "settings.businesses.wizard.title": "Create a New Business",
+  "settings.businesses.wizard.nameLabel": "Business Name",
+  "settings.businesses.wizard.namePlaceholder": "e.g. Sunset Grill",
+  "settings.businesses.wizard.create": "Create Business",
+  "settings.businesses.created": "{name} created",
+
   /* settings — devices */
   "settings.devices.title": "Devices & Printers",
   "settings.devices.subtitle": "POS terminals, screens and printers across the branch network",

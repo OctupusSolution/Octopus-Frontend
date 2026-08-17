@@ -819,6 +819,22 @@ export const ar = {
   "settings.branches.added": "تمت إضافة الفرع",
   "settings.branches.editNote": "تعديل الفروع قريبًا في النسخة التجريبية",
 
+  /* settings — businesses (multi-business switcher) */
+  "settings.businesses.title": "أعمالي التجارية",
+  "settings.businesses.subtitle": "جميع الأعمال التجارية التي تديرها بنفس الحساب، والعمل النشط حاليًا",
+  "settings.businesses.create": "إنشاء عمل تجاري جديد",
+  "settings.businesses.active": "نشط",
+  "settings.businesses.switch": "التبديل إلى هذا العمل",
+  "settings.businesses.switched": "تم التبديل إلى {name}",
+  "settings.businesses.branchCount": "{n} فرع",
+  "settings.businesses.emptyTitle": "لا توجد أعمال تجارية بعد",
+  "settings.businesses.emptyBody": "أنشئ عملك التجاري الأول لبدء استخدام أوكتوبس",
+  "settings.businesses.wizard.title": "إنشاء عمل تجاري جديد",
+  "settings.businesses.wizard.nameLabel": "اسم العمل التجاري",
+  "settings.businesses.wizard.namePlaceholder": "مثال: مطعم الغروب",
+  "settings.businesses.wizard.create": "إنشاء العمل التجاري",
+  "settings.businesses.created": "تم إنشاء {name}",
+
   /* settings — devices */
   "settings.devices.title": "الأجهزة والطابعات",
   "settings.devices.subtitle": "أجهزة نقاط البيع والشاشات والطابعات في جميع الفروع",

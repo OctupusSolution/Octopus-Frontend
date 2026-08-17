@@ -3,7 +3,7 @@
 // left and which ones are already behind them.
 import { Check } from "lucide-react";
 import clsx from "clsx";
-import { BRAND_GRADIENT } from "./brand";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 
 export function StepRail({ step, total }: { step: number; total: number }) {
   return (

@@ -4,7 +4,7 @@
 import { CheckCircle2, Circle } from "lucide-react";
 import { baseModuleIds, type ModuleId, type TypeCode, type VerticalId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 import { AccountStep, type AccountDetails } from "./account-step";
 
 export function LaunchStep({

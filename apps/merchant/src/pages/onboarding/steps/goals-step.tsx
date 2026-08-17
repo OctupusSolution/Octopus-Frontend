@@ -6,8 +6,8 @@ import { Check } from "lucide-react";
 import clsx from "clsx";
 import { GOALS, type GoalId } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CatalogIcon } from "../_shared/icon";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { CatalogIcon } from "@/shared/lib/catalog-icon";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 
 export function GoalsStep({
   selected,

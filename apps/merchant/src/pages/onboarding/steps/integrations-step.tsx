@@ -9,7 +9,7 @@ import {
   INTEGRATIONS, type IntegrationCategory, type IntegrationId, type IntegrationOption,
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 
 const CATEGORIES: readonly IntegrationCategory[] = ["delivery", "payments", "accounting", "messaging"];
 const CATEGORY_KEY: Record<IntegrationCategory, string> = {

@@ -46,7 +46,7 @@ export function OnboardingPage() {
   const { t, dir } = useI18n();
   const navigate = useNavigate();
   const { signIn } = useAuth();
-  const { saveConfig } = useTenantConfig();
+  const { createBusiness } = useTenantConfig();
 
   const [step, setStep] = useState(1);
   const [vertical, setVertical] = useState<VerticalId | null>(null);
@@ -103,7 +103,7 @@ export function OnboardingPage() {
 
   function handleCreate() {
     if (!vertical || !type) return;
-    saveConfig({
+    createBusiness({
       vertical,
       businessType: type,
       enabledModules: enabled,

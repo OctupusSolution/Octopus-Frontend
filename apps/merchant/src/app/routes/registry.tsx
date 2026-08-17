@@ -133,6 +133,8 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/reports/scheduled").then(m => ({ default: m.ScheduledPage }))) },
   { id: "settings",     path: "/settings",     section: "Settings",     page: "Integrations",
     element: lazy(() => import("@/pages/settings").then(m => ({ default: m.SettingsPage }))) },
+  { id: "settings-businesses", path: "/settings/businesses", section: "Settings", page: "My Businesses",
+    element: lazy(() => import("@/pages/settings/businesses").then(m => ({ default: m.BusinessesSettingsPage }))) },
   { id: "settings-business", path: "/settings/business", section: "Settings", page: "Business & Legal Entities",
     element: lazy(() => import("@/pages/settings/business").then(m => ({ default: m.BusinessSettingsPage }))) },
   { id: "settings-branches", path: "/settings/branches", section: "Settings", page: "Branches & Sections",

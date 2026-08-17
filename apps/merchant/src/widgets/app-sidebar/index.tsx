@@ -67,7 +67,7 @@ const SECTIONS: NavSection[] = [
 
 const FOOTER_GROUPS: NavGroup[] = [
   { id: "settings", label: "Settings", icon: Settings,
-    items: ["Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules", "Integrations"] },
+    items: ["My Businesses", "Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules", "Integrations"] },
 ];
 
 // Which module owns each nav group. A group whose module the tenant did not
@@ -152,6 +152,7 @@ const ITEM_PATHS: Record<string, string> = {
   "Customers": "/reports/customers",
   "Compliance": "/reports/compliance",
   "Scheduled Reports": "/reports/scheduled",
+  "My Businesses": "/settings/businesses",
   "Business & Legal Entities": "/settings/business",
   "Branches & Sections": "/settings/branches",
   "Devices & Printers": "/settings/devices",

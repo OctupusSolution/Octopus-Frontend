@@ -11,7 +11,7 @@ import {
 } from "../_shared/extras-catalog";
 import type { ModuleId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CatalogIcon } from "../_shared/icon";
+import { CatalogIcon } from "@/shared/lib/catalog-icon";
 
 const ROLES: readonly TeamRole[] = ["manager", "staff", "accountant"];
 

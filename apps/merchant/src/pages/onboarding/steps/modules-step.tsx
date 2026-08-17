@@ -11,8 +11,8 @@ import {
   getModule, questionsFor, type ModuleId, type TypeCode,
 } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CatalogIcon } from "../_shared/icon";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { CatalogIcon } from "@/shared/lib/catalog-icon";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 import type { Answers } from "./questions-step";
 
 /** Why a module ended up switched on, in the merchant's own terms. */

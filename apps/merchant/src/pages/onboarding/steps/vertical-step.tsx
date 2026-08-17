@@ -9,8 +9,8 @@ import { Check, Lock } from "lucide-react";
 import clsx from "clsx";
 import { verticals, type VerticalId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CatalogIcon } from "../_shared/icon";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { CatalogIcon } from "@/shared/lib/catalog-icon";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
 
 export function VerticalStep({
   selected,

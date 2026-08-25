@@ -31,7 +31,7 @@ export function LaunchStep({
   const percent = Math.round((checks.filter((c) => c.done).length / checks.length) * 100);
 
   return (
-    <div className="mx-auto flex max-w-[440px] flex-col gap-4">
+    <div className="mx-auto flex max-w-[560px] flex-col gap-4">
       <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">

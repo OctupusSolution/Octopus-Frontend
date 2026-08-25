@@ -18,25 +18,26 @@ export type GoalId =
 
 export interface Goal {
   id: GoalId;
-  icon: string;
+  /** filename inside apps/assets/onboarding-Goals, resolved to a URL in the UI layer */
+  image: string;
   nameKey: string;
   descKey: string;
 }
 
 export const GOALS: readonly Goal[] = [
-  { id: "moreOnlineOrders", icon: "ShoppingBag",
+  { id: "moreOnlineOrders", image: "online-orders.png",
     nameKey: "onboarding.goals.moreOnlineOrders.name", descKey: "onboarding.goals.moreOnlineOrders.desc" },
-  { id: "fasterService", icon: "Zap",
+  { id: "fasterService", image: "faster.png",
     nameKey: "onboarding.goals.fasterService.name", descKey: "onboarding.goals.fasterService.desc" },
-  { id: "understandNumbers", icon: "BarChart3",
+  { id: "understandNumbers", image: "increase-numbers.png",
     nameKey: "onboarding.goals.understandNumbers.name", descKey: "onboarding.goals.understandNumbers.desc" },
-  { id: "retainCustomers", icon: "Heart",
+  { id: "retainCustomers", image: "new-customer.png",
     nameKey: "onboarding.goals.retainCustomers.name", descKey: "onboarding.goals.retainCustomers.desc" },
-  { id: "openBranches", icon: "Building2",
+  { id: "openBranches", image: "new-branch.png",
     nameKey: "onboarding.goals.openBranches.name", descKey: "onboarding.goals.openBranches.desc" },
-  { id: "cutFoodCosts", icon: "TrendingDown",
+  { id: "cutFoodCosts", image: "food-cost.png",
     nameKey: "onboarding.goals.cutFoodCosts.name", descKey: "onboarding.goals.cutFoodCosts.desc" },
-  { id: "modernizeExperience", icon: "Sparkles",
+  { id: "modernizeExperience", image: "guest-experience.png",
     nameKey: "onboarding.goals.modernizeExperience.name", descKey: "onboarding.goals.modernizeExperience.desc" },
 ];
 
@@ -50,8 +51,10 @@ export interface IntegrationOption {
   name: string;
   category: IntegrationCategory;
   descKey: string;
-  /** Swatch for the initial-letter badge, same convention as settings/integrations. */
+  /** Swatch for the initial-letter badge, used as a fallback when there is no logo image. */
   color: string;
+  /** filename inside apps/assets/onboarding-Integrations, resolved to a URL in the UI layer. Not every vendor has one yet. */
+  image?: string;
 }
 
 export type IntegrationId = string;
@@ -60,25 +63,25 @@ export type IntegrationId = string;
 // the same names again later rather than a different invented list.
 export const INTEGRATIONS: readonly IntegrationOption[] = [
   { id: "hungerstation", name: "HungerStation", category: "delivery", color: "#F59E0B",
-    descKey: "onboarding.integrations.item.hungerstation.desc" },
+    image: "hunger-station.png", descKey: "onboarding.integrations.item.hungerstation.desc" },
   { id: "jahez", name: "Jahez", category: "delivery", color: "#22C55E",
-    descKey: "onboarding.integrations.item.jahez.desc" },
+    image: "jahez.png", descKey: "onboarding.integrations.item.jahez.desc" },
   { id: "mrsool", name: "Mrsool", category: "delivery", color: "#EF4444",
-    descKey: "onboarding.integrations.item.mrsool.desc" },
+    image: "mrsool.png", descKey: "onboarding.integrations.item.mrsool.desc" },
   { id: "moyasar", name: "Moyasar", category: "payments", color: "#6C4DFF",
-    descKey: "onboarding.integrations.item.moyasar.desc" },
+    image: "moyasar.png", descKey: "onboarding.integrations.item.moyasar.desc" },
   { id: "tap", name: "Tap", category: "payments", color: "#5B8DEF",
-    descKey: "onboarding.integrations.item.tap.desc" },
+    image: "tap.png", descKey: "onboarding.integrations.item.tap.desc" },
   { id: "hyperpay", name: "HyperPay", category: "payments", color: "#0D6EFD",
-    descKey: "onboarding.integrations.item.hyperpay.desc" },
+    image: "hyper-pay.png", descKey: "onboarding.integrations.item.hyperpay.desc" },
   { id: "qoyod", name: "Qoyod", category: "accounting", color: "#885CF6",
-    descKey: "onboarding.integrations.item.qoyod.desc" },
+    image: "qoyod.png", descKey: "onboarding.integrations.item.qoyod.desc" },
   { id: "wafeq", name: "Wafeq", category: "accounting", color: "#2EC9C0",
-    descKey: "onboarding.integrations.item.wafeq.desc" },
+    image: "wafeq.png", descKey: "onboarding.integrations.item.wafeq.desc" },
   { id: "daftra", name: "Daftra", category: "accounting", color: "#4C35D4",
-    descKey: "onboarding.integrations.item.daftra.desc" },
+    image: "daftra.png", descKey: "onboarding.integrations.item.daftra.desc" },
   { id: "whatsapp", name: "WhatsApp Cloud API", category: "messaging", color: "#22C55E",
-    descKey: "onboarding.integrations.item.whatsapp.desc" },
+    image: "whatsapp.png", descKey: "onboarding.integrations.item.whatsapp.desc" },
 ];
 
 // ---------------------------------------------------------------------------

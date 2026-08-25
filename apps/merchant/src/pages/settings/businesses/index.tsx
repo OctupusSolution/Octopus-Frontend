@@ -1,16 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Building2, CircleCheck, Plus } from "lucide-react";
-import { Badge, Button, EmptyState, Input, Modal } from "@ui/primitives";
+import { Badge, Button, EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig, type TenantConfig } from "@/app/providers/tenant-config-provider";
-import {
-  baseModuleIds, defaultModulesFor, getRestaurantType, getVertical, questionsFor,
-  withDependencies, withoutDependents,
-  type ModuleId, type TypeCode, type VerticalId,
-} from "@/shared/catalog";
-import { VerticalStep, TypeStep, QuestionsStep, ModulesStep, type Answers } from "@/widgets/business-wizard";
-
-const WIZARD_TOTAL_STEPS = 5;
+import { getRestaurantType, getVertical } from "@/shared/catalog";
 
 function formatCreatedAt(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en-US", {
@@ -70,144 +64,12 @@ function BusinessCard({
   );
 }
 
-function CreateBusinessModal({
-  open,
-  onClose,
-  onCreated,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreated: (name: string) => void;
-}) {
-  const { t } = useI18n();
-  const { createBusiness } = useTenantConfig();
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
-  const [vertical, setVertical] = useState<VerticalId | null>(null);
-  const [type, setType] = useState<TypeCode | null>(null);
-  const [answers, setAnswers] = useState<Answers>({});
-  const [enabled, setEnabled] = useState<ModuleId[]>([...baseModuleIds]);
-
-  // Reset to a blank wizard every time it's reopened.
-  useEffect(() => {
-    if (!open) return;
-    setStep(1);
-    setName("");
-    setVertical(null);
-    setType(null);
-    setAnswers({});
-    setEnabled([...baseModuleIds]);
-  }, [open]);
-
-  // Re-derive the module set whenever the type or an answer changes, same
-  // rule the 10-step signup flow uses.
-  useEffect(() => {
-    if (!type) return;
-    const fromType = defaultModulesFor(type);
-    const fromAnswers: ModuleId[] = [];
-    for (const question of questionsFor(type)) {
-      const option = question.options.find((o) => o.id === answers[question.id]);
-      if (option) fromAnswers.push(...option.enables);
-    }
-    setEnabled(withDependencies([...fromType, ...fromAnswers]));
-  }, [type, answers]);
-
-  const branchCount = useMemo(() => {
-    if (!type) return 1;
-    const question = questionsFor(type).find((q) => q.id === "branches");
-    const option = question?.options.find((o) => o.id === answers.branches);
-    return option?.branchCount ?? 1;
-  }, [type, answers.branches]);
-
-  function handleSelectType(code: TypeCode) {
-    setType(code);
-    setAnswers({});
-  }
-
-  function handleToggleModule(id: ModuleId, next: boolean) {
-    setEnabled((prev) => (next ? withDependencies([...prev, id]) : withoutDependents(prev, id)));
-  }
-
-  function handleCreate() {
-    if (!vertical || !type) return;
-    const businessName = name.trim();
-    createBusiness({
-      businessName,
-      vertical,
-      businessType: type,
-      enabledModules: enabled,
-      branchCount,
-    });
-    onCreated(businessName);
-  }
-
-  const canContinue =
-    step === 1 ? name.trim() !== "" :
-    step === 2 ? vertical !== null :
-    step === 3 ? type !== null :
-    true;
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      className="max-w-2xl"
-      title={t("settings.businesses.wizard.title")}
-      footer={
-        <>
-          {step > 1 && (
-            <Button variant="secondary" size="sm" onClick={() => setStep((s) => s - 1)}>
-              {t("onboarding.back")}
-            </Button>
-          )}
-          {step < WIZARD_TOTAL_STEPS ? (
-            <Button variant="primary" size="sm" disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
-              {t("onboarding.next")}
-            </Button>
-          ) : (
-            <Button variant="primary" size="sm" onClick={handleCreate}>
-              {t("settings.businesses.wizard.create")}
-            </Button>
-          )}
-        </>
-      }
-    >
-      <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[#0D6EFD]">
-        {t("onboarding.step").replace("{n}", String(step)).replace("{total}", String(WIZARD_TOTAL_STEPS))}
-      </p>
-
-      <div className="octo-scroll mt-3 max-h-[55vh] overflow-y-auto pe-1">
-        {step === 1 && (
-          <Input
-            label={t("settings.businesses.wizard.nameLabel")}
-            placeholder={t("settings.businesses.wizard.namePlaceholder")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-        )}
-        {step === 2 && <VerticalStep selected={vertical} onSelect={setVertical} />}
-        {step === 3 && <TypeStep selected={type} onSelect={handleSelectType} />}
-        {step === 4 && type && (
-          <QuestionsStep
-            type={type}
-            answers={answers}
-            onAnswer={(questionId, optionId) => setAnswers((prev) => ({ ...prev, [questionId]: optionId }))}
-          />
-        )}
-        {step === 5 && type && (
-          <ModulesStep type={type} answers={answers} enabled={enabled} onToggle={handleToggleModule} />
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 export function BusinessesSettingsPage() {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { businesses, activeTenantId, switchBusiness } = useTenantConfig();
   const [toast, setToast] = useState<string | null>(null);
-  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -215,14 +77,18 @@ export function BusinessesSettingsPage() {
     return () => window.clearTimeout(id);
   }, [toast]);
 
+  // The create wizard lives on its own route and hands the new name back via
+  // navigation state on redirect, rather than a callback prop.
+  useEffect(() => {
+    const created = (location.state as { created?: string } | null)?.created;
+    if (!created) return;
+    setToast(t("settings.businesses.created").replace("{name}", created));
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location, navigate, t]);
+
   function handleSwitch(business: TenantConfig) {
     switchBusiness(business.id);
     setToast(t("settings.businesses.switched").replace("{name}", business.businessName));
-  }
-
-  function handleCreated(name: string) {
-    setWizardOpen(false);
-    setToast(t("settings.businesses.created").replace("{name}", name));
   }
 
   return (
@@ -236,7 +102,7 @@ export function BusinessesSettingsPage() {
             {t("settings.businesses.subtitle")}
           </p>
         </div>
-        <Button variant="primary" size="sm" icon={<Plus size={13} />} onClick={() => setWizardOpen(true)}>
+        <Button variant="primary" size="sm" icon={<Plus size={13} />} onClick={() => navigate("/settings/businesses/new")}>
           {t("settings.businesses.create")}
         </Button>
       </header>
@@ -256,13 +122,13 @@ export function BusinessesSettingsPage() {
             title={t("settings.businesses.emptyTitle")}
             description={t("settings.businesses.emptyBody")}
             action={
-              <Button variant="primary" size="sm" icon={<Plus size={13} />} onClick={() => setWizardOpen(true)}>
+              <Button variant="primary" size="sm" icon={<Plus size={13} />} onClick={() => navigate("/settings/businesses/new")}>
                 {t("settings.businesses.create")}
               </Button>
             }
           />
         ) : (
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {businesses.map((business) => (
               <BusinessCard
                 key={business.id}
@@ -274,8 +140,6 @@ export function BusinessesSettingsPage() {
           </div>
         )}
       </section>
-
-      <CreateBusinessModal open={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={handleCreated} />
 
       {toast && (
         <div className="fixed bottom-5 end-5 z-50 flex items-center gap-2 rounded-[9px] border border-[#22C55E]/20 bg-[#22C55E]/10 px-4 py-2.5 text-[12.5px] font-medium text-[#16a34a] shadow-lg">

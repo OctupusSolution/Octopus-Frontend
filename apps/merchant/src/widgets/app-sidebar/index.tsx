@@ -44,8 +44,7 @@ const SECTIONS: NavSection[] = [
         items: ["Categories & Items", "Modifiers", "Combos", "Price Lists & Channels", "Schedules & Ramadan Profile", "Availability (86 board)"] },
       { id: "inventory", label: "Inventory", icon: Package,
         items: ["Ingredients & Suppliers", "Recipes & Costing", "Purchase Orders & Receipts", "Stock Counts & Variance", "Waste", "Transfers", "Production"] },
-      { id: "delivery", label: "Delivery", icon: Truck,
-        items: ["Zones", "Dispatch Board", "Drivers", "Aggregator Channels"] },
+      { id: "delivery-aggregators", label: "Delivery", icon: Truck },
     ],
   },
   {
@@ -79,7 +78,7 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   menu: "orders",
   reservations: "bookings",
   inventory: "inventory",
-  delivery: "delivery",
+  "delivery-aggregators": "delivery",
   customers: "customers",
   marketing: "loyalty",
   finance: "payments",
@@ -93,7 +92,6 @@ const GROUP_MODULE: Record<string, ModuleId> = {
 // without taking the rest of Finance with it.
 const ITEM_MODULE: Record<string, ModuleId> = {
   "Accounting Sync": "accounting",
-  "Aggregator Channels": "integrations",
   "Integrations": "integrations",
 };
 
@@ -125,10 +123,6 @@ const ITEM_PATHS: Record<string, string> = {
   "Customer List & Profiles": "/customers",
   "Segments": "/customers/segments",
   "Feedback & Complaints": "/customers/feedback",
-  "Zones": "/delivery/zones",
-  "Dispatch Board": "/delivery/dispatch",
-  "Drivers": "/delivery/drivers",
-  "Aggregator Channels": "/delivery/aggregators",
   "Loyalty Program": "/marketing/loyalty",
   "Gift Cards": "/marketing/gift-cards",
   "Subscriptions & Memberships": "/marketing/subscriptions",

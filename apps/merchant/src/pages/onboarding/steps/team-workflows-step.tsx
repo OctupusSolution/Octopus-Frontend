@@ -78,9 +78,18 @@ export function TeamWorkflowsStep({
           </Button>
         </div>
 
-        {team.length === 0 ? (
+        {team.length === 0 && (
           <p className="mt-3 text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.team.empty")}</p>
-        ) : (
+        )}
+
+        <p className="mt-3 text-[11px] text-[var(--octo-text-faint)]">{t("onboarding.team.disclaimer")}</p>
+      </section>
+
+      {team.length > 0 && (
+        <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+          <h3 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+            {t("onboarding.team.membersTitle")}
+          </h3>
           <div className="mt-3 flex flex-col gap-1.5">
             {team.map((invite) => (
               <div
@@ -105,10 +114,8 @@ export function TeamWorkflowsStep({
               </div>
             ))}
           </div>
-        )}
-
-        <p className="mt-3 text-[11px] text-[var(--octo-text-faint)]">{t("onboarding.team.disclaimer")}</p>
-      </section>
+        </section>
+      )}
 
       <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
         <h3 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">

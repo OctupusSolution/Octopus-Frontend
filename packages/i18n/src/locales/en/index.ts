@@ -2922,6 +2922,7 @@ export const en = {
   // --- pricing ---
   "pricing.line.base": "OCTOPUS base subscription",
   "pricing.line.extraBranches": "Additional branches",
+  "pricing.line.integrations": "Integrations",
   "pricing.monthlyTotal": "Monthly total",
   "pricing.perMonth": "/ month",
   "pricing.quoted": "Plus quoted items",

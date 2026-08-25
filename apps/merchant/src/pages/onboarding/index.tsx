@@ -170,7 +170,12 @@ export function OnboardingPage() {
       </main>
 
       {current.showPriceBar ? (
-        <PriceBar modules={draft.enabled} branchCount={draft.brand.branchCount} action={actions} />
+        <PriceBar
+          modules={draft.enabled}
+          branchCount={draft.brand.branchCount}
+          integrations={draft.integrations}
+          action={actions}
+        />
       ) : (
         <div className="sticky bottom-0 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 backdrop-blur">
           <div className="mx-auto flex max-w-[1180px] items-center justify-end gap-2 px-5 py-3.5">{actions}</div>

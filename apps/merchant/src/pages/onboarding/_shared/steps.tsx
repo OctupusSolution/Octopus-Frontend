@@ -15,6 +15,9 @@ import { ReviewStep } from "../steps/review-step";
 import { PublicLinkStep } from "../steps/public-link-step";
 import { DashboardPreviewStep } from "../steps/dashboard-preview-step";
 import { PaymentStep } from "../steps/payment-step";
+import { ReviewPlanAside } from "../steps/review-plan-aside";
+import { PublicLinkAside } from "../steps/public-link-aside";
+import { DashboardPreviewAside } from "../steps/dashboard-preview-aside";
 
 /** Enabling pulls in prerequisites; disabling drops anything that depended on
  * `id`. Same dependency-resolution rule the Create Business wizard uses — the
@@ -36,8 +39,10 @@ export interface StepProps {
 export interface StepDef {
   id: string;
   labelKey: string;
-  titleKey: string;
-  subtitleKey: string;
+  /** Optional: a step that carries its own headline (the landing step) omits
+   *  it, and the shared header block is simply not rendered. */
+  titleKey?: string;
+  subtitleKey?: string;
   Component: ComponentType<StepProps>;
   Aside?: ComponentType<StepProps>;
   canContinue: (draft: OnboardingDraft) => boolean;
@@ -48,8 +53,8 @@ export const STEPS: readonly StepDef[] = [
   {
     id: "getStarted",
     labelKey: "onboarding.rail.getStarted",
-    titleKey: "onboarding.getStarted.title.c",
-    subtitleKey: "onboarding.getStarted.subtitle",
+    // No titleKey/subtitleKey: this step renders its own hero headline, so the
+    // shared "Step n of m / title / subtitle" block is skipped for it.
     Component: GetStartedStep,
     canContinue: () => true,
     showPriceBar: false,
@@ -121,6 +126,7 @@ export const STEPS: readonly StepDef[] = [
     titleKey: "onboarding.review.title",
     subtitleKey: "onboarding.review.subtitle",
     Component: ReviewStep,
+    Aside: ReviewPlanAside,
     canContinue: () => true,
     showPriceBar: false,
   },
@@ -130,6 +136,7 @@ export const STEPS: readonly StepDef[] = [
     titleKey: "onboarding.publicLink.title",
     subtitleKey: "onboarding.publicLink.subtitle",
     Component: PublicLinkStep,
+    Aside: PublicLinkAside,
     canContinue: () => true,
     showPriceBar: false,
   },
@@ -139,6 +146,7 @@ export const STEPS: readonly StepDef[] = [
     titleKey: "onboarding.dashboardPreview.title",
     subtitleKey: "onboarding.dashboardPreview.subtitle",
     Component: DashboardPreviewStep,
+    Aside: DashboardPreviewAside,
     canContinue: () => true,
     showPriceBar: false,
   },
@@ -152,3 +160,24 @@ export const STEPS: readonly StepDef[] = [
     showPriceBar: false,
   },
 ];
+
+/** 1-based position of a step in the flow. Edit links resolve through this so
+ *  reordering STEPS cannot silently send a merchant to the wrong screen.
+ *
+ *  An unknown id throws rather than returning a number. Every caller passes a
+ *  literal id declared in this file, so a typo or a removed step surfaces as a
+ *  hard failure the first time that screen renders — loudly — instead of
+ *  quietly landing the merchant somewhere else. Returning 0 would be the worst
+ *  of both: the reducer would clamp it to step 1 and nobody would notice.
+ *
+ *  Resolve it during render, not at module scope: the step components are
+ *  imported by this module, so a module-scope call from one of them would run
+ *  before STEPS is initialised. */
+export function stepNumber(id: string): number {
+  const index = STEPS.findIndex((s) => s.id === id);
+  if (index === -1) throw new Error(`stepNumber: no step with id "${id}" in STEPS`);
+  return index + 1;
+}
+
+/** How many steps the flow has. Used to normalise a restored `draft.step`. */
+export const STEP_COUNT = STEPS.length;

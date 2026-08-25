@@ -29,7 +29,11 @@ export function OnboardingPage() {
   const { createBusiness } = useTenantConfig();
   const { draft, dispatch, clear, restored } = useOnboardingDraft();
 
-  const index = Math.min(Math.max(1, draft.step), STEPS.length) - 1;
+  // `draft.step` is normalised to the valid range when a persisted draft is
+  // restored, so no clamping is needed here. Clamping for display only used to
+  // hide an out-of-range value from the screen while leaving it in the reducer,
+  // which made Back a no-op until it had decremented back into range.
+  const index = draft.step - 1;
   const current = STEPS[index];
   const labelKeys = useMemo(() => STEPS.map((s) => s.labelKey), []);
 
@@ -150,7 +154,7 @@ export function OnboardingPage() {
       <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-8">
         <StepRail step={index + 1} labelKeys={labelKeys} />
 
-        {current.id !== "getStarted" && (
+        {current.titleKey && (
           <>
             <span className="mt-8 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0D6EFD]">
               {t("onboarding.step").replace("{n}", String(index + 1)).replace("{total}", String(STEPS.length))}
@@ -158,7 +162,9 @@ export function OnboardingPage() {
             <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)] sm:text-[28px]">
               {t(current.titleKey)}
             </h1>
-            <p className="mt-2 text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
+            {current.subtitleKey && (
+              <p className="mt-2 text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
+            )}
           </>
         )}
 
@@ -170,12 +176,7 @@ export function OnboardingPage() {
       </main>
 
       {current.showPriceBar ? (
-        <PriceBar
-          modules={draft.enabled}
-          branchCount={draft.brand.branchCount}
-          integrations={draft.integrations}
-          action={actions}
-        />
+        <PriceBar draft={draft} action={actions} />
       ) : (
         <div className="sticky bottom-0 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 backdrop-blur">
           <div className="mx-auto flex max-w-[1180px] items-center justify-end gap-2 px-5 py-3.5">{actions}</div>

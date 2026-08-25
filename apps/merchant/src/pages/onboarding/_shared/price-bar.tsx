@@ -5,26 +5,18 @@
 import { useState } from "react";
 import { ChevronUp } from "lucide-react";
 import clsx from "clsx";
-import { computePrice, formatSar, type ModuleId } from "@/shared/catalog";
+import { formatSar } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { integrationsTotal, type IntegrationId } from "./extras-catalog";
+import type { OnboardingDraft } from "./draft";
+import { priceFor } from "./pricing";
 
-export function PriceBar({
-  modules,
-  branchCount,
-  integrations,
-  action,
-}: {
-  modules: readonly ModuleId[];
-  branchCount: number;
-  integrations: readonly IntegrationId[];
-  action: React.ReactNode;
-}) {
+export function PriceBar({ draft, action }: { draft: OnboardingDraft; action: React.ReactNode }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const price = computePrice(modules, branchCount);
-  const connectors = integrationsTotal(integrations);
-  const total = price.total + connectors;
+  // Same helper the review aside and the payment step use, so the three
+  // surfaces cannot drift apart.
+  const price = priceFor(draft);
+  const { connectors, total } = price;
 
   return (
     <div className="sticky bottom-0 z-20 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 shadow-[0_-8px_20px_rgba(15,23,42,0.05)] backdrop-blur">

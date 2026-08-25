@@ -4,9 +4,10 @@ import { useState } from "react";
 import { CheckCircle2, CreditCard, Info, Link2, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { Button, Modal } from "@ui/primitives";
-import { computePrice, formatSar } from "@/shared/catalog";
+import { formatSar } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { INTEGRATIONS, integrationsTotal } from "../_shared/extras-catalog";
+import { INTEGRATIONS } from "../_shared/extras-catalog";
+import { priceFor } from "../_shared/pricing";
 import { PAYMENT_METHODS, simulatePayment } from "../_shared/payment-catalog";
 import { paymentLogo } from "../_shared/assets";
 import { CreateAccountModal } from "./create-account-modal";
@@ -23,9 +24,9 @@ export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
   const [accountOpen, setAccountOpen] = useState(!draft.accountCreated);
   const [processing, setProcessing] = useState(false);
 
-  const price = computePrice(draft.enabled, draft.brand.branchCount);
-  const connectors = integrationsTotal(draft.integrations);
-  const total = price.total + connectors;
+  // Same helper the price bar and the review aside use.
+  const price = priceFor(draft);
+  const total = price.total;
   const selectedIntegrations = INTEGRATIONS.filter((i) => draft.integrations.includes(i.id));
 
   async function handlePay() {
@@ -55,7 +56,7 @@ export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
             </ul>
           </div>
           <p className="text-[17px] font-bold text-[#0D6EFD]">
-            {formatSar(price.total, locale)} <span className="text-[11px] font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
+            {formatSar(price.subscription, locale)} <span className="text-[11px] font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
           </p>
         </div>
       </section>

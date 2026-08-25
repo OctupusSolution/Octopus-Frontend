@@ -3135,6 +3135,7 @@ export const ar = {
   "onboarding.dashboardPreview.subtitle": "بنينا مساحة عملك حول طريقة عمل نشاطك. ألقِ نظرة سريعة واستكشفها قبل الإطلاق.",
   "onboarding.dashboardPreview.summary": "ملخص الإعداد",
   "onboarding.dashboardPreview.configured": "كل شيء مهيأ بناءً على إعدادك.",
+  "onboarding.dashboardPreview.sampleNote": "أرقام تجريبية — ستظهر أرقامك الحقيقية بمجرد بدء التداول.",
   "onboarding.dashboardPreview.backToSetup": "العودة إلى الإعداد",
   "onboarding.dashboardPreview.continueToPayment": "متابعة إلى الدفع",
 

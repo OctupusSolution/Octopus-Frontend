@@ -2,14 +2,29 @@
 // honours the merchant's colour, logo and language instead of showing someone
 // else's restaurant. Desktop and mobile are the same markup at two widths.
 import { useState } from "react";
-import { Check, Copy, GripVertical, Link2, Monitor, Smartphone } from "lucide-react";
+import { Check, Link2, Monitor, Smartphone } from "lucide-react";
 import clsx from "clsx";
 import { Input, Segmented } from "@ui/primitives";
 import { getModule } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { publicLinkAsset } from "../_shared/assets";
 import { serviceCategoriesFor } from "../_shared/ai-insights";
+import { readableOn } from "../_shared/brand-catalog";
 import type { StepProps } from "../_shared/steps";
+
+/** Strips a merchant's custom tag down to a legal DNS label: lowercase
+ *  alphanumerics and interior hyphens only, no leading/trailing hyphen,
+ *  63 characters max (the real subdomain limit). An all-hyphen or empty
+ *  input collapses to "" and the caller falls back to "restaurant". */
+function sanitizeTag(value: string): string {
+  return value
+    .replace(/[^a-z0-9-]/gi, "")
+    .toLowerCase()
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "");
+}
 
 const CATEGORY_IMAGES = ["cat-desserts.webp", "cat-mains.webp", "cat-breakfast.webp", "cat-drinks.webp"];
 // Three dishes exist where the design shows six; they repeat until the rest arrive.
@@ -37,8 +52,24 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Segmented
               options={[
-                { id: "desktop", label: <Monitor size={14} /> },
-                { id: "mobile", label: <Smartphone size={14} /> },
+                {
+                  id: "desktop",
+                  label: (
+                    <>
+                      <Monitor size={14} />
+                      <span className="sr-only">{t("onboarding.publicLink.desktop")}</span>
+                    </>
+                  ),
+                },
+                {
+                  id: "mobile",
+                  label: (
+                    <>
+                      <Smartphone size={14} />
+                      <span className="sr-only">{t("onboarding.publicLink.mobile")}</span>
+                    </>
+                  ),
+                },
               ]}
               value={view}
               onChange={(id) => setView(id as "desktop" | "mobile")}
@@ -51,9 +82,14 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
               {brand.logoDataUrl ? (
                 <img src={brand.logoDataUrl} alt="" className="h-6 object-contain" />
               ) : (
-                <span className="text-[12px] font-bold text-white">{brand.businessName || "OCTOPUS"}</span>
+                <span className="text-[12px] font-bold" style={{ color: readableOn(brand.secondary) }}>
+                  {brand.businessName || "OCTOPUS"}
+                </span>
               )}
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-white" style={{ backgroundColor: brand.primary }}>
+              <span
+                className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
+              >
                 {t("onboarding.publicLink.live")}
               </span>
             </header>
@@ -82,7 +118,12 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
                     <p className="mt-1.5 truncate text-[10.5px] font-medium text-[var(--octo-text-primary)]">
                       {t(categories[i % categories.length])}
                     </p>
-                    <p className="text-[10.5px] font-bold" style={{ color: brand.primary }}>SAR {45 + i * 5}</p>
+                    <p
+                      className="mt-1 inline-block rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-bold"
+                      style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
+                    >
+                      SAR {45 + i * 5}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -97,14 +138,13 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
             <p className="mt-2 flex items-center gap-1.5 rounded-[9px] bg-[var(--octo-hover)] px-2.5 py-2 text-[11px] text-[#0D6EFD]">
               <Link2 size={12} className="shrink-0" />
               <span className="truncate">{url}</span>
-              <Copy size={12} className="ms-auto shrink-0 text-[var(--octo-text-faint)]" />
             </p>
           </div>
 
           <Input
             label={t("onboarding.publicLink.customTag")}
             value={publicLink.tag}
-            onChange={(e) => dispatch({ type: "patchPublicLink", patch: { tag: e.target.value.replace(/[^a-z0-9-]/gi, "").toLowerCase() } })}
+            onChange={(e) => dispatch({ type: "patchPublicLink", patch: { tag: sanitizeTag(e.target.value) } })}
             className="!py-2 !text-[12px]"
           />
 
@@ -159,7 +199,6 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
         <ul className="mt-3 flex flex-col gap-1.5">
           {publicLink.sections.map((id) => (
             <li key={id} className="flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-2 text-[11.5px] text-[var(--octo-text-secondary)]">
-              <GripVertical size={13} className="text-[var(--octo-text-faint)]" />
               {t(SECTION_LABELS[id] ?? id)}
             </li>
           ))}

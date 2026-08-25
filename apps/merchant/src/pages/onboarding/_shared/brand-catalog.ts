@@ -70,3 +70,19 @@ export const THEME_TEMPLATES: readonly ThemeTemplate[] = [
   { id: "warm",    nameKey: "onboarding.theme.warm.name",    descKey: "onboarding.theme.warm.desc",
     bestForKeys: ["onboarding.theme.tag.family", "onboarding.theme.tag.traditional"] },
 ];
+
+/** Black or white, whichever stays readable on `hex`. Merchants can pick any
+ *  brand colour, including a very light one. */
+export function readableOn(hex: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex ?? "");
+  if (!match) return "#1D1D1D";
+
+  const int = parseInt(match[1], 16);
+  const channel = (shift: number) => {
+    const c = ((int >> shift) & 0xff) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0);
+
+  return luminance > 0.5 ? "#1D1D1D" : "#FFFFFF";
+}

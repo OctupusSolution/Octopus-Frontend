@@ -1,4 +1,4 @@
-// Step 9 — a read-only recap of everything chosen so far, with an edit link
+// The review step — a read-only recap of everything chosen so far, with an edit link
 // per card that jumps straight back to the step that produced it. Writes
 // nothing; it only reads the wizard's own state back.
 //

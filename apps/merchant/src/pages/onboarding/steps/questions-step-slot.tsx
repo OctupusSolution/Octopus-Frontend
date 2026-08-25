@@ -1,5 +1,5 @@
-// Step 4's current occupant: the qualifying questions, until the Business
-// Details & Brand Setup form replaces them.
+// The businessDetails step's current occupant: the qualifying questions,
+// until the Business Details & Brand Setup form replaces them.
 import { QuestionsStep } from "@/widgets/business-wizard";
 import type { StepProps } from "../_shared/steps";
 

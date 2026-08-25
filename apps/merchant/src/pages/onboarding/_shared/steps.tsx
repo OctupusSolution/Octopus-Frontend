@@ -4,10 +4,18 @@
 import type { ComponentType, Dispatch } from "react";
 import type { DraftAction, OnboardingDraft } from "./draft";
 import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
+import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
 import { QuestionsStepSlot } from "../steps/questions-step-slot";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStepSlot } from "../steps/review-step-slot";
 import { PaymentStepSlot } from "../steps/payment-step-slot";
+
+/** Enabling pulls in prerequisites; disabling drops anything that depended on
+ * `id`. Same dependency-resolution rule the Create Business wizard uses — the
+ * two flows must never disagree about what a module toggle actually does. */
+function toggleModule(draft: OnboardingDraft, id: ModuleId, next: boolean): ModuleId[] {
+  return next ? withDependencies([...draft.enabled, id]) : withoutDependents(draft.enabled, id);
+}
 
 export interface StepProps {
   draft: OnboardingDraft;
@@ -68,7 +76,7 @@ export const STEPS: readonly StepDef[] = [
           type={draft.type}
           answers={draft.answers}
           enabled={draft.enabled}
-          onToggle={(id, next) => dispatch({ type: "setModules", ids: next ? [...draft.enabled, id] : draft.enabled.filter((m) => m !== id) })}
+          onToggle={(id, next) => dispatch({ type: "setModules", ids: toggleModule(draft, id, next) })}
         />
       ) : null,
     canContinue: () => true,

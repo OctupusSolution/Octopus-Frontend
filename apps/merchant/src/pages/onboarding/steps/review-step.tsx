@@ -29,10 +29,20 @@ export function ReviewStep({ draft, dispatch }: StepProps) {
     { labelKey: "onboarding.review.currency", value: brand.currency },
   ];
 
+  const businessComplete = draft.vertical !== null && draft.type !== null
+    && brand.businessName.trim() !== "" && brand.city !== "";
+  const modulesComplete = draft.enabled.length > 0;
+  const integrationsComplete = draft.integrations.length > 0;
+
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
       <div className="flex flex-col gap-3">
-        <Section titleKey="onboarding.review.business" onEdit={() => dispatch({ type: "goTo", step: 4 })} t={t}>
+        <Section
+          titleKey="onboarding.review.business"
+          onEdit={() => dispatch({ type: "goTo", step: 4 })}
+          t={t}
+          complete={businessComplete}
+        >
           <dl className="flex flex-col gap-2">
             {rows.map((row) => (
               <div key={row.labelKey} className="flex items-center justify-between gap-3 text-[12px]">
@@ -56,20 +66,34 @@ export function ReviewStep({ draft, dispatch }: StepProps) {
           </dl>
         </Section>
 
-        <Section titleKey="onboarding.review.modules" onEdit={() => dispatch({ type: "goTo", step: 5 })} t={t}>
-          <div className="flex flex-wrap gap-1.5">
-            {draft.enabled.map((id) => {
-              const module = getModule(id);
-              return module ? (
-                <span key={id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
-                  {t(module.nameKey)}
-                </span>
-              ) : null;
-            })}
-          </div>
+        <Section
+          titleKey="onboarding.review.modules"
+          onEdit={() => dispatch({ type: "goTo", step: 5 })}
+          t={t}
+          complete={modulesComplete}
+        >
+          {draft.enabled.length === 0 ? (
+            <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {draft.enabled.map((id) => {
+                const module = getModule(id);
+                return module ? (
+                  <span key={id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
+                    {t(module.nameKey)}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
         </Section>
 
-        <Section titleKey="onboarding.review.integrations" onEdit={() => dispatch({ type: "goTo", step: 6 })} t={t}>
+        <Section
+          titleKey="onboarding.review.integrations"
+          onEdit={() => dispatch({ type: "goTo", step: 6 })}
+          t={t}
+          complete={integrationsComplete}
+        >
           {selectedIntegrations.length === 0 ? (
             <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
           ) : (
@@ -117,12 +141,13 @@ export function ReviewStep({ draft, dispatch }: StepProps) {
 }
 
 function Section({
-  titleKey, onEdit, t, children,
+  titleKey, onEdit, t, children, complete,
 }: {
   titleKey: string;
   onEdit: () => void;
   t: (key: string) => string;
   children: React.ReactNode;
+  complete: boolean;
 }) {
   return (
     <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
@@ -138,10 +163,12 @@ function Section({
         </button>
       </div>
       <div className="mt-3">{children}</div>
-      <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#22C55E]">
-        <CheckCircle2 size={12} />
-        {t("onboarding.review.completed")}
-      </p>
+      {complete && (
+        <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#22C55E]">
+          <CheckCircle2 size={12} />
+          {t("onboarding.review.completed")}
+        </p>
+      )}
     </section>
   );
 }

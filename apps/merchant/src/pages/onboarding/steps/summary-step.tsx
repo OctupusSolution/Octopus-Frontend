@@ -6,15 +6,15 @@
 // what OCTOPUS surfaces once the business is live, not a real analysis run
 // against this data. Labelled as such, same honesty rule as every other mock
 // section in this flow.
-import { Building2, Check, CheckCircle2, Package, Pencil, Plug, ShieldCheck, Sparkles, Star, Users2 } from "lucide-react";
+import { Building2, Check, CheckCircle2, Package, Pencil, Plug, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   addOnModules, computePrice, formatSar, getRestaurantType, getVertical,
   type ModuleId, type TypeCode, type VerticalId,
 } from "@/shared/catalog";
 import {
-  GOALS, INTEGRATIONS, SECURITY_OPTIONS, WORKFLOW_TEMPLATES,
-  type GoalId, type IntegrationId, type SecuritySettings, type TeamInvite, type WorkflowId,
+  INTEGRATIONS,
+  type IntegrationId,
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { DASHBOARD_MOCKUP_URL } from "../_shared/assets";
@@ -24,24 +24,16 @@ const CHECKLIST_ITEMS = ["secure", "compliant", "connected", "ready"] as const;
 export function SummaryStep({
   vertical,
   type,
-  goals,
   enabled,
   branchCount,
   integrations,
-  security,
-  team,
-  workflows,
   onEditStep,
 }: {
   vertical: VerticalId | null;
   type: TypeCode | null;
-  goals: readonly GoalId[];
   enabled: readonly ModuleId[];
   branchCount: number;
   integrations: readonly IntegrationId[];
-  security: SecuritySettings;
-  team: readonly TeamInvite[];
-  workflows: readonly WorkflowId[];
   onEditStep: (step: number) => void;
 }) {
   const { t, locale } = useI18n();
@@ -50,7 +42,6 @@ export function SummaryStep({
   const typeEntry = type ? getRestaurantType(type) : undefined;
   const price = computePrice(enabled, branchCount);
   const enabledAddOns = addOnModules.filter((m) => enabled.includes(m.id));
-  const activeSecurity = SECURITY_OPTIONS.filter((o) => o.locked || security[o.id as keyof SecuritySettings]);
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
@@ -73,26 +64,10 @@ export function SummaryStep({
         </SummaryCard>
 
         <SummaryCard
-          icon={<Star size={16} />}
-          color="#F59E0B"
-          title={t("onboarding.review.goals")}
-          onEdit={() => onEditStep(3)}
-          complete={goals.length > 0}
-        >
-          {goals.length === 0 ? (
-            <EmptyLine text={t("onboarding.review.noGoals")} />
-          ) : (
-            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
-              {goals.map((id) => t(GOALS.find((g) => g.id === id)?.nameKey ?? "")).join(" · ")}
-            </p>
-          )}
-        </SummaryCard>
-
-        <SummaryCard
           icon={<Package size={16} />}
           color="#0D6EFD"
           title={t("onboarding.review.modules")}
-          onEdit={() => onEditStep(5)}
+          onEdit={() => onEditStep(4)}
           complete
         >
           <p className="mb-1.5 text-[15px] font-bold text-[var(--octo-text-primary)]">
@@ -111,7 +86,7 @@ export function SummaryStep({
           icon={<Plug size={16} />}
           color="#8B5CF6"
           title={t("onboarding.review.integrations")}
-          onEdit={() => onEditStep(6)}
+          onEdit={() => onEditStep(5)}
           complete={integrations.length > 0}
         >
           {integrations.length === 0 ? (
@@ -120,41 +95,6 @@ export function SummaryStep({
             <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
               {integrations.map((id) => INTEGRATIONS.find((i) => i.id === id)?.name ?? id).join(" · ")}
             </p>
-          )}
-        </SummaryCard>
-
-        <SummaryCard
-          icon={<ShieldCheck size={16} />}
-          color="#06B6D4"
-          title={t("onboarding.review.security")}
-          onEdit={() => onEditStep(7)}
-          complete={activeSecurity.length > 0}
-        >
-          <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
-            {activeSecurity.map((o) => t(o.nameKey)).join(" · ")}
-          </p>
-        </SummaryCard>
-
-        <SummaryCard
-          icon={<Users2 size={16} />}
-          color="#6366F1"
-          title={t("onboarding.review.members")}
-          onEdit={() => onEditStep(8)}
-          complete={team.length > 0}
-        >
-          {team.length === 0 ? (
-            <EmptyLine text={t("onboarding.review.noTeam")} />
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
-                {t("onboarding.review.teamCount").replace("{n}", String(team.length))}
-              </p>
-              {workflows.length > 0 && (
-                <p className="text-[11.5px] text-[var(--octo-text-faint)]">
-                  {t("onboarding.review.workflowCount").replace("{n}", String(workflows.length))}
-                </p>
-              )}
-            </div>
           )}
         </SummaryCard>
       </div>

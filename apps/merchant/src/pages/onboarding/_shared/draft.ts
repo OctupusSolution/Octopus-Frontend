@@ -157,3 +157,28 @@ export function draftReducer(state: OnboardingDraft, action: DraftAction): Onboa
       return { ...state, paid: true };
   }
 }
+
+// --- Completeness predicates -------------------------------------------
+// The Review step (7) and the Dashboard Preview summary (9) show the same
+// three "Completed" ticks over the same three groups of answers. They used to
+// each decide for themselves — Review from the real data, Preview
+// unconditionally — so a merchant with no integrations was told "None
+// selected" on step 7 and "Completed" on step 9. One definition each, read by
+// both screens.
+
+/** The business card: industry, type, name and city all answered. */
+export function businessComplete(draft: OnboardingDraft): boolean {
+  return draft.vertical !== null && draft.type !== null
+    && draft.brand.businessName.trim() !== "" && draft.brand.city !== "";
+}
+
+/** At least one module switched on. */
+export function modulesComplete(draft: OnboardingDraft): boolean {
+  return draft.enabled.length > 0;
+}
+
+/** At least one connector chosen. Integrations are optional, so "not
+ *  complete" here means "nothing selected", not "something is wrong". */
+export function integrationsComplete(draft: OnboardingDraft): boolean {
+  return draft.integrations.length > 0;
+}

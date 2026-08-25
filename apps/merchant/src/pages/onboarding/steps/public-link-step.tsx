@@ -1,33 +1,21 @@
 // Step 8 — the customer-facing page, rendered rather than screenshotted, so it
 // honours the merchant's colour, logo and language instead of showing someone
 // else's restaurant. Desktop and mobile are the same markup at two widths.
+//
+// The link, theming and connected-modules controls live in the registry's
+// `Aside` slot (see public-link-aside.tsx) rather than in a second column
+// hand-rolled here, so every side panel in the flow is one width and one
+// treatment.
 import { useState } from "react";
-import { Check, Link2, Monitor, Smartphone } from "lucide-react";
+import { Monitor, Smartphone } from "lucide-react";
 import clsx from "clsx";
-import { Input, Segmented } from "@ui/primitives";
-import { getModule } from "@/shared/catalog";
+import { Segmented } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { publicLinkAsset } from "../_shared/assets";
 import { serviceCategoriesFor } from "../_shared/ai-insights";
 import { readableOn } from "../_shared/brand-catalog";
+import { formatBrandPrice } from "../_shared/pricing";
 import type { StepProps } from "../_shared/steps";
-
-/** What the merchant sees while typing: strips disallowed characters and caps
- *  the length, nothing more. It deliberately does NOT trim or collapse
- *  hyphens — the field is a controlled input, so trimming here runs on every
- *  keystroke, and a hyphen the merchant just typed is always "trailing" at
- *  that instant. Do that and `-` becomes untypeable inside a tag. Storage
- *  stays permissive; DNS-legality is enforced only where the URL is built. */
-function sanitizeTag(value: string): string {
-  return value.replace(/[^a-z0-9-]/gi, "").toLowerCase().slice(0, 63);
-}
-
-/** What the public URL is built from: collapses repeated hyphens and trims
- *  them from both ends so the result is a legal DNS label. Applied once, on
- *  the already-stored (not-yet-trimmed) tag, not on every keystroke. */
-function dnsLabel(tag: string): string {
-  return tag.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-}
 
 const CATEGORY_IMAGES = ["cat-desserts.webp", "cat-mains.webp", "cat-breakfast.webp", "cat-drinks.webp"];
 // Three dishes exist where the design shows six; they repeat until the rest arrive.
@@ -40,161 +28,99 @@ const SECTION_LABELS: Record<string, string> = {
   bestSeller: "onboarding.publicLink.section.bestSeller",
 };
 
-export function PublicLinkStep({ draft, dispatch }: StepProps) {
-  const { t } = useI18n();
+export function PublicLinkStep({ draft }: StepProps) {
+  const { t, locale } = useI18n();
   const [view, setView] = useState<"desktop" | "mobile">("desktop");
   const { brand, publicLink } = draft;
 
   const categories = serviceCategoriesFor(draft.type);
-  const url = `https://${dnsLabel(publicLink.tag) || "restaurant"}.octopus.app`;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)]">
-        <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Segmented
-              options={[
-                {
-                  id: "desktop",
-                  label: (
-                    <>
-                      <Monitor size={14} />
-                      <span className="sr-only">{t("onboarding.publicLink.desktop")}</span>
-                    </>
-                  ),
-                },
-                {
-                  id: "mobile",
-                  label: (
-                    <>
-                      <Smartphone size={14} />
-                      <span className="sr-only">{t("onboarding.publicLink.mobile")}</span>
-                    </>
-                  ),
-                },
-              ]}
-              value={view}
-              onChange={(id) => setView(id as "desktop" | "mobile")}
-            />
-            <span className="text-[11.5px] text-[var(--octo-text-muted)]">{t("onboarding.publicLink.viewAsCustomer")}</span>
-          </div>
-
-          <div className={clsx("mx-auto mt-4 overflow-hidden rounded-xl border border-[var(--octo-border-card)]", view === "mobile" && "max-w-[320px]")}>
-            <header className="flex items-center justify-between gap-3 px-3 py-2" style={{ backgroundColor: brand.secondary }}>
-              {brand.logoDataUrl ? (
-                <img src={brand.logoDataUrl} alt="" className="h-6 object-contain" />
-              ) : (
-                <span className="text-[12px] font-bold" style={{ color: readableOn(brand.secondary) }}>
-                  {brand.businessName || "OCTOPUS"}
-                </span>
-              )}
-              <span
-                className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-                style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
-              >
-                {t("onboarding.publicLink.live")}
-              </span>
-            </header>
-
-            <div className="relative">
-              <img src={publicLinkAsset("hero.webp")} alt="" className="h-40 w-full object-cover" />
-              <div className="absolute inset-0 grid place-items-center bg-black/45 px-4 text-center">
-                <p className="text-[15px] font-bold text-white">{brand.businessName || t("onboarding.businessName")}</p>
-              </div>
-            </div>
-
-            <div className="bg-[var(--octo-page-bg)] p-3">
-              <div className={clsx("grid gap-2", view === "mobile" ? "grid-cols-2" : "grid-cols-4")}>
-                {categories.map((key, i) => (
-                  <div key={key} className="flex items-center gap-2 overflow-hidden rounded-[10px] bg-[var(--octo-card)] p-2">
-                    <img src={publicLinkAsset(CATEGORY_IMAGES[i % CATEGORY_IMAGES.length])} alt="" className="h-9 w-9 shrink-0 object-contain" />
-                    <span className="truncate text-[10.5px] font-medium text-[var(--octo-text-primary)]">{t(key)}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className={clsx("mt-3 grid gap-2", view === "mobile" ? "grid-cols-2" : "grid-cols-3")}>
-                {DISH_IMAGES.map((image, i) => (
-                  <div key={`${image}-${i}`} className="overflow-hidden rounded-[10px] bg-[var(--octo-card)] p-2">
-                    <img src={publicLinkAsset(image)} alt="" className="h-20 w-full object-contain" />
-                    <p className="mt-1.5 truncate text-[10.5px] font-medium text-[var(--octo-text-primary)]">
-                      {t(categories[i % categories.length])}
-                    </p>
-                    <p
-                      className="mt-1 inline-block rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-bold"
-                      style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
-                    >
-                      SAR {45 + i * 5}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <aside className="flex h-fit flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-          <div>
-            <p className="text-[11.5px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.publicLink.yourLink")}</p>
-            <p className="mt-1 text-[10.5px] text-[var(--octo-text-muted)]">{t("onboarding.publicLink.yourLinkNote")}</p>
-            <p className="mt-2 flex items-center gap-1.5 rounded-[9px] bg-[var(--octo-hover)] px-2.5 py-2 text-[11px] text-[#0D6EFD]">
-              <Link2 size={12} className="shrink-0" />
-              <span className="truncate">{url}</span>
-            </p>
-          </div>
-
-          <Input
-            label={t("onboarding.publicLink.customTag")}
-            value={publicLink.tag}
-            onChange={(e) => dispatch({ type: "patchPublicLink", patch: { tag: sanitizeTag(e.target.value) } })}
-            className="!py-2 !text-[12px]"
+      <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Segmented
+            options={[
+              {
+                id: "desktop",
+                label: (
+                  <>
+                    <Monitor size={14} />
+                    <span className="sr-only">{t("onboarding.publicLink.desktop")}</span>
+                  </>
+                ),
+              },
+              {
+                id: "mobile",
+                label: (
+                  <>
+                    <Smartphone size={14} />
+                    <span className="sr-only">{t("onboarding.publicLink.mobile")}</span>
+                  </>
+                ),
+              },
+            ]}
+            value={view}
+            onChange={(id) => setView(id as "desktop" | "mobile")}
           />
+          <span className="text-[11.5px] text-[var(--octo-text-muted)]">{t("onboarding.publicLink.viewAsCustomer")}</span>
+        </div>
 
-          <div>
-            <p className="text-[11.5px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.publicLink.theming")}</p>
-            <label className="mt-2 flex items-center justify-between gap-3 text-[11px] text-[var(--octo-text-secondary)]">
-              {t("onboarding.publicLink.primaryColor")}
-              <input
-                type="color"
-                value={brand.primary}
-                onChange={(e) => dispatch({ type: "patchBrand", patch: { primary: e.target.value } })}
-                className="h-6 w-14 cursor-pointer rounded border border-[var(--octo-border-input)] bg-transparent p-0.5"
-              />
-            </label>
-            <label className="mt-2 flex items-center justify-between gap-3 text-[11px] text-[var(--octo-text-secondary)]">
-              {t("onboarding.publicLink.secondaryColor")}
-              <input
-                type="color"
-                value={brand.secondary}
-                onChange={(e) => dispatch({ type: "patchBrand", patch: { secondary: e.target.value } })}
-                className="h-6 w-14 cursor-pointer rounded border border-[var(--octo-border-input)] bg-transparent p-0.5"
-              />
-            </label>
+        <div className={clsx("mx-auto mt-4 overflow-hidden rounded-xl border border-[var(--octo-border-card)]", view === "mobile" && "max-w-[320px]")}>
+          <header className="flex items-center justify-between gap-3 px-3 py-2" style={{ backgroundColor: brand.secondary }}>
+            {brand.logoDataUrl ? (
+              <img src={brand.logoDataUrl} alt="" className="h-6 object-contain" />
+            ) : (
+              <span className="text-[12px] font-bold" style={{ color: readableOn(brand.secondary) }}>
+                {brand.businessName || "OCTOPUS"}
+              </span>
+            )}
+            <span
+              className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+              style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
+            >
+              {t("onboarding.publicLink.live")}
+            </span>
+          </header>
+
+          <div className="relative">
+            <img src={publicLinkAsset("hero.webp")} alt="" className="h-40 w-full object-cover" />
+            <div className="absolute inset-0 grid place-items-center bg-black/45 px-4 text-center">
+              <p className="text-[15px] font-bold text-white">{brand.businessName || t("onboarding.businessName")}</p>
+            </div>
           </div>
 
-          <div>
-            <p className="text-[11.5px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.publicLink.connectedModules")}</p>
-            <p className="mt-1 text-[10.5px] text-[var(--octo-text-muted)]">
-              {t("onboarding.publicLink.connectedNote").replace("{n}", String(draft.enabled.length))}
-            </p>
-            <ul className="mt-2 flex flex-col gap-1">
-              {draft.enabled.map((id) => {
-                const module = getModule(id);
-                return module ? (
-                  <li key={id} className="flex items-center justify-between gap-2 rounded-[8px] bg-[var(--octo-hover)] px-2.5 py-1.5 text-[10.5px]">
-                    <span className="truncate text-[var(--octo-text-secondary)]">{t(module.nameKey)}</span>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-[#22C55E]">
-                      <Check size={10} strokeWidth={3} />
-                      {t("onboarding.publicLink.live")}
-                    </span>
-                  </li>
-                ) : null;
-              })}
-            </ul>
+          <div className="bg-[var(--octo-page-bg)] p-3">
+            <div className={clsx("grid gap-2", view === "mobile" ? "grid-cols-2" : "grid-cols-4")}>
+              {categories.map((key, i) => (
+                <div key={key} className="flex items-center gap-2 overflow-hidden rounded-[10px] bg-[var(--octo-card)] p-2">
+                  <img src={publicLinkAsset(CATEGORY_IMAGES[i % CATEGORY_IMAGES.length])} alt="" className="h-9 w-9 shrink-0 object-contain" />
+                  <span className="truncate text-[10.5px] font-medium text-[var(--octo-text-primary)]">{t(key)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className={clsx("mt-3 grid gap-2", view === "mobile" ? "grid-cols-2" : "grid-cols-3")}>
+              {DISH_IMAGES.map((image, i) => (
+                <div key={`${image}-${i}`} className="overflow-hidden rounded-[10px] bg-[var(--octo-card)] p-2">
+                  <img src={publicLinkAsset(image)} alt="" className="h-20 w-full object-contain" />
+                  <p className="mt-1.5 truncate text-[10.5px] font-medium text-[var(--octo-text-primary)]">
+                    {t(categories[i % categories.length])}
+                  </p>
+                  <p
+                    className="mt-1 inline-block rounded-[6px] px-1.5 py-0.5 text-[10.5px] font-bold"
+                    style={{ backgroundColor: brand.primary, color: readableOn(brand.primary) }}
+                  >
+                    {/* Sample prices, but in the currency the merchant chose on
+                        step 4 and formatted the way every other figure is. */}
+                    {formatBrandPrice(45 + i * 5, brand.currency, locale)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </aside>
-      </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
         <h3 className="text-[13px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.publicLink.customize")}</h3>

@@ -2,24 +2,27 @@
 // card back to the step that owns it, and the plan beside it. Nothing new is
 // decided here; this is the last look before the previews.
 import { CheckCircle2, Pencil } from "lucide-react";
-import {
-  computePrice, formatSar, getModule, getRestaurantType, verticals,
-} from "@/shared/catalog";
+import { getModule, getRestaurantType, verticals } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { INTEGRATIONS, integrationsTotal } from "../_shared/extras-catalog";
+import { INTEGRATIONS } from "../_shared/extras-catalog";
 import { CITIES } from "../_shared/brand-catalog";
-import type { StepProps } from "../_shared/steps";
+import { businessComplete, modulesComplete, integrationsComplete } from "../_shared/draft";
+import { stepNumber, type StepProps } from "../_shared/steps";
 
 export function ReviewStep({ draft, dispatch }: StepProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { brand } = draft;
 
   const vertical = verticals.find((v) => v.id === draft.vertical);
   const type = draft.type ? getRestaurantType(draft.type) : undefined;
   const city = CITIES.find((c) => c.id === brand.city);
   const selectedIntegrations = INTEGRATIONS.filter((i) => draft.integrations.includes(i.id));
-  const price = computePrice(draft.enabled, brand.branchCount);
-  const connectors = integrationsTotal(draft.integrations);
+
+  // Resolved through the registry, never hardcoded: reordering STEPS moves
+  // these links with it instead of quietly pointing at the wrong screen.
+  const detailsStep = stepNumber("businessDetails");
+  const modulesStep = stepNumber("modules");
+  const integrationsStep = stepNumber("integrations");
 
   const rows: { labelKey: string; value: string }[] = [
     { labelKey: "onboarding.review.industry", value: vertical ? t(vertical.nameKey) : "—" },
@@ -29,113 +32,77 @@ export function ReviewStep({ draft, dispatch }: StepProps) {
     { labelKey: "onboarding.review.currency", value: brand.currency },
   ];
 
-  const businessComplete = draft.vertical !== null && draft.type !== null
-    && brand.businessName.trim() !== "" && brand.city !== "";
-  const modulesComplete = draft.enabled.length > 0;
-  const integrationsComplete = draft.integrations.length > 0;
-
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)]">
-      <div className="flex flex-col gap-3">
-        <Section
-          titleKey="onboarding.review.business"
-          onEdit={() => dispatch({ type: "goTo", step: 4 })}
-          t={t}
-          complete={businessComplete}
-        >
-          <dl className="flex flex-col gap-2">
-            {rows.map((row) => (
-              <div key={row.labelKey} className="flex items-center justify-between gap-3 text-[12px]">
-                <dt className="text-[var(--octo-text-muted)]">{t(row.labelKey)}</dt>
-                <dd className="font-medium text-[var(--octo-text-primary)]">{row.value}</dd>
-              </div>
-            ))}
+    <div className="flex flex-col gap-3">
+      <Section
+        titleKey="onboarding.review.business"
+        onEdit={() => dispatch({ type: "goTo", step: detailsStep })}
+        t={t}
+        complete={businessComplete(draft)}
+      >
+        <dl className="flex flex-col gap-2">
+          {rows.map((row) => (
+            <div key={row.labelKey} className="flex items-center justify-between gap-3 text-[12px]">
+              <dt className="text-[var(--octo-text-muted)]">{t(row.labelKey)}</dt>
+              <dd className="font-medium text-[var(--octo-text-primary)]">{row.value}</dd>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-3 text-[12px]">
+            <dt className="text-[var(--octo-text-muted)]">{t("onboarding.review.primaryColor")}</dt>
+            <dd className="inline-flex items-center gap-1.5 rounded-[7px] border border-[var(--octo-border-card)] px-2 py-1">
+              <span className="h-3.5 w-3.5 rounded-[4px]" style={{ backgroundColor: brand.primary }} />
+              <span className="font-medium text-[var(--octo-text-primary)]">{brand.primary}</span>
+            </dd>
+          </div>
+          {brand.logoDataUrl && (
             <div className="flex items-center justify-between gap-3 text-[12px]">
-              <dt className="text-[var(--octo-text-muted)]">{t("onboarding.review.primaryColor")}</dt>
-              <dd className="inline-flex items-center gap-1.5 rounded-[7px] border border-[var(--octo-border-card)] px-2 py-1">
-                <span className="h-3.5 w-3.5 rounded-[4px]" style={{ backgroundColor: brand.primary }} />
-                <span className="font-medium text-[var(--octo-text-primary)]">{brand.primary}</span>
-              </dd>
-            </div>
-            {brand.logoDataUrl && (
-              <div className="flex items-center justify-between gap-3 text-[12px]">
-                <dt className="text-[var(--octo-text-muted)]">{t("onboarding.review.logo")}</dt>
-                <dd><img src={brand.logoDataUrl} alt="" className="h-7 rounded-[6px] object-contain" /></dd>
-              </div>
-            )}
-          </dl>
-        </Section>
-
-        <Section
-          titleKey="onboarding.review.modules"
-          onEdit={() => dispatch({ type: "goTo", step: 5 })}
-          t={t}
-          complete={modulesComplete}
-        >
-          {draft.enabled.length === 0 ? (
-            <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {draft.enabled.map((id) => {
-                const module = getModule(id);
-                return module ? (
-                  <span key={id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
-                    {t(module.nameKey)}
-                  </span>
-                ) : null;
-              })}
+              <dt className="text-[var(--octo-text-muted)]">{t("onboarding.review.logo")}</dt>
+              <dd><img src={brand.logoDataUrl} alt="" className="h-7 rounded-[6px] object-contain" /></dd>
             </div>
           )}
-        </Section>
+        </dl>
+      </Section>
 
-        <Section
-          titleKey="onboarding.review.integrations"
-          onEdit={() => dispatch({ type: "goTo", step: 6 })}
-          t={t}
-          complete={integrationsComplete}
-        >
-          {selectedIntegrations.length === 0 ? (
-            <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              {selectedIntegrations.map((item) => (
-                <span key={item.id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
-                  {item.name}
+      <Section
+        titleKey="onboarding.review.modules"
+        onEdit={() => dispatch({ type: "goTo", step: modulesStep })}
+        t={t}
+        complete={modulesComplete(draft)}
+      >
+        {draft.enabled.length === 0 ? (
+          <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {draft.enabled.map((id) => {
+              const module = getModule(id);
+              return module ? (
+                <span key={id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
+                  {t(module.nameKey)}
                 </span>
-              ))}
-            </div>
-          )}
-        </Section>
-      </div>
+              ) : null;
+            })}
+          </div>
+        )}
+      </Section>
 
-      <aside className="h-fit rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-        <h3 className="text-[14px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.review.plan")}</h3>
-
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-[10px] bg-[#0D6EFD] px-3 py-2.5 text-white">
-          <span className="text-[11.5px] font-medium">{t("onboarding.review.subscription")}</span>
-          <span className="text-[12.5px] font-bold">{formatSar(price.total, locale)}</span>
-        </div>
-
-        {selectedIntegrations.length > 0 && (
-          <ul className="mt-3 flex flex-col gap-1.5 border-b border-[var(--octo-divider)] pb-3">
+      <Section
+        titleKey="onboarding.review.integrations"
+        onEdit={() => dispatch({ type: "goTo", step: integrationsStep })}
+        t={t}
+        complete={integrationsComplete(draft)}
+      >
+        {selectedIntegrations.length === 0 ? (
+          <p className="text-[11.5px] text-[var(--octo-text-faint)]">{t("onboarding.review.none")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
             {selectedIntegrations.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3 text-[11.5px]">
-                <span className="text-[var(--octo-text-secondary)]">{item.name}</span>
-                <span className="font-medium text-[var(--octo-text-primary)]">{formatSar(item.priceSar, locale)}</span>
-              </li>
+              <span key={item.id} className="rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]">
+                {item.name}
+              </span>
             ))}
-          </ul>
+          </div>
         )}
-
-        <div className="mt-3 flex items-center justify-between gap-3 rounded-[10px] bg-[var(--octo-hover)] px-3 py-2.5">
-          <span className="text-[11.5px] font-semibold text-[var(--octo-text-secondary)]">{t("onboarding.review.total")}</span>
-          <span className="text-[15px] font-bold text-[#0D6EFD]">{formatSar(price.total + connectors, locale)}</span>
-        </div>
-
-        {price.hasQuotedItems && (
-          <p className="mt-2 text-[10.5px] text-[var(--octo-text-faint)]">{t("pricing.quoted")}</p>
-        )}
-      </aside>
+      </Section>
     </div>
   );
 }

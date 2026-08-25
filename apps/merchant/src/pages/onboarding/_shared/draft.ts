@@ -40,7 +40,6 @@ export interface PublicLinkSettings {
 export interface AccountFields {
   fullName: string;
   email: string;
-  phone: string;
   password: string;
   companyName: string;
 }
@@ -89,7 +88,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   },
   integrations: [],
   publicLink: { tag: "restaurant", sections: ["hero", "offers", "menu", "bestSeller"] },
-  account: { fullName: "", email: "", phone: "", password: "", companyName: "" },
+  account: { fullName: "", email: "", password: "", companyName: "" },
   accountCreated: false,
   paymentMethod: null,
   paid: false,

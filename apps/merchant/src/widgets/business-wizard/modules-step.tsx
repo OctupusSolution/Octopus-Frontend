@@ -4,7 +4,8 @@
 // what we switched on for this merchant (with the reason we did it), and what
 // they could add. Modules the type marks `na` never appear at all — offering a
 // cloud kitchen a table-reservations upsell would be noise, not revenue.
-import { Info, Lock } from "lucide-react";
+import { useState } from "react";
+import { Info, Lock, Search } from "lucide-react";
 import clsx from "clsx";
 import {
   addOnModules, availabilityFor, baseModuleIds, dependentsOf, formatSar,
@@ -44,22 +45,50 @@ export function ModulesStep({
   answers,
   enabled,
   onToggle,
+  searchable = false,
 }: {
   type: TypeCode;
   answers: Answers;
   enabled: readonly ModuleId[];
   onToggle: (id: ModuleId, next: boolean) => void;
+  /** Onboarding shows a search field and a selected-count badge; the Create
+   *  Business modal does not have room for either. */
+  searchable?: boolean;
 }) {
   const { t, locale } = useI18n();
+  const [query, setQuery] = useState("");
 
   // `na` modules are dropped entirely — they are not part of this product for
   // this business type, so they are not shown even as a locked upsell.
-  const applicable = addOnModules.filter((m) => availabilityFor(type, m.id) !== "na");
+  const applicable = addOnModules
+    .filter((m) => availabilityFor(type, m.id) !== "na")
+    .filter((m) => !query.trim() || t(m.nameKey).toLowerCase().includes(query.trim().toLowerCase()));
   const selected = applicable.filter((m) => enabled.includes(m.id));
   const available = applicable.filter((m) => !enabled.includes(m.id));
 
   return (
     <div className="flex flex-col gap-3">
+      {searchable && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="relative flex min-w-[200px] flex-1 items-center">
+            <span className="pointer-events-none absolute start-3 text-[var(--octo-text-muted)]"><Search size={14} /></span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("onboarding.modules.search")}
+              aria-label={t("onboarding.modules.search")}
+              className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2 ps-9 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30"
+            />
+          </span>
+          <span className="rounded-full bg-[var(--octo-hover)] px-3 py-1.5 text-[11.5px] text-[var(--octo-text-secondary)]">
+            {t("onboarding.modules.all")}
+          </span>
+          <span className="rounded-full bg-[#0D6EFD] px-3 py-1.5 text-[11.5px] font-semibold text-white">
+            {t("onboarding.modules.selected").replace("{n}", String(enabled.length))}
+          </span>
+        </div>
+      )}
+
       {/* Always included */}
       <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
         <h3 className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">

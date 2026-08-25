@@ -7,6 +7,7 @@ import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
 import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
 import { GetStartedStep } from "../steps/get-started-step";
 import { InsightsAside } from "../steps/insights-aside";
+import { ModulesSummaryAside } from "../steps/modules-summary-aside";
 import { BusinessDetailsStep } from "../steps/business-details-step";
 import { BusinessDetailsAside } from "../steps/business-details-aside";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
@@ -91,8 +92,10 @@ export const STEPS: readonly StepDef[] = [
           answers={draft.answers}
           enabled={draft.enabled}
           onToggle={(id, next) => dispatch({ type: "setModules", ids: toggleModule(draft, id, next) })}
+          searchable
         />
       ) : null,
+    Aside: ModulesSummaryAside,
     canContinue: () => true,
     showPriceBar: true,
   },

@@ -5,7 +5,7 @@
 // lives in the STEPS registry, and each step is handed { draft, dispatch }.
 // Rendered outside the app shell — no sidebar, no top bar — because the
 // sidebar it would show does not exist yet at this point.
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Languages, Moon, Sun } from "lucide-react";
 import { Button } from "@ui/primitives";
@@ -27,22 +27,47 @@ export function OnboardingPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const { createBusiness } = useTenantConfig();
-  const { draft, dispatch, clear } = useOnboardingDraft();
+  const { draft, dispatch, clear, restored } = useOnboardingDraft();
 
-  const index = Math.min(draft.step, STEPS.length) - 1;
+  const index = Math.min(Math.max(1, draft.step), STEPS.length) - 1;
   const current = STEPS[index];
   const labelKeys = useMemo(() => STEPS.map((s) => s.labelKey), []);
 
   // The module set is derived from the type profile plus whatever the answers
-  // switched on. Re-derived only when the type or an answer changes, so manual
-  // toggles on the Modules step are never clobbered.
+  // switched on, and re-derived whenever the type or an answer changes. A
+  // restored draft already carries the merchant's own hand-picked `enabled`
+  // list, so deriving on the mount that restored it would clobber those picks
+  // with the type's defaults. `restoredSnapshot` freezes the exact
+  // `{ type, answers }` the draft was restored with, once, without ever being
+  // mutated by the effect itself — comparing against a frozen value (rather
+  // than consuming a "first run" flag inside the effect body) is what keeps
+  // this correct under React 18 StrictMode, which deliberately re-invokes a
+  // fresh mount's effects twice; a flag flipped inside the effect gets
+  // consumed by the first of those two invocations and derives (and
+  // overwrites the restored picks) on the second. Once a real `setType` or
+  // `answer` dispatch changes `draft.type`/`draft.answers` away from the
+  // snapshot, the comparison stops matching for the rest of the session and
+  // every subsequent change derives normally.
+  const restoredSnapshot = useRef(restored ? { type: draft.type, answers: draft.answers } : null);
   useEffect(() => {
+    const snapshot = restoredSnapshot.current;
+    if (snapshot && draft.type === snapshot.type && draft.answers === snapshot.answers) return;
     if (!draft.type) return;
     const fromAnswers = questionsFor(draft.type).flatMap((question) => {
       const option = question.options.find((o) => o.id === draft.answers[question.id]);
       return option ? [...option.enables] : [];
     });
     dispatch({ type: "setModules", ids: withDependencies([...defaultModulesFor(draft.type), ...fromAnswers]) });
+
+    // Branch count rides along with the same trigger: derived from the
+    // `branches` qualifying answer when the merchant has actually answered
+    // it, left untouched otherwise (a later task adds an explicit numeric
+    // field and must not have a default silently overwrite it).
+    const branchesQuestion = questionsFor(draft.type).find((q) => q.id === "branches");
+    const branchesOption = branchesQuestion?.options.find((o) => o.id === draft.answers[branchesQuestion.id]);
+    if (branchesOption?.branchCount !== undefined) {
+      dispatch({ type: "patchBrand", patch: { branchCount: branchesOption.branchCount } });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.type, draft.answers]);
 

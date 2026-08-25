@@ -5,29 +5,34 @@
 // DRAFT_VERSION guards the shape: a draft written by the previous ten-step
 // flow has fields this one no longer understands, so it is discarded rather
 // than rehydrated into something half-valid.
-import { useEffect, useReducer, useCallback } from "react";
+import { useEffect, useReducer, useCallback, useMemo } from "react";
 import { draftReducer, EMPTY_DRAFT, type OnboardingDraft } from "./draft";
 
 const DRAFT_KEY = "octopus.onboarding.draft";
 const DRAFT_VERSION = 2;
 
-function readDraft(): OnboardingDraft {
-  if (typeof window === "undefined") return EMPTY_DRAFT;
+/** `restored` is true only when a valid persisted draft was found — a fresh
+ * `EMPTY_DRAFT` (no session, or a discarded stale/corrupt one) is not a restore. */
+function readDraft(): { draft: OnboardingDraft; restored: boolean } {
+  if (typeof window === "undefined") return { draft: EMPTY_DRAFT, restored: false };
   try {
     const raw = window.sessionStorage.getItem(DRAFT_KEY);
-    if (!raw) return EMPTY_DRAFT;
+    if (!raw) return { draft: EMPTY_DRAFT, restored: false };
     const parsed = JSON.parse(raw) as { version?: number; draft?: OnboardingDraft };
-    if (parsed.version !== DRAFT_VERSION || !parsed.draft) return EMPTY_DRAFT;
+    if (parsed.version !== DRAFT_VERSION || !parsed.draft) return { draft: EMPTY_DRAFT, restored: false };
     // Merge over EMPTY_DRAFT so a key added after this draft was written is
     // present rather than undefined.
-    return { ...EMPTY_DRAFT, ...parsed.draft };
+    return { draft: { ...EMPTY_DRAFT, ...parsed.draft }, restored: true };
   } catch {
-    return EMPTY_DRAFT;
+    return { draft: EMPTY_DRAFT, restored: false };
   }
 }
 
 export function useOnboardingDraft() {
-  const [draft, dispatch] = useReducer(draftReducer, undefined, readDraft);
+  // Read once, on mount, so the reducer seeds from the persisted draft and
+  // `restored` reflects that same read — not recomputed on every render.
+  const initial = useMemo(readDraft, []);
+  const [draft, dispatch] = useReducer(draftReducer, initial.draft);
 
   useEffect(() => {
     try {
@@ -42,5 +47,5 @@ export function useOnboardingDraft() {
     window.sessionStorage.removeItem(DRAFT_KEY);
   }, []);
 
-  return { draft, dispatch, clear };
+  return { draft, dispatch, clear, restored: initial.restored };
 }

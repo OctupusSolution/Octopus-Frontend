@@ -9,12 +9,12 @@ export function PaymentStepSlot({ draft, dispatch }: StepProps) {
       details={{
         businessName: draft.brand.businessName,
         email: draft.account.email,
-        phone: "",
+        phone: draft.account.phone,
         password: draft.account.password,
       }}
       onChange={(next) => {
         dispatch({ type: "patchBrand", patch: { businessName: next.businessName } });
-        dispatch({ type: "patchAccount", patch: { email: next.email, password: next.password } });
+        dispatch({ type: "patchAccount", patch: { email: next.email, phone: next.phone, password: next.password } });
       }}
     />
   );

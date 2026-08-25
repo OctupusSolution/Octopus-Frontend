@@ -22,7 +22,7 @@ export function VerticalStep({
   const { t } = useI18n();
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {verticals.map((vertical) => {
         const available = vertical.status === "available";
         const active = selected === vertical.id;
@@ -35,7 +35,7 @@ export function VerticalStep({
             onClick={() => onSelect(vertical.id)}
             title={available ? t("onboarding.vertical.available") : t("onboarding.vertical.comingSoon")}
             className={clsx(
-              "relative flex flex-col items-center gap-1.5 rounded-xl border p-4 text-center transition-all duration-200",
+              "relative flex flex-col items-center gap-1.5 rounded-xl border p-6 text-center transition-all duration-200",
               active
                 ? "border-[#0D6EFD] bg-[var(--octo-selected)] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]"
                 : available
@@ -49,9 +49,9 @@ export function VerticalStep({
             <img
               src={verticalIcon(vertical.image)}
               alt=""
-              width={56}
-              height={56}
-              className={clsx("h-14 w-14 object-contain", !available && "opacity-50 grayscale-[30%]")}
+              width={64}
+              height={64}
+              className={clsx("h-16 w-16 object-contain", !available && "opacity-50 grayscale-[30%]")}
             />
             <span
               className={clsx(
@@ -61,19 +61,10 @@ export function VerticalStep({
             >
               {t(vertical.nameKey)}
             </span>
-            <span className="text-[10.5px] leading-snug text-[var(--octo-text-faint)]">
-              {t(vertical.descKey)}
-            </span>
 
             {active && (
               <span className="absolute end-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#0D6EFD] text-white">
                 <Check size={11} strokeWidth={3} />
-              </span>
-            )}
-
-            {available && !active && (
-              <span className="absolute end-2 top-2 rounded-full bg-[#16a34a]/10 px-1.5 py-0.5 text-[9px] font-semibold text-[#16a34a]">
-                {t("onboarding.vertical.available")}
               </span>
             )}
 

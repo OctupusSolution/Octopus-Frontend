@@ -6,6 +6,7 @@ import type { DraftAction, OnboardingDraft } from "./draft";
 import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
 import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
 import { GetStartedStep } from "../steps/get-started-step";
+import { InsightsAside } from "../steps/insights-aside";
 import { QuestionsStepSlot } from "../steps/questions-step-slot";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStepSlot } from "../steps/review-step-slot";
@@ -52,6 +53,7 @@ export const STEPS: readonly StepDef[] = [
     Component: ({ draft, dispatch }) => (
       <VerticalStep selected={draft.vertical} onSelect={(id) => dispatch({ type: "setVertical", id })} />
     ),
+    Aside: InsightsAside,
     canContinue: (d) => d.vertical !== null,
     showPriceBar: false,
   },

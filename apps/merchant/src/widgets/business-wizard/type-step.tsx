@@ -30,7 +30,7 @@ export function TypeStep({
             type="button"
             onClick={() => onSelect(type.code)}
             className={clsx(
-              "relative flex flex-col items-center rounded-xl border p-[18px] text-center transition-all duration-200",
+              "relative flex flex-col items-start rounded-xl border p-[18px] text-start transition-all duration-200",
               active
                 ? "border-[#0D6EFD] bg-[var(--octo-selected)] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]"
                 : "border-[var(--octo-border-card)] bg-[var(--octo-card)] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
@@ -48,19 +48,20 @@ export function TypeStep({
             <img
               src={typeIcon(type.image)}
               alt=""
-              width={56}
-              height={56}
-              className="h-14 w-14 object-contain"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
             />
 
-            <h3 className="mt-3 text-[13px] font-semibold text-[var(--octo-text-primary)]">
+            <h3 className="mt-3 text-[13.5px] font-bold text-[var(--octo-text-primary)]">
               {t(type.nameKey)}
             </h3>
-            <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--octo-text-muted)]">
+            <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">
               {t(type.descKey)}
             </p>
-            <p className="mt-2 w-full border-t border-[var(--octo-divider)] pt-2 text-[11px] leading-relaxed text-[var(--octo-text-secondary)]">
-              {t(type.fitKey)}
+            <p className="mt-2.5 flex w-full items-start gap-1.5 rounded-[8px] bg-[var(--octo-selected)] px-2 py-1.5 text-[10.5px] leading-relaxed text-[#0D6EFD]">
+              <Check size={12} strokeWidth={3} className="mt-px shrink-0" />
+              <span>{t(type.fitKey)}</span>
             </p>
           </button>
         );

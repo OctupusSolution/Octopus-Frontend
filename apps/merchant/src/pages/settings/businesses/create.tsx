@@ -16,6 +16,7 @@ import { VerticalStep, TypeStep, QuestionsStep, ModulesStep, type Answers } from
 import { StepRail } from "@/pages/onboarding/_shared/step-rail";
 
 const WIZARD_TOTAL_STEPS = 5;
+const WIZARD_RAIL_LABEL_KEYS = [1, 2, 3, 4, 5].map((n) => `settings.businesses.wizard.rail.step${n}`);
 
 export function CreateBusinessPage() {
   const { t, dir } = useI18n();
@@ -95,7 +96,7 @@ export function CreateBusinessPage() {
       </h1>
 
       <div className="mt-5 max-w-[960px]">
-        <StepRail step={step} total={WIZARD_TOTAL_STEPS} labelPrefix="settings.businesses.wizard.rail.step" />
+        <StepRail step={step} labelKeys={WIZARD_RAIL_LABEL_KEYS} />
       </div>
 
       <div className="mt-7 max-w-[960px]">

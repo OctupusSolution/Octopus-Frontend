@@ -24,7 +24,7 @@ export function PriceBar({
   return (
     <div className="sticky bottom-0 z-20 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 shadow-[0_-8px_20px_rgba(15,23,42,0.05)] backdrop-blur">
       {open && (
-        <div className="mx-auto max-w-[900px] px-5 pt-4">
+        <div className="mx-auto max-w-[1180px] px-5 pt-4">
           <ul className="flex flex-col gap-1.5 border-b border-[var(--octo-divider)] pb-3">
             {price.lines.map((line) => (
               <li key={line.id} className="flex items-center justify-between text-[12px]">
@@ -38,7 +38,7 @@ export function PriceBar({
         </div>
       )}
 
-      <div className="mx-auto flex max-w-[900px] flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+      <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-3 px-5 py-3.5">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}

@@ -86,7 +86,10 @@ export function ModulesStep({
               className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2 ps-9 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30"
             />
           </span>
-          <span className="rounded-full bg-[var(--octo-hover)] px-3 py-1.5 text-[11.5px] text-[var(--octo-text-secondary)]">
+          {/* A label, not a control. Styled as a pill next to the live
+              "Selected N" badge it read as half of a segmented filter that
+              did nothing when clicked, so it is plain muted text. */}
+          <span className="px-1 text-[11.5px] text-[var(--octo-text-muted)]">
             {t("onboarding.modules.all")}
           </span>
           <span className="rounded-full bg-[#0D6EFD] px-3 py-1.5 text-[11.5px] font-semibold text-white">

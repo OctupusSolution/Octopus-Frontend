@@ -1,9 +1,10 @@
 // The panel beside step 4. Brand tone and menu categories come from the chosen
 // business type; the identity preview is the merchant's own logo and colour,
 // so it updates as they pick.
-import { RefreshCw, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { brandToneFor, serviceCategoriesFor } from "../_shared/ai-insights";
+import { readableOn } from "../_shared/brand-catalog";
 import type { StepProps } from "../_shared/steps";
 
 export function BusinessDetailsAside({ draft }: StepProps) {
@@ -51,20 +52,16 @@ export function BusinessDetailsAside({ draft }: StepProps) {
           {brand.logoDataUrl ? (
             <img src={brand.logoDataUrl} alt="" className="max-h-14 max-w-[70%] object-contain" />
           ) : (
-            <span className="px-3 text-center text-[13px] font-bold text-white">
+            // The gradient runs primary -> secondary; the merchant may pick a
+            // very light primary, so this label follows the same contrast rule
+            // every other merchant-coloured surface uses instead of assuming
+            // white reads.
+            <span className="px-3 text-center text-[13px] font-bold" style={{ color: readableOn(brand.primary) }}>
               {brand.businessName || t("onboarding.businessName")}
             </span>
           )}
         </div>
       </div>
-
-      <button
-        type="button"
-        className="inline-flex items-center justify-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[11px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
-      >
-        <RefreshCw size={12} />
-        {t("onboarding.aside.regenerate")}
-      </button>
     </section>
   );
 }

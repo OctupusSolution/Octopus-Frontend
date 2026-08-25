@@ -43,9 +43,8 @@ export function publicLinkAsset(file: string): string {
 }
 
 // Only one real theme thumbnail exists. `elegant` uses it; `modern` and `warm`
-// fall back to a gradient built from the merchant's own palette (see
-// ThemeTemplate.thumb in brand-catalog.ts). Returning null is how a component
-// learns to render the gradient instead of an <img>.
+// fall back to a gradient built from the merchant's own palette. Returning
+// null is how a component learns to render that gradient instead of an <img>.
 export function themeThumb(id: string): string | null {
   return id === "elegant" ? url("onboarding-Themes/Brand Theme.png") : null;
 }

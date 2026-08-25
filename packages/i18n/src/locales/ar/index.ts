@@ -2922,6 +2922,7 @@ export const ar = {
   // --- pricing ---
   "pricing.line.base": "اشتراك أوكتوبس الأساسي",
   "pricing.line.extraBranches": "فروع إضافية",
+  "pricing.line.integrations": "التكاملات",
   "pricing.monthlyTotal": "الإجمالي الشهري",
   "pricing.perMonth": "/ شهرياً",
   "pricing.quoted": "بالإضافة إلى بنود بعرض سعر",

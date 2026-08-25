@@ -11,6 +11,7 @@ import {
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { BRAND_GRADIENT } from "@/shared/lib/brand";
+import { formatSar } from "@/shared/catalog";
 import { integrationLogo } from "../_shared/assets";
 
 const CATEGORIES: readonly IntegrationCategory[] = ["delivery", "payments", "accounting", "messaging"];
@@ -28,7 +29,7 @@ export function IntegrationsStep({
   selected: readonly IntegrationId[];
   onToggle: (id: IntegrationId) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <div className="flex flex-col gap-4">
@@ -48,6 +49,7 @@ export function IntegrationsStep({
                   active={selected.includes(item.id)}
                   onToggle={() => onToggle(item.id)}
                   t={t}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -63,12 +65,13 @@ export function IntegrationsStep({
 }
 
 function IntegrationCard({
-  item, active, onToggle, t,
+  item, active, onToggle, t, locale,
 }: {
   item: IntegrationOption;
   active: boolean;
   onToggle: () => void;
   t: (key: string) => string;
+  locale: string;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -113,6 +116,9 @@ function IntegrationCard({
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{item.name}</p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--octo-text-muted)]">{t(item.descKey)}</p>
+        <p className="mt-1 text-[11.5px] font-semibold text-[var(--octo-text-primary)]">
+          {formatSar(item.priceSar, locale)} <span className="font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
+        </p>
       </div>
       {active && (
         <span

@@ -7,19 +7,24 @@ import { ChevronUp } from "lucide-react";
 import clsx from "clsx";
 import { computePrice, formatSar, type ModuleId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { integrationsTotal, type IntegrationId } from "./extras-catalog";
 
 export function PriceBar({
   modules,
   branchCount,
+  integrations,
   action,
 }: {
   modules: readonly ModuleId[];
   branchCount: number;
+  integrations: readonly IntegrationId[];
   action: React.ReactNode;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const price = computePrice(modules, branchCount);
+  const connectors = integrationsTotal(integrations);
+  const total = price.total + connectors;
 
   return (
     <div className="sticky bottom-0 z-20 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 shadow-[0_-8px_20px_rgba(15,23,42,0.05)] backdrop-blur">
@@ -34,6 +39,12 @@ export function PriceBar({
                 </span>
               </li>
             ))}
+            {connectors > 0 && (
+              <li className="flex items-center justify-between text-[12px]">
+                <span className="text-[var(--octo-text-secondary)]">{t("pricing.line.integrations")}</span>
+                <span className="font-medium text-[var(--octo-text-primary)]">{formatSar(connectors, locale)}</span>
+              </li>
+            )}
           </ul>
         </div>
       )}
@@ -51,7 +62,7 @@ export function PriceBar({
             </p>
             <p className="mt-0.5 flex items-baseline gap-1.5">
               <span className="text-[22px] font-bold leading-none text-[var(--octo-text-primary)]">
-                {formatSar(price.total, locale)}
+                {formatSar(total, locale)}
               </span>
               <span className="text-[11.5px] text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
             </p>

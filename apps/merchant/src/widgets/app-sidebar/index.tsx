@@ -312,7 +312,16 @@ export function AppSidebar() {
   const location = useLocation();
   const { t, dir } = useI18n();
   const { user, signOut } = useAuth();
-  const { isModuleEnabled } = useTenantConfig();
+  const { isModuleEnabled, activeBusiness } = useTenantConfig();
+
+  // The merchant typed their business name on step 4 of onboarding and their
+  // email in the account modal. Greeting them as somebody else's company —
+  // this used to read "Al Bahri Group / owner@albahri.sa" — is the last thing
+  // the signup flow shows. Fall back to the generic label only when there is
+  // genuinely no business yet (a deep link into an unprovisioned session).
+  const accountName = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
+  const accountEmail = user?.email ?? "";
+  const accountInitials = accountName.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
 
   // Navigation is filtered to what this tenant actually bought, at both
   // levels: whole groups, and individual sub-items that belong to a
@@ -490,13 +499,13 @@ export function AppSidebar() {
 
       <div className={clsx("flex items-center gap-2.5 border-t border-[var(--octo-border-card)] py-3", collapsed ? "justify-center px-0" : "px-4")}>
         <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-deep-navy text-xs font-semibold text-white">
-          AR
+          {accountInitials}
         </div>
         {!collapsed && (
           <>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">Al Bahri Group</p>
-              <p className="truncate text-[11px] text-[var(--octo-text-muted)]">owner@albahri.sa</p>
+              <p className="truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{accountName}</p>
+              <p className="truncate text-[11px] text-[var(--octo-text-muted)]">{accountEmail}</p>
             </div>
             <div ref={accountRef} className="relative">
               <button

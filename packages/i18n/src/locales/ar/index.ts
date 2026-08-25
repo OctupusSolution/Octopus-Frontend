@@ -111,6 +111,7 @@ export const ar = {
   "sidebar.collapse": "طي الشريط الجانبي",
   "sidebar.expand": "توسيع الشريط الجانبي",
   "sidebar.accountMenu": "قائمة الحساب",
+  "sidebar.accountFallback": "نشاطك التجاري",
 
   /* -------------------------------------------------------------- breadcrumb */
   "breadcrumb.overview": "نظرة عامة",
@@ -172,7 +173,7 @@ export const ar = {
 
   /* ----------------------------------------------------------------- dashboard */
   "dashboard.title": "لوحة تحكم التاجر",
-  "dashboard.subtitle": "تحليلات ومتابعة شاملة للعمليات لمجموعة البحر الأحمر",
+  "dashboard.subtitle": "تحليلات ومتابعة شاملة للعمليات لـ {business}",
   "dashboard.globalFilter": "تصفية شاملة",
   "dashboard.lastUpdated": "آخر تحديث: قبل 30 دقيقة",
   "dashboard.kpi.orders": "الطلبات النشطة",
@@ -2760,8 +2761,6 @@ export const ar = {
   "onboarding.requiresNote": "يتطلب {name}",
   "onboarding.summaryFor": "إعدادك لـ {type}",
 
-  // --- onboarding: goals (step 3) ---
-
   // --- onboarding: integrations (step 6) ---
   "onboarding.integrations.category.delivery": "تطبيقات التوصيل",
   "onboarding.integrations.category.payments": "المدفوعات",
@@ -2779,11 +2778,7 @@ export const ar = {
   "onboarding.integrations.item.whatsapp.desc": "أرسل تحديثات الطلبات والحجوزات عبر واتساب.",
   "onboarding.integrations.disclaimer": "تقدر تربط أي منها لاحقاً من الإعدادات — ولا شيء متصل الآن.",
 
-  // --- onboarding: data & security (step 7) ---
-
-  // --- onboarding: team & workflows (step 8) ---
-
-  // --- onboarding: review (step 9) ---
+  // --- onboarding: review (step 7) ---
   "onboarding.review.business": "النشاط",
   "onboarding.review.industry": "القطاع",
   "onboarding.review.type": "النوع",
@@ -2797,14 +2792,11 @@ export const ar = {
   "onboarding.review.plan": "خطتك",
   "onboarding.review.subscription": "اشتراك OCTOPUS",
   "onboarding.review.total": "الإجمالي",
-  "onboarding.review.continueToPreview": "متابعة إلى المعاينة",
   "onboarding.review.none": "لم يتم اختيار شيء",
   "onboarding.review.modules": "وحدات النظام المتصلة",
   "onboarding.review.integrations": "التكاملات",
   "onboarding.review.edit": "تعديل",
   "onboarding.review.completed": "مكتمل",
-
-  // --- onboarding: launch (step 10) ---
 
   // --- pricing ---
   "pricing.line.base": "اشتراك أوكتوبس الأساسي",
@@ -2884,7 +2876,6 @@ export const ar = {
   "onboarding.aside.brandTone": "طابع العلامة",
   "onboarding.aside.serviceCategories": "فئات الخدمات",
   "onboarding.aside.publicIdentity": "معاينة الهوية العامة",
-  "onboarding.aside.regenerate": "إعادة توليد الاقتراحات",
   "onboarding.aside.summary.title": "ملخص الذكاء الاصطناعي",
   "onboarding.aside.summary.lead": "اختيارات موفقة!",
   "onboarding.aside.summary.count": "سيتضمن نظام تشغيلك {n} وحدة أساسية.",
@@ -2997,19 +2988,13 @@ export const ar = {
   "onboarding.publicLink.yourLinkNote": "هذا رابطك الموجه للعملاء، شاركه للبدء.",
   "onboarding.publicLink.customTag": "علامة مخصصة",
   "onboarding.publicLink.theming": "الطابع والهوية",
-  "onboarding.publicLink.themingNote": "خصص شكل صفحتك.",
   "onboarding.publicLink.primaryColor": "اللون الأساسي",
   "onboarding.publicLink.secondaryColor": "اللون الثانوي",
-  "onboarding.publicLink.font": "الخط",
-  "onboarding.publicLink.style": "النمط",
-  "onboarding.publicLink.logo": "الشعار",
   "onboarding.publicLink.connectedModules": "وحدات النظام المتصلة",
   "onboarding.publicLink.connectedNote": "هذه الصفحة مدعومة بـ {n} وحدة من النظام.",
   "onboarding.publicLink.live": "مباشر",
   "onboarding.publicLink.customize": "خصص رابطك العام",
   "onboarding.publicLink.customizeNote": "أدر الأقسام وترتيبها وطريقة ظهورها للعملاء.",
-  "onboarding.publicLink.dropHint": "اسحب وأفلت لإضافة تبويب جديد.",
-  "onboarding.publicLink.saveDraft": "حفظ كمسودة",
   "onboarding.publicLink.section.hero": "القسم الرئيسي",
   "onboarding.publicLink.section.offers": "شريط العروض",
   "onboarding.publicLink.section.menu": "القائمة",
@@ -3023,8 +3008,6 @@ export const ar = {
   "onboarding.dashboardPreview.summary": "ملخص الإعداد",
   "onboarding.dashboardPreview.configured": "كل شيء مهيأ بناءً على إعدادك.",
   "onboarding.dashboardPreview.sampleNote": "أرقام تجريبية — ستظهر أرقامك الحقيقية بمجرد بدء التداول.",
-  "onboarding.dashboardPreview.backToSetup": "العودة إلى الإعداد",
-  "onboarding.dashboardPreview.continueToPayment": "متابعة إلى الدفع",
 
   /* ------------------------------------------------ onboarding: step 10 */
   "onboarding.payment.title": "أكمل إعدادك",
@@ -3059,6 +3042,4 @@ export const ar = {
   "onboarding.account.createdTitle": "تم إنشاء الحساب بنجاح!",
   "onboarding.account.createdNote": "تم إنشاء حسابك وحفظ إعداد نشاطك. أكمل الدفع لتفعيل مساحة عملك والبدء مع OCTOPUS.",
   "onboarding.account.continueToPayment": "متابعة إلى الدفع",
-  "onboarding.account.panelTitle": "أنشئ حسابك وابدأ",
-  "onboarding.account.panelNote": "أدخل بياناتك وابدأ نظام تشغيلك.",
 } as const;

@@ -111,6 +111,7 @@ export const en = {
   "sidebar.collapse": "Collapse sidebar",
   "sidebar.expand": "Expand sidebar",
   "sidebar.accountMenu": "Account menu",
+  "sidebar.accountFallback": "Your business",
 
   /* -------------------------------------------------------------- breadcrumb */
   "breadcrumb.overview": "Overview",
@@ -172,7 +173,7 @@ export const en = {
 
   /* ----------------------------------------------------------------- dashboard */
   "dashboard.title": "Merchant Dashboard",
-  "dashboard.subtitle": "Comprehensive analytics and operations monitoring for Al Bahri Group",
+  "dashboard.subtitle": "Comprehensive analytics and operations monitoring for {business}",
   "dashboard.globalFilter": "Global Filter",
   "dashboard.lastUpdated": "Last Updated: 30 minutes ago",
   "dashboard.kpi.orders": "TOTAL ORDERS ACTIVE",
@@ -2760,8 +2761,6 @@ export const en = {
   "onboarding.requiresNote": "Requires {name}",
   "onboarding.summaryFor": "Your setup for {type}",
 
-  // --- onboarding: goals (step 3) ---
-
   // --- onboarding: integrations (step 6) ---
   "onboarding.integrations.category.delivery": "Delivery apps",
   "onboarding.integrations.category.payments": "Payments",
@@ -2779,11 +2778,7 @@ export const en = {
   "onboarding.integrations.item.whatsapp.desc": "Send order and booking updates over WhatsApp.",
   "onboarding.integrations.disclaimer": "You can connect any of these anytime from Settings — nothing here connects yet.",
 
-  // --- onboarding: data & security (step 7) ---
-
-  // --- onboarding: team & workflows (step 8) ---
-
-  // --- onboarding: review (step 9) ---
+  // --- onboarding: review (step 7) ---
   "onboarding.review.business": "Business",
   "onboarding.review.industry": "Industry",
   "onboarding.review.type": "Type",
@@ -2797,14 +2792,11 @@ export const en = {
   "onboarding.review.plan": "Your Plan",
   "onboarding.review.subscription": "OCTOPUS Subscription",
   "onboarding.review.total": "Total",
-  "onboarding.review.continueToPreview": "Continue to Preview",
   "onboarding.review.none": "None selected",
   "onboarding.review.modules": "Connected OS Modules",
   "onboarding.review.integrations": "Integrations",
   "onboarding.review.edit": "Edit",
   "onboarding.review.completed": "Completed",
-
-  // --- onboarding: launch (step 10) ---
 
   // --- pricing ---
   "pricing.line.base": "OCTOPUS base subscription",
@@ -2884,7 +2876,6 @@ export const en = {
   "onboarding.aside.brandTone": "Brand Tone",
   "onboarding.aside.serviceCategories": "Services Categories",
   "onboarding.aside.publicIdentity": "Public Identity Preview",
-  "onboarding.aside.regenerate": "Regenerate Suggestions",
   "onboarding.aside.summary.title": "AI Summary",
   "onboarding.aside.summary.lead": "Great choices!",
   "onboarding.aside.summary.count": "Your OS will include {n} core modules.",
@@ -2997,19 +2988,13 @@ export const en = {
   "onboarding.publicLink.yourLinkNote": "This is your customer-facing link, share it to start.",
   "onboarding.publicLink.customTag": "Custom Tag",
   "onboarding.publicLink.theming": "Theme & Branding",
-  "onboarding.publicLink.themingNote": "Customize how your page looks.",
   "onboarding.publicLink.primaryColor": "Primary Color",
   "onboarding.publicLink.secondaryColor": "Secondary Color",
-  "onboarding.publicLink.font": "Font",
-  "onboarding.publicLink.style": "Style",
-  "onboarding.publicLink.logo": "Logo",
   "onboarding.publicLink.connectedModules": "Connected OS Modules",
   "onboarding.publicLink.connectedNote": "This page is powered by {n} OS modules.",
   "onboarding.publicLink.live": "Live",
   "onboarding.publicLink.customize": "Customize your public link",
   "onboarding.publicLink.customizeNote": "Manage sections, their order and how they appear to customers.",
-  "onboarding.publicLink.dropHint": "Drag and drop to add a new tab.",
-  "onboarding.publicLink.saveDraft": "Save As Draft",
   "onboarding.publicLink.section.hero": "Hero Section",
   "onboarding.publicLink.section.offers": "Offers Banner",
   "onboarding.publicLink.section.menu": "Menu",
@@ -3023,8 +3008,6 @@ export const en = {
   "onboarding.dashboardPreview.summary": "Setup Summary",
   "onboarding.dashboardPreview.configured": "Everything is configured based on your setup.",
   "onboarding.dashboardPreview.sampleNote": "Sample figures — your real numbers appear once you start trading.",
-  "onboarding.dashboardPreview.backToSetup": "Back to setup",
-  "onboarding.dashboardPreview.continueToPayment": "Continue to Payment",
 
   /* ------------------------------------------------ onboarding: step 10 */
   "onboarding.payment.title": "Complete Your Setup",
@@ -3059,6 +3042,4 @@ export const en = {
   "onboarding.account.createdTitle": "Account Created Successfully!",
   "onboarding.account.createdNote": "Your account has been created and your business setup has been saved. Complete your payment to activate your workspace and get started with OCTOPUS.",
   "onboarding.account.continueToPayment": "Continue to Payment",
-  "onboarding.account.panelTitle": "Create your account and launch",
-  "onboarding.account.panelNote": "Enter your data and start your OS.",
 } as const;

@@ -12,18 +12,21 @@ import { serviceCategoriesFor } from "../_shared/ai-insights";
 import { readableOn } from "../_shared/brand-catalog";
 import type { StepProps } from "../_shared/steps";
 
-/** Strips a merchant's custom tag down to a legal DNS label: lowercase
- *  alphanumerics and interior hyphens only, no leading/trailing hyphen,
- *  63 characters max (the real subdomain limit). An all-hyphen or empty
- *  input collapses to "" and the caller falls back to "restaurant". */
+/** What the merchant sees while typing: strips disallowed characters and caps
+ *  the length, nothing more. It deliberately does NOT trim or collapse
+ *  hyphens — the field is a controlled input, so trimming here runs on every
+ *  keystroke, and a hyphen the merchant just typed is always "trailing" at
+ *  that instant. Do that and `-` becomes untypeable inside a tag. Storage
+ *  stays permissive; DNS-legality is enforced only where the URL is built. */
 function sanitizeTag(value: string): string {
-  return value
-    .replace(/[^a-z0-9-]/gi, "")
-    .toLowerCase()
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 63)
-    .replace(/-+$/g, "");
+  return value.replace(/[^a-z0-9-]/gi, "").toLowerCase().slice(0, 63);
+}
+
+/** What the public URL is built from: collapses repeated hyphens and trims
+ *  them from both ends so the result is a legal DNS label. Applied once, on
+ *  the already-stored (not-yet-trimmed) tag, not on every keystroke. */
+function dnsLabel(tag: string): string {
+  return tag.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
 }
 
 const CATEGORY_IMAGES = ["cat-desserts.webp", "cat-mains.webp", "cat-breakfast.webp", "cat-drinks.webp"];
@@ -43,7 +46,7 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
   const { brand, publicLink } = draft;
 
   const categories = serviceCategoriesFor(draft.type);
-  const url = `https://${publicLink.tag || "restaurant"}.octopus.app`;
+  const url = `https://${dnsLabel(publicLink.tag) || "restaurant"}.octopus.app`;
 
   return (
     <div className="flex flex-col gap-4">

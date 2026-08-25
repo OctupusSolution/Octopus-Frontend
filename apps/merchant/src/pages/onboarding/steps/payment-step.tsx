@@ -87,39 +87,40 @@ export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
 
       <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
         <p className="text-[12.5px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.payment.methods")}</p>
-        <div className="mt-3 flex flex-col gap-2">
+        <fieldset className="mt-3 flex flex-col gap-2">
+          <legend className="sr-only">{t("onboarding.payment.methods")}</legend>
           {PAYMENT_METHODS.map((method) => {
             const active = draft.paymentMethod === method.id;
             return (
-              <button
+              <label
                 key={method.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => dispatch({ type: "setPaymentMethod", id: method.id })}
                 className={clsx(
-                  "flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-start transition-colors",
-                  active
-                    ? "border-[#0D6EFD] bg-[var(--octo-selected)]"
-                    : "border-[var(--octo-border-input)] hover:bg-[var(--octo-hover)]"
+                  "flex cursor-pointer items-center gap-3 rounded-[10px] border px-3 py-2.5 text-start transition-colors",
+                  "has-[:checked]:border-[#0D6EFD] has-[:checked]:bg-[var(--octo-selected)]",
+                  "border-[var(--octo-border-input)] hover:bg-[var(--octo-hover)]"
                 )}
               >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value={method.id}
+                  checked={active}
+                  onChange={() => dispatch({ type: "setPaymentMethod", id: method.id })}
+                  className="peer sr-only"
+                />
                 {method.logo ? (
                   <img src={paymentLogo(method.logo)} alt="" className="h-5 w-10 shrink-0 object-contain" />
                 ) : (
                   <CreditCard size={18} className="shrink-0 text-[var(--octo-text-muted)]" />
                 )}
                 <span className="flex-1 text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t(method.labelKey)}</span>
-                <span className={clsx(
-                  "grid h-4 w-4 shrink-0 place-items-center rounded-full border",
-                  active ? "border-[#0D6EFD]" : "border-[var(--octo-border-input)]"
-                )}>
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full border border-[var(--octo-border-input)] peer-checked:border-[#0D6EFD]">
                   {active && <span className="h-2 w-2 rounded-full bg-[#0D6EFD]" />}
                 </span>
-              </button>
+              </label>
             );
           })}
-        </div>
+        </fieldset>
 
         <Button
           variant="primary"
@@ -164,7 +165,7 @@ export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
             <Link2 size={12} />
             {`https://${draft.publicLink.tag || "restaurant"}.octopus.app`}
           </p>
-          <Button variant="primary" className="mt-2 w-full justify-center !py-2.5" onClick={onFinish}>
+          <Button variant="primary" className="mt-2 w-full justify-center !py-2.5" onClick={() => onFinish?.()}>
             {t("onboarding.payment.goToDashboard")}
           </Button>
         </div>

@@ -10,10 +10,7 @@ import { Check, Lock } from "lucide-react";
 import clsx from "clsx";
 import { verticals, type VerticalId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-
-function iconUrl(filename: string): string {
-  return new URL(`../../../../assets/onboarding-Business/${filename}`, import.meta.url).href;
-}
+import { verticalIcon } from "@/pages/onboarding/_shared/assets";
 
 export function VerticalStep({
   selected,
@@ -50,7 +47,7 @@ export function VerticalStep({
             )}
           >
             <img
-              src={iconUrl(vertical.image)}
+              src={verticalIcon(vertical.image)}
               alt=""
               width={56}
               height={56}

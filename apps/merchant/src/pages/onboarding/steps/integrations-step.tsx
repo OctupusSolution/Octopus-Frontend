@@ -11,10 +11,7 @@ import {
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { BRAND_GRADIENT } from "@/shared/lib/brand";
-
-function imageUrl(filename: string): string {
-  return new URL(`../../../../../assets/onboarding-Integrations/${filename}`, import.meta.url).href;
-}
+import { integrationLogo } from "../_shared/assets";
 
 const CATEGORIES: readonly IntegrationCategory[] = ["delivery", "payments", "accounting", "messaging"];
 const CATEGORY_KEY: Record<IntegrationCategory, string> = {
@@ -98,7 +95,7 @@ function IntegrationCard({
             </span>
           ) : (
             <img
-              src={imageUrl(item.image)}
+              src={integrationLogo(item.image)}
               alt=""
               className="block h-full w-full object-contain"
               onError={() => setImageFailed(true)}

@@ -5,6 +5,7 @@ import type { ComponentType, Dispatch } from "react";
 import type { DraftAction, OnboardingDraft } from "./draft";
 import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
 import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
+import { GetStartedStep } from "../steps/get-started-step";
 import { QuestionsStepSlot } from "../steps/questions-step-slot";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStepSlot } from "../steps/review-step-slot";
@@ -34,6 +35,15 @@ export interface StepDef {
 }
 
 export const STEPS: readonly StepDef[] = [
+  {
+    id: "getStarted",
+    labelKey: "onboarding.rail.getStarted",
+    titleKey: "onboarding.getStarted.title.c",
+    subtitleKey: "onboarding.getStarted.subtitle",
+    Component: GetStartedStep,
+    canContinue: () => true,
+    showPriceBar: false,
+  },
   {
     id: "businessType",
     labelKey: "onboarding.rail.businessType",

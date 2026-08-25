@@ -14,7 +14,7 @@ import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStep } from "../steps/review-step";
 import { PublicLinkStep } from "../steps/public-link-step";
 import { DashboardPreviewStep } from "../steps/dashboard-preview-step";
-import { PaymentStepSlot } from "../steps/payment-step-slot";
+import { PaymentStep } from "../steps/payment-step";
 
 /** Enabling pulls in prerequisites; disabling drops anything that depended on
  * `id`. Same dependency-resolution rule the Create Business wizard uses — the
@@ -142,8 +142,8 @@ export const STEPS: readonly StepDef[] = [
     labelKey: "onboarding.rail.payment",
     titleKey: "onboarding.payment.title",
     subtitleKey: "onboarding.payment.subtitle",
-    Component: PaymentStepSlot,
-    canContinue: (d) => d.account.email.trim() !== "" && d.brand.businessName.trim() !== "",
+    Component: PaymentStep,
+    canContinue: (d) => d.paid,
     showPriceBar: false,
   },
 ];

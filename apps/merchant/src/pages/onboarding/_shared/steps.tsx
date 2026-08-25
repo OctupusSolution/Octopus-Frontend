@@ -11,7 +11,7 @@ import { ModulesSummaryAside } from "../steps/modules-summary-aside";
 import { BusinessDetailsStep } from "../steps/business-details-step";
 import { BusinessDetailsAside } from "../steps/business-details-aside";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
-import { ReviewStepSlot } from "../steps/review-step-slot";
+import { ReviewStep } from "../steps/review-step";
 import { PaymentStepSlot } from "../steps/payment-step-slot";
 
 /** Enabling pulls in prerequisites; disabling drops anything that depended on
@@ -113,7 +113,7 @@ export const STEPS: readonly StepDef[] = [
     labelKey: "onboarding.rail.review",
     titleKey: "onboarding.review.title",
     subtitleKey: "onboarding.review.subtitle",
-    Component: ReviewStepSlot,
+    Component: ReviewStep,
     canContinue: () => true,
     showPriceBar: false,
   },

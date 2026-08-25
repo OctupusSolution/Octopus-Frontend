@@ -15,13 +15,18 @@ export function QuestionsStep({
   type,
   answers,
   onAnswer,
+  exclude = [],
 }: {
   type: TypeCode;
   answers: Answers;
   onAnswer: (questionId: string, optionId: string) => void;
+  /** Question ids to drop — e.g. when a caller asks the same thing as a
+   * dedicated field elsewhere on the same screen. Empty by default so
+   * existing callers are unaffected. */
+  exclude?: readonly string[];
 }) {
   const { t } = useI18n();
-  const list = questionsFor(type);
+  const list = questionsFor(type).filter((q) => !exclude.includes(q.id));
 
   return (
     <div className="flex flex-col gap-3">

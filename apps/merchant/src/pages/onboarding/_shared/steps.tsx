@@ -13,6 +13,7 @@ import { BusinessDetailsAside } from "../steps/business-details-aside";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStep } from "../steps/review-step";
 import { PublicLinkStep } from "../steps/public-link-step";
+import { DashboardPreviewStep } from "../steps/dashboard-preview-step";
 import { PaymentStepSlot } from "../steps/payment-step-slot";
 
 /** Enabling pulls in prerequisites; disabling drops anything that depended on
@@ -124,6 +125,15 @@ export const STEPS: readonly StepDef[] = [
     titleKey: "onboarding.publicLink.title",
     subtitleKey: "onboarding.publicLink.subtitle",
     Component: PublicLinkStep,
+    canContinue: () => true,
+    showPriceBar: false,
+  },
+  {
+    id: "dashboardPreview",
+    labelKey: "onboarding.rail.dashboardPreview",
+    titleKey: "onboarding.dashboardPreview.title",
+    subtitleKey: "onboarding.dashboardPreview.subtitle",
+    Component: DashboardPreviewStep,
     canContinue: () => true,
     showPriceBar: false,
   },

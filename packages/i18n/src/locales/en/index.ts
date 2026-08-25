@@ -3135,6 +3135,7 @@ export const en = {
   "onboarding.dashboardPreview.subtitle": "We've built your workspace around the way your business works. Take a quick look and explore it before you launch.",
   "onboarding.dashboardPreview.summary": "Setup Summary",
   "onboarding.dashboardPreview.configured": "Everything is configured based on your setup.",
+  "onboarding.dashboardPreview.sampleNote": "Sample figures — your real numbers appear once you start trading.",
   "onboarding.dashboardPreview.backToSetup": "Back to setup",
   "onboarding.dashboardPreview.continueToPayment": "Continue to Payment",
 

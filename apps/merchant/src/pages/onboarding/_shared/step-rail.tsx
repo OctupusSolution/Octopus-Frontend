@@ -9,6 +9,15 @@ import { useI18n } from "@/app/providers/i18n-provider";
 export function StepRail({ step, labelKeys }: { step: number; labelKeys: readonly string[] }) {
   const { t } = useI18n();
 
+  // The label is a fixed 72px block under a 7px-wide dot column. Five of those
+  // fit on a phone; ten do not — they collide into unreadable mush and the
+  // container does not scroll. Below the breakpoint where the labels fit, the
+  // rail falls back to numbered dots, which stay legible at any width and keep
+  // the active step (ringed, coloured) on screen without scrolling. The
+  // threshold moves with the step count so the five-step Create Business rail
+  // keeps its labels from `sm` up, exactly as before.
+  const labelVisibility = labelKeys.length <= 6 ? "hidden sm:block" : "hidden lg:block";
+
   return (
     <div className="flex w-full items-start" role="presentation">
       {labelKeys.map((labelKey, i) => {
@@ -32,6 +41,7 @@ export function StepRail({ step, labelKeys }: { step: number; labelKeys: readonl
               </div>
               <span
                 className={clsx(
+                  labelVisibility,
                   "w-[72px] text-center text-[10px] font-medium leading-tight",
                   done || active ? "text-[#0D6EFD]" : "text-[var(--octo-text-faint)]"
                 )}

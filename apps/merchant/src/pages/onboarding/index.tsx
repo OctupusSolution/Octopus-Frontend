@@ -163,8 +163,8 @@ export function OnboardingPage() {
         )}
 
         <div className="mt-6">
-          <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} /> : undefined}>
-            <current.Component draft={draft} dispatch={dispatch} />
+          <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} onFinish={handleFinish} /> : undefined}>
+            <current.Component draft={draft} dispatch={dispatch} onFinish={handleFinish} />
           </StepShell>
         </div>
       </main>

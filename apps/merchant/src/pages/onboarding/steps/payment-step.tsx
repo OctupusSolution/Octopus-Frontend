@@ -18,7 +18,7 @@ const INCLUDES = [
   "onboarding.payment.includesPublicLink",
 ];
 
-export function PaymentStep({ draft, dispatch }: StepProps) {
+export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
   const { t, locale } = useI18n();
   const [accountOpen, setAccountOpen] = useState(!draft.accountCreated);
   const [processing, setProcessing] = useState(false);
@@ -164,6 +164,9 @@ export function PaymentStep({ draft, dispatch }: StepProps) {
             <Link2 size={12} />
             {`https://${draft.publicLink.tag || "restaurant"}.octopus.app`}
           </p>
+          <Button variant="primary" className="mt-2 w-full justify-center !py-2.5" onClick={onFinish}>
+            {t("onboarding.payment.goToDashboard")}
+          </Button>
         </div>
       </Modal>
     </div>

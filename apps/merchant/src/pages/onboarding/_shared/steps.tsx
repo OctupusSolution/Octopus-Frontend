@@ -7,7 +7,8 @@ import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
 import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
 import { GetStartedStep } from "../steps/get-started-step";
 import { InsightsAside } from "../steps/insights-aside";
-import { QuestionsStepSlot } from "../steps/questions-step-slot";
+import { BusinessDetailsStep } from "../steps/business-details-step";
+import { BusinessDetailsAside } from "../steps/business-details-aside";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
 import { ReviewStepSlot } from "../steps/review-step-slot";
 import { PaymentStepSlot } from "../steps/payment-step-slot";
@@ -73,8 +74,9 @@ export const STEPS: readonly StepDef[] = [
     labelKey: "onboarding.rail.businessDetails",
     titleKey: "onboarding.details.title",
     subtitleKey: "onboarding.details.subtitle",
-    Component: QuestionsStepSlot,
-    canContinue: () => true,
+    Component: BusinessDetailsStep,
+    Aside: BusinessDetailsAside,
+    canContinue: (d) => d.brand.businessName.trim() !== "" && d.brand.city !== "",
     showPriceBar: true,
   },
   {

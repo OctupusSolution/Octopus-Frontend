@@ -150,13 +150,17 @@ export function OnboardingPage() {
       <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-8">
         <StepRail step={index + 1} labelKeys={labelKeys} />
 
-        <span className="mt-8 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0D6EFD]">
-          {t("onboarding.step").replace("{n}", String(index + 1)).replace("{total}", String(STEPS.length))}
-        </span>
-        <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)] sm:text-[28px]">
-          {t(current.titleKey)}
-        </h1>
-        <p className="mt-2 text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
+        {current.id !== "getStarted" && (
+          <>
+            <span className="mt-8 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0D6EFD]">
+              {t("onboarding.step").replace("{n}", String(index + 1)).replace("{total}", String(STEPS.length))}
+            </span>
+            <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)] sm:text-[28px]">
+              {t(current.titleKey)}
+            </h1>
+            <p className="mt-2 text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
+          </>
+        )}
 
         <div className="mt-6">
           <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} /> : undefined}>

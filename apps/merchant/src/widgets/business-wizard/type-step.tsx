@@ -9,10 +9,7 @@ import clsx from "clsx";
 import { restaurantTypes, type TypeCode } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { BRAND_GRADIENT } from "@/shared/lib/brand";
-
-function imageUrl(filename: string): string {
-  return new URL(`../../../../assets/onboarding-Type/${filename}`, import.meta.url).href;
-}
+import { typeIcon } from "@/pages/onboarding/_shared/assets";
 
 export function TypeStep({
   selected,
@@ -49,7 +46,7 @@ export function TypeStep({
             )}
 
             <img
-              src={imageUrl(type.image)}
+              src={typeIcon(type.image)}
               alt=""
               width={56}
               height={56}

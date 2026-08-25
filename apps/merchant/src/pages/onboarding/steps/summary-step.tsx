@@ -17,8 +17,7 @@ import {
   type GoalId, type IntegrationId, type SecuritySettings, type TeamInvite, type WorkflowId,
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-
-const HERO_IMAGE_URL = new URL("../../../../../assets/Review.png", import.meta.url).href;
+import { DASHBOARD_MOCKUP_URL } from "../_shared/assets";
 
 const CHECKLIST_ITEMS = ["secure", "compliant", "connected", "ready"] as const;
 
@@ -161,7 +160,7 @@ export function SummaryStep({
       </div>
 
       <div className="flex flex-col gap-3">
-        <img src={HERO_IMAGE_URL} alt="" className="w-full object-contain" />
+        <img src={DASHBOARD_MOCKUP_URL} alt="" className="w-full object-contain" />
 
         <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
           <div className="flex items-center gap-2">

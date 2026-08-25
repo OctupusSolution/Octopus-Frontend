@@ -22,6 +22,7 @@ import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { useTheme } from "@/app/providers/theme-provider";
 import { PriceBar } from "./_shared/price-bar";
 import { StepRail } from "./_shared/step-rail";
+import { LOGO_URL } from "./_shared/assets";
 import {
   DEFAULT_SECURITY,
   type GoalId, type IntegrationId, type SecuritySettings, type TeamInvite, type WorkflowId,
@@ -35,7 +36,6 @@ import { SummaryStep } from "./steps/summary-step";
 import { LaunchStep } from "./steps/launch-step";
 import type { AccountDetails } from "./steps/account-step";
 
-const LOGO_URL = new URL("../../../../assets/Logo/OCTOPUS LOGO.svg", import.meta.url).href;
 const TOTAL_STEPS = 10;
 
 /** Add/remove `id` from a small local-state array — the same toggle shape used by goals, integrations and workflows. */

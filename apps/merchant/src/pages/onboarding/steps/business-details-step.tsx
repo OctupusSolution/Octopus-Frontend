@@ -2,7 +2,7 @@
 // theme templates under it. The qualifying questions live at the bottom of the
 // form card because the module set is still derived from them; they are the
 // same questions, asked as fields rather than as a separate screen.
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
 import clsx from "clsx";
 import { Input, Select } from "@ui/primitives";
@@ -18,6 +18,20 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
   const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   const { brand } = draft;
+
+  // The branch-count field is held as raw text while it has focus. Committing
+  // a clamped number on every keystroke made the field snap to 1 the instant
+  // the merchant cleared it, so typing "12" fought them: clearing "1" wrote 1
+  // straight back. The clamp still runs — just on blur, where an empty or
+  // nonsensical value can be corrected without interrupting typing.
+  const [branchCountText, setBranchCountText] = useState<string | null>(null);
+
+  function commitBranchCount() {
+    const parsed = Math.floor(Number(branchCountText));
+    const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : brand.branchCount;
+    dispatch({ type: "patchBrand", patch: { branchCount: next } });
+    setBranchCountText(null);
+  }
 
   function handleLogo(file: File | undefined) {
     if (!file) return;
@@ -94,8 +108,9 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
             type="number"
             min={1}
             label={t("onboarding.details.branchCount")}
-            value={String(brand.branchCount)}
-            onChange={(e) => dispatch({ type: "patchBrand", patch: { branchCount: Math.max(1, Number(e.target.value) || 1) } })}
+            value={branchCountText ?? String(brand.branchCount)}
+            onChange={(e) => setBranchCountText(e.target.value)}
+            onBlur={commitBranchCount}
             className="!py-2.5 !text-[13px]"
           />
           <fieldset className="flex flex-col gap-1.5">
@@ -136,18 +151,22 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
               return (
                 <div key={day} className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-2.5 py-1.5">
                   <span className="w-9 text-[11.5px] font-medium text-[var(--octo-text-secondary)]">{t(`onboarding.day.${day}`)}</span>
+                  {/* Closed means closed: leaving the windows editable made
+                      the switch look broken. */}
                   <input
                     type="time"
                     value={hours.from}
+                    disabled={!hours.open}
                     onChange={(e) => dispatch({ type: "setDayHours", day, hours: { ...hours, from: e.target.value } })}
-                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)]"
+                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
                   />
-                  <span className="text-[var(--octo-text-faint)]">—</span>
+                  <span className={clsx("text-[var(--octo-text-faint)]", !hours.open && "opacity-45")}>—</span>
                   <input
                     type="time"
                     value={hours.to}
+                    disabled={!hours.open}
                     onChange={(e) => dispatch({ type: "setDayHours", day, hours: { ...hours, to: e.target.value } })}
-                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)]"
+                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
                   />
                   <button
                     type="button"
@@ -207,7 +226,11 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
                 type="button"
                 aria-pressed={brand.primary === palette.primary}
                 aria-label={`${t("onboarding.details.palette")} ${palette.primary}`}
-                onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary, secondary: palette.secondary } })}
+                // The solid swatch is the primary colour, and that is all it
+                // sets — the suggested combinations below are what set a
+                // primary/secondary pair. Two rows with identical handlers made
+                // the second one a decoy.
+                onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary } })}
                 className={clsx(
                   "h-12 w-24 rounded-[10px] border-2 transition-all",
                   brand.primary === palette.primary ? "border-[#0D6EFD]" : "border-transparent"
@@ -234,9 +257,16 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
               <button
                 key={palette.id}
                 type="button"
-                aria-label={`${t("onboarding.details.palette")} ${palette.primary}`}
+                aria-pressed={brand.primary === palette.primary && brand.secondary === palette.secondary}
+                aria-label={`${t("onboarding.details.suggested")} ${palette.primary}`}
+                // A suggested combination: primary and secondary together.
                 onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary, secondary: palette.secondary } })}
-                className="flex overflow-hidden rounded-[8px] border border-[var(--octo-border-card)]"
+                className={clsx(
+                  "flex overflow-hidden rounded-[8px] border-2",
+                  brand.primary === palette.primary && brand.secondary === palette.secondary
+                    ? "border-[#0D6EFD]"
+                    : "border-[var(--octo-border-card)]"
+                )}
               >
                 {palette.tints.map((tint) => (
                   <span key={tint} className="h-8 w-8" style={{ backgroundColor: tint }} />

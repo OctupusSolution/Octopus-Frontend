@@ -3,7 +3,7 @@
 // form card because the module set is still derived from them; they are the
 // same questions, asked as fields rather than as a separate screen.
 import { useRef } from "react";
-import { ChevronDown, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import clsx from "clsx";
 import { Input, Select } from "@ui/primitives";
 import { QuestionsStep } from "@/widgets/business-wizard";
@@ -22,9 +22,38 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
   function handleLogo(file: File | undefined) {
     if (!file) return;
     // Read to a data URL — there is no upload endpoint, and the logo only ever
-    // needs to render inside this wizard.
+    // needs to render inside this wizard. The whole draft (this data URL
+    // included) gets JSON.stringify'd into sessionStorage on every change, so
+    // an unbounded photo can blow the storage quota and silently break the
+    // resume-after-refresh guarantee. Downscale to at most 512px on the
+    // longest edge — more than any surface here actually renders — rather
+    // than rejecting the file outright, since there is no i18n key to explain
+    // a rejection to the merchant.
+    const MAX_EDGE = 512;
     const reader = new FileReader();
-    reader.onload = () => dispatch({ type: "patchBrand", patch: { logoDataUrl: String(reader.result) } });
+    reader.onerror = () => {
+      // Leave logoDataUrl unset rather than storing a broken value.
+    };
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      const img = new Image();
+      img.onerror = () => {
+        // Failed to decode — leave logoDataUrl unset.
+      };
+      img.onload = () => {
+        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+        const width = Math.round(img.width * scale);
+        const height = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, width, height);
+        dispatch({ type: "patchBrand", patch: { logoDataUrl: canvas.toDataURL("image/png") } });
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(file);
   }
 
@@ -177,6 +206,7 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
                 key={palette.id}
                 type="button"
                 aria-pressed={brand.primary === palette.primary}
+                aria-label={`${t("onboarding.details.palette")} ${palette.primary}`}
                 onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary, secondary: palette.secondary } })}
                 className={clsx(
                   "h-12 w-24 rounded-[10px] border-2 transition-all",
@@ -204,6 +234,7 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
               <button
                 key={palette.id}
                 type="button"
+                aria-label={`${t("onboarding.details.palette")} ${palette.primary}`}
                 onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary, secondary: palette.secondary } })}
                 className="flex overflow-hidden rounded-[8px] border border-[var(--octo-border-card)]"
               >

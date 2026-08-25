@@ -60,11 +60,17 @@ export function ModulesStep({
 
   // `na` modules are dropped entirely — they are not part of this product for
   // this business type, so they are not shown even as a locked upsell.
-  const applicable = addOnModules
-    .filter((m) => availabilityFor(type, m.id) !== "na")
-    .filter((m) => !query.trim() || t(m.nameKey).toLowerCase().includes(query.trim().toLowerCase()));
+  const applicableUnfiltered = addOnModules.filter((m) => availabilityFor(type, m.id) !== "na");
+  const applicable = applicableUnfiltered.filter(
+    (m) => !query.trim() || t(m.nameKey).toLowerCase().includes(query.trim().toLowerCase())
+  );
   const selected = applicable.filter((m) => enabled.includes(m.id));
   const available = applicable.filter((m) => !enabled.includes(m.id));
+  // The badge counts enabled add-on modules the merchant can actually see and
+  // toggle — independent of the search query, so it must not shrink just
+  // because a query narrows what's on screen. (Distinct from the aside's
+  // `draft.enabled.length`, which also includes the always-on base modules.)
+  const enabledAddOnCount = applicableUnfiltered.filter((m) => enabled.includes(m.id)).length;
 
   return (
     <div className="flex flex-col gap-3">
@@ -84,7 +90,7 @@ export function ModulesStep({
             {t("onboarding.modules.all")}
           </span>
           <span className="rounded-full bg-[#0D6EFD] px-3 py-1.5 text-[11.5px] font-semibold text-white">
-            {t("onboarding.modules.selected").replace("{n}", String(enabled.length))}
+            {t("onboarding.modules.selected").replace("{n}", String(enabledAddOnCount))}
           </span>
         </div>
       )}

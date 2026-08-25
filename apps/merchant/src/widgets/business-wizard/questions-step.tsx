@@ -5,7 +5,6 @@
 // home kitchen is never asked about staff shifts — not because those
 // questions are hidden, but because the SRS capability matrix says they do
 // not apply to that segment.
-import { Check } from "lucide-react";
 import clsx from "clsx";
 import { questionsFor, type Question, type TypeCode } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -54,20 +53,20 @@ function QuestionCard({
   t: (key: string) => string;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+    <section className="rounded-2xl bg-[var(--octo-hover)] px-5 py-[18px]">
       <div className="flex items-start gap-2.5">
-        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--octo-hover)] text-[10.5px] font-semibold text-[var(--octo-text-secondary)]">
+        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--octo-card)] text-[10.5px] font-semibold text-[var(--octo-text-secondary)]">
           {index}
         </span>
         <div className="min-w-0">
-          <h3 className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t(question.textKey)}</h3>
+          <h3 className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t(question.textKey)}</h3>
           {question.helpKey && (
             <p className="mt-0.5 text-[11.5px] text-[var(--octo-text-muted)]">{t(question.helpKey)}</p>
           )}
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {question.options.map((option) => {
           const active = selected === option.id;
           return (
@@ -77,18 +76,21 @@ function QuestionCard({
               onClick={() => onSelect(option.id)}
               aria-pressed={active}
               className={clsx(
-                "flex items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-start text-[12.5px] transition-colors",
+                "flex items-center gap-2.5 rounded-[10px] border bg-[var(--octo-card)] px-3.5 py-3 text-start text-[12.5px] transition-colors",
                 active
-                  ? "border-[#0D6EFD] bg-[var(--octo-selected)] font-medium text-[#0D6EFD]"
-                  : "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+                  ? "border-[#0D6EFD] font-medium text-[#0D6EFD] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]"
+                  : "border-transparent text-[var(--octo-text-secondary)] hover:border-[var(--octo-border-input)]"
               )}
             >
+              <span
+                className={clsx(
+                  "grid h-4 w-4 shrink-0 place-items-center rounded-full border-2 transition-colors",
+                  active ? "border-[#0D6EFD]" : "border-[var(--octo-border-input)]"
+                )}
+              >
+                {active && <span className="h-2 w-2 rounded-full bg-[#0D6EFD]" />}
+              </span>
               {t(option.labelKey)}
-              {active && (
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-white">
-                  <Check size={9} strokeWidth={3} />
-                </span>
-              )}
             </button>
           );
         })}

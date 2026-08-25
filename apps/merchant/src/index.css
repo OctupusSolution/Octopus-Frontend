@@ -169,3 +169,52 @@ body {
 .animate-octo-pulse {
   animation: octo-pulse 0.75s ease-in-out infinite;
 }
+
+/* Login brand panel — a slow tidal shift on the gradient plus drifting wave
+   silhouettes, so the surface reads as water rather than a static swatch. */
+@keyframes octo-tide {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.octo-tide-bg {
+  background-image: linear-gradient(120deg, #0a5ce0, #0d6efd 35%, #7a5bff 68%, #6c4dff);
+  background-size: 220% 220%;
+  animation: octo-tide 16s ease-in-out infinite;
+}
+
+@keyframes octo-wave-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.octo-wave {
+  animation: octo-wave-drift linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .octo-tide-bg,
+  .octo-wave {
+    animation: none;
+  }
+}
+
+/* Touch-the-water ripple — spawned imperatively at the pointer position as
+   it moves over the login brand panel, so the surface visibly reacts. */
+@keyframes octo-ripple-expand {
+  0% { transform: translate(-50%, -50%) scale(0.25); opacity: 0.55; }
+  100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
+}
+.octo-ripple {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
+  animation: octo-ripple-expand 950ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .octo-ripple {
+    display: none;
+  }
+}

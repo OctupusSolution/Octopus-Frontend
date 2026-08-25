@@ -8,8 +8,11 @@ import { Check } from "lucide-react";
 import clsx from "clsx";
 import { restaurantTypes, type TypeCode } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CatalogIcon } from "@/shared/lib/catalog-icon";
 import { BRAND_GRADIENT } from "@/shared/lib/brand";
+
+function imageUrl(filename: string): string {
+  return new URL(`../../../../assets/onboarding-Type/${filename}`, import.meta.url).href;
+}
 
 export function TypeStep({
   selected,
@@ -21,7 +24,7 @@ export function TypeStep({
   const { t } = useI18n();
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {restaurantTypes.map((type) => {
         const active = selected === type.code;
         return (
@@ -30,7 +33,7 @@ export function TypeStep({
             type="button"
             onClick={() => onSelect(type.code)}
             className={clsx(
-              "relative flex flex-col rounded-xl border p-[18px] text-start transition-all duration-200",
+              "relative flex flex-col items-center rounded-xl border p-[18px] text-center transition-all duration-200",
               active
                 ? "border-[#0D6EFD] bg-[var(--octo-selected)] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]"
                 : "border-[var(--octo-border-card)] bg-[var(--octo-card)] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
@@ -45,15 +48,13 @@ export function TypeStep({
               </span>
             )}
 
-            <span
-              className={clsx(
-                "grid h-9 w-9 place-items-center rounded-[9px] transition-colors",
-                active ? "text-white" : "bg-[var(--octo-hover)] text-[var(--octo-text-secondary)]"
-              )}
-              style={active ? { background: BRAND_GRADIENT } : undefined}
-            >
-              <CatalogIcon name={type.icon} size={17} />
-            </span>
+            <img
+              src={imageUrl(type.image)}
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 object-contain"
+            />
 
             <h3 className="mt-3 text-[13px] font-semibold text-[var(--octo-text-primary)]">
               {t(type.nameKey)}
@@ -61,7 +62,7 @@ export function TypeStep({
             <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--octo-text-muted)]">
               {t(type.descKey)}
             </p>
-            <p className="mt-2 border-t border-[var(--octo-divider)] pt-2 text-[11px] leading-relaxed text-[var(--octo-text-secondary)]">
+            <p className="mt-2 w-full border-t border-[var(--octo-divider)] pt-2 text-[11px] leading-relaxed text-[var(--octo-text-secondary)]">
               {t(type.fitKey)}
             </p>
           </button>

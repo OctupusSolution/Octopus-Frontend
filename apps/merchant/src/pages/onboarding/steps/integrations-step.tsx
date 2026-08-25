@@ -3,6 +3,7 @@
 // same honesty as "coming soon" verticals: shown for real, not faked as live.
 // Real setup happens later in Settings → Integrations, which lists this exact
 // same vendor set so nothing here feels invented.
+import { useState } from "react";
 import { Check } from "lucide-react";
 import clsx from "clsx";
 import {
@@ -10,6 +11,10 @@ import {
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { BRAND_GRADIENT } from "@/shared/lib/brand";
+
+function imageUrl(filename: string): string {
+  return new URL(`../../../../../assets/onboarding-Integrations/${filename}`, import.meta.url).href;
+}
 
 const CATEGORIES: readonly IntegrationCategory[] = ["delivery", "payments", "accounting", "messaging"];
 const CATEGORY_KEY: Record<IntegrationCategory, string> = {
@@ -68,6 +73,8 @@ function IntegrationCard({
   onToggle: () => void;
   t: (key: string) => string;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
   return (
     <button
       type="button"
@@ -80,12 +87,32 @@ function IntegrationCard({
           : "border-[var(--octo-border-card)] bg-[var(--octo-card)] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
       )}
     >
-      <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold"
-        style={{ backgroundColor: `${item.color}1A`, color: item.color }}
-      >
-        {item.name.charAt(0)}
-      </span>
+      {item.image ? (
+        <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-[var(--octo-border-card)] bg-white p-1.5">
+          {imageFailed ? (
+            <span
+              className="grid h-full w-full place-items-center rounded-md text-[13px] font-bold"
+              style={{ backgroundColor: `${item.color}1A`, color: item.color }}
+            >
+              {item.name.charAt(0)}
+            </span>
+          ) : (
+            <img
+              src={imageUrl(item.image)}
+              alt=""
+              className="block h-full w-full object-contain"
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </span>
+      ) : (
+        <span
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[13px] font-bold"
+          style={{ backgroundColor: `${item.color}1A`, color: item.color }}
+        >
+          {item.name.charAt(0)}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{item.name}</p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--octo-text-muted)]">{t(item.descKey)}</p>

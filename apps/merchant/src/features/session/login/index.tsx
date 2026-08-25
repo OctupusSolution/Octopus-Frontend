@@ -6,6 +6,7 @@ import { Mail, Lock } from "lucide-react";
 import { Input, Checkbox, Button } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { GoogleIcon, MicrosoftIcon, AppleIcon } from "./social-icons";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -13,6 +14,14 @@ interface LoginErrors {
   email?: string;
   password?: string;
 }
+
+type SocialProvider = "google" | "microsoft" | "apple";
+
+const SOCIAL_PROVIDERS: { id: SocialProvider; icon: (size: number) => JSX.Element; labelKey: "login.google" | "login.microsoft" | "login.apple"; ariaKey: "login.continueWithGoogle" | "login.continueWithMicrosoft" | "login.continueWithApple" }[] = [
+  { id: "google", icon: (size) => <GoogleIcon size={size} />, labelKey: "login.google", ariaKey: "login.continueWithGoogle" },
+  { id: "microsoft", icon: (size) => <MicrosoftIcon size={size} />, labelKey: "login.microsoft", ariaKey: "login.continueWithMicrosoft" },
+  { id: "apple", icon: (size) => <AppleIcon size={size} />, labelKey: "login.apple", ariaKey: "login.continueWithApple" },
+];
 
 export function LoginForm() {
   const { signIn } = useAuth();
@@ -45,6 +54,13 @@ export function LoginForm() {
     navigate("/", { replace: true });
   }
 
+  // Mock OAuth — same fake-session shortcut as the email form, no provider is
+  // actually contacted. Swap for a real redirect flow once auth exists.
+  function handleSocialSignIn(provider: SocialProvider) {
+    signIn(`owner@${provider}.demo`);
+    navigate("/", { replace: true });
+  }
+
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col">
       <h1 className="text-[26px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)]">{t("login.signIn")}</h1>
@@ -52,7 +68,30 @@ export function LoginForm() {
         {t("login.welcome")}
       </p>
 
-      <div className="mt-7 flex flex-col gap-4">
+      <div className="mt-7 grid grid-cols-3 gap-2.5">
+        {SOCIAL_PROVIDERS.map(({ id, icon, labelKey, ariaKey }) => (
+          <button
+            key={id}
+            type="button"
+            aria-label={t(ariaKey)}
+            onClick={() => handleSocialSignIn(id)}
+            className="flex items-center justify-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2.5 text-[11.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:border-[var(--octo-text-faint)] hover:bg-[var(--octo-hover)]"
+          >
+            {icon(15)}
+            <span className="hidden sm:inline">{t(labelKey)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--octo-text-faint)]">
+          {t("login.orContinueWithEmail")}
+        </span>
+        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
+      </div>
+
+      <div className="mt-6 flex flex-col gap-4">
         <Input
           type="email"
           label={t("login.email")}
@@ -96,7 +135,7 @@ export function LoginForm() {
         </div>
       </div>
 
-      <Button type="submit" className="mt-6 w-full !py-2.5 !text-[13px]">
+      <Button type="submit" className="mt-6 w-full !py-2.5 !text-[13px] justify-center font-semibold">
         {t("login.signIn")}
       </Button>
 

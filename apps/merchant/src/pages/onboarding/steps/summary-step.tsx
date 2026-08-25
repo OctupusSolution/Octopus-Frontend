@@ -1,10 +1,15 @@
 // Step 9 — a read-only recap of everything chosen so far, with an edit link
 // per card that jumps straight back to the step that produced it. Writes
 // nothing; it only reads the wizard's own state back.
-import { Check, Pencil } from "lucide-react";
+//
+// The AI Insights / Quality Checklist panels are illustrative — a preview of
+// what OCTOPUS surfaces once the business is live, not a real analysis run
+// against this data. Labelled as such, same honesty rule as every other mock
+// section in this flow.
+import { Building2, Check, CheckCircle2, Package, Pencil, Plug, ShieldCheck, Sparkles, Star, Users2 } from "lucide-react";
 import type { ReactNode } from "react";
 import {
-  addOnModules, computePrice, formatSar, getModule, getRestaurantType, getVertical,
+  addOnModules, computePrice, formatSar, getRestaurantType, getVertical,
   type ModuleId, type TypeCode, type VerticalId,
 } from "@/shared/catalog";
 import {
@@ -12,6 +17,10 @@ import {
   type GoalId, type IntegrationId, type SecuritySettings, type TeamInvite, type WorkflowId,
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
+
+const HERO_IMAGE_URL = new URL("../../../../../assets/Review.png", import.meta.url).href;
+
+const CHECKLIST_ITEMS = ["secure", "compliant", "connected", "ready"] as const;
 
 export function SummaryStep({
   vertical,
@@ -45,101 +54,209 @@ export function SummaryStep({
   const activeSecurity = SECURITY_OPTIONS.filter((o) => o.locked || security[o.id as keyof SecuritySettings]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-      <SummaryCard title={t("onboarding.review.business")} onEdit={() => onEditStep(1)}>
-        {verticalEntry || typeEntry ? (
-          <div className="flex flex-col gap-1.5 text-[12.5px] text-[var(--octo-text-secondary)]">
-            {verticalEntry && <p><span className="text-[var(--octo-text-faint)]">{t("onboarding.review.industry")}: </span>{t(verticalEntry.nameKey)}</p>}
-            {typeEntry && <p><span className="text-[var(--octo-text-faint)]">{t("onboarding.review.type")}: </span>{t(typeEntry.nameKey)}</p>}
-          </div>
-        ) : (
-          <EmptyLine text={t("onboarding.review.noBusiness")} />
-        )}
-      </SummaryCard>
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
+      <div className="flex flex-col gap-3">
+        <SummaryCard
+          icon={<Building2 size={16} />}
+          color="#0D6EFD"
+          title={t("onboarding.review.business")}
+          onEdit={() => onEditStep(1)}
+          complete={Boolean(verticalEntry || typeEntry)}
+        >
+          {verticalEntry || typeEntry ? (
+            <div className="flex flex-col gap-1 text-[12.5px] text-[var(--octo-text-secondary)]">
+              {verticalEntry && <p><span className="text-[var(--octo-text-faint)]">{t("onboarding.review.industry")}: </span>{t(verticalEntry.nameKey)}</p>}
+              {typeEntry && <p><span className="text-[var(--octo-text-faint)]">{t("onboarding.review.type")}: </span>{t(typeEntry.nameKey)}</p>}
+            </div>
+          ) : (
+            <EmptyLine text={t("onboarding.review.noBusiness")} />
+          )}
+        </SummaryCard>
 
-      <SummaryCard title={t("onboarding.review.goals")} onEdit={() => onEditStep(3)}>
-        {goals.length === 0 ? (
-          <EmptyLine text={t("onboarding.review.noGoals")} />
-        ) : (
-          <ChipList items={goals.map((id) => t(GOALS.find((g) => g.id === id)?.nameKey ?? ""))} />
-        )}
-      </SummaryCard>
+        <SummaryCard
+          icon={<Star size={16} />}
+          color="#F59E0B"
+          title={t("onboarding.review.goals")}
+          onEdit={() => onEditStep(3)}
+          complete={goals.length > 0}
+        >
+          {goals.length === 0 ? (
+            <EmptyLine text={t("onboarding.review.noGoals")} />
+          ) : (
+            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
+              {goals.map((id) => t(GOALS.find((g) => g.id === id)?.nameKey ?? "")).join(" · ")}
+            </p>
+          )}
+        </SummaryCard>
 
-      <SummaryCard title={t("onboarding.review.modules")} onEdit={() => onEditStep(5)}>
-        <p className="mb-2 text-[15px] font-bold text-[var(--octo-text-primary)]">
-          {formatSar(price.total, locale)} <span className="text-[11px] font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
-        </p>
-        {enabledAddOns.length === 0 ? (
-          <EmptyLine text={t("onboarding.review.noAddOns")} />
-        ) : (
-          <ChipList items={enabledAddOns.map((m) => t(m.nameKey))} />
-        )}
-      </SummaryCard>
+        <SummaryCard
+          icon={<Package size={16} />}
+          color="#0D6EFD"
+          title={t("onboarding.review.modules")}
+          onEdit={() => onEditStep(5)}
+          complete
+        >
+          <p className="mb-1.5 text-[15px] font-bold text-[var(--octo-text-primary)]">
+            {formatSar(price.total, locale)} <span className="text-[11px] font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
+          </p>
+          {enabledAddOns.length === 0 ? (
+            <EmptyLine text={t("onboarding.review.noAddOns")} />
+          ) : (
+            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
+              {enabledAddOns.map((m) => t(m.nameKey)).join(" · ")}
+            </p>
+          )}
+        </SummaryCard>
 
-      <SummaryCard title={t("onboarding.review.integrations")} onEdit={() => onEditStep(6)}>
-        {integrations.length === 0 ? (
-          <EmptyLine text={t("onboarding.review.noIntegrations")} />
-        ) : (
-          <ChipList items={integrations.map((id) => INTEGRATIONS.find((i) => i.id === id)?.name ?? id)} />
-        )}
-      </SummaryCard>
+        <SummaryCard
+          icon={<Plug size={16} />}
+          color="#8B5CF6"
+          title={t("onboarding.review.integrations")}
+          onEdit={() => onEditStep(6)}
+          complete={integrations.length > 0}
+        >
+          {integrations.length === 0 ? (
+            <EmptyLine text={t("onboarding.review.noIntegrations")} />
+          ) : (
+            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
+              {integrations.map((id) => INTEGRATIONS.find((i) => i.id === id)?.name ?? id).join(" · ")}
+            </p>
+          )}
+        </SummaryCard>
 
-      <SummaryCard title={t("onboarding.review.security")} onEdit={() => onEditStep(7)}>
-        <ChipList items={activeSecurity.map((o) => t(o.nameKey))} />
-      </SummaryCard>
+        <SummaryCard
+          icon={<ShieldCheck size={16} />}
+          color="#06B6D4"
+          title={t("onboarding.review.security")}
+          onEdit={() => onEditStep(7)}
+          complete={activeSecurity.length > 0}
+        >
+          <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
+            {activeSecurity.map((o) => t(o.nameKey)).join(" · ")}
+          </p>
+        </SummaryCard>
 
-      <SummaryCard title={t("onboarding.review.teamWorkflows")} onEdit={() => onEditStep(8)}>
-        <div className="flex flex-col gap-2">
+        <SummaryCard
+          icon={<Users2 size={16} />}
+          color="#6366F1"
+          title={t("onboarding.review.members")}
+          onEdit={() => onEditStep(8)}
+          complete={team.length > 0}
+        >
           {team.length === 0 ? (
             <EmptyLine text={t("onboarding.review.noTeam")} />
           ) : (
-            <p className="text-[12px] text-[var(--octo-text-secondary)]">
-              {t("onboarding.review.teamCount").replace("{n}", String(team.length))}
+            <div className="flex flex-col gap-0.5">
+              <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
+                {t("onboarding.review.teamCount").replace("{n}", String(team.length))}
+              </p>
+              {workflows.length > 0 && (
+                <p className="text-[11.5px] text-[var(--octo-text-faint)]">
+                  {t("onboarding.review.workflowCount").replace("{n}", String(workflows.length))}
+                </p>
+              )}
+            </div>
+          )}
+        </SummaryCard>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <img src={HERO_IMAGE_URL} alt="" className="w-full object-contain" />
+
+        <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-[#8B5CF6]" />
+            <h3 className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("onboarding.review.aiInsights.title")}</h3>
+          </div>
+          <div className="mt-3 rounded-lg bg-[var(--octo-selected)] p-3">
+            <p className="flex items-start gap-2 text-[12px] font-medium text-[var(--octo-text-primary)]">
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#0D6EFD]" />
+              {t("onboarding.review.aiInsights.headline")}
             </p>
-          )}
-          {workflows.length === 0 ? (
-            <EmptyLine text={t("onboarding.review.noWorkflows")} />
-          ) : (
-            <ChipList items={workflows.map((id) => t(WORKFLOW_TEMPLATES.find((w) => w.id === id)?.nameKey ?? ""))} />
-          )}
-        </div>
-      </SummaryCard>
+            <ul className="mt-2 flex flex-col gap-1 ps-[22px] text-[11.5px] text-[var(--octo-text-secondary)]" style={{ listStyleType: "disc" }}>
+              <li>{t("onboarding.review.aiInsights.point1")}</li>
+              <li>{t("onboarding.review.aiInsights.point2")}</li>
+              <li>{t("onboarding.review.aiInsights.point3")}</li>
+              <li>{t("onboarding.review.aiInsights.point4")}</li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={14} className="text-[#16a34a]" />
+            <h3 className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("onboarding.review.checklist.title")}</h3>
+          </div>
+          <p className="mt-1 text-[11.5px] text-[var(--octo-text-muted)]">{t("onboarding.review.aiInsights.headline")}</p>
+          <ul className="mt-3 flex flex-col gap-2.5">
+            {CHECKLIST_ITEMS.map((id) => (
+              <li key={id} className="flex items-start gap-2">
+                <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#16a34a] text-white">
+                  <Check size={10} strokeWidth={3} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-medium text-[var(--octo-text-primary)]">{t(`onboarding.review.checklist.${id}.name`)}</p>
+                  <p className="text-[11px] text-[var(--octo-text-muted)]">{t(`onboarding.review.checklist.${id}.desc`)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <p className="text-[10.5px] leading-relaxed text-[var(--octo-text-faint)]">{t("onboarding.review.aiDisclaimer")}</p>
+      </div>
     </div>
   );
 }
 
-function SummaryCard({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
+function SummaryCard({
+  icon,
+  color,
+  title,
+  onEdit,
+  complete,
+  children,
+}: {
+  icon: ReactNode;
+  color: string;
+  title: string;
+  onEdit: () => void;
+  complete: boolean;
+  children: ReactNode;
+}) {
   const { t } = useI18n();
   return (
-    <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{title}</h3>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex items-center gap-1 text-[11px] font-medium text-[#0D6EFD] hover:underline"
-        >
-          <Pencil size={11} /> {t("onboarding.review.edit")}
-        </button>
-      </div>
-      <div className="mt-2.5">{children}</div>
-    </section>
-  );
-}
+    <section className="flex items-start gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
+      <span
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]"
+        style={{ backgroundColor: `${color}1A`, color }}
+      >
+        {icon}
+      </span>
 
-function ChipList({ items }: { items: readonly string[] }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((label, i) => (
-        <span
-          key={`${label}-${i}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-[var(--octo-hover)] px-2.5 py-1 text-[11.5px] text-[var(--octo-text-secondary)]"
-        >
-          <Check size={11} />
-          {label}
-        </span>
-      ))}
-    </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{title}</h3>
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={t("onboarding.review.edit")}
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[var(--octo-border-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            <Pencil size={13} />
+          </button>
+        </div>
+
+        <div className="mt-1.5">{children}</div>
+
+        {complete && (
+          <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-[#16a34a]">
+            <CheckCircle2 size={13} />
+            {t("onboarding.review.completed")}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -26,6 +26,11 @@ function toggleModule(draft: OnboardingDraft, id: ModuleId, next: boolean): Modu
 export interface StepProps {
   draft: OnboardingDraft;
   dispatch: Dispatch<DraftAction>;
+  /** Finishes the whole wizard: creates the business, signs the merchant in,
+   * clears the persisted draft and navigates to the dashboard. Only the last
+   * step needs it — the payment success dialog calls it directly rather than
+   * relying on the sticky footer, which the dialog itself sits on top of. */
+  onFinish?: () => void;
 }
 
 export interface StepDef {

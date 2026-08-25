@@ -99,7 +99,7 @@ export function OnboardingPage() {
       )}
       {isLast ? (
         <Button variant="primary" disabled={!canContinue} onClick={handleFinish}>
-          {t("onboarding.create")}
+          {t("onboarding.payment.goToDashboard")}
         </Button>
       ) : (
         <Button variant="primary" disabled={!canContinue} onClick={() => dispatch({ type: "next" })}>

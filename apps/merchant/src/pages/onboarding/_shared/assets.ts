@@ -10,7 +10,6 @@ function url(path: string): string {
 
 export const LOGO_URL = url("Logo/OCTOPUS LOGO.svg");
 export const HERO_URL = url("Get Started/section image.webp");
-export const IPHONE_FRAME_URL = url("Iphone 14.webp");
 export const DASHBOARD_MOCKUP_URL = url("Review.webp");
 
 /** `apps/assets/onboarding-Business/<file>` — vertical cards, step 2. */

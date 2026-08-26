@@ -1,14 +1,13 @@
 "use client";
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { ar, en, getDirection, type Locale } from "@i18n/index";
-
-const dictionaries: Record<Locale, Record<string, string>> = { en, ar };
+import { getDirection, type Locale } from "@i18n/index";
+import { createTranslator, type Translate } from "@/shared/i18n/translate";
 
 interface I18nContextValue {
   locale: Locale;
   dir: "ltr" | "rtl";
-  t: (key: string, vars?: Record<string, string | number>) => string;
+  t: Translate;
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null);
@@ -18,21 +17,10 @@ const I18nContext = createContext<I18nContextValue | null>(null);
  *  first paint is already in the right language and direction. Reading storage
  *  on the client would flash the wrong one. */
 export function StoreI18nProvider({ locale, children }: { locale: Locale; children: ReactNode }) {
-  const value = useMemo<I18nContextValue>(() => {
-    const dict = dictionaries[locale];
-    return {
-      locale,
-      dir: getDirection(locale),
-      t: (key, vars) => {
-        const template = dict[key] ?? key;
-        if (!vars) return template;
-        return Object.entries(vars).reduce(
-          (out, [name, v]) => out.split(`{${name}}`).join(String(v)),
-          template,
-        );
-      },
-    };
-  }, [locale]);
+  const value = useMemo<I18nContextValue>(
+    () => ({ locale, dir: getDirection(locale), t: createTranslator(locale) }),
+    [locale],
+  );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

@@ -9,14 +9,24 @@ import { useI18n } from "@/app/providers/i18n-provider";
 export function StepRail({ step, labelKeys }: { step: number; labelKeys: readonly string[] }) {
   const { t } = useI18n();
 
-  // The label is a fixed 72px block under a 7px-wide dot column. Five of those
-  // fit on a phone; ten do not — they collide into unreadable mush and the
-  // container does not scroll. Below the breakpoint where the labels fit, the
-  // rail falls back to numbered dots, which stay legible at any width and keep
-  // the active step (ringed, coloured) on screen without scrolling. The
-  // threshold moves with the step count so the five-step Create Business rail
-  // keeps its labels from `sm` up, exactly as before.
-  const labelVisibility = labelKeys.length <= 6 ? "hidden sm:block" : "hidden lg:block";
+  // The label is a fixed 72px block under a 7px-wide dot column, with ~12px
+  // of connector margin between columns — a rail of N labels needs roughly
+  // N*72 + (N-1)*12 px of room before they stop touching each other. Below
+  // that, the rail falls back to numbered dots, which stay legible at any
+  // width and keep the active step (ringed, coloured) on screen without
+  // scrolling.
+  //
+  // This rail renders inside two hosts that do not have the same room at the
+  // same viewport width: signup runs full-bleed outside the app shell, but
+  // add-business runs inside the settings shell, where the expanded sidebar
+  // (258px) plus the shell's own paddings leave it with roughly 400px less
+  // than signup has at any given viewport. Both of today's lists (9 steps for
+  // add-business, 10 for signup) need that narrower host's numbers, not
+  // signup's, to pick a breakpoint that never shows labels with too little
+  // room to hold them — hence `xl`, not `lg`: at `lg` (1024px) add-business's
+  // column is only ~596px, well short of the ~744px nine labels need, and the
+  // gap does not close until past 1100px either.
+  const labelVisibility = labelKeys.length <= 6 ? "hidden sm:block" : "hidden xl:block";
 
   return (
     <div className="flex w-full items-start" role="presentation">

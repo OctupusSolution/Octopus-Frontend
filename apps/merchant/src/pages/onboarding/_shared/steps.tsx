@@ -34,6 +34,12 @@ export interface StepProps {
    * step needs it — the payment success dialog calls it directly rather than
    * relying on the sticky footer, which the dialog itself sits on top of. */
   onFinish?: () => void;
+  /** i18n key for the finish button's label — "Go To My Dashboard" on
+   * signup, something else on a host that finishes somewhere other than the
+   * dashboard. Same reason as `onFinish`: the payment success dialog renders
+   * its own copy of the finish button rather than relying on the sticky
+   * footer's, so it needs this passed down too. */
+  finishLabelKey?: string;
 }
 
 export interface StepDef {

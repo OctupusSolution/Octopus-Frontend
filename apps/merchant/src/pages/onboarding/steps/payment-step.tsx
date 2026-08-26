@@ -1,5 +1,6 @@
-// Step 10 — the plan, the methods, and a checkout that is honestly a demo.
-// `simulatePayment` is a timer, not a gateway, and the page says so.
+// The payment screen — the plan, the methods, and a checkout that is
+// honestly a demo. `simulatePayment` is a timer, not a gateway, and the page
+// says so.
 import { useState } from "react";
 import { CheckCircle2, CreditCard, Info, Link2, Loader2 } from "lucide-react";
 import clsx from "clsx";
@@ -19,7 +20,7 @@ const INCLUDES = [
   "onboarding.payment.includesPublicLink",
 ];
 
-export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
+export function PaymentStep({ draft, dispatch, onFinish, finishLabelKey }: StepProps) {
   const { t, locale } = useI18n();
   const [accountOpen, setAccountOpen] = useState(!draft.accountCreated);
   const [processing, setProcessing] = useState(false);
@@ -167,7 +168,7 @@ export function PaymentStep({ draft, dispatch, onFinish }: StepProps) {
             {`https://${draft.publicLink.tag || "restaurant"}.octopus.app`}
           </p>
           <Button variant="primary" className="mt-2 w-full justify-center !py-2.5" onClick={() => onFinish?.()}>
-            {t("onboarding.payment.goToDashboard")}
+            {t(finishLabelKey ?? "onboarding.payment.goToDashboard")}
           </Button>
         </div>
       </Modal>

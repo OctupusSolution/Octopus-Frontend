@@ -833,6 +833,7 @@ export const ar = {
   "settings.businesses.emptyTitle": "لا توجد أعمال تجارية بعد",
   "settings.businesses.emptyBody": "أنشئ عملك التجاري الأول لبدء استخدام أوكتوبس",
   "settings.businesses.wizard.title": "إنشاء عمل تجاري جديد",
+  "settings.businesses.wizard.create": "إنشاء العمل التجاري",
   "settings.businesses.created": "تم إنشاء {name}",
 
   /* settings — devices */

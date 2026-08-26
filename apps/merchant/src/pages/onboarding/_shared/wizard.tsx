@@ -36,9 +36,21 @@ export interface WizardProps {
    *  viewport, outside the app shell. Add-business sits inside the settings
    *  shell and must not force a full-height page. */
   containerClassName?: string;
+  /** Label for the primary button on the last step. Signup finishes into the
+   *  dashboard, so the default reads "Go To My Dashboard"; add-business
+   *  passes its own key, since finishing there returns to the businesses
+   *  list instead. */
+  finishLabelKey?: string;
 }
 
-export function Wizard({ steps, draftConfig, onFinish, chrome, containerClassName }: WizardProps) {
+export function Wizard({
+  steps,
+  draftConfig,
+  onFinish,
+  chrome,
+  containerClassName,
+  finishLabelKey = "onboarding.payment.goToDashboard",
+}: WizardProps) {
   const { t, dir } = useI18n();
   const { draft, dispatch, clear, keep, restored } = useOnboardingDraft(draftConfig);
 
@@ -103,10 +115,12 @@ export function Wizard({ steps, draftConfig, onFinish, chrome, containerClassNam
     clear();
   }
 
-  // "Save As Draft" does not leave the flow — the header already has a link
-  // that does. It promotes the draft from this tab's sessionStorage to
-  // localStorage, so closing the tab no longer throws the signup away, and says
-  // so. Leaving is then the merchant's own next move, or not.
+  // "Save As Draft" does not leave the flow — there is already a link outside
+  // the wizard body that does (the header's back-to-sign-in on signup, the
+  // page's back-link on add-business). It promotes the draft from this tab's
+  // sessionStorage to localStorage, so closing the tab no longer throws the
+  // draft away, and says so. Leaving is then the merchant's own next move, or
+  // not.
   function handleSaveDraft() {
     setNote(t(keep() ? "onboarding.publicLink.draftKept" : "onboarding.publicLink.draftKeptFailed"));
   }
@@ -130,7 +144,7 @@ export function Wizard({ steps, draftConfig, onFinish, chrome, containerClassNam
       )}
       {isLast ? (
         <Button variant="primary" disabled={!canContinue} onClick={handleFinish}>
-          {t("onboarding.payment.goToDashboard")}
+          {t(finishLabelKey)}
         </Button>
       ) : (
         <Button variant="primary" disabled={!canContinue} onClick={() => dispatch({ type: "next" })}>
@@ -164,8 +178,8 @@ export function Wizard({ steps, draftConfig, onFinish, chrome, containerClassNam
           )}
 
           <div className="mt-6">
-            <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} onFinish={handleFinish} /> : undefined}>
-              <current.Component draft={draft} dispatch={dispatch} onFinish={handleFinish} />
+            <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} /> : undefined}>
+              <current.Component draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} />
             </StepShell>
           </div>
         </main>

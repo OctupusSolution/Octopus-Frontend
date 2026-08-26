@@ -5,6 +5,7 @@ import { getDirection } from "@i18n/index";
 import { readLocaleCookie } from "@/shared/lib/locale-cookie";
 import { OrderingSessionProvider } from "@/entities/order";
 import { getTenantBySlug, TENANT_SLUG_HEADER } from "@/entities/tenant";
+import { StoreI18nProvider } from "@/app/providers";
 import { SiteHeader } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
 import "./globals.css";
@@ -30,11 +31,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang={locale} dir={getDirection(locale)} className={`${inter.variable} ${readexPro.variable}`}>
       <body>
-        <OrderingSessionProvider>
-          <SiteHeader locale={locale} />
-          <main>{children}</main>
-          <SiteFooter tenant={tenant} />
-        </OrderingSessionProvider>
+        <StoreI18nProvider locale={locale}>
+          <OrderingSessionProvider>
+            <SiteHeader locale={locale} />
+            <main>{children}</main>
+            <SiteFooter tenant={tenant} />
+          </OrderingSessionProvider>
+        </StoreI18nProvider>
       </body>
     </html>
   );

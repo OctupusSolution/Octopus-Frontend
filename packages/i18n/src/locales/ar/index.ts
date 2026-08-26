@@ -3161,4 +3161,10 @@ export const ar = {
   "store.footer.newsletterSubmit": "إرسال",
   "store.footer.newsletterThanks": "شكراً لك، تم تسجيل بريدك.",
   "store.footer.newsletterInvalid": "من فضلك أدخل بريداً إلكترونياً صحيحاً.",
+
+  "store.placeholder.title": "قريباً",
+  "store.placeholder.body": "هذه الصفحة قيد الإنشاء. تصفّح القائمة في الوقت الحالي.",
+  "store.track.prompt": "أدخل رقم طلبك لمتابعة حالته.",
+  "store.track.placeholder": "رقم الطلب",
+  "store.track.submit": "تتبع الطلب",
 } as const;

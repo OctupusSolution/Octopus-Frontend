@@ -1,7 +1,7 @@
 // The single source of step order. Adding, removing or reordering a step is an
 // edit to this array — the rail, the continue guard and the price bar all read
 // from it, so they cannot drift out of sync with each other.
-import type { ComponentType, Dispatch } from "react";
+import { createContext, useContext, type ComponentType, type Dispatch, type ReactNode } from "react";
 import type { DraftAction, OnboardingDraft } from "./draft";
 import { VerticalStep, TypeStep, ModulesStep } from "@/widgets/business-wizard";
 import { withDependencies, withoutDependents, type ModuleId } from "@/shared/catalog";
@@ -166,23 +166,42 @@ export const STEPS: readonly StepDef[] = [
   },
 ];
 
-/** 1-based position of a step in the flow. Edit links resolve through this so
- *  reordering STEPS cannot silently send a merchant to the wrong screen.
+/** The signup flow minus the marketing "Get Started" hero — the one step that
+ *  makes no sense for a merchant who is already signed in and adding a second
+ *  business. Every other step, in the same order. */
+export const ADD_BUSINESS_STEPS: readonly StepDef[] = STEPS.filter((s) => s.id !== "getStarted");
+
+/** Carries whichever step list is actually driving the current flow. Supplied
+ *  by the wizard around its content, so `useStepNumber` below resolves edit
+ *  links against the steps the merchant can actually see — the full ten for
+ *  signup, the shorter nine for add-business — never always the full STEPS. */
+const StepsContext = createContext<readonly StepDef[] | null>(null);
+
+export function StepsProvider({ steps, children }: { steps: readonly StepDef[]; children: ReactNode }) {
+  return <StepsContext.Provider value={steps}>{children}</StepsContext.Provider>;
+}
+
+/** Returns a resolver for the 1-based position of a step in the *active*
+ *  flow's step list. Edit links resolve through this so reordering STEPS — or
+ *  running a shorter list, like add-business's nine steps — cannot silently
+ *  send a merchant to the wrong screen.
  *
  *  An unknown id throws rather than returning a number. Every caller passes a
  *  literal id declared in this file, so a typo or a removed step surfaces as a
  *  hard failure the first time that screen renders — loudly — instead of
  *  quietly landing the merchant somewhere else. Returning 0 would be the worst
- *  of both: the reducer would clamp it to step 1 and nobody would notice.
- *
- *  Resolve it during render, not at module scope: the step components are
- *  imported by this module, so a module-scope call from one of them would run
- *  before STEPS is initialised. */
-export function stepNumber(id: string): number {
-  const index = STEPS.findIndex((s) => s.id === id);
-  if (index === -1) throw new Error(`stepNumber: no step with id "${id}" in STEPS`);
-  return index + 1;
+ *  of both: the reducer would clamp it to step 1 and nobody would notice. */
+export function useStepNumber(): (id: string) => number {
+  const steps = useContext(StepsContext);
+  if (!steps) throw new Error("useStepNumber must be used within a StepsProvider");
+  return (id: string) => {
+    const index = steps.findIndex((s) => s.id === id);
+    if (index === -1) throw new Error(`stepNumber: no step with id "${id}" in the active steps list`);
+    return index + 1;
+  };
 }
 
-/** How many steps the flow has. Used to normalise a restored `draft.step`. */
+/** How many steps the signup flow has. Used to normalise a restored
+ *  `draft.step` for that flow; add-business normalises against
+ *  `ADD_BUSINESS_STEPS.length` instead. */
 export const STEP_COUNT = STEPS.length;

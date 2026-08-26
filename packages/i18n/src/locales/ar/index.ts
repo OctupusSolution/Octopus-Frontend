@@ -833,14 +833,6 @@ export const ar = {
   "settings.businesses.emptyTitle": "لا توجد أعمال تجارية بعد",
   "settings.businesses.emptyBody": "أنشئ عملك التجاري الأول لبدء استخدام أوكتوبس",
   "settings.businesses.wizard.title": "إنشاء عمل تجاري جديد",
-  "settings.businesses.wizard.nameLabel": "اسم العمل التجاري",
-  "settings.businesses.wizard.namePlaceholder": "مثال: مطعم الغروب",
-  "settings.businesses.wizard.create": "إنشاء العمل التجاري",
-  "settings.businesses.wizard.rail.step1": "الاسم",
-  "settings.businesses.wizard.rail.step2": "النشاط",
-  "settings.businesses.wizard.rail.step3": "النوع",
-  "settings.businesses.wizard.rail.step4": "التفاصيل",
-  "settings.businesses.wizard.rail.step5": "الوحدات",
   "settings.businesses.created": "تم إنشاء {name}",
 
   /* settings — devices */

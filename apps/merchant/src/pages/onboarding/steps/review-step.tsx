@@ -7,10 +7,11 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { INTEGRATIONS } from "../_shared/extras-catalog";
 import { CITIES } from "../_shared/brand-catalog";
 import { businessComplete, modulesComplete, integrationsComplete } from "../_shared/draft";
-import { stepNumber, type StepProps } from "../_shared/steps";
+import { useStepNumber, type StepProps } from "../_shared/steps";
 
 export function ReviewStep({ draft, dispatch }: StepProps) {
   const { t } = useI18n();
+  const stepNumber = useStepNumber();
   const { brand } = draft;
 
   const vertical = verticals.find((v) => v.id === draft.vertical);

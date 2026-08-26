@@ -833,14 +833,6 @@ export const en = {
   "settings.businesses.emptyTitle": "No businesses yet",
   "settings.businesses.emptyBody": "Create your first business to start using OCTOPUS",
   "settings.businesses.wizard.title": "Create a New Business",
-  "settings.businesses.wizard.nameLabel": "Business Name",
-  "settings.businesses.wizard.namePlaceholder": "e.g. Sunset Grill",
-  "settings.businesses.wizard.create": "Create Business",
-  "settings.businesses.wizard.rail.step1": "Name",
-  "settings.businesses.wizard.rail.step2": "Business",
-  "settings.businesses.wizard.rail.step3": "Type",
-  "settings.businesses.wizard.rail.step4": "Details",
-  "settings.businesses.wizard.rail.step5": "Modules",
   "settings.businesses.created": "{name} created",
 
   /* settings — devices */

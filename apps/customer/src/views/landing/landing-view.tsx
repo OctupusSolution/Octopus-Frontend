@@ -1,22 +1,59 @@
-import { Card, CardBody } from "@ui/primitives";
-import type { Locale } from "@i18n/index";
+"use client";
+
+import { useState } from "react";
+import type { MenuCategory, MenuItem } from "@octopus/api-client";
+import { useI18n } from "@/app/providers";
+import { AddToCartModal } from "@/features/cart/add-to-cart";
 import type { Tenant } from "@/entities/tenant";
-import { SelectFulfillment } from "@/features/session/select-fulfillment";
+import { bestSellers, offers } from "@/shared/lib/storefront";
+import { SectionHeading } from "@/shared/ui";
+import { CategoryMosaic } from "@/widgets/category-mosaic";
+import { ProductRow } from "@/widgets/product-row";
+import { StoreHero } from "@/widgets/store-hero";
 
 export interface LandingViewProps {
   tenant: Tenant;
-  locale: Locale;
+  categories: MenuCategory[];
+  items: MenuItem[];
 }
 
-export function LandingView({ tenant }: LandingViewProps) {
+export function LandingView({ categories, items }: LandingViewProps) {
+  const { t } = useI18n();
+  const [selected, setSelected] = useState<MenuItem | null>(null);
+
+  function hrefFor(item: MenuItem): string {
+    const category = categories.find((c) => c.id === item.categoryId);
+    return category ? `/menu/${category.slug}/${item.id}` : "/menu";
+  }
+
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-5 px-4 py-10 sm:px-0">
-      <h1 className="text-[21px] font-bold text-[var(--octo-text-primary)]">{tenant.name}</h1>
-      <Card className="w-full">
-        <CardBody>
-          <SelectFulfillment tenant={tenant} />
-        </CardBody>
-      </Card>
-    </div>
+    <>
+      <StoreHero />
+
+      <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-4 py-14 sm:px-6">
+        <section className="flex flex-col gap-5">
+          <SectionHeading id="menu" title={t("store.section.menu")} />
+          <CategoryMosaic categories={categories} />
+        </section>
+
+        <ProductRow
+          id="best-sellers"
+          title={t("store.section.bestSellers")}
+          items={bestSellers(items)}
+          hrefFor={hrefFor}
+          onAdd={setSelected}
+        />
+
+        <ProductRow
+          id="offers"
+          title={t("store.section.offers")}
+          items={offers(items)}
+          hrefFor={hrefFor}
+          onAdd={setSelected}
+        />
+      </div>
+
+      <AddToCartModal item={selected} onClose={() => setSelected(null)} />
+    </>
   );
 }

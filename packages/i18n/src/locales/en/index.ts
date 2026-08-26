@@ -833,6 +833,7 @@ export const en = {
   "settings.businesses.emptyTitle": "No businesses yet",
   "settings.businesses.emptyBody": "Create your first business to start using OCTOPUS",
   "settings.businesses.wizard.title": "Create a New Business",
+  "settings.businesses.wizard.create": "Create Business",
   "settings.businesses.created": "{name} created",
 
   /* settings — devices */

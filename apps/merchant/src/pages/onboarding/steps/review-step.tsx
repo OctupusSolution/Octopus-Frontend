@@ -1,6 +1,6 @@
-// Step 7 — everything the merchant chose, in one place, with an edit link per
-// card back to the step that owns it, and the plan beside it. Nothing new is
-// decided here; this is the last look before the previews.
+// The review screen — everything the merchant chose, in one place, with an
+// edit link per card back to the step that owns it, and the plan beside it.
+// Nothing new is decided here; this is the last look before the previews.
 import { CheckCircle2, Pencil } from "lucide-react";
 import { getModule, getRestaurantType, verticals } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";

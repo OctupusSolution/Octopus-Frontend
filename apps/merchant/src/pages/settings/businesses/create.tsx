@@ -58,7 +58,12 @@ export function CreateBusinessPage() {
         {t("settings.businesses.wizard.title")}
       </h1>
 
-      <Wizard steps={ADD_BUSINESS_STEPS} draftConfig={DRAFT_CONFIG} onFinish={handleFinish} />
+      <Wizard
+        steps={ADD_BUSINESS_STEPS}
+        draftConfig={DRAFT_CONFIG}
+        onFinish={handleFinish}
+        finishLabelKey="settings.businesses.wizard.create"
+      />
     </div>
   );
 }

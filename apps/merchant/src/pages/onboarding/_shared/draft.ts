@@ -162,12 +162,12 @@ export function draftReducer(state: OnboardingDraft, action: DraftAction): Onboa
 }
 
 // --- Completeness predicates -------------------------------------------
-// The Review step (7) and the Dashboard Preview summary (9) show the same
-// three "Completed" ticks over the same three groups of answers. They used to
-// each decide for themselves — Review from the real data, Preview
+// The Review step and the Dashboard Preview summary show the same three
+// "Completed" ticks over the same three groups of answers. They used to each
+// decide for themselves — Review from the real data, Preview
 // unconditionally — so a merchant with no integrations was told "None
-// selected" on step 7 and "Completed" on step 9. One definition each, read by
-// both screens.
+// selected" on Review and "Completed" on Dashboard Preview. One definition
+// each, read by both screens.
 
 /** The business card: industry, type, name and city all answered. */
 export function businessComplete(draft: OnboardingDraft): boolean {

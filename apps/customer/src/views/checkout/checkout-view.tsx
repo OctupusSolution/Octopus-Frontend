@@ -9,7 +9,9 @@ import type { GuestInfo } from "@/entities/customer";
 import { computeCartSubtotalSar, computePromoDiscountSar, formatSar } from "@/shared/lib/pricing";
 import { Breadcrumb } from "@/shared/ui";
 import { GuestCheckoutForm, isValidGuestName, isValidGuestPhone } from "@/features/session/guest-checkout";
+import { SelectFulfillment } from "@/features/session/select-fulfillment";
 import { PlaceOrderButton } from "@/features/order/place-order";
+import type { Tenant } from "@/entities/tenant";
 
 // Payment capture is local-only for this MVP — no gateway call happens here.
 // The eventual backend step charges through Moyasar/Tap using this choice.
@@ -19,10 +21,15 @@ const PAYMENT_METHODS = [
 ] as const;
 type PaymentMethodId = (typeof PAYMENT_METHODS)[number]["id"];
 
-export function CheckoutView() {
+export interface CheckoutViewProps {
+  tenant: Tenant;
+}
+
+export function CheckoutView({ tenant }: CheckoutViewProps) {
   const { state } = useOrderingSession();
   const [guest, setGuest] = useState<GuestInfo>({ name: "", phone: "" });
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("card");
+  const [changingChannel, setChangingChannel] = useState(false);
 
   if (state.lines.length === 0) {
     return (
@@ -38,7 +45,10 @@ export function CheckoutView() {
   const subtotalSar = computeCartSubtotalSar(state.lines);
   const discountSar = state.promoCode ? computePromoDiscountSar(subtotalSar, state.promoCode) : 0;
   const totalSar = subtotalSar - discountSar;
-  const canSubmit = isValidGuestName(guest.name) && isValidGuestPhone(guest.phone);
+  // Browsing no longer asks for a channel up front, so the customer can reach
+  // this page without one. The order cannot be placed until it is chosen here.
+  const needsChannel = state.channel === null;
+  const canSubmit = !needsChannel && isValidGuestName(guest.name) && isValidGuestPhone(guest.phone);
 
   const availablePaymentMethods =
     state.channel === "dine_in" ? PAYMENT_METHODS.filter((method) => method.id !== "cash") : PAYMENT_METHODS;
@@ -56,11 +66,30 @@ export function CheckoutView() {
       <GuestCheckoutForm value={guest} onChange={setGuest} />
 
       <Card>
-        <CardBody className="flex items-center justify-between gap-3 p-4">
-          <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{recapLine}</p>
-          <Link href="/" className="shrink-0 text-[11.5px] font-medium text-[#0D6EFD] hover:underline">
-            تغيير
-          </Link>
+        <CardBody className="p-4">
+          {needsChannel || changingChannel ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-[11.5px] font-semibold text-[var(--octo-text-primary)]">
+                طريقة الاستلام
+              </p>
+              <SelectFulfillment
+                tenant={tenant}
+                submitLabel="تأكيد طريقة الاستلام"
+                onConfirmed={() => setChangingChannel(false)}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{recapLine}</p>
+              <button
+                type="button"
+                onClick={() => setChangingChannel(true)}
+                className="shrink-0 text-[11.5px] font-medium text-[#0D6EFD] hover:underline"
+              >
+                تغيير
+              </button>
+            </div>
+          )}
         </CardBody>
       </Card>
 

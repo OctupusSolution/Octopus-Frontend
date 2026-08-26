@@ -3161,4 +3161,10 @@ export const en = {
   "store.footer.newsletterSubmit": "Send",
   "store.footer.newsletterThanks": "Thank you, your email is registered.",
   "store.footer.newsletterInvalid": "Please enter a valid email address.",
+
+  "store.placeholder.title": "Coming soon",
+  "store.placeholder.body": "This page is still being built. Browse the menu in the meantime.",
+  "store.track.prompt": "Enter your order number to follow its progress.",
+  "store.track.placeholder": "Order number",
+  "store.track.submit": "Track order",
 } as const;

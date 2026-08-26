@@ -5,7 +5,7 @@
 // lives in the STEPS registry, and each step is handed { draft, dispatch }.
 // Rendered outside the app shell — no sidebar, no top bar — because the
 // sidebar it would show does not exist yet at this point.
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Languages, Moon, Sun } from "lucide-react";
 import { Button } from "@ui/primitives";
@@ -27,7 +27,17 @@ export function OnboardingPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const { createBusiness } = useTenantConfig();
-  const { draft, dispatch, clear, restored } = useOnboardingDraft();
+  const { draft, dispatch, clear, keep, restored } = useOnboardingDraft();
+
+  // A local, self-dismissing note, the same shape the settings pages use —
+  // there is no shared toast in this app to reach for. It exists for one
+  // message: whether "Save As Draft" actually kept anything.
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!note) return;
+    const id = window.setTimeout(() => setNote(null), 3200);
+    return () => window.clearTimeout(id);
+  }, [note]);
 
   // `draft.step` is normalised to the valid range when a persisted draft is
   // restored, so no clamping is needed here. Clamping for display only used to
@@ -84,9 +94,25 @@ export function OnboardingPage() {
       branchCount: draft.brand.branchCount,
       businessName: draft.brand.businessName.trim() || "My Business",
     });
-    signIn(draft.account.email.trim() || "owner@octopus.sa", draft.account.password.trim() !== "");
+    // `passwordSet` comes from `accountCreated`, not from the password value.
+    // The password is deliberately not persisted (see use-onboarding-draft.ts),
+    // so after a mid-flow refresh it is "" even for a merchant who set one —
+    // deriving the flag from it would hand them the Set Password screen the
+    // moment they finished paying, with no way back to the account modal
+    // (`accountCreated` is persisted, so that modal never reopens). The flag
+    // itself is the honest signal: the account form cannot be submitted without
+    // a non-empty password, so `accountCreated` means one was set.
+    signIn(draft.account.email.trim() || "owner@octopus.sa", draft.accountCreated);
     clear();
     navigate("/", { replace: true });
+  }
+
+  // "Save As Draft" does not leave the flow — the header already has a link
+  // that does. It promotes the draft from this tab's sessionStorage to
+  // localStorage, so closing the tab no longer throws the signup away, and says
+  // so. Leaving is then the merchant's own next move, or not.
+  function handleSaveDraft() {
+    setNote(t(keep() ? "onboarding.publicLink.draftKept" : "onboarding.publicLink.draftKeptFailed"));
   }
 
   const canContinue = current.canContinue(draft);
@@ -99,6 +125,11 @@ export function OnboardingPage() {
       {index > 0 && (
         <Button variant="secondary" onClick={() => dispatch({ type: "back" })} icon={<BackArrow size={14} />}>
           {t("onboarding.back")}
+        </Button>
+      )}
+      {current.showSaveDraft && (
+        <Button variant="secondary" onClick={handleSaveDraft}>
+          {t("onboarding.publicLink.saveDraft")}
         </Button>
       )}
       {isLast ? (
@@ -179,7 +210,14 @@ export function OnboardingPage() {
         <PriceBar draft={draft} action={actions} />
       ) : (
         <div className="sticky bottom-0 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 backdrop-blur">
-          <div className="mx-auto flex max-w-[1180px] items-center justify-end gap-2 px-5 py-3.5">{actions}</div>
+          <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-end gap-2 px-5 py-3.5">
+            {note && (
+              <p role="status" className="me-auto text-[11.5px] text-[var(--octo-text-muted)]">
+                {note}
+              </p>
+            )}
+            {actions}
+          </div>
         </div>
       )}
     </div>

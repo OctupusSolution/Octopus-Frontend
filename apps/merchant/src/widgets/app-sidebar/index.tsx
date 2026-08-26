@@ -320,7 +320,7 @@ export function AppSidebar() {
   // the signup flow shows. Fall back to the generic label only when there is
   // genuinely no business yet (a deep link into an unprovisioned session).
   const accountName = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
-  const accountEmail = user?.email ?? "";
+  const accountEmail = user?.email?.trim() || t("sidebar.emailFallback");
   const accountInitials = accountName.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
 
   // Navigation is filtered to what this tenant actually bought, at both
@@ -527,7 +527,7 @@ export function AppSidebar() {
                     <p className="truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
                       {user?.name ?? "Merchant"}
                     </p>
-                    <p className="truncate text-[11px] text-[var(--octo-text-muted)]">{user?.email ?? ""}</p>
+                    <p className="truncate text-[11px] text-[var(--octo-text-muted)]">{accountEmail}</p>
                   </div>
                   <button
                     type="button"

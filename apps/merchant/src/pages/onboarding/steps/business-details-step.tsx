@@ -12,6 +12,7 @@ import {
   AUDIENCES, BRANCH_TYPES, CITIES, CURRENCIES, PALETTES, THEME_TEMPLATES, WEEKDAYS,
 } from "../_shared/brand-catalog";
 import { themeThumb } from "../_shared/assets";
+import { readLogoFile } from "../_shared/logo-file";
 import type { StepProps } from "../_shared/steps";
 
 export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
@@ -31,44 +32,6 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
     const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : brand.branchCount;
     dispatch({ type: "patchBrand", patch: { branchCount: next } });
     setBranchCountText(null);
-  }
-
-  function handleLogo(file: File | undefined) {
-    if (!file) return;
-    // Read to a data URL — there is no upload endpoint, and the logo only ever
-    // needs to render inside this wizard. The whole draft (this data URL
-    // included) gets JSON.stringify'd into sessionStorage on every change, so
-    // an unbounded photo can blow the storage quota and silently break the
-    // resume-after-refresh guarantee. Downscale to at most 512px on the
-    // longest edge — more than any surface here actually renders — rather
-    // than rejecting the file outright, since there is no i18n key to explain
-    // a rejection to the merchant.
-    const MAX_EDGE = 512;
-    const reader = new FileReader();
-    reader.onerror = () => {
-      // Leave logoDataUrl unset rather than storing a broken value.
-    };
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      const img = new Image();
-      img.onerror = () => {
-        // Failed to decode — leave logoDataUrl unset.
-      };
-      img.onload = () => {
-        const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
-        const width = Math.round(img.width * scale);
-        const height = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-        dispatch({ type: "patchBrand", patch: { logoDataUrl: canvas.toDataURL("image/png") } });
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
   }
 
   return (
@@ -199,7 +162,11 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
             type="file"
             accept="image/*"
             className="sr-only"
-            onChange={(e) => handleLogo(e.target.files?.[0])}
+            onChange={(e) =>
+              readLogoFile(e.target.files?.[0], (logoDataUrl) =>
+                dispatch({ type: "patchBrand", patch: { logoDataUrl } })
+              )
+            }
           />
           <button
             type="button"

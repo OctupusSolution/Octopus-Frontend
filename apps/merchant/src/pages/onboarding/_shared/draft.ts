@@ -29,6 +29,8 @@ export interface BrandDetails {
   primary: string;
   secondary: string;
   themeTemplate: string | null;
+  /** A FONTS id from brand-catalog.ts — the face the public page is set in. */
+  font: string;
 }
 
 export interface PublicLinkSettings {
@@ -85,6 +87,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
     primary: "#001EC9",
     secondary: "#1D1D1D",
     themeTemplate: null,
+    font: "inter",
   },
   integrations: [],
   publicLink: { tag: "restaurant", sections: ["hero", "offers", "menu", "bestSeller"] },

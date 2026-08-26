@@ -86,3 +86,68 @@ export function readableOn(hex: string): string {
 
   return luminance > 0.5 ? "#1D1D1D" : "#FFFFFF";
 }
+
+/** A typeface the merchant can put on their public page.
+ *
+ *  `stack` is a whole CSS stack rather than one family on purpose: nothing in
+ *  this app loads a webfont (packages/ui/src/tokens/tokens.css names "Inter"
+ *  and "Readex Pro" inside fallback lists, but there is no @font-face rule and
+ *  no <link> in index.html), so a choice only changes anything if it resolves
+ *  to something the machine already has. Every option below does.
+ *
+ *  `arabic` records whether the leading family carries Arabic glyphs. An
+ *  Arabic page set in a Latin-only face falls back glyph by glyph and looks
+ *  broken, which is the same reason packages/i18n/src/lib/fonts.ts swaps the
+ *  app's own face per locale — `fontStack` applies that rule here. */
+export interface FontChoice {
+  id: string;
+  /** The family name, shown as-is: a typeface is not translated. */
+  label: string;
+  stack: string;
+  arabic: boolean;
+}
+
+export const FONTS: readonly FontChoice[] = [
+  { id: "inter",   label: "Inter",      stack: "var(--font-latin)",                     arabic: false },
+  { id: "readex",  label: "Readex Pro", stack: "var(--font-arabic)",                    arabic: true  },
+  { id: "georgia", label: "Georgia",    stack: "Georgia, 'Times New Roman', serif",     arabic: false },
+  { id: "tahoma",  label: "Tahoma",     stack: "Tahoma, Geneva, Verdana, sans-serif",   arabic: true  },
+];
+
+/** The stack to render the public page in. Falls back to the app's Arabic face
+ *  when the merchant picked a Latin-only one and the page is being previewed in
+ *  Arabic — showing them tofu boxes would be a worse answer than honouring the
+ *  choice literally. */
+export function fontStack(id: string, locale: string): string {
+  const font = FONTS.find((f) => f.id === id) ?? FONTS[0];
+  return locale === "ar" && !font.arabic ? "var(--font-arabic)" : font.stack;
+}
+
+/** What the "Style" control on step 8 actually changes on the public page.
+ *
+ *  The ids are THEME_TEMPLATES', not a second list: step 8's Style select edits
+ *  `brand.themeTemplate`, the same field step 4's template cards set, so the
+ *  two screens cannot disagree about which style is active. `modern` is the
+ *  fallback for a merchant who never opened the template cards, which is what
+ *  the design shows selected by default. */
+export interface StyleTokens {
+  /** Corner radius for cards and images inside the preview, as a CSS length. */
+  radius: string;
+  /** Section-heading treatment. */
+  headingWeight: number;
+  headingTracking: string;
+  headingTransform: "none" | "uppercase";
+  /** How far the hero image is dimmed behind the business name. */
+  heroScrim: string;
+}
+
+export function styleTokens(id: string | null): StyleTokens {
+  switch (id) {
+    case "elegant":
+      return { radius: "2px", headingWeight: 500, headingTracking: "0.12em", headingTransform: "uppercase", heroScrim: "rgba(0,0,0,0.55)" };
+    case "warm":
+      return { radius: "16px", headingWeight: 700, headingTracking: "0", headingTransform: "none", heroScrim: "rgba(0,0,0,0.35)" };
+    default:
+      return { radius: "10px", headingWeight: 700, headingTracking: "-0.01em", headingTransform: "none", heroScrim: "rgba(0,0,0,0.45)" };
+  }
+}

@@ -90,7 +90,9 @@ export const EMPTY_DRAFT: OnboardingDraft = {
     font: "inter",
   },
   integrations: [],
-  publicLink: { tag: "restaurant", sections: ["hero", "offers", "menu", "bestSeller"] },
+  // Hero, menu, best sellers, offers — the order the storefront design runs
+  // them in. The merchant reorders them on step 8.
+  publicLink: { tag: "restaurant", sections: ["hero", "menu", "bestSeller", "offers"] },
   account: { fullName: "", email: "", password: "", companyName: "" },
   accountCreated: false,
   paymentMethod: null,

@@ -3,20 +3,21 @@
 // form card because the module set is still derived from them; they are the
 // same questions, asked as fields rather than as a separate screen.
 import { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { ChevronDown, Upload } from "lucide-react";
 import clsx from "clsx";
 import { Input, Select } from "@ui/primitives";
 import { QuestionsStep } from "@/widgets/business-wizard";
 import { useI18n } from "@/app/providers/i18n-provider";
 import {
   AUDIENCES, BRANCH_TYPES, CITIES, CURRENCIES, PALETTES, THEME_TEMPLATES, WEEKDAYS,
+  formatTime, summarizeHours, timeOptions,
 } from "../_shared/brand-catalog";
 import { themeThumb } from "../_shared/assets";
 import { readLogoFile } from "../_shared/logo-file";
 import type { StepProps } from "../_shared/steps";
 
 export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   const { brand } = draft;
 
@@ -27,12 +28,23 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
   // nonsensical value can be corrected without interrupting typing.
   const [branchCountText, setBranchCountText] = useState<string | null>(null);
 
+  // Seven rows of opening hours is the tallest thing on this form by a wide
+  // margin, and most merchants keep the default. The section starts folded and
+  // states what it currently holds, so the answer is still visible without
+  // costing the rest of the form a screenful.
+  const [hoursExpanded, setHoursExpanded] = useState(false);
+
   function commitBranchCount() {
     const parsed = Math.floor(Number(branchCountText));
     const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : brand.branchCount;
     dispatch({ type: "patchBrand", patch: { branchCount: next } });
     setBranchCountText(null);
   }
+
+  // What the folded row says. Not "Operating Hours" again — a summary is only
+  // worth the space if a merchant can read their answer off it without
+  // unfolding. Same helper the page preview's footer uses on step 8.
+  const hoursSummary = summarizeHours(brand.hours, t, locale);
 
   return (
     <div className="flex flex-col gap-4">
@@ -108,7 +120,25 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
           <legend className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
             {t("onboarding.details.hours")}
           </legend>
-          <div className="mt-2 flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setHoursExpanded((open) => !open)}
+            aria-expanded={hoursExpanded}
+            aria-controls="onboarding-hours"
+            className="mt-2 flex w-full items-center justify-between gap-3 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[11.5px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/30"
+          >
+            <span className="truncate">{hoursSummary}</span>
+            <ChevronDown
+              size={14}
+              className={clsx("shrink-0 text-[var(--octo-text-muted)] transition-transform", hoursExpanded && "rotate-180")}
+            />
+          </button>
+
+          {/* Hidden with `display: none`, not unmounted: that takes the folded
+              rows out of the tab order and the accessibility tree just the same,
+              while leaving the element in the DOM so `aria-controls` above
+              always resolves to something. */}
+          <div id="onboarding-hours" className={clsx("mt-1.5 flex-col gap-1.5", hoursExpanded ? "flex" : "hidden")}>
             {WEEKDAYS.map((day) => {
               const hours = brand.hours[day];
               return (
@@ -116,20 +146,18 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
                   <span className="w-9 text-[11.5px] font-medium text-[var(--octo-text-secondary)]">{t(`onboarding.day.${day}`)}</span>
                   {/* Closed means closed: leaving the windows editable made
                       the switch look broken. */}
-                  <input
-                    type="time"
+                  <TimeSelect
                     value={hours.from}
+                    label={`${t(`onboarding.day.${day}`)} — ${t("onboarding.details.opensAt")}`}
                     disabled={!hours.open}
-                    onChange={(e) => dispatch({ type: "setDayHours", day, hours: { ...hours, from: e.target.value } })}
-                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+                    onChange={(from) => dispatch({ type: "setDayHours", day, hours: { ...hours, from } })}
                   />
                   <span className={clsx("text-[var(--octo-text-faint)]", !hours.open && "opacity-45")}>—</span>
-                  <input
-                    type="time"
+                  <TimeSelect
                     value={hours.to}
+                    label={`${t(`onboarding.day.${day}`)} — ${t("onboarding.details.closesAt")}`}
                     disabled={!hours.open}
-                    onChange={(e) => dispatch({ type: "setDayHours", day, hours: { ...hours, to: e.target.value } })}
-                    className="rounded-[7px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[11.5px] text-[var(--octo-text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
+                    onChange={(to) => dispatch({ type: "setDayHours", day, hours: { ...hours, to } })}
                   />
                   <button
                     type="button"
@@ -311,5 +339,51 @@ export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
         </div>
       </section>
     </div>
+  );
+}
+
+/** One end of a day's opening window.
+ *
+ *  A list rather than a free-form clock: `<input type="time">` renders as a
+ *  different control in every browser — and as a keyboard-hostile one in
+ *  several — while a merchant setting seven days of hours is picking from the
+ *  same handful of times each time. Half-hour steps, from brand-catalog.ts.
+ *
+ *  The stored value stays "HH:MM" either way, so nothing downstream of the
+ *  draft has to know this changed. */
+function TimeSelect({
+  value, label, disabled, onChange,
+}: {
+  value: string;
+  label: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const { locale } = useI18n();
+  const options = timeOptions(locale);
+
+  // A draft written before this list existed can hold a time that is not on the
+  // half-hour grid — the old field accepted any minute. Snapping it to the
+  // nearest option would quietly rewrite hours the merchant already set, and a
+  // <select> whose value matches no option silently displays the first one
+  // instead, so the odd value is offered as an option of its own.
+  const list = options.some((option) => option.value === value)
+    ? options
+    : [...options, { value, label: formatTime(value, locale) }].sort((a, b) => a.value.localeCompare(b.value));
+
+  return (
+    <Select
+      aria-label={label}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className="!w-[112px] !py-1 !ps-2 !text-[11.5px]"
+    >
+      {list.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </Select>
   );
 }

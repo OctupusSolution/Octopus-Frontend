@@ -18,6 +18,14 @@
   --octo-seg-bg: #f3f3f5;
   --octo-selected: #eef4ff;
 
+  /* Storefront surfaces. The shared palette targets the merchant console,
+     whose page background (#e9eaec) is far darker than the storefront design.
+     Brand, text and semantic colours still come from the shared palette. */
+  --octo-store-page: #f7f8fa;
+  --octo-store-soft: #f1f3f5;
+  --octo-store-footer: #e7edf4;
+  --octo-store-notice: #fff6e8;
+
   --octo-text-primary: #16161d;
   --octo-text-secondary: #6b6b74;
   --octo-text-muted: #8b8b93;
@@ -28,5 +36,5 @@
 }
 
 body {
-  @apply bg-[var(--octo-page-bg)] text-[var(--octo-text-primary)] antialiased;
+  @apply bg-[var(--octo-store-page)] text-[var(--octo-text-primary)] antialiased;
 }

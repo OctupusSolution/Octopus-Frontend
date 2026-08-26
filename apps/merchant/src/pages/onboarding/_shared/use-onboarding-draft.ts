@@ -15,14 +15,29 @@
 // DRAFT_VERSION guards the shape: a draft written by the previous ten-step
 // flow has fields this one no longer understands, so it is discarded rather
 // than rehydrated into something half-valid.
+//
+// Two flows share this hook — signup and add-business — each with its own
+// storage keys (an abandoned draft in one must never surface in the other),
+// its own step count to normalise against, and, for add-business, a patch
+// applied over EMPTY_DRAFT so a fresh draft starts with the account step
+// already considered done. `useOnboardingDraft` takes all of that as a config
+// rather than assuming signup's values.
 import { useEffect, useReducer, useCallback, useMemo } from "react";
 import { draftReducer, EMPTY_DRAFT, type OnboardingDraft } from "./draft";
-import { STEP_COUNT } from "./steps";
 
-const DRAFT_KEY = "octopus.onboarding.draft";
-/** The explicitly kept copy. A separate key, not a separate format. */
-const KEPT_KEY = "octopus.onboarding.draft.kept";
 const DRAFT_VERSION = 2;
+
+export interface OnboardingDraftConfig {
+  /** sessionStorage key for the auto-saved copy. */
+  draftKey: string;
+  /** localStorage key for the explicitly kept copy. */
+  keptKey: string;
+  /** How many steps the active flow has. Used to normalise a restored
+   *  `draft.step` into range. */
+  stepCount: number;
+  /** Applied over EMPTY_DRAFT when there is nothing persisted to restore. */
+  patch?: Partial<OnboardingDraft>;
+}
 
 /** What actually gets written, at either lifetime.
  *
@@ -40,7 +55,7 @@ function serialize(draft: OnboardingDraft): string {
 }
 
 /** Rehydrates one stored string, or returns null if there is nothing usable. */
-function parseDraft(raw: string | null): OnboardingDraft | null {
+function parseDraft(raw: string | null, stepCount: number): OnboardingDraft | null {
   if (!raw) return null;
   const parsed = JSON.parse(raw) as { version?: number; draft?: OnboardingDraft };
   if (parsed.version !== DRAFT_VERSION || !parsed.draft) return null;
@@ -60,64 +75,71 @@ function parseDraft(raw: string | null): OnboardingDraft | null {
   // than clamping it at render time: a page that clamps for display only
   // still has the out-of-range number in state, so Back decrements a value
   // the merchant cannot see and appears to do nothing.
-  merged.step = Math.min(Math.max(1, Math.floor(merged.step) || 1), STEP_COUNT);
+  merged.step = Math.min(Math.max(1, Math.floor(merged.step) || 1), stepCount);
   return merged;
 }
 
+/** EMPTY_DRAFT, with the flow's own patch (if any) applied — what a brand new
+ *  draft for this flow looks like. */
+function freshDraft(config: OnboardingDraftConfig): OnboardingDraft {
+  return config.patch ? { ...EMPTY_DRAFT, ...config.patch } : EMPTY_DRAFT;
+}
+
 /** `restored` is true only when a valid persisted draft was found — a fresh
- * `EMPTY_DRAFT` (nothing stored, or a discarded stale/corrupt one) is not a
- * restore. The session copy wins over the kept one: it is the newer of the two
+ * draft (nothing stored, or a discarded stale/corrupt one) is not a restore.
+ * The session copy wins over the kept one: it is the newer of the two
  * whenever both exist, because it is rewritten on every change. */
-function readDraft(): { draft: OnboardingDraft; restored: boolean } {
-  if (typeof window === "undefined") return { draft: EMPTY_DRAFT, restored: false };
+function readDraft(config: OnboardingDraftConfig): { draft: OnboardingDraft; restored: boolean } {
+  if (typeof window === "undefined") return { draft: freshDraft(config), restored: false };
   try {
     const draft =
-      parseDraft(window.sessionStorage.getItem(DRAFT_KEY)) ??
-      parseDraft(window.localStorage.getItem(KEPT_KEY));
-    return draft ? { draft, restored: true } : { draft: EMPTY_DRAFT, restored: false };
+      parseDraft(window.sessionStorage.getItem(config.draftKey), config.stepCount) ??
+      parseDraft(window.localStorage.getItem(config.keptKey), config.stepCount);
+    return draft ? { draft, restored: true } : { draft: freshDraft(config), restored: false };
   } catch {
-    return { draft: EMPTY_DRAFT, restored: false };
+    return { draft: freshDraft(config), restored: false };
   }
 }
 
-export function useOnboardingDraft() {
+export function useOnboardingDraft(config: OnboardingDraftConfig) {
   // Read once, on mount, so the reducer seeds from the persisted draft and
   // `restored` reflects that same read — not recomputed on every render.
-  const initial = useMemo(readDraft, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => readDraft(config), []);
   const [draft, dispatch] = useReducer(draftReducer, initial.draft);
 
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(DRAFT_KEY, serialize(draft));
+      window.sessionStorage.setItem(config.draftKey, serialize(draft));
     } catch {
       // Private browsing or a full quota — the wizard still works, it just
       // will not survive a refresh. Not worth interrupting signup over.
     }
-  }, [draft]);
+  }, [draft, config.draftKey]);
 
   /** "Save As Draft": keep this draft past the life of the tab. Reports whether
    *  it actually landed, so the caller does not promise a merchant in private
    *  browsing something that silently did not happen. */
   const keep = useCallback((): boolean => {
     try {
-      window.localStorage.setItem(KEPT_KEY, serialize(draft));
+      window.localStorage.setItem(config.keptKey, serialize(draft));
       return true;
     } catch {
       return false;
     }
-  }, [draft]);
+  }, [draft, config.keptKey]);
 
   const clear = useCallback(() => {
     // Both lifetimes end when the business exists — a kept draft left behind
     // would offer to resume a signup that has already finished.
-    window.sessionStorage.removeItem(DRAFT_KEY);
+    window.sessionStorage.removeItem(config.draftKey);
     try {
-      window.localStorage.removeItem(KEPT_KEY);
+      window.localStorage.removeItem(config.keptKey);
     } catch {
       // Nothing was kept, or storage is unavailable. Either way there is
       // nothing to clean up.
     }
-  }, []);
+  }, [config.draftKey, config.keptKey]);
 
   return { draft, dispatch, clear, keep, restored: initial.restored };
 }

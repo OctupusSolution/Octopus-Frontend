@@ -1,6 +1,6 @@
-// Tag normalisation for the public link. Shared between the step (which builds
-// the preview URL) and its aside (which owns the input), so both agree on what
-// a tag is allowed to contain.
+// Tag normalisation for the public link, kept out of the aside that uses it so
+// the two rules — what may be typed, and what a legal DNS label is — are stated
+// once, next to each other, with the reasoning for keeping them apart.
 
 /** What the merchant sees while typing: strips disallowed characters and caps
  *  the length, nothing more. It deliberately does NOT trim or collapse

@@ -47,6 +47,10 @@ export interface StepDef {
   Aside?: ComponentType<StepProps>;
   canContinue: (draft: OnboardingDraft) => boolean;
   showPriceBar: boolean;
+  /** Whether the footer offers "Save As Draft" beside Back and Continue. The
+   *  design puts it on step 8 — the last screen a merchant sees before the
+   *  account and payment steps, and so the natural place to stop for now. */
+  showSaveDraft?: boolean;
 }
 
 export const STEPS: readonly StepDef[] = [
@@ -139,6 +143,7 @@ export const STEPS: readonly StepDef[] = [
     Aside: PublicLinkAside,
     canContinue: () => true,
     showPriceBar: false,
+    showSaveDraft: true,
   },
   {
     id: "dashboardPreview",

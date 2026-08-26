@@ -1,82 +1,45 @@
-// Full-page "create a new business" wizard. Used to be a modal squeezed into
-// a dialog — five steps (name, industry, type, qualifying questions, modules)
-// need more room than that, so it's now its own route instead.
-import { useEffect, useMemo, useState } from "react";
+// "Create another business" — the same onboarding flow signup uses, minus the
+// Get Started hero (a merchant who is already signed in doesn't need the
+// pitch) and, on Payment, the Create Account modal (they already have an
+// account). Runs inside the app shell, with the existing back-link and page
+// title standing in for the header the standalone signup flow renders.
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Building2 } from "lucide-react";
-import { Button, Input } from "@ui/primitives";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
-import {
-  baseModuleIds, defaultModulesFor, questionsFor,
-  withDependencies, withoutDependents,
-  type ModuleId, type TypeCode, type VerticalId,
-} from "@/shared/catalog";
-import { VerticalStep, TypeStep, QuestionsStep, ModulesStep, type Answers } from "@/widgets/business-wizard";
-import { StepRail } from "@/pages/onboarding/_shared/step-rail";
+import { Wizard } from "@/pages/onboarding/_shared/wizard";
+import { ADD_BUSINESS_STEPS } from "@/pages/onboarding/_shared/steps";
+import type { OnboardingDraft } from "@/pages/onboarding/_shared/draft";
+import type { OnboardingDraftConfig } from "@/pages/onboarding/_shared/use-onboarding-draft";
 
-const WIZARD_TOTAL_STEPS = 5;
-const WIZARD_RAIL_LABEL_KEYS = [1, 2, 3, 4, 5].map((n) => `settings.businesses.wizard.rail.step${n}`);
+const DRAFT_CONFIG: OnboardingDraftConfig = {
+  draftKey: "octopus.addBusiness.draft",
+  keptKey: "octopus.addBusiness.draft.kept",
+  stepCount: ADD_BUSINESS_STEPS.length,
+  // The merchant creating a second business already has an account — the
+  // Payment step's Create Account modal opens only when `!accountCreated`,
+  // so starting a fresh draft with this already true keeps it from ever
+  // appearing on this flow.
+  patch: { accountCreated: true },
+};
 
 export function CreateBusinessPage() {
   const { t, dir } = useI18n();
   const navigate = useNavigate();
   const { createBusiness } = useTenantConfig();
 
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState("");
-  const [vertical, setVertical] = useState<VerticalId | null>(null);
-  const [type, setType] = useState<TypeCode | null>(null);
-  const [answers, setAnswers] = useState<Answers>({});
-  const [enabled, setEnabled] = useState<ModuleId[]>([...baseModuleIds]);
-
-  // Re-derive the module set whenever the type or an answer changes, same
-  // rule the 10-step signup flow uses.
-  useEffect(() => {
-    if (!type) return;
-    const fromType = defaultModulesFor(type);
-    const fromAnswers: ModuleId[] = [];
-    for (const question of questionsFor(type)) {
-      const option = question.options.find((o) => o.id === answers[question.id]);
-      if (option) fromAnswers.push(...option.enables);
-    }
-    setEnabled(withDependencies([...fromType, ...fromAnswers]));
-  }, [type, answers]);
-
-  const branchCount = useMemo(() => {
-    if (!type) return 1;
-    const question = questionsFor(type).find((q) => q.id === "branches");
-    const option = question?.options.find((o) => o.id === answers.branches);
-    return option?.branchCount ?? 1;
-  }, [type, answers.branches]);
-
-  function handleSelectType(code: TypeCode) {
-    setType(code);
-    setAnswers({});
-  }
-
-  function handleToggleModule(id: ModuleId, next: boolean) {
-    setEnabled((prev) => (next ? withDependencies([...prev, id]) : withoutDependents(prev, id)));
-  }
-
-  function handleCreate() {
-    if (!vertical || !type) return;
-    const businessName = name.trim();
+  function handleFinish(draft: OnboardingDraft) {
+    if (!draft.vertical || !draft.type) return;
+    const businessName = draft.brand.businessName.trim() || "My Business";
     createBusiness({
+      vertical: draft.vertical,
+      businessType: draft.type,
+      enabledModules: draft.enabled,
+      branchCount: draft.brand.branchCount,
       businessName,
-      vertical,
-      businessType: type,
-      enabledModules: enabled,
-      branchCount,
     });
     navigate("/settings/businesses", { replace: true, state: { created: businessName } });
   }
-
-  const canContinue =
-    step === 1 ? name.trim() !== "" :
-    step === 2 ? vertical !== null :
-    step === 3 ? type !== null :
-    true;
 
   const BackArrow = dir === "rtl" ? ArrowRight : ArrowLeft;
 
@@ -95,54 +58,7 @@ export function CreateBusinessPage() {
         {t("settings.businesses.wizard.title")}
       </h1>
 
-      <div className="mt-5 max-w-[960px]">
-        <StepRail step={step} labelKeys={WIZARD_RAIL_LABEL_KEYS} />
-      </div>
-
-      <div className="mt-7 max-w-[960px]">
-        {step === 1 && (
-          <section className="mx-auto w-full max-w-[560px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-7">
-            <Input
-              label={t("settings.businesses.wizard.nameLabel")}
-              icon={<Building2 size={15} />}
-              placeholder={t("settings.businesses.wizard.namePlaceholder")}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              className="!py-2.5 !text-[13.5px]"
-            />
-          </section>
-        )}
-        {step === 2 && <VerticalStep selected={vertical} onSelect={setVertical} />}
-        {step === 3 && <TypeStep selected={type} onSelect={handleSelectType} />}
-        {step === 4 && type && (
-          <QuestionsStep
-            type={type}
-            answers={answers}
-            onAnswer={(questionId, optionId) => setAnswers((prev) => ({ ...prev, [questionId]: optionId }))}
-          />
-        )}
-        {step === 5 && type && (
-          <ModulesStep type={type} answers={answers} enabled={enabled} onToggle={handleToggleModule} />
-        )}
-      </div>
-
-      <div className="mt-8 flex max-w-[960px] items-center justify-end gap-2 border-t border-[var(--octo-border-card)] pt-4">
-        {step > 1 && (
-          <Button variant="secondary" onClick={() => setStep((s) => s - 1)} icon={<BackArrow size={14} />}>
-            {t("onboarding.back")}
-          </Button>
-        )}
-        {step < WIZARD_TOTAL_STEPS ? (
-          <Button variant="primary" disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
-            {t("onboarding.next")}
-          </Button>
-        ) : (
-          <Button variant="primary" onClick={handleCreate}>
-            {t("settings.businesses.wizard.create")}
-          </Button>
-        )}
-      </div>
+      <Wizard steps={ADD_BUSINESS_STEPS} draftConfig={DRAFT_CONFIG} onFinish={handleFinish} />
     </div>
   );
 }

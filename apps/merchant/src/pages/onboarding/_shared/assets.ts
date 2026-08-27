@@ -37,9 +37,16 @@ export function getStartedAsset(file: string): string {
   return url(`Get Started/${file}`);
 }
 
-/** `apps/assets/public-link/<file>` — storefront preview imagery, step 8. */
-export function publicLinkAsset(file: string): string {
-  return url(`public-link/${file}`);
+/** `apps/customer/public/images/storefront/<file>` — the photography the
+ *  customer storefront actually ships.
+ *
+ *  Step 8 depicts that exact page, so it shows those exact pictures rather
+ *  than a second copy in `apps/assets`. Two copies would be seven megabytes
+ *  of duplicated photographs that drift apart the first time one side is
+ *  re-shot — which is precisely how step 8 ended up pointing at four category
+ *  images that no longer existed. */
+export function storefrontAsset(file: string): string {
+  return new URL(`../../../../../customer/public/images/storefront/${file}`, import.meta.url).href;
 }
 
 // Only one real theme thumbnail exists. `elegant` uses it; `modern` and `warm`

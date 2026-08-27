@@ -47,11 +47,13 @@ export function brandToneFor(type: TypeCode | null): string[] {
   }
 }
 
-/** Menu section names to seed the storefront preview with. */
+/** Menu section names to seed the storefront preview with. Five of them: the
+ *  storefront's category mosaic is a five-tile block with one running tall
+ *  through both rows, and a four-item list left a hole in the corner. */
 export function serviceCategoriesFor(type: TypeCode | null): string[] {
   switch (type) {
-    case "T5": return ["onboarding.category.pastries", "onboarding.category.cakes", "onboarding.category.drinks", "onboarding.category.desserts"];
-    case "T4": return ["onboarding.category.coffee", "onboarding.category.drinks", "onboarding.category.pastries", "onboarding.category.breakfast"];
-    default:   return ["onboarding.category.signature", "onboarding.category.appetizers", "onboarding.category.drinks", "onboarding.category.desserts"];
+    case "T5": return ["onboarding.category.pastries", "onboarding.category.cakes", "onboarding.category.drinks", "onboarding.category.desserts", "onboarding.category.breakfast"];
+    case "T4": return ["onboarding.category.coffee", "onboarding.category.drinks", "onboarding.category.pastries", "onboarding.category.breakfast", "onboarding.category.cakes"];
+    default:   return ["onboarding.category.signature", "onboarding.category.appetizers", "onboarding.category.drinks", "onboarding.category.desserts", "onboarding.category.breakfast"];
   }
 }

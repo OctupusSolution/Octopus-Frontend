@@ -3,13 +3,16 @@
 // same honesty as "coming soon" verticals: shown for real, not faked as live.
 // Real setup happens later in Settings → Integrations, which lists this exact
 // same vendor set so nothing here feels invented.
+import { useState } from "react";
 import { Check } from "lucide-react";
 import clsx from "clsx";
 import {
   INTEGRATIONS, type IntegrationCategory, type IntegrationId, type IntegrationOption,
 } from "../_shared/extras-catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { BRAND_GRADIENT } from "../_shared/brand";
+import { BRAND_GRADIENT } from "@/shared/lib/brand";
+import { formatSar } from "@/shared/catalog";
+import { integrationLogo } from "../_shared/assets";
 
 const CATEGORIES: readonly IntegrationCategory[] = ["delivery", "payments", "accounting", "messaging"];
 const CATEGORY_KEY: Record<IntegrationCategory, string> = {
@@ -26,7 +29,7 @@ export function IntegrationsStep({
   selected: readonly IntegrationId[];
   onToggle: (id: IntegrationId) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,6 +49,7 @@ export function IntegrationsStep({
                   active={selected.includes(item.id)}
                   onToggle={() => onToggle(item.id)}
                   t={t}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -61,13 +65,16 @@ export function IntegrationsStep({
 }
 
 function IntegrationCard({
-  item, active, onToggle, t,
+  item, active, onToggle, t, locale,
 }: {
   item: IntegrationOption;
   active: boolean;
   onToggle: () => void;
   t: (key: string) => string;
+  locale: string;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
   return (
     <button
       type="button"
@@ -80,15 +87,38 @@ function IntegrationCard({
           : "border-[var(--octo-border-card)] bg-[var(--octo-card)] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
       )}
     >
-      <span
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[13px] font-bold"
-        style={{ backgroundColor: `${item.color}1A`, color: item.color }}
-      >
-        {item.name.charAt(0)}
-      </span>
+      {item.image ? (
+        <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-lg border border-[var(--octo-border-card)] bg-white p-1.5">
+          {imageFailed ? (
+            <span
+              className="grid h-full w-full place-items-center rounded-md text-[13px] font-bold"
+              style={{ backgroundColor: `${item.color}1A`, color: item.color }}
+            >
+              {item.name.charAt(0)}
+            </span>
+          ) : (
+            <img
+              src={integrationLogo(item.image)}
+              alt=""
+              className="block h-full w-full object-contain"
+              onError={() => setImageFailed(true)}
+            />
+          )}
+        </span>
+      ) : (
+        <span
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-[13px] font-bold"
+          style={{ backgroundColor: `${item.color}1A`, color: item.color }}
+        >
+          {item.name.charAt(0)}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{item.name}</p>
         <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--octo-text-muted)]">{t(item.descKey)}</p>
+        <p className="mt-1 text-[11.5px] font-semibold text-[var(--octo-text-primary)]">
+          {formatSar(item.priceSar, locale)} <span className="font-normal text-[var(--octo-text-muted)]">{t("pricing.perMonth")}</span>
+        </p>
       </div>
       {active && (
         <span

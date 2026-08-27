@@ -4,9 +4,9 @@
 // removed. ZATCA tax invoicing is among them deliberately: e-invoicing is a
 // legal obligation for every Saudi business, so it is not a paid extra.
 //
-// `Delivery & Dispatch` is a first-class module here even though the original
-// twelve-module list omitted it — the console already ships four working
-// delivery pages, and they need to be entitled and priced like anything else.
+// `Delivery` is a first-class module here even though the original
+// twelve-module list omitted it — connecting third-party delivery apps
+// (aggregator channels) needs to be entitled and priced like anything else.
 
 export type ModuleId =
   | "core"

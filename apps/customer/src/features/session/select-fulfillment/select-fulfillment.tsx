@@ -10,6 +10,12 @@ import { fulfillmentLabel, type FulfillmentChannel } from "@/shared/lib/fulfillm
 
 export interface SelectFulfillmentProps {
   tenant: Tenant;
+  /** What to do once a channel is confirmed. Defaults to navigating to the
+   *  menu, which is what this did as the standalone home-page gate. Checkout
+   *  passes its own handler, because there the picker is one field among
+   *  several on a page the customer should stay on. */
+  onConfirmed?: () => void;
+  submitLabel?: string;
 }
 
 const CHANNEL_OPTIONS: { id: FulfillmentChannel; icon: typeof MapPin }[] = [
@@ -18,7 +24,11 @@ const CHANNEL_OPTIONS: { id: FulfillmentChannel; icon: typeof MapPin }[] = [
   { id: "dine_in", icon: UtensilsCrossed },
 ];
 
-export function SelectFulfillment({ tenant }: SelectFulfillmentProps) {
+export function SelectFulfillment({
+  tenant,
+  onConfirmed,
+  submitLabel = "متابعة إلى القائمة",
+}: SelectFulfillmentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setChannel, setDeliveryAddress, setBranch, setTable } = useOrderingSession();
@@ -43,6 +53,11 @@ export function SelectFulfillment({ tenant }: SelectFulfillmentProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function finish() {
+    if (onConfirmed) onConfirmed();
+    else router.push("/menu");
+  }
+
   function handleContinue() {
     if (channel === "delivery") {
       const matched = tenant.deliveryZones.some((zone) => address.toLowerCase().includes(zone.toLowerCase()));
@@ -54,14 +69,14 @@ export function SelectFulfillment({ tenant }: SelectFulfillmentProps) {
       setChannel(tenant.id, "delivery");
       setDeliveryAddress(address);
       setBranch(tenant.branches[0].id);
-      router.push("/menu");
+      finish();
       return;
     }
 
     if (channel === "takeaway") {
       setChannel(tenant.id, "takeaway");
       setBranch(branchId);
-      router.push("/menu");
+      finish();
       return;
     }
 
@@ -73,7 +88,7 @@ export function SelectFulfillment({ tenant }: SelectFulfillmentProps) {
     setChannel(tenant.id, "dine_in");
     setTable(tableNumber);
     setBranch(tenant.branches[0].id);
-    router.push("/menu");
+    finish();
   }
 
   return (
@@ -129,7 +144,7 @@ export function SelectFulfillment({ tenant }: SelectFulfillmentProps) {
       )}
 
       <Button onClick={handleContinue} className="w-full justify-center">
-        متابعة إلى القائمة
+        {submitLabel}
       </Button>
     </div>
   );

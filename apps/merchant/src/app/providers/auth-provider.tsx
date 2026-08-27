@@ -13,13 +13,19 @@ export interface SessionUser {
   name: string;
   role: string;
   signedInAt: string;
+  /** Whether a password was set at signup — never the password itself, just the flag. */
+  passwordSet: boolean;
 }
 
 interface AuthContextValue {
   isAuthenticated: boolean;
   user: SessionUser | null;
-  signIn: (email: string) => void;
+  /** `passwordSet` defaults to true (email/social sign-in already implies credentials); the onboarding account step passes it explicitly. */
+  signIn: (email: string, passwordSet?: boolean) => void;
   signOut: () => void;
+  /** True once signed in without a password — the shell blocks on this until `setPasswordSet` runs. */
+  needsPassword: boolean;
+  setPasswordSet: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -57,18 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     isAuthenticated: user !== null,
     user,
-    signIn: (email: string) =>
+    signIn: (email: string, passwordSet = true) =>
       setUser({
         email,
         name: displayNameFromEmail(email),
         role: "owner",
         signedInAt: new Date().toISOString(),
+        passwordSet,
       }),
     signOut: () => setUser(null),
+    needsPassword: user !== null && !user.passwordSet,
+    setPasswordSet: () => setUser((prev) => (prev ? { ...prev, passwordSet: true } : prev)),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);

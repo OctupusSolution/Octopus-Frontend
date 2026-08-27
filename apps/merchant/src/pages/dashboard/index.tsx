@@ -17,6 +17,7 @@ import {
   type DashboardBranchOption,
 } from "@/shared/api/mock-dashboard";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { labelKey } from "@/shared/lib/labels";
 import { Checkbox } from "@ui/primitives";
 
@@ -40,7 +41,13 @@ const KPI_ROUTES: Record<string, string> = {
 // since its bar chart needs a definite height to resolve percentages.
 export function DashboardPage() {
   const { t } = useI18n();
+  const { activeBusiness } = useTenantConfig();
   const navigate = useNavigate();
+
+  // The subtitle used to name someone else's company outright. It now names
+  // the business the merchant actually created, with the generic label as the
+  // fallback for an unprovisioned session.
+  const businessLabel = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
 
   const [refreshing, setRefreshing] = useState(false);
   const [updatedLabel, setUpdatedLabel] = useState<string>(lastUpdatedLabel);
@@ -135,7 +142,7 @@ export function DashboardPage() {
             {t("dashboard.title")}
           </h1>
           <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">
-            {t("dashboard.subtitle")}
+            {t("dashboard.subtitle").replace("{business}", businessLabel)}
           </p>
         </div>
 

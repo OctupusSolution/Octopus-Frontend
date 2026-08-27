@@ -1,0 +1,389 @@
+// Step 4 — the essentials plus the brand. Two cards: the details form, and the
+// theme templates under it. The qualifying questions live at the bottom of the
+// form card because the module set is still derived from them; they are the
+// same questions, asked as fields rather than as a separate screen.
+import { useRef, useState } from "react";
+import { ChevronDown, Upload } from "lucide-react";
+import clsx from "clsx";
+import { Input, Select } from "@ui/primitives";
+import { QuestionsStep } from "@/widgets/business-wizard";
+import { useI18n } from "@/app/providers/i18n-provider";
+import {
+  AUDIENCES, BRANCH_TYPES, CITIES, CURRENCIES, PALETTES, THEME_TEMPLATES, WEEKDAYS,
+  formatTime, summarizeHours, timeOptions,
+} from "../_shared/brand-catalog";
+import { themeThumb } from "../_shared/assets";
+import { readLogoFile } from "../_shared/logo-file";
+import type { StepProps } from "../_shared/steps";
+
+export function BusinessDetailsStep({ draft, dispatch }: StepProps) {
+  const { t, locale } = useI18n();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { brand } = draft;
+
+  // The branch-count field is held as raw text while it has focus. Committing
+  // a clamped number on every keystroke made the field snap to 1 the instant
+  // the merchant cleared it, so typing "12" fought them: clearing "1" wrote 1
+  // straight back. The clamp still runs — just on blur, where an empty or
+  // nonsensical value can be corrected without interrupting typing.
+  const [branchCountText, setBranchCountText] = useState<string | null>(null);
+
+  // Seven rows of opening hours is the tallest thing on this form by a wide
+  // margin, and most merchants keep the default. The section starts folded and
+  // states what it currently holds, so the answer is still visible without
+  // costing the rest of the form a screenful.
+  const [hoursExpanded, setHoursExpanded] = useState(false);
+
+  function commitBranchCount() {
+    const parsed = Math.floor(Number(branchCountText));
+    const next = Number.isFinite(parsed) && parsed >= 1 ? parsed : brand.branchCount;
+    dispatch({ type: "patchBrand", patch: { branchCount: next } });
+    setBranchCountText(null);
+  }
+
+  // What the folded row says. Not "Operating Hours" again — a summary is only
+  // worth the space if a merchant can read their answer off it without
+  // unfolding. Same helper the page preview's footer uses on step 8.
+  const hoursSummary = summarizeHours(brand.hours, t, locale);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label={t("onboarding.businessName")}
+            value={brand.businessName}
+            onChange={(e) => dispatch({ type: "patchBrand", patch: { businessName: e.target.value } })}
+            className="!py-2.5 !text-[13px]"
+          />
+          <Select
+            label={t("onboarding.details.city")}
+            value={brand.city}
+            onChange={(e) => dispatch({ type: "patchBrand", patch: { city: e.target.value } })}
+          >
+            <option value="">{t("onboarding.details.cityPlaceholder")}</option>
+            {CITIES.map((c) => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
+          </Select>
+          <Select
+            label={t("onboarding.details.branchType")}
+            value={brand.branchType}
+            onChange={(e) => dispatch({ type: "patchBrand", patch: { branchType: e.target.value } })}
+          >
+            <option value="">{t("onboarding.details.branchTypePlaceholder")}</option>
+            {BRANCH_TYPES.map((b) => <option key={b.id} value={b.id}>{t(b.labelKey)}</option>)}
+          </Select>
+          <Select
+            label={t("onboarding.details.currency")}
+            value={brand.currency}
+            onChange={(e) => dispatch({ type: "patchBrand", patch: { currency: e.target.value } })}
+          >
+            {CURRENCIES.map((c) => <option key={c.id} value={c.id}>{t(c.labelKey)}</option>)}
+          </Select>
+          <Input
+            type="number"
+            min={1}
+            label={t("onboarding.details.branchCount")}
+            value={branchCountText ?? String(brand.branchCount)}
+            onChange={(e) => setBranchCountText(e.target.value)}
+            onBlur={commitBranchCount}
+            className="!py-2.5 !text-[13px]"
+          />
+          <fieldset className="flex flex-col gap-1.5">
+            <legend className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+              {t("onboarding.details.audience")}
+            </legend>
+            <div className="flex flex-wrap gap-1.5">
+              {AUDIENCES.map((a) => {
+                const on = brand.audiences.includes(a.id);
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => dispatch({ type: "toggleAudience", id: a.id })}
+                    className={clsx(
+                      "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                      on
+                        ? "border-[#0D6EFD] bg-[var(--octo-selected)] text-[#0D6EFD]"
+                        : "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+                    )}
+                  >
+                    {t(a.labelKey)}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        </div>
+
+        <fieldset className="mt-5">
+          <legend className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+            {t("onboarding.details.hours")}
+          </legend>
+          <button
+            type="button"
+            onClick={() => setHoursExpanded((open) => !open)}
+            aria-expanded={hoursExpanded}
+            aria-controls="onboarding-hours"
+            className="mt-2 flex w-full items-center justify-between gap-3 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[11.5px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/30"
+          >
+            <span className="truncate">{hoursSummary}</span>
+            <ChevronDown
+              size={14}
+              className={clsx("shrink-0 text-[var(--octo-text-muted)] transition-transform", hoursExpanded && "rotate-180")}
+            />
+          </button>
+
+          {/* Hidden with `display: none`, not unmounted: that takes the folded
+              rows out of the tab order and the accessibility tree just the same,
+              while leaving the element in the DOM so `aria-controls` above
+              always resolves to something. */}
+          <div id="onboarding-hours" className={clsx("mt-1.5 flex-col gap-1.5", hoursExpanded ? "flex" : "hidden")}>
+            {WEEKDAYS.map((day) => {
+              const hours = brand.hours[day];
+              return (
+                <div key={day} className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-2.5 py-1.5">
+                  <span className="w-9 text-[11.5px] font-medium text-[var(--octo-text-secondary)]">{t(`onboarding.day.${day}`)}</span>
+                  {/* Closed means closed: leaving the windows editable made
+                      the switch look broken. */}
+                  <TimeSelect
+                    value={hours.from}
+                    label={`${t(`onboarding.day.${day}`)} — ${t("onboarding.details.opensAt")}`}
+                    disabled={!hours.open}
+                    onChange={(from) => dispatch({ type: "setDayHours", day, hours: { ...hours, from } })}
+                  />
+                  <span className={clsx("text-[var(--octo-text-faint)]", !hours.open && "opacity-45")}>—</span>
+                  <TimeSelect
+                    value={hours.to}
+                    label={`${t(`onboarding.day.${day}`)} — ${t("onboarding.details.closesAt")}`}
+                    disabled={!hours.open}
+                    onChange={(to) => dispatch({ type: "setDayHours", day, hours: { ...hours, to } })}
+                  />
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={hours.open}
+                    aria-label={t(`onboarding.day.${day}`)}
+                    onClick={() => dispatch({ type: "setDayHours", day, hours: { ...hours, open: !hours.open } })}
+                    className={clsx(
+                      "relative ms-auto h-5 w-9 shrink-0 rounded-full transition-colors",
+                      hours.open ? "bg-[#0D6EFD]" : "bg-[var(--octo-switch-off)]"
+                    )}
+                  >
+                    <span className={clsx(
+                      "absolute top-0.5 h-4 w-4 rounded-full bg-[var(--octo-knob)] shadow transition-all",
+                      hours.open ? "start-[18px]" : "start-0.5"
+                    )} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <fieldset className="mt-5">
+          <legend className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+            {t("onboarding.details.logo")}
+          </legend>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) =>
+              readLogoFile(e.target.files?.[0], (logoDataUrl) =>
+                dispatch({ type: "patchBrand", patch: { logoDataUrl } })
+              )
+            }
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="mt-2 flex w-full flex-col items-center justify-center gap-1.5 rounded-[10px] border border-dashed border-[var(--octo-border-input)] px-3 py-6 text-[11.5px] text-[var(--octo-text-muted)] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            {brand.logoDataUrl ? (
+              <img src={brand.logoDataUrl} alt="" className="max-h-24 object-contain" />
+            ) : (
+              <Upload size={16} />
+            )}
+            {t(brand.logoDataUrl ? "onboarding.details.changeLogo" : "onboarding.details.uploadLogo")}
+          </button>
+        </fieldset>
+
+        <fieldset className="mt-5">
+          <legend className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+            {t("onboarding.details.palette")}
+          </legend>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {PALETTES.map((palette) => (
+              <button
+                key={palette.id}
+                type="button"
+                aria-pressed={brand.primary === palette.primary}
+                aria-label={`${t("onboarding.details.palette")} ${palette.primary}`}
+                // The solid swatch is the primary colour, and that is all it
+                // sets — the suggested combinations below are what set a
+                // primary/secondary pair. Two rows with identical handlers made
+                // the second one a decoy.
+                onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary } })}
+                className={clsx(
+                  "h-12 w-24 rounded-[10px] border-2 transition-all",
+                  brand.primary === palette.primary ? "border-[#0D6EFD]" : "border-transparent"
+                )}
+                style={{ backgroundColor: palette.primary }}
+              />
+            ))}
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2 text-[11.5px] font-medium text-[#0D6EFD]">
+              {t("onboarding.details.addCustomColor")}
+              <input
+                type="color"
+                value={brand.primary}
+                onChange={(e) => dispatch({ type: "patchBrand", patch: { primary: e.target.value } })}
+                className="h-4 w-4 cursor-pointer border-0 bg-transparent p-0"
+              />
+            </label>
+          </div>
+
+          <p className="mt-4 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+            {t("onboarding.details.suggested")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {PALETTES.map((palette) => (
+              <button
+                key={palette.id}
+                type="button"
+                aria-pressed={brand.primary === palette.primary && brand.secondary === palette.secondary}
+                aria-label={`${t("onboarding.details.suggested")} ${palette.primary}`}
+                // A suggested combination: primary and secondary together.
+                onClick={() => dispatch({ type: "patchBrand", patch: { primary: palette.primary, secondary: palette.secondary } })}
+                className={clsx(
+                  "flex overflow-hidden rounded-[8px] border-2",
+                  brand.primary === palette.primary && brand.secondary === palette.secondary
+                    ? "border-[#0D6EFD]"
+                    : "border-[var(--octo-border-card)]"
+                )}
+              >
+                {palette.tints.map((tint) => (
+                  <span key={tint} className="h-8 w-8" style={{ backgroundColor: tint }} />
+                ))}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        {draft.type && (
+          <div className="mt-6 border-t border-[var(--octo-divider)] pt-5">
+            <QuestionsStep
+              type={draft.type}
+              answers={draft.answers}
+              onAnswer={(questionId, optionId) => dispatch({ type: "answer", questionId, optionId })}
+              exclude={["branches"]}
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-5">
+        <h3 className="text-[18px] font-bold text-[var(--octo-text-primary)]">{t("onboarding.details.brandTheme")}</h3>
+        <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">{t("onboarding.details.subtitle")}</p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {THEME_TEMPLATES.map((template) => {
+            const thumb = themeThumb(template.id);
+            const active = brand.themeTemplate === template.id;
+            return (
+              <article
+                key={template.id}
+                className={clsx(
+                  "flex flex-col overflow-hidden rounded-xl border transition-all",
+                  active ? "border-[#0D6EFD] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]" : "border-[var(--octo-border-card)]"
+                )}
+              >
+                {thumb ? (
+                  <img src={thumb} alt="" className="h-28 w-full object-cover" />
+                ) : (
+                  // No photo for this template yet — a gradient from the
+                  // merchant's own palette, rather than someone else's stock image.
+                  <div
+                    className="h-28 w-full"
+                    style={{ background: `linear-gradient(135deg, ${brand.primary} 0%, ${brand.secondary} 100%)` }}
+                  />
+                )}
+                <div className="flex flex-1 flex-col gap-2 p-3.5">
+                  <p className="text-[13.5px] font-bold text-[var(--octo-text-primary)]">{t(template.nameKey)}</p>
+                  <p className="text-[11px] leading-relaxed text-[var(--octo-text-muted)]">{t(template.descKey)}</p>
+                  <p className="text-[10.5px] text-[var(--octo-text-faint)]">{t("onboarding.details.bestFor")}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {template.bestForKeys.map((key) => (
+                      <span key={key} className="rounded-full bg-[var(--octo-selected)] px-2 py-0.5 text-[10px] text-[#0D6EFD]">
+                        {t(key)}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "patchBrand", patch: { themeTemplate: template.id } })}
+                    className={clsx(
+                      "mt-auto rounded-[9px] border px-3 py-2 text-[11.5px] font-semibold transition-colors",
+                      active
+                        ? "border-[#0D6EFD] bg-[#0D6EFD] text-white"
+                        : "border-[#0D6EFD] text-[#0D6EFD] hover:bg-[var(--octo-selected)]"
+                    )}
+                  >
+                    {t("onboarding.details.useTemplate")}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/** One end of a day's opening window.
+ *
+ *  A list rather than a free-form clock: `<input type="time">` renders as a
+ *  different control in every browser — and as a keyboard-hostile one in
+ *  several — while a merchant setting seven days of hours is picking from the
+ *  same handful of times each time. Half-hour steps, from brand-catalog.ts.
+ *
+ *  The stored value stays "HH:MM" either way, so nothing downstream of the
+ *  draft has to know this changed. */
+function TimeSelect({
+  value, label, disabled, onChange,
+}: {
+  value: string;
+  label: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const { locale } = useI18n();
+  const options = timeOptions(locale);
+
+  // A draft written before this list existed can hold a time that is not on the
+  // half-hour grid — the old field accepted any minute. Snapping it to the
+  // nearest option would quietly rewrite hours the merchant already set, and a
+  // <select> whose value matches no option silently displays the first one
+  // instead, so the odd value is offered as an option of its own.
+  const list = options.some((option) => option.value === value)
+    ? options
+    : [...options, { value, label: formatTime(value, locale) }].sort((a, b) => a.value.localeCompare(b.value));
+
+  return (
+    <Select
+      aria-label={label}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className="!w-[112px] !py-1 !ps-2 !text-[11.5px]"
+    >
+      {list.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </Select>
+  );
+}

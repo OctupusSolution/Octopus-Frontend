@@ -1,18 +1,16 @@
-import type { ReactNode } from "react";
-
 export interface SectionHeadingProps {
   title: string;
-  action?: ReactNode;
+  /** Anchor target for the nav's in-page links. */
+  id?: string;
 }
 
-export function SectionHeading({ title, action }: SectionHeadingProps) {
+export function SectionHeading({ title, id }: SectionHeadingProps) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="flex items-center gap-2 text-[13px] font-semibold text-[var(--octo-text-primary)]">
-        <span className="h-4 w-1 rounded-full bg-[#0D6EFD]" aria-hidden="true" />
+    <h2 id={id} className="flex scroll-mt-20 items-center gap-3">
+      <span className="h-[26px] w-[4px] shrink-0 rounded-full bg-[#0D6EFD]" aria-hidden="true" />
+      <span className="text-[22px] font-bold text-[var(--octo-text-primary)] sm:text-[28px]">
         {title}
-      </h2>
-      {action}
-    </div>
+      </span>
+    </h2>
   );
 }

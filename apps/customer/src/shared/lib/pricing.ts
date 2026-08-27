@@ -29,3 +29,11 @@ export function computePromoDiscountSar(subtotal: number, code: string): number 
   if (!percent) return 0;
   return subtotal * percent;
 }
+
+// `formatSar` renders "SAR 153.00". The storefront draws the number and the
+// currency word at different sizes, and money.ts is shared with the merchant
+// console, so the split lives here instead.
+/** "153.00" — the currency word comes from the `store.currency` i18n key. */
+export function formatAmount(n: number): string {
+  return n.toFixed(2);
+}

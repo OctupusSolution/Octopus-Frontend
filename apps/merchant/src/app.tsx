@@ -6,6 +6,7 @@ import { PageTransition } from "@/widgets/page-transition";
 import { routes } from "@/app/routes/registry";
 import { LoginPage } from "@/pages/login";
 import { OnboardingPage } from "@/pages/onboarding";
+import { SetPasswordPage } from "@/pages/set-password";
 import { AuthProvider, useAuth } from "@/app/providers/auth-provider";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { TenantConfigProvider } from "@/app/providers/tenant-config-provider";
@@ -28,7 +29,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, needsPassword } = useAuth();
   const { pathname } = useLocation();
   const { t } = useI18n();
 
@@ -46,6 +47,12 @@ function AppShell() {
   // An authenticated user has no business on the sign-in screen.
   if (pathname === "/login") {
     return <Navigate to="/" replace />;
+  }
+
+  // Skipped the password at signup — block the shell until one is set,
+  // rather than leaving the account without one indefinitely.
+  if (needsPassword) {
+    return <SetPasswordPage />;
   }
 
   return (

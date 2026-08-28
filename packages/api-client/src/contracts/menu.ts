@@ -26,6 +26,8 @@ export interface MenuItemModifierOption {
   id: string;
   label: string;
   priceDeltaSar: number;
+  /** "تكفي 8 افراد" — a qualifier shown under the option's label. */
+  note?: string;
 }
 
 export interface MenuItemModifierGroup {
@@ -63,6 +65,14 @@ export interface MenuItem {
   group?: MenuGroupId;
   dietary?: DietaryId[];
   inStock?: boolean;
+
+  /** Price is assembled from choices rather than announced, so the product page
+   *  shows a running breakdown above the fold. */
+  customisable?: boolean;
+  allowsCustomerImage?: boolean;
+  /** Renders "900+ سعر حراري" rather than an exact figure — a made-to-order
+   *  item cannot promise a precise count. */
+  caloriesApprox?: boolean;
 }
 
 export interface MenuCategory {
@@ -476,7 +486,7 @@ const ITEMS: readonly MenuItem[] = [
     categoryId: "cat-desserts",
     name: "كيك مناسبات مخصوص",
     description:
-      "كيك إسفنجي محضّر حسب اختيارك، مناسب لأعياد الميلاد والمناسبات الخاصة ويتم تجهيزه بناءً على رغبتك في الطلب.",
+      "كيكة إسفنجية محضرة حسب اختيارك، مناسبة لأعياد الميلاد والمناسبات الخاصة.",
     priceSar: 153,
     // Priced per size on request, so there is no single "was" price to strike
     // through — the card says «السعر يبدأ من» instead.
@@ -486,10 +496,40 @@ const ITEMS: readonly MenuItem[] = [
     inStock: true,
     availableFor: ALL_CHANNELS,
     rating: 4.6,
-    calories: 480,
+    calories: 900,
+    caloriesApprox: true,
     allergens: ["gluten", "dairy", "eggs"],
     badges: ["best_seller"],
-    modifierGroups: [],
+    customisable: true,
+    allowsCustomerImage: true,
+    modifierGroups: [
+      {
+        id: "grp-cake-size", label: "إختر الحجم", required: true, multiple: false, display: "pills",
+        options: [
+          { id: "opt-cake-medium", label: "متوسط", note: "تكفي 8 افراد", priceDeltaSar: 0 },
+          { id: "opt-cake-large", label: "كبيرة", note: "تكفي 10+ افراد", priceDeltaSar: 40 },
+          { id: "opt-cake-custom", label: "حجم مخصوص", priceDeltaSar: 0 },
+        ],
+      },
+      {
+        id: "grp-cake-flavour", label: "اختر النكهة", required: true, multiple: false, display: "pills",
+        options: [
+          { id: "opt-flavour-chocolate", label: "شوكولاتة", priceDeltaSar: 0 },
+          { id: "opt-flavour-vanilla", label: "فانيليا", priceDeltaSar: 0 },
+          { id: "opt-flavour-red-velvet", label: "ريد فيلفيت", priceDeltaSar: 10 },
+        ],
+      },
+      {
+        id: "grp-cake-extras", label: "الإضافات", required: false, multiple: true, display: "accordion",
+        options: [
+          // The comp's chip reads +20 while its own banner totals on 30. The
+          // 183.00 total recurs across four screens, so 30 is the figure the
+          // design is actually built on.
+          { id: "opt-cake-candles", label: "شموع", priceDeltaSar: 30 },
+          { id: "opt-cake-message", label: "رسالة على الكيك", priceDeltaSar: 30 },
+        ],
+      },
+    ],
   },
   {
     id: "item-kunafa",
@@ -521,6 +561,24 @@ const ITEMS: readonly MenuItem[] = [
     rating: 4.5,
     calories: 390,
     allergens: ["gluten", "dairy", "nuts"],
+    modifierGroups: [],
+  },
+  {
+    id: "item-donut",
+    categoryId: "cat-desserts",
+    name: "دونات",
+    description: "دوناتس طازجة وهشة، محشوة بحشوة لذيذة ومغطاة بطبقة حلوة وشهية.",
+    priceSar: 50,
+    compareAtPriceSar: 70,
+    // Carries the cake photograph: no donut shot exists in the asset library.
+    imageUrl: `${IMG}/cake.png`,
+    available: true,
+    inStock: true,
+    availableFor: ALL_CHANNELS,
+    rating: 4.5,
+    calories: 350,
+    allergens: ["gluten", "dairy", "eggs"],
+    badges: ["best_seller", "offer"],
     modifierGroups: [],
   },
 

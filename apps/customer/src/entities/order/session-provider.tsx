@@ -39,6 +39,20 @@ type Action =
       quantity: number;
       modifiers: OrderLineModifier[];
       notes: string;
+      customerImageName?: string;
+      customerImageSize?: number;
+    }
+  | {
+      type: "REPLACE_LINE";
+      lineId: string;
+      menuItemId: string;
+      name: string;
+      unitPriceSar: number;
+      quantity: number;
+      modifiers: OrderLineModifier[];
+      notes: string;
+      customerImageName?: string;
+      customerImageSize?: number;
     }
   | { type: "UPDATE_QUANTITY"; lineId: string; quantity: number }
   | { type: "REMOVE_LINE"; lineId: string }
@@ -76,8 +90,32 @@ function reducer(state: OrderingSessionState, action: Action): OrderingSessionSt
             quantity: action.quantity,
             modifiers: action.modifiers,
             notes: action.notes,
+            customerImageName: action.customerImageName,
+            customerImageSize: action.customerImageSize,
           },
         ],
+      };
+    case "REPLACE_LINE":
+      // Editing a line comes back through the product page carrying a lineId
+      // from the URL. A stale or unknown id leaves the cart untouched rather
+      // than throwing — a shared link should not strand the customer.
+      return {
+        ...state,
+        lines: state.lines.map((line) =>
+          line.lineId === action.lineId
+            ? {
+                ...line,
+                menuItemId: action.menuItemId,
+                name: action.name,
+                unitPriceSar: action.unitPriceSar,
+                quantity: action.quantity,
+                modifiers: action.modifiers,
+                notes: action.notes,
+                customerImageName: action.customerImageName,
+                customerImageSize: action.customerImageSize,
+              }
+            : line,
+        ),
       };
     case "UPDATE_QUANTITY":
       if (action.quantity <= 0) {
@@ -113,6 +151,19 @@ interface OrderingSessionContextValue {
     quantity: number,
     modifiers: OrderLineModifier[],
     notes: string,
+    customerImageName?: string,
+    customerImageSize?: number,
+  ) => void;
+  replaceLine: (
+    lineId: string,
+    menuItemId: string,
+    name: string,
+    unitPriceSar: number,
+    quantity: number,
+    modifiers: OrderLineModifier[],
+    notes: string,
+    customerImageName?: string,
+    customerImageSize?: number,
   ) => void;
   updateQuantity: (lineId: string, quantity: number) => void;
   removeLine: (lineId: string) => void;
@@ -156,8 +207,16 @@ export function OrderingSessionProvider({ children }: { children: ReactNode }) {
     setDeliveryAddress: (address) => dispatch({ type: "SET_DELIVERY_ADDRESS", address }),
     setBranch: (branchId) => dispatch({ type: "SET_BRANCH", branchId }),
     setTable: (tableNumber) => dispatch({ type: "SET_TABLE", tableNumber }),
-    addLine: (menuItemId, name, unitPriceSar, quantity, modifiers, notes) =>
-      dispatch({ type: "ADD_LINE", menuItemId, name, unitPriceSar, quantity, modifiers, notes }),
+    addLine: (menuItemId, name, unitPriceSar, quantity, modifiers, notes, customerImageName, customerImageSize) =>
+      dispatch({
+        type: "ADD_LINE", menuItemId, name, unitPriceSar, quantity, modifiers, notes,
+        customerImageName, customerImageSize,
+      }),
+    replaceLine: (lineId, menuItemId, name, unitPriceSar, quantity, modifiers, notes, customerImageName, customerImageSize) =>
+      dispatch({
+        type: "REPLACE_LINE", lineId, menuItemId, name, unitPriceSar, quantity, modifiers, notes,
+        customerImageName, customerImageSize,
+      }),
     updateQuantity: (lineId, quantity) => dispatch({ type: "UPDATE_QUANTITY", lineId, quantity }),
     removeLine: (lineId) => dispatch({ type: "REMOVE_LINE", lineId }),
     applyPromo: (code) => dispatch({ type: "APPLY_PROMO", code }),

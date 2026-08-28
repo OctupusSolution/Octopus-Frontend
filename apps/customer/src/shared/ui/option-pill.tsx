@@ -1,7 +1,6 @@
 "use client";
 
 import { useI18n } from "@/app/providers";
-import { formatAmount } from "@/shared/lib/pricing";
 
 export interface OptionPillProps {
   label: string;
@@ -49,9 +48,11 @@ export function OptionPill({
       <span className="flex flex-col items-start gap-0.5 text-start">
         <span>
           {label}
+          {/* No decimals: the design writes "+20ر.س" on the chip, and a
+              surcharge of a whole riyal does not need ".00" after it. */}
           {priceDeltaSar !== undefined && priceDeltaSar > 0 && (
             <span className="ms-1.5 text-[9.5px] font-semibold text-[#0D6EFD]">
-              +{formatAmount(priceDeltaSar)}
+              +{priceDeltaSar}
               {t("store.currency")}
             </span>
           )}

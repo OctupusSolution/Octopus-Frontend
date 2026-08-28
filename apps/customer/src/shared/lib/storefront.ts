@@ -1,4 +1,4 @@
-import type { AllergenId, DietaryId, MenuGroupId, MenuItem } from "@octopus/api-client";
+import type { AllergenId, DietaryId, MenuGroupId, MenuItem, OrderLine } from "@octopus/api-client";
 
 const GROUP_IDS: readonly MenuGroupId[] = [
   "all", "chicken", "meat", "burger", "pizza", "sides", "appetizers", "salads",
@@ -95,4 +95,33 @@ export function relatedItems(items: MenuItem[], to: MenuItem, limit = 4): MenuIt
     (i) => i.categoryId === to.categoryId && !sameGroup.includes(i),
   );
   return [...sameGroup, ...sameCategory].slice(0, limit);
+}
+
+export interface LinePricing {
+  baseSar: number;
+  addonsSar: number;
+  totalSar: number;
+}
+
+/** The cart shows the base price and the paid additions on separate rows, so
+ *  the two are kept apart rather than folded into a single total. */
+export function computeLinePricing(line: OrderLine): LinePricing {
+  const baseSar = line.unitPriceSar * line.quantity;
+  const addonsSar =
+    line.modifiers.reduce((sum, modifier) => sum + modifier.priceDeltaSar, 0) * line.quantity;
+  return { baseSar, addonsSar, totalSar: baseSar + addonsSar };
+}
+
+export function computeCartPricing(lines: readonly OrderLine[]): LinePricing {
+  return lines.reduce<LinePricing>(
+    (running, line) => {
+      const priced = computeLinePricing(line);
+      return {
+        baseSar: running.baseSar + priced.baseSar,
+        addonsSar: running.addonsSar + priced.addonsSar,
+        totalSar: running.totalSar + priced.totalSar,
+      };
+    },
+    { baseSar: 0, addonsSar: 0, totalSar: 0 },
+  );
 }

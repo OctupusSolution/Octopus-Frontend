@@ -2,79 +2,130 @@
 
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { EmptyState } from "@ui/primitives";
+import type { MenuCategory, MenuItem, OrderLine } from "@octopus/api-client";
+import { useI18n } from "@/app/providers";
 import { useOrderingSession } from "@/entities/order";
-import { getBranchName, type Tenant } from "@/entities/tenant";
-import { computeCartSubtotalSar, computePromoDiscountSar, formatSar } from "@/shared/lib/pricing";
-import { Breadcrumb } from "@/shared/ui";
-import { ApplyPromo } from "@/features/cart/apply-promo";
-import { CartSummary } from "@/widgets/cart-summary";
+import type { Tenant } from "@/entities/tenant";
+import { AddToCartModal } from "@/features/cart/add-to-cart";
+import { computePromoDiscountSar } from "@/shared/lib/pricing";
+import { bestSellers, computeCartPricing, relatedItems } from "@/shared/lib/storefront";
+import { Breadcrumb, SectionHeading } from "@/shared/ui";
+import { CartLines } from "@/widgets/cart-lines";
+import { CartTotals } from "@/widgets/cart-totals";
+import { ProductRow } from "@/widgets/product-row";
 
 export interface CartViewProps {
   tenant: Tenant;
+  categories: MenuCategory[];
+  items: MenuItem[];
 }
 
-export function CartView({ tenant }: CartViewProps) {
+export function CartView({ categories, items }: CartViewProps) {
+  const { t } = useI18n();
+  const router = useRouter();
   const { state, updateQuantity, removeLine } = useOrderingSession();
+  const [selected, setSelected] = useState<MenuItem | null>(null);
 
-  const subtotalSar = computeCartSubtotalSar(state.lines);
-  const discountSar = state.promoCode ? computePromoDiscountSar(subtotalSar, state.promoCode) : 0;
-  const totalSar = subtotalSar - discountSar;
-  const itemCount = state.lines.reduce((sum, line) => sum + line.quantity, 0);
+  // The design's breadcrumb names the product the customer came from, so it
+  // is read off the most recent line.
+  const lastLine = state.lines[state.lines.length - 1] ?? null;
+  const lastItem = lastLine ? items.find((i) => i.id === lastLine.menuItemId) ?? null : null;
+  const lastCategory = lastItem
+    ? categories.find((c) => c.id === lastItem.categoryId) ?? null
+    : null;
 
-  let contextLine: string | null = null;
-  if (state.channel === "delivery") contextLine = `التوصيل إلى: ${state.deliveryAddress ?? "—"}`;
-  else if (state.channel === "dine_in") contextLine = `الطاولة: ${state.tableNumber ?? "—"}`;
-  else if (state.channel === "takeaway") contextLine = `الاستلام من: ${getBranchName(state.branchId)}`;
+  const pricing = computeCartPricing(state.lines);
+  const discountSar = state.promoCode
+    ? computePromoDiscountSar(pricing.totalSar, state.promoCode)
+    : 0;
 
-  const belowMinimum = state.channel === "delivery" && subtotalSar < tenant.minDeliveryOrderSar;
+  const suggestions = lastItem ? relatedItems(items, lastItem) : bestSellers(items);
+
+  function itemFor(line: OrderLine): MenuItem | null {
+    return items.find((i) => i.id === line.menuItemId) ?? null;
+  }
+
+  function imageFor(line: OrderLine): string | null {
+    return itemFor(line)?.imageUrl ?? null;
+  }
+
+  function hrefForItem(item: MenuItem): string {
+    const category = categories.find((c) => c.id === item.categoryId);
+    return category ? `/menu/${category.slug}/${item.id}` : "/menu";
+  }
+
+  function hrefForLine(line: OrderLine): string {
+    const item = itemFor(line);
+    if (!item) return "/menu";
+    return `${hrefForItem(item)}?line=${line.lineId}`;
+  }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-6 sm:px-[26px]">
-      <Breadcrumb items={[{ label: "الرئيسية", href: "/" }, { label: "السلة" }]} />
-      <h1 className="text-[21px] font-bold text-[var(--octo-text-primary)]">سلة الطلبات ({itemCount})</h1>
-      {contextLine && <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{contextLine}</p>}
-
-      {state.lines.length === 0 ? (
-        <EmptyState
-          icon={<ShoppingBag size={18} />}
-          title="السلة فارغة"
-          action={
-            <Link
-              href="/menu"
-              className="inline-flex items-center justify-center rounded-[9px] bg-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-            >
-              تصفح القائمة
-            </Link>
-          }
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-12 px-4 py-8 sm:px-6">
+      <div className="flex flex-col gap-5">
+        <Breadcrumb
+          items={[
+            { label: t("store.nav.home"), href: "/" },
+            { label: t("store.nav.menu"), href: "/menu" },
+            ...(lastCategory
+              ? [{ label: lastCategory.name, href: `/menu/${lastCategory.slug}` }]
+              : []),
+            ...(lastItem && lastCategory
+              ? [{ label: lastItem.name, href: hrefForItem(lastItem) }]
+              : []),
+            { label: t("store.cart.title") },
+          ]}
         />
-      ) : (
-        <>
-          <CartSummary
-            lines={state.lines}
-            subtotalSar={subtotalSar}
-            discountSar={discountSar}
-            totalSar={totalSar}
-            onQuantityChange={updateQuantity}
-            onRemove={removeLine}
+
+        <div className="flex items-baseline gap-2">
+          <SectionHeading title={t("store.cart.title")} />
+          <span className="text-[15px] text-[var(--octo-text-muted)]">({state.lines.length})</span>
+        </div>
+
+        {state.lines.length === 0 ? (
+          <EmptyState
+            icon={<ShoppingBag size={18} />}
+            title={t("store.cart.empty")}
+            action={
+              <Link
+                href="/menu"
+                className="inline-flex items-center justify-center rounded-[10px] bg-[#0D6EFD] px-4 py-2 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
+              >
+                {t("store.cart.browse")}
+              </Link>
+            }
           />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <CartLines
+              lines={state.lines}
+              imageFor={imageFor}
+              hrefFor={hrefForLine}
+              onQuantityChange={updateQuantity}
+              onRemove={removeLine}
+            />
 
-          <ApplyPromo />
+            <CartTotals
+              pricing={pricing}
+              discountSar={discountSar}
+              onContinue={() => router.push("/checkout")}
+            />
+          </div>
+        )}
+      </div>
 
-          {belowMinimum ? (
-            <p className="text-[11.5px] font-medium text-[#F59E0B]">
-              الحد الأدنى للطلب للتوصيل هو {formatSar(tenant.minDeliveryOrderSar)}
-            </p>
-          ) : (
-            <Link
-              href="/checkout"
-              className="flex items-center justify-center rounded-[9px] bg-[#0D6EFD] px-3 py-[9px] text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
-            >
-              متابعة إلى الدفع
-            </Link>
-          )}
-        </>
-      )}
+      <ProductRow
+        id="also-buy"
+        title={t("store.cart.alsoBuy")}
+        items={suggestions}
+        hrefFor={hrefForItem}
+        onAdd={setSelected}
+      />
+
+      <AddToCartModal item={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

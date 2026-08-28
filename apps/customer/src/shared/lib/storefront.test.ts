@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { MenuItem } from "@octopus/api-client";
+import type { MenuItem, OrderLine } from "@octopus/api-client";
 import {
-  bestSellers, discountPercent, filterItems, offers, parseFilters, relatedItems,
+  bestSellers, computeCartPricing, computeLinePricing, discountPercent,
+  filterItems, offers, parseFilters, relatedItems,
 } from "./storefront";
 
 function item(overrides: Partial<MenuItem> & { id: string }): MenuItem {
@@ -157,5 +158,65 @@ describe("derivations", () => {
       item({ id: "burger", categoryId: "cat-main", group: "burger" }),
     ];
     expect(relatedItems(pool, pool[0]).map((i) => i.id)).toEqual(["kunafa"]);
+  });
+});
+
+describe("computeLinePricing", () => {
+  function line(overrides: Partial<OrderLine> = {}): OrderLine {
+    return {
+      lineId: "l1", menuItemId: "m1", name: "x", unitPriceSar: 153,
+      quantity: 1, modifiers: [], notes: "", ...overrides,
+    };
+  }
+
+  it("splits the cake's 153 base and 30 of candles into the comp's 183 total", () => {
+    expect(computeLinePricing(line({
+      modifiers: [{ groupId: "g", optionId: "o", label: "شموع", priceDeltaSar: 30 }],
+    }))).toEqual({ baseSar: 153, addonsSar: 30, totalSar: 183 });
+  });
+
+  it("reports no additions for a line without modifiers", () => {
+    expect(computeLinePricing(line())).toEqual({ baseSar: 153, addonsSar: 0, totalSar: 153 });
+  });
+
+  it("multiplies both halves by the quantity", () => {
+    expect(computeLinePricing(line({
+      quantity: 3,
+      modifiers: [{ groupId: "g", optionId: "o", label: "شموع", priceDeltaSar: 30 }],
+    }))).toEqual({ baseSar: 459, addonsSar: 90, totalSar: 549 });
+  });
+
+  it("counts a free modifier as no addition at all", () => {
+    expect(computeLinePricing(line({
+      modifiers: [{ groupId: "g", optionId: "o", label: "شوكولاتة", priceDeltaSar: 0 }],
+    })).addonsSar).toBe(0);
+  });
+
+  it("sums several modifiers", () => {
+    expect(computeLinePricing(line({
+      modifiers: [
+        { groupId: "g", optionId: "a", label: "شموع", priceDeltaSar: 30 },
+        { groupId: "g", optionId: "b", label: "رسالة", priceDeltaSar: 30 },
+      ],
+    })).addonsSar).toBe(60);
+  });
+});
+
+describe("computeCartPricing", () => {
+  const a: OrderLine = {
+    lineId: "a", menuItemId: "m1", name: "cake", unitPriceSar: 153, quantity: 1,
+    modifiers: [{ groupId: "g", optionId: "o", label: "شموع", priceDeltaSar: 30 }], notes: "",
+  };
+  const b: OrderLine = {
+    lineId: "b", menuItemId: "m2", name: "donut", unitPriceSar: 50, quantity: 2,
+    modifiers: [], notes: "",
+  };
+
+  it("adds the lines up, keeping the split", () => {
+    expect(computeCartPricing([a, b])).toEqual({ baseSar: 253, addonsSar: 30, totalSar: 283 });
+  });
+
+  it("is all zeroes for an empty cart", () => {
+    expect(computeCartPricing([])).toEqual({ baseSar: 0, addonsSar: 0, totalSar: 0 });
   });
 });

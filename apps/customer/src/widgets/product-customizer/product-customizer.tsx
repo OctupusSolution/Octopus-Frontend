@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { MenuItemModifierGroup } from "@octopus/api-client";
 import { useI18n } from "@/app/providers";
 import { AccordionRow, OptionPill } from "@/shared/ui";
@@ -10,13 +11,16 @@ export interface ProductCustomizerProps {
   groups: MenuItemModifierGroup[];
   selections: ModifierSelections;
   onChange: (groupId: string, optionIds: string[]) => void;
+  /** Rendered above the first group — the design puts "إرفق الصورة" first,
+   *  before any choice. */
+  imageSlot?: ReactNode;
 }
 
 /** Fully controlled — it holds no state of its own, so the view above it can
  *  price the current selection without reaching in here for it. */
-export function ProductCustomizer({ groups, selections, onChange }: ProductCustomizerProps) {
+export function ProductCustomizer({ groups, selections, onChange, imageSlot }: ProductCustomizerProps) {
   const { t } = useI18n();
-  if (groups.length === 0) return null;
+  if (groups.length === 0 && !imageSlot) return null;
 
   function pillsFor(group: MenuItemModifierGroup) {
     const chosen = selections[group.id] ?? [];
@@ -31,6 +35,8 @@ export function ProductCustomizer({ groups, selections, onChange }: ProductCusto
           <OptionPill
             key={option.id}
             label={option.label}
+            note={option.note}
+            priceDeltaSar={option.priceDeltaSar}
             multiple={group.multiple}
             selected={chosen.includes(option.id)}
             onSelect={() => {
@@ -63,6 +69,7 @@ export function ProductCustomizer({ groups, selections, onChange }: ProductCusto
       </h2>
 
       <div className="mt-5 flex flex-col gap-5">
+        {imageSlot}
         {groups.map((group) =>
           group.display === "accordion" ? (
             <AccordionRow key={group.id} label={group.label}>

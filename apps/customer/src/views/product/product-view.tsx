@@ -1,14 +1,16 @@
 "use client";
 
 import { Flame } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import type { MenuCategory, MenuItem, OrderLineModifier } from "@octopus/api-client";
+import type { MenuCategory, MenuItem, OrderLine, OrderLineModifier } from "@octopus/api-client";
 import { useI18n } from "@/app/providers";
 import { useOrderingSession } from "@/entities/order";
+import { AttachImage, type AttachedImage } from "@/features/cart/attach-image";
 import { discountPercent, relatedItems } from "@/shared/lib/storefront";
 import { Breadcrumb, PriceBlock, QuantityStepper, RatingStars, SectionHeading } from "@/shared/ui";
 import { AllergenPanel } from "@/widgets/allergen-panel";
+import { PriceBreakdown } from "@/widgets/price-breakdown";
 import { ProductCustomizer, type ModifierSelections } from "@/widgets/product-customizer";
 import { ProductGallery } from "@/widgets/product-gallery";
 import { ProductRow } from "@/widgets/product-row";
@@ -20,11 +22,17 @@ export interface ProductViewProps {
   items: MenuItem[];
 }
 
-/** Required single-choice groups start on their first option, which is what
- *  the design shows — every pill row has one already lit. */
-function initialSelections(item: MenuItem): ModifierSelections {
+/** Restores what an edited line had chosen; otherwise required single-choice
+ *  groups start on their first option, which is what the design shows — every
+ *  pill row has one already lit. */
+function selectionsFrom(item: MenuItem, line: OrderLine | null): ModifierSelections {
   const seeded: ModifierSelections = {};
   for (const group of item.modifierGroups) {
+    const fromLine = line?.modifiers.filter((m) => m.groupId === group.id).map((m) => m.optionId);
+    if (fromLine && fromLine.length > 0) {
+      seeded[group.id] = fromLine;
+      continue;
+    }
     seeded[group.id] =
       group.required && !group.multiple && group.options.length > 0 ? [group.options[0].id] : [];
   }
@@ -34,36 +42,66 @@ function initialSelections(item: MenuItem): ModifierSelections {
 export function ProductView({ item, category, categories, items }: ProductViewProps) {
   const { t } = useI18n();
   const router = useRouter();
-  const { addLine } = useOrderingSession();
+  const searchParams = useSearchParams();
+  const { state, addLine, replaceLine } = useOrderingSession();
 
-  const [selections, setSelections] = useState<ModifierSelections>(() => initialSelections(item));
-  const [quantity, setQuantity] = useState(1);
+  const editingLineId = searchParams.get("line");
+  const editingLine = state.lines.find((line) => line.lineId === editingLineId) ?? null;
+
+  const [selections, setSelections] = useState<ModifierSelections>(
+    () => selectionsFrom(item, editingLine),
+  );
+  const [quantity, setQuantity] = useState(() => editingLine?.quantity ?? 1);
+  const [image, setImage] = useState<AttachedImage | null>(null);
 
   const percent = discountPercent(item);
   const soldOut = item.inStock === false;
   const images = item.images && item.images.length > 0 ? item.images : [item.imageUrl];
+
+  const selectedOptions = item.modifierGroups.flatMap((group) =>
+    (selections[group.id] ?? []).flatMap((optionId) => {
+      const option = group.options.find((o) => o.id === optionId);
+      return option ? [{ group, option }] : [];
+    }),
+  );
+
+  const breakdownRows = [
+    { label: item.name, amountSar: item.priceSar },
+    ...selectedOptions
+      .filter(({ option }) => option.priceDeltaSar > 0)
+      .map(({ option }) => ({
+        label: t("store.product.addonLine", { name: option.label }),
+        amountSar: option.priceDeltaSar,
+      })),
+  ];
+  const breakdownTotal = breakdownRows.reduce((sum, row) => sum + row.amountSar, 0);
 
   function hrefFor(other: MenuItem): string {
     const cat = categories.find((c) => c.id === other.categoryId);
     return cat ? `/menu/${cat.slug}/${other.id}` : "/menu";
   }
 
-  function handleAdd() {
-    const modifiers: OrderLineModifier[] = item.modifierGroups.flatMap((group) =>
-      (selections[group.id] ?? []).flatMap((optionId) => {
-        const option = group.options.find((o) => o.id === optionId);
-        return option
-          ? [{
-              groupId: group.id,
-              optionId: option.id,
-              label: option.label,
-              priceDeltaSar: option.priceDeltaSar,
-            }]
-          : [];
-      }),
-    );
+  function handleSubmit() {
+    const modifiers: OrderLineModifier[] = selectedOptions.map(({ group, option }) => ({
+      groupId: group.id,
+      groupLabel: group.label,
+      optionId: option.id,
+      label: option.label,
+      priceDeltaSar: option.priceDeltaSar,
+    }));
 
-    addLine(item.id, item.name, item.priceSar, quantity, modifiers, "");
+    // An edit cannot restore the preview — only the name was ever persisted —
+    // so an untouched field keeps whatever the line already carried.
+    const imageName = image?.name ?? editingLine?.customerImageName;
+    const imageSize = image?.size ?? editingLine?.customerImageSize;
+
+    if (editingLine) {
+      replaceLine(editingLine.lineId, item.id, item.name, item.priceSar, quantity,
+                  modifiers, "", imageName, imageSize);
+    } else {
+      addLine(item.id, item.name, item.priceSar, quantity, modifiers, "", imageName, imageSize);
+    }
+
     router.push("/cart");
   }
 
@@ -80,6 +118,8 @@ export function ProductView({ item, category, categories, items }: ProductViewPr
         />
 
         <SectionHeading title={t("store.section.productDetails")} />
+
+        {item.customisable && <PriceBreakdown rows={breakdownRows} totalSar={breakdownTotal} />}
 
         <div className="grid gap-10 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
@@ -105,7 +145,9 @@ export function ProductView({ item, category, categories, items }: ProductViewPr
             {item.calories !== undefined && (
               <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[var(--octo-selected)] px-3.5 py-1.5 text-[12px] font-semibold text-[var(--octo-text-primary)]">
                 <Flame size={14} className="text-[#F59E0B]" aria-hidden="true" />
-                {t("store.product.calories", { n: item.calories })}
+                {t(item.caloriesApprox ? "store.product.caloriesApprox" : "store.product.calories", {
+                  n: item.calories,
+                })}
               </span>
             )}
 
@@ -124,6 +166,18 @@ export function ProductView({ item, category, categories, items }: ProductViewPr
               onChange={(groupId, optionIds) =>
                 setSelections((prev) => ({ ...prev, [groupId]: optionIds }))
               }
+              imageSlot={
+                item.allowsCustomerImage ? (
+                  <div className="flex flex-col gap-1.5">
+                    <AttachImage value={image} onChange={setImage} />
+                    {!image && editingLine?.customerImageName && (
+                      <p className="text-[11px] text-[var(--octo-text-muted)]">
+                        {t("store.cart.attachedImage", { name: editingLine.customerImageName })}
+                      </p>
+                    )}
+                  </div>
+                ) : undefined
+              }
             />
 
             <div className="flex flex-col gap-2">
@@ -137,10 +191,12 @@ export function ProductView({ item, category, categories, items }: ProductViewPr
                 <button
                   type="button"
                   disabled={soldOut}
-                  onClick={handleAdd}
+                  onClick={handleSubmit}
                   className="flex-1 rounded-[10px] bg-[#0D6EFD] px-6 py-3 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {soldOut ? t("store.product.outOfStock") : t("store.product.addToCart")}
+                  {soldOut
+                    ? t("store.product.outOfStock")
+                    : t(editingLine ? "store.product.update" : "store.product.addToCart")}
                 </button>
               </div>
             </div>

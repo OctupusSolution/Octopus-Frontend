@@ -13,6 +13,10 @@ export type OrderStatus =
 
 export interface OrderLineModifier {
   groupId: string;
+  /** "الحجم". The cart prints the group's name beside the chosen option, and a
+   *  line already persisted must not have to re-open the menu — which may have
+   *  changed under it — to translate an id into a label. */
+  groupLabel?: string;
   optionId: string;
   label: string;
   priceDeltaSar: number;
@@ -26,6 +30,11 @@ export interface OrderLine {
   quantity: number;
   modifiers: OrderLineModifier[];
   notes: string;
+  /** Name and size only, never the bytes: the cart is persisted to
+   *  localStorage and a base64 image would risk the whole quota, taking the
+   *  cart with it. */
+  customerImageName?: string;
+  customerImageSize?: number;
 }
 
 export interface Order {

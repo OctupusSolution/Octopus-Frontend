@@ -16,6 +16,11 @@ describe("step movement", () => {
     const last = run(EMPTY_SITE_DRAFT, { type: "goTo", step: STEP_COUNT }, { type: "next" });
     expect(last.step).toBe(STEP_COUNT);
   });
+
+  it("clamps a goTo outside the flow instead of trusting it", () => {
+    expect(run(EMPTY_SITE_DRAFT, { type: "goTo", step: 0 }).step).toBe(1);
+    expect(run(EMPTY_SITE_DRAFT, { type: "goTo", step: 99 }).step).toBe(STEP_COUNT);
+  });
 });
 
 describe("brand patches", () => {
@@ -29,6 +34,28 @@ describe("brand patches", () => {
     const next = run(EMPTY_SITE_DRAFT, { type: "patchTypography", locale: "ar", patch: { titles: "readex" } });
     expect(next.brand.typography.ar.titles).toBe("readex");
     expect(next.brand.typography.en.titles).toBe(EMPTY_SITE_DRAFT.brand.typography.en.titles);
+  });
+});
+
+describe("theme, brand and navigation patches", () => {
+  it("patches the theme without dropping the filter", () => {
+    const next = run(EMPTY_SITE_DRAFT, { type: "patchTheme", patch: { id: "modern" } });
+    expect(next.theme.id).toBe("modern");
+    expect(next.theme.filter).toBe(EMPTY_SITE_DRAFT.theme.filter);
+  });
+
+  it("patches brand fields without dropping colours or typography", () => {
+    const next = run(EMPTY_SITE_DRAFT, { type: "patchBrand", patch: { businessName: "Ocean Table" } });
+    expect(next.brand.businessName).toBe("Ocean Table");
+    expect(next.brand.colors).toEqual(EMPTY_SITE_DRAFT.brand.colors);
+    expect(next.brand.typography).toEqual(EMPTY_SITE_DRAFT.brand.typography);
+  });
+
+  it("patches navigation booleans without touching hidden", () => {
+    const next = run(EMPTY_SITE_DRAFT, { type: "patchNavigation", patch: { stickyHeader: false } });
+    expect(next.navigation.stickyHeader).toBe(false);
+    expect(next.navigation.showInHeader).toBe(EMPTY_SITE_DRAFT.navigation.showInHeader);
+    expect(next.navigation.hidden).toEqual(EMPTY_SITE_DRAFT.navigation.hidden);
   });
 });
 
@@ -72,6 +99,29 @@ describe("sections", () => {
 
   it("selects a section for the inspector", () => {
     expect(run(EMPTY_SITE_DRAFT, { type: "selectSection", id: "offers" }).selectedSection).toBe("offers");
+  });
+
+  it("reorders sections by replacing the list", () => {
+    const reversed = [...EMPTY_SITE_DRAFT.sections].reverse();
+    expect(run(EMPTY_SITE_DRAFT, { type: "setSections", sections: reversed }).sections[0].id)
+      .toBe(reversed[0].id);
+  });
+
+  it("writes a generic section's first patch, then merges a second one in", () => {
+    const first = run(EMPTY_SITE_DRAFT, { type: "patchGeneric", id: "loyalty", patch: { headline: "Join" } });
+    expect(first.sectionSettings.generic.loyalty).toEqual({ headline: "Join" });
+
+    const second = run(first, { type: "patchGeneric", id: "loyalty", patch: { visible: true } });
+    expect(second.sectionSettings.generic.loyalty).toEqual({ headline: "Join", visible: true });
+  });
+});
+
+describe("preview", () => {
+  it("patches the rehearsal state without dropping the tester list", () => {
+    const seeded = { ...EMPTY_SITE_DRAFT, preview: { ...EMPTY_SITE_DRAFT.preview, testers: [{ email: "a@b.com", roleKey: "owner", canView: true, tested: false }] } };
+    const next = run(seeded, { type: "patchPreview", patch: { simulation: "running" } });
+    expect(next.preview.simulation).toBe("running");
+    expect(next.preview.testers).toEqual(seeded.preview.testers);
   });
 });
 

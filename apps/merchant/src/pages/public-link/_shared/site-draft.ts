@@ -370,8 +370,14 @@ export function siteDraftReducer(state: SiteDraft, action: SiteAction): SiteDraf
           return { ...state, sectionSettings: { ...state.sectionSettings, menu: { ...state.sectionSettings.menu, ...action.patch } } };
         case "offers":
           return { ...state, sectionSettings: { ...state.sectionSettings, offers: { ...state.sectionSettings.offers, ...action.patch } } };
+        default: {
+          // A patchSection variant with no case above is a compile error here, not
+          // a silent no-op at runtime — which is what an unhandled dispatch would
+          // otherwise become, several steps away from the code that sent it.
+          const unreachable: never = action;
+          return unreachable;
+        }
       }
-      break;
     case "patchGeneric":
       return {
         ...state,

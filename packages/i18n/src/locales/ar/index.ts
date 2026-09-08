@@ -3456,4 +3456,9 @@ export const ar = {
   "publicLink.brand.heroPattern": "نمط الواجهة الرئيسية",
   "publicLink.brand.change": "تغيير",
   "publicLink.brand.resetDefaults": "إعادة الضبط لإعدادات القالب",
+  "publicLink.reorder.hint": "اسحب لإعادة ترتيب الأقسام",
+  "publicLink.reorder.move": "تحريك لأعلى / تحريك لأسفل",
+  "publicLink.nav.bookTable": "احجز طاولة",
+  "publicLink.nav.viewMenu": "عرض القائمة",
+  "publicLink.pages.enabledCount": "{n} من {total} صفحات مفعّلة",
 } as const;

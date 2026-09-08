@@ -3456,4 +3456,9 @@ export const en = {
   "publicLink.brand.heroPattern": "Hero Pattern",
   "publicLink.brand.change": "Change",
   "publicLink.brand.resetDefaults": "Reset to Theme Defaults",
+  "publicLink.reorder.hint": "Drag to reorder sections",
+  "publicLink.reorder.move": "Move up / Move down",
+  "publicLink.nav.bookTable": "Book a Table",
+  "publicLink.nav.viewMenu": "View Menu",
+  "publicLink.pages.enabledCount": "{n} of {total} pages enabled",
 } as const;

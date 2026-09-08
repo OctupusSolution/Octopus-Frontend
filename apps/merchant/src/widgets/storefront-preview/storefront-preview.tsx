@@ -139,12 +139,16 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
             <ShoppingBag size={10} />
           </span>
           <span className="min-w-0 text-end">
-            <span className="block truncate text-[10px] font-bold text-[var(--octo-text-primary)]">
-              {model.samplePrice}
-            </span>
-            <span className="block truncate text-[8px] text-[var(--octo-text-faint)] line-through">
-              {model.sampleWasPrice}
-            </span>
+            {model.samplePrices.length > 0 && (
+              <span className="block truncate text-[10px] font-bold text-[var(--octo-text-primary)]">
+                {model.samplePrices[index % model.samplePrices.length]}
+              </span>
+            )}
+            {model.sampleWasPrices.length > 0 && (
+              <span className="block truncate text-[8px] text-[var(--octo-text-faint)] line-through">
+                {model.sampleWasPrices[index % model.sampleWasPrices.length]}
+              </span>
+            )}
           </span>
         </div>
       </article>

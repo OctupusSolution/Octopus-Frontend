@@ -18,6 +18,8 @@ import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
 import { GenericInspector } from "./customize/generic-inspector";
 import { HeroInspector } from "./customize/hero-inspector";
+import { ReservationsInspector } from "./customize/reservations-inspector";
+import { WaitlistInspector } from "./customize/waitlist-inspector";
 import type { StepProps } from "../_shared/steps";
 
 /** Module scope, not nested inside `CustomizeStep`: a component redefined on
@@ -85,12 +87,14 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
     setAddOpen(false);
   }
 
-  // "hero" has its own hand-written inspector; "reservations", "waitlist",
-  // "menu" and "offers" get theirs in Tasks 17-18. Until then, and for every
-  // section whose inspector really is "generic", `GenericInspector` is the
-  // fallback.
+  // "hero", "reservations" and "waitlist" have their own hand-written
+  // inspectors; "menu" and "offers" get theirs in Task 18. Until then, and for
+  // every section whose inspector really is "generic", `GenericInspector` is
+  // the fallback.
   function renderInspector() {
     if (selectedMeta?.inspector === "hero") return <HeroInspector draft={draft} dispatch={dispatch} />;
+    if (selectedMeta?.inspector === "reservations") return <ReservationsInspector draft={draft} dispatch={dispatch} />;
+    if (selectedMeta?.inspector === "waitlist") return <WaitlistInspector draft={draft} dispatch={dispatch} />;
     return <GenericInspector draft={draft} dispatch={dispatch} />;
   }
 

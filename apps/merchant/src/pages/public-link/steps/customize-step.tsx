@@ -16,6 +16,8 @@ import type { SectionEntry, SiteAction } from "../_shared/site-draft";
 import { DeviceFrame } from "../ui/device-frame";
 import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
+import { GenericInspector } from "./customize/generic-inspector";
+import { HeroInspector } from "./customize/hero-inspector";
 import type { StepProps } from "../_shared/steps";
 
 /** Module scope, not nested inside `CustomizeStep`: a component redefined on
@@ -83,17 +85,13 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
     setAddOpen(false);
   }
 
-  // `selectedMeta?.inspector` is the real routing key — Tasks 16-18 turn this
-  // into a switch with a branch per inspector kind ("hero", "reservations",
-  // "waitlist", "menu", "offers", "generic"). Until then every section, of
-  // whatever kind, falls back to this placeholder.
+  // "hero" has its own hand-written inspector; "reservations", "waitlist",
+  // "menu" and "offers" get theirs in Tasks 17-18. Until then, and for every
+  // section whose inspector really is "generic", `GenericInspector` is the
+  // fallback.
   function renderInspector() {
-    return (
-      <EmptyState
-        title={selectedMeta ? t(selectedMeta.labelKey) : draft.selectedSection}
-        description={t("publicLink.customize.settingForSelected")}
-      />
-    );
+    if (selectedMeta?.inspector === "hero") return <HeroInspector draft={draft} dispatch={dispatch} />;
+    return <GenericInspector draft={draft} dispatch={dispatch} />;
   }
 
   return (

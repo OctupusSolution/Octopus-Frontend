@@ -18,6 +18,8 @@ import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
 import { GenericInspector } from "./customize/generic-inspector";
 import { HeroInspector } from "./customize/hero-inspector";
+import { MenuInspector } from "./customize/menu-inspector";
+import { OffersInspector } from "./customize/offers-inspector";
 import { ReservationsInspector } from "./customize/reservations-inspector";
 import { WaitlistInspector } from "./customize/waitlist-inspector";
 import type { StepProps } from "../_shared/steps";
@@ -87,14 +89,15 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
     setAddOpen(false);
   }
 
-  // "hero", "reservations" and "waitlist" have their own hand-written
-  // inspectors; "menu" and "offers" get theirs in Task 18. Until then, and for
-  // every section whose inspector really is "generic", `GenericInspector` is
-  // the fallback.
+  // "hero", "reservations", "waitlist", "menu" and "offers" all have their
+  // own hand-written inspectors; every other section falls back to
+  // `GenericInspector`, driven by `SiteSection.fields`.
   function renderInspector() {
     if (selectedMeta?.inspector === "hero") return <HeroInspector draft={draft} dispatch={dispatch} />;
     if (selectedMeta?.inspector === "reservations") return <ReservationsInspector draft={draft} dispatch={dispatch} />;
     if (selectedMeta?.inspector === "waitlist") return <WaitlistInspector draft={draft} dispatch={dispatch} />;
+    if (selectedMeta?.inspector === "menu") return <MenuInspector draft={draft} dispatch={dispatch} />;
+    if (selectedMeta?.inspector === "offers") return <OffersInspector draft={draft} dispatch={dispatch} />;
     return <GenericInspector draft={draft} dispatch={dispatch} />;
   }
 

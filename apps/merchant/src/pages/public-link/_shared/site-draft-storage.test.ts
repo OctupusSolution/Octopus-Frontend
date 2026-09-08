@@ -28,6 +28,37 @@ describe("parseDraft rejects what it cannot trust", () => {
   });
 });
 
+describe("parseDraft rejects a corrupted shape rather than half-merging it", () => {
+  it("discards a draft whose pages is null", () => {
+    const raw = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, pages: null } });
+    expect(parseDraft(raw)).toBeNull();
+  });
+
+  it("discards a draft whose sections is a string, not an array", () => {
+    const raw = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, sections: "x" } });
+    expect(parseDraft(raw)).toBeNull();
+  });
+
+  it("discards a draft whose sectionSettings is missing hero", () => {
+    const { hero: _hero, ...restSectionSettings } = EMPTY_SITE_DRAFT.sectionSettings;
+    const raw = JSON.stringify({
+      version: DRAFT_VERSION,
+      draft: { ...EMPTY_SITE_DRAFT, sectionSettings: restSectionSettings },
+    });
+    expect(parseDraft(raw)).toBeNull();
+  });
+
+  it("discards a draft whose pages array holds a non-object entry", () => {
+    const raw = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, pages: [1, 2, 3] } });
+    expect(parseDraft(raw)).toBeNull();
+  });
+
+  it("still round-trips a well-formed draft — the guard is not so strict it rejects everything", () => {
+    const draft = { ...EMPTY_SITE_DRAFT, step: 4, brand: { ...EMPTY_SITE_DRAFT.brand, businessName: "Ocean Table" } };
+    expect(parseDraft(serializeDraft(draft))).toEqual(draft);
+  });
+});
+
 describe("parseDraft normalises the step", () => {
   it("pulls an out-of-range step back into the flow", () => {
     const high = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, step: 99 } });

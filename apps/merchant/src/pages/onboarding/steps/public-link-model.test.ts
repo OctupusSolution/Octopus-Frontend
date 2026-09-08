@@ -28,4 +28,12 @@ describe("previewModelFromOnboarding", () => {
   it("passes the device through", () => {
     expect(previewModelFromOnboarding(EMPTY_DRAFT, "mobile", t, "en").device).toBe("mobile");
   });
+
+  it("builds a four-price ladder rather than one repeated price", () => {
+    const model = previewModelFromOnboarding(EMPTY_DRAFT, "desktop", t, "en");
+    expect(model.samplePrices).toHaveLength(4);
+    expect(model.samplePrices[0]).not.toBe(model.samplePrices[1]);
+    expect(model.sampleWasPrices).toHaveLength(4);
+    expect(model.sampleWasPrices[0]).not.toBe(model.sampleWasPrices[1]);
+  });
 });

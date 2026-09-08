@@ -41,10 +41,11 @@ export interface StorefrontPreviewModel {
   /** Already summarised, e.g. "Daily 11:00 AM – 12:00 AM". Empty string
    *  renders nothing. */
   hoursSummary: string;
-  /** Already formatted sample price, e.g. "SAR 153.00". */
-  samplePrice: string;
-  /** Already formatted struck-through price. */
-  sampleWasPrice: string;
+  /** One formatted price per product card, in card order. The widget indexes
+   *  into this modulo its length, so a host may supply fewer than it draws. */
+  samplePrices: readonly string[];
+  /** The struck-through "was" price for each card, same order and length. */
+  sampleWasPrices: readonly string[];
   hero: PreviewHero;
   device: PreviewDevice;
 }

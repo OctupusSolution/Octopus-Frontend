@@ -11,6 +11,11 @@ import { sectionLabelKey } from "./public-link-sections";
 import { dnsLabel } from "./public-link-tag";
 import type { OnboardingDraft } from "../_shared/draft";
 
+// The four product cards' prices, in card order — 45/50/55/60 with was-prices
+// 63/70/77/84 — exactly what the pre-move component computed inline as
+// `45 + index * 5` / `Math.round(price * 1.4)` for `index` 0..3.
+const PRICE_LADDER = [0, 1, 2, 3].map((i) => 45 + i * 5);
+
 export function previewModelFromOnboarding(
   draft: OnboardingDraft,
   device: PreviewDevice,
@@ -38,8 +43,8 @@ export function previewModelFromOnboarding(
     categories: serviceCategoriesFor(draft.type),
     cityLabel: city ? t(city.labelKey) : "",
     hoursSummary: summarizeHours(brand.hours, t, locale),
-    samplePrice: formatBrandPrice(153, brand.currency, locale),
-    sampleWasPrice: formatBrandPrice(170, brand.currency, locale),
+    samplePrices: PRICE_LADDER.map((p) => formatBrandPrice(p, brand.currency, locale)),
+    sampleWasPrices: PRICE_LADDER.map((p) => formatBrandPrice(Math.round(p * 1.4), brand.currency, locale)),
     hero: {},
     device,
   };

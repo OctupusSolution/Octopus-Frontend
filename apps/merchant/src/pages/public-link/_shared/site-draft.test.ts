@@ -103,8 +103,9 @@ describe("sections", () => {
 
   it("reorders sections by replacing the list", () => {
     const reversed = [...EMPTY_SITE_DRAFT.sections].reverse();
-    expect(run(EMPTY_SITE_DRAFT, { type: "setSections", sections: reversed }).sections[0].id)
-      .toBe(reversed[0].id);
+    const next = run(EMPTY_SITE_DRAFT, { type: "setSections", sections: reversed });
+    expect(next.sections[0].id).toBe(reversed[0].id);
+    expect(next.selectedSection).toBe(EMPTY_SITE_DRAFT.selectedSection);
   });
 
   it("writes a generic section's first patch, then merges a second one in", () => {

@@ -3487,4 +3487,11 @@ export const ar = {
   "publicLink.navigation.updatesInstantly": "تُحدَّث تغييرات التنقل فورًا في رابطك العام",
   "publicLink.nav.hidePage": "إخفاء من التنقل",
   "publicLink.nav.showPage": "إظهار في التنقل",
+  "publicLink.stepTitle.customize": "تخصيص الأقسام",
+  "publicLink.customize.subtitle": "أضف الأقسام أو احذفها أو أعد ترتيبها في صفحتك الرئيسية.",
+  "publicLink.customize.homepageSections": "أقسام الصفحة الرئيسية",
+  "publicLink.customize.addSection": "إضافة قسم",
+  "publicLink.customize.selectedSection": "القسم المحدد",
+  "publicLink.customize.settingForSelected": "إعدادات القسم المحدد",
+  "publicLink.customize.deleteSection": "حذف القسم",
 } as const;

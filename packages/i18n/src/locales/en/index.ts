@@ -3487,4 +3487,11 @@ export const en = {
   "publicLink.navigation.updatesInstantly": "Changes to navigation update instantly across your Public Link",
   "publicLink.nav.hidePage": "Hide from navigation",
   "publicLink.nav.showPage": "Show in navigation",
+  "publicLink.stepTitle.customize": "Customize Sections",
+  "publicLink.customize.subtitle": "Add, remove and reorder sections on your homepage.",
+  "publicLink.customize.homepageSections": "Homepage Sections",
+  "publicLink.customize.addSection": "Add Section",
+  "publicLink.customize.selectedSection": "Selected Section",
+  "publicLink.customize.settingForSelected": "Setting for Selected Section",
+  "publicLink.customize.deleteSection": "Delete Section",
 } as const;

@@ -59,9 +59,10 @@ export interface StorefrontPreviewModel {
   sections: readonly string[];
   navItems: readonly { labelKey: string; visible: boolean }[];
   categories: readonly string[];
-  cityKey: string | null;
+  cityLabel: string;
   hoursSummary: string;
-  currency: string;
+  samplePrice: string;
+  sampleWasPrice: string;
   hero: {
     headline?: string; sub?: string;
     primaryCta?: string; secondaryCta?: string;

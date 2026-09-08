@@ -68,27 +68,29 @@ export function BuilderShell({ draft, dispatch, save, children }: BuilderShellPr
             {note}
           </p>
         )}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {draft.step > 1 && (
-              <Button variant="secondary" onClick={() => dispatch({ type: "back" })}>
-                {t("publicLink.back")}
-              </Button>
-            )}
-            <Button variant="secondary" icon={<HelpCircle size={14} />}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          {draft.step > 1 && (
+            <Button variant="secondary" onClick={() => dispatch({ type: "back" })} className="shrink-0">
+              {t("publicLink.back")}
+            </Button>
+          )}
+          {/* The frames lay the footer out as one full-width row — Help,
+              Save Draft and Next Step sharing the content column at roughly
+              235/505/570px — rather than three shrink-to-fit buttons
+              clustered to either side. The ratio only applies at `lg`, where
+              the column is wide enough to hold it; below that the three
+              stack (then sit three-across at `sm`) so labels never get
+              crushed. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex-1 lg:[grid-template-columns:235fr_505fr_570fr]">
+            <Button variant="secondary" icon={<HelpCircle size={14} />} className="w-full justify-center">
               {t("publicLink.help")}
             </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={handleSaveDraft}>
+            <Button variant="secondary" onClick={handleSaveDraft} className="w-full justify-center">
               {t("publicLink.saveDraft")}
             </Button>
-            <Button
-              variant="primary"
-              icon={<ArrowRight size={14} className="rtl:rotate-180" />}
-              onClick={() => dispatch({ type: "next" })}
-            >
+            <Button variant="primary" onClick={() => dispatch({ type: "next" })} className="w-full justify-center">
               {t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
+              <ArrowRight size={14} className="rtl:rotate-180" />
             </Button>
           </div>
         </div>

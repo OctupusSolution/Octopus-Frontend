@@ -74,6 +74,26 @@ describe("previewModelFromSite", () => {
     expect(previewModelFromSite(named, "desktop", t, "en").url).toBe("ocean-table.octopus.app");
   });
 
+  it("pairs a section's heading to its own id, not to whatever page sits at the same index", () => {
+    // The draft's enabled section order ("offers" first) deliberately does not
+    // match the page order ("home" first), so an index-based pairing between
+    // `sections` and `navItems` would put a page's label on the wrong block.
+    const draft = {
+      ...EMPTY_SITE_DRAFT,
+      sections: [
+        { id: "offers", enabled: true },
+        { id: "hero", enabled: false },
+        { id: "menu", enabled: true },
+      ],
+    };
+    const model = previewModelFromSite(draft, "desktop", t, "en");
+    expect(model.sections).toEqual(["offers", "menu"]);
+    expect(model.sectionLabelKeys.offers).toBe("publicLink.section.offers");
+    expect(model.sectionLabelKeys.menu).toBe("publicLink.section.menu");
+    // Not any page module's label (e.g. "home", which sits first in navItems).
+    expect(model.sectionLabelKeys.offers).not.toBe(model.navItems[0]?.labelKey);
+  });
+
   it("never hands the widget an empty categories or price array, even with no sections at all", () => {
     const draft = { ...EMPTY_SITE_DRAFT, sections: [] };
     const model = previewModelFromSite(draft, "desktop", t, "en");

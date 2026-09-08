@@ -3,14 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed, Package,
   Users, Megaphone, Truck, Wallet, UserCog, BarChart3, Settings, HelpCircle,
-  ChevronDown, Search, PanelLeft, MoreVertical, LogOut,
+  ChevronDown, Search, PanelLeft, LogOut, Building2, Check,
+  Clock3, Armchair, PencilRuler, Plug, Ticket, CreditCard, Link2,
 } from "lucide-react";
 import clsx from "clsx";
 import { routes } from "@/app/routes/registry";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useAuth } from "@/app/providers/auth-provider";
-import { useTenantConfig } from "@/app/providers/tenant-config-provider";
-import type { ModuleId } from "@/shared/catalog";
+import { useTenantConfig, type TenantConfig } from "@/app/providers/tenant-config-provider";
+import { getRestaurantType, type ModuleId } from "@/shared/catalog";
 import { labelKey } from "@/shared/lib/labels";
 
 // Navigation content is the OCTOPUS Restaurants SRS, Section 18.1
@@ -22,12 +23,23 @@ interface NavGroup {
   label: string;
   icon: React.ElementType;
   items?: string[];
+  /** Destination for a group whose id is not itself a route id — the entries
+   *  promoted out of a parent group (Wait list, Floor Plan, Promotions,
+   *  Payments, Integrations) all point at a nested route. */
+  path?: string;
+  /** No page exists yet, so the entry renders but does not navigate. */
+  placeholder?: boolean;
 }
 interface NavSection {
   label: string;
   groups: NavGroup[];
 }
 
+// The frame promotes six pages out of their parent groups and onto the top
+// level. They MOVE rather than duplicate: Reservations no longer lists Floor
+// Plan or Waitlist, Marketing no longer lists Promotions, Finance no longer
+// lists Payments, Settings no longer lists Integrations. One page, one place
+// in the nav.
 const SECTIONS: NavSection[] = [
   {
     label: "Overview",
@@ -39,7 +51,11 @@ const SECTIONS: NavSection[] = [
       { id: "orders", label: "Orders", icon: ClipboardList,
         items: ["Live Orders (all channels)", "Order History", "Pre-Orders & Scheduled"] },
       { id: "reservations", label: "Reservations", icon: CalendarClock,
-        items: ["Calendar / Timeline", "Floor Plan", "Waitlist", "Private Rooms & Events"] },
+        items: ["Calendar / Timeline", "Private Rooms & Events"] },
+      { id: "waitlist", label: "Wait list", icon: Clock3, path: "/reservations/waitlist" },
+      { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan" },
+      { id: "floor-plan-builder", label: "Floor Plan Builder", icon: PencilRuler, placeholder: true },
+      { id: "public-link", label: "Public Link Builder", icon: Link2, path: "/public-link" },
       { id: "menu", label: "Menu", icon: UtensilsCrossed,
         items: ["Categories & Items", "Modifiers", "Combos", "Price Lists & Channels", "Schedules & Ramadan Profile", "Availability (86 board)"] },
       { id: "inventory", label: "Inventory", icon: Package,
@@ -50,12 +66,14 @@ const SECTIONS: NavSection[] = [
   {
     label: "Business",
     groups: [
-      { id: "customers", label: "Customers", icon: Users,
+      { id: "customers", label: "Customer CRM", icon: Users,
         items: ["Customer List & Profiles", "Segments", "Feedback & Complaints"] },
       { id: "marketing", label: "Marketing", icon: Megaphone,
-        items: ["Loyalty Program", "Gift Cards", "Subscriptions & Memberships", "Promotions & Vouchers", "Campaigns"] },
+        items: ["Loyalty Program", "Gift Cards", "Subscriptions & Memberships", "Campaigns"] },
+      { id: "promotions", label: "Promotions", icon: Ticket, path: "/marketing/promotions" },
       { id: "finance", label: "Finance", icon: Wallet,
-        items: ["Payments & Transactions", "Tax Invoices (ZATCA)", "Settlements & Reconciliation", "Accounting Sync", "House Accounts"] },
+        items: ["Tax Invoices (ZATCA)", "Settlements & Reconciliation", "Accounting Sync", "House Accounts"] },
+      { id: "payments", label: "Payments", icon: CreditCard, path: "/finance/payments" },
       { id: "staff", label: "Staff", icon: UserCog,
         items: ["Employees", "Schedule", "Attendance", "Tips", "Payroll Inputs"] },
       { id: "reports", label: "Reports", icon: BarChart3,
@@ -66,7 +84,8 @@ const SECTIONS: NavSection[] = [
 
 const FOOTER_GROUPS: NavGroup[] = [
   { id: "settings", label: "Settings", icon: Settings,
-    items: ["My Businesses", "Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules", "Integrations"] },
+    items: ["My Businesses", "Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
+  { id: "integrations", label: "Integrations", icon: Plug, path: "/settings/integrations" },
 ];
 
 // Which module owns each nav group. A group whose module the tenant did not
@@ -77,14 +96,20 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   orders: "orders",
   menu: "orders",
   reservations: "bookings",
+  waitlist: "bookings",
+  "floor-plan": "bookings",
+  "floor-plan-builder": "bookings",
   inventory: "inventory",
   "delivery-aggregators": "delivery",
   customers: "customers",
   marketing: "loyalty",
+  promotions: "loyalty",
   finance: "payments",
+  payments: "payments",
   staff: "hr",
   reports: "reports",
   settings: "core",
+  integrations: "integrations",
 };
 
 // A handful of sub-pages belong to a different module than their parent, so
@@ -92,7 +117,6 @@ const GROUP_MODULE: Record<string, ModuleId> = {
 // without taking the rest of Finance with it.
 const ITEM_MODULE: Record<string, ModuleId> = {
   "Accounting Sync": "accounting",
-  "Integrations": "integrations",
 };
 
 // Derived from the route registry so every routed page automatically gets
@@ -106,8 +130,6 @@ const ITEM_PATHS: Record<string, string> = {
   "Order History": "/orders/history",
   "Pre-Orders & Scheduled": "/orders/preorders",
   "Calendar / Timeline": "/reservations/calendar",
-  "Floor Plan": "/reservations/floor-plan",
-  "Waitlist": "/reservations/waitlist",
   "Private Rooms & Events": "/reservations/events",
   "Categories & Items": "/menu/items",
   "Modifiers": "/menu/modifiers",
@@ -126,9 +148,7 @@ const ITEM_PATHS: Record<string, string> = {
   "Loyalty Program": "/marketing/loyalty",
   "Gift Cards": "/marketing/gift-cards",
   "Subscriptions & Memberships": "/marketing/subscriptions",
-  "Promotions & Vouchers": "/marketing/promotions",
   "Campaigns": "/marketing/campaigns",
-  "Payments & Transactions": "/finance/payments",
   "Tax Invoices (ZATCA)": "/finance/tax-invoices",
   "Settlements & Reconciliation": "/finance/settlements",
   "Accounting Sync": "/finance/accounting",
@@ -153,8 +173,23 @@ const ITEM_PATHS: Record<string, string> = {
   "Roles & Permissions": "/settings/roles",
   "Tax Profile": "/settings/tax",
   "Restaurant Type & Modules": "/settings/modules",
-  "Integrations": "/settings/integrations",
 };
+
+// Where each top-level group goes. Most groups are named after their own
+// route id; the promoted ones carry an explicit `path` instead.
+const ALL_GROUPS: NavGroup[] = [...SECTIONS.flatMap((s) => s.groups), ...FOOTER_GROUPS];
+const GROUP_PATH: Record<string, string> = Object.fromEntries(
+  ALL_GROUPS.map((g) => [g.id, g.path ?? ROUTES[g.id]]).filter(([, path]) => !!path) as [string, string][]
+);
+
+// "/reservations" is a prefix of "/reservations/waitlist", so a plain
+// startsWith would light up Reservations while the merchant is on Wait list.
+// Only the longest matching group path — the most specific one — wins.
+function groupForPath(pathname: string): string | undefined {
+  return Object.entries(GROUP_PATH)
+    .filter(([, path]) => pathname === path || (path !== "/" && pathname.startsWith(path + "/")))
+    .sort((a, b) => b[1].length - a[1].length)[0]?.[0];
+}
 
 function filterGroups(
   groups: readonly NavGroup[],
@@ -173,6 +208,25 @@ function filterGroups(
       });
       return { ...group, items };
     });
+}
+
+// The business card in the footer shows the photo of the restaurant type the
+// merchant picked at onboarding — the only picture of their business the app
+// actually holds. Same `apps/assets` root OctopusMark resolves against.
+function typeThumb(file: string): string {
+  return new URL(`../../../../assets/onboarding-Type/${file}`, import.meta.url).href;
+}
+
+function initialsOf(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w[0] ?? "")
+      .join("")
+      .toUpperCase() || "?"
+  );
 }
 
 function OctopusMark({ size = 32 }: { size?: number }) {
@@ -216,25 +270,45 @@ function GroupButton({
   const Icon = group.icon;
   const { t } = useI18n();
   const label = t(labelKey(group.label));
+  const disabled = !!group.placeholder;
 
   return (
     <button
       ref={setRef}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
-      title={collapsed ? label : undefined}
+      disabled={disabled}
+      title={disabled ? `${label} — ${t("sidebar.comingSoon")}` : collapsed ? label : undefined}
       className={clsx(
-        "flex w-full items-center gap-2.5 rounded-lg text-start text-[13px] font-medium transition-colors",
-        collapsed ? "justify-center px-0 py-2.5" : "px-2.5 py-2",
-        isActive ? "bg-soft-blue text-ocean-blue" : "text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+        "group flex w-full items-center gap-2.5 rounded-full text-start text-[13px] font-medium transition-colors",
+        collapsed ? "justify-center px-0 py-2" : "px-3.5 py-2",
+        disabled
+          ? "cursor-default text-white/40"
+          : isActive
+            ? "bg-[#F5F9FF] text-ocean-blue hover:bg-[#F5F9FF] hover:text-ocean-blue"
+            : "text-white/85 hover:bg-white/10 hover:text-white"
       )}
     >
-      <Icon size={16} className={isActive ? "shrink-0 text-ocean-blue" : "shrink-0 text-[var(--octo-text-faint)]"} />
+      <Icon
+        size={17}
+        strokeWidth={1.8}
+        className={clsx(
+          "shrink-0",
+          disabled ? "text-white/40" : isActive ? "text-ocean-blue" : "text-white/85 group-hover:text-white"
+        )}
+      />
       {!collapsed && (
         <>
           <span className="flex-1">{label}</span>
           {group.items && (
-            <ChevronDown size={14} className={clsx("text-[var(--octo-text-faint)] transition-transform duration-300", isOpen && "rotate-180")} />
+            <ChevronDown
+              size={15}
+              className={clsx(
+                "transition-transform duration-300",
+                isActive ? "text-ocean-blue" : "text-white/70 group-hover:text-white",
+                isOpen && "rotate-180"
+              )}
+            />
           )}
         </>
       )}
@@ -269,7 +343,7 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
         open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
       )}
     >
-      <div className="relative ms-[22px] mt-0.5 flex flex-col gap-0.5 border-s border-[var(--octo-border-card)] ps-3 pb-0.5">
+      <div className="relative ms-[24px] mt-0.5 flex flex-col gap-0.5 border-s border-white/20 ps-3 pb-1">
         {group.items.map((item) => {
           const path = ITEM_PATHS[item];
           const isActive = !!path && path === bestMatchPath;
@@ -281,11 +355,11 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
                 if (path) navigate(path);
               }}
               className={clsx(
-                "relative rounded-md px-2 py-1.5 text-start text-[12.5px] transition-colors",
-                "before:absolute before:start-[-13px] before:top-1/2 before:h-px before:w-2.5 before:bg-[var(--octo-track)]",
+                "relative rounded-full px-2.5 py-1.5 text-start text-[12px] transition-colors",
+                "before:absolute before:start-[-13px] before:top-1/2 before:h-px before:w-2.5 before:bg-white/20",
                 isActive
-                  ? "border border-[var(--octo-border-card)] bg-[var(--octo-card)] font-medium text-[var(--octo-text-primary)] shadow-sm"
-                  : "text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)] hover:text-[var(--octo-text-primary)]"
+                  ? "bg-[#F5F9FF] font-medium text-ocean-blue hover:bg-[#F5F9FF] hover:text-ocean-blue"
+                  : "text-white/65 hover:bg-white/10 hover:text-white"
               )}
             >
               {t(labelKey(item))}
@@ -297,22 +371,77 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
   );
 }
 
-export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth < 900 : false
+// The two rounded cards that sit under the nav. They share a shell — a pill
+// with a 38px thumbnail, a two-line label and a chevron — so the business and
+// the signed-in user read as one stacked pair rather than two unrelated rows.
+function FooterCard({
+  collapsed,
+  thumb,
+  title,
+  subtitle,
+  open,
+  onToggle,
+  ariaLabel,
+  children,
+}: {
+  collapsed: boolean;
+  thumb: React.ReactNode;
+  title: string;
+  subtitle: string;
+  open: boolean;
+  onToggle: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  // The collapsed rail has nowhere to hang a dropdown, so the cards degrade to
+  // plain thumbnails rather than buttons that would open nothing.
+  if (collapsed) {
+    return <div title={title} className="mx-auto">{thumb}</div>;
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        className={clsx(
+          "flex w-full items-center gap-2.5 rounded-full py-1.5 pe-2.5 ps-1.5 text-start transition-colors",
+          open ? "bg-white/15" : "bg-white/[0.08] hover:bg-white/[0.14]"
+        )}
+      >
+        {thumb}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12.5px] font-semibold leading-tight text-white">{title}</p>
+          <p className="truncate text-[10.5px] leading-tight text-white/60">{subtitle}</p>
+        </div>
+        <ChevronDown size={15} className={clsx("shrink-0 text-white/70 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute bottom-full start-0 z-50 mb-2 w-full min-w-[224px] rounded-2xl border border-white/10 bg-[#001E4B] p-1.5 shadow-xl">
+          {children}
+        </div>
+      )}
+    </div>
   );
+}
+
+export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolean; onToggleCollapsed: (collapsed: boolean) => void }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ dashboard: true });
   const [activeGroup, setActiveGroup] = useState("dashboard");
   const [flyout, setFlyout] = useState<{ group: NavGroup; top: number; left: number } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [businessOpen, setBusinessOpen] = useState(false);
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const accountRef = useRef<HTMLDivElement | null>(null);
+  const footerRef = useRef<HTMLDivElement | null>(null);
   const userToggled = useRef(false);
+  const setCollapsed = onToggleCollapsed;
   const navigate = useNavigate();
   const location = useLocation();
   const { t, dir } = useI18n();
   const { user, signOut } = useAuth();
-  const { isModuleEnabled, activeBusiness } = useTenantConfig();
+  const { isModuleEnabled, activeBusiness, businesses, activeTenantId, switchBusiness } = useTenantConfig();
 
   // The merchant typed their business name on step 4 of onboarding and their
   // email in the account modal. Greeting them as somebody else's company —
@@ -321,7 +450,20 @@ export function AppSidebar() {
   // genuinely no business yet (a deep link into an unprovisioned session).
   const accountName = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
   const accountEmail = user?.email?.trim() || t("sidebar.emailFallback");
-  const accountInitials = accountName.trim().split(/\s+/).slice(0, 2).map((w) => w[0] ?? "").join("").toUpperCase() || "?";
+  const userName = user?.name?.trim() || t("sidebar.userFallback");
+  const userInitials = initialsOf(userName);
+
+  // The mock session only ever carries "owner", but a real one will carry the
+  // rest of the staff roles — translate through the shared staff dictionary
+  // and fall back to the raw string rather than printing a bare key.
+  const roleKey = `staff.role.${user?.role ?? ""}`;
+  const roleLabel = user?.role ? (t(roleKey) === roleKey ? user.role : t(roleKey)) : t("sidebar.emailFallback");
+
+  // The restaurant type picked at onboarding is the only picture and the only
+  // one-line description of the business the app holds, so it stands in for
+  // the photo-and-location line the frame shows.
+  const businessType = activeBusiness ? getRestaurantType(activeBusiness.businessType) : undefined;
+  const businessSubtitle = businessType ? t(businessType.nameKey) : t("sidebar.noBusiness");
 
   // Navigation is filtered to what this tenant actually bought, at both
   // levels: whole groups, and individual sub-items that belong to a
@@ -345,22 +487,24 @@ export function AppSidebar() {
   useEffect(() => {
     function onResize() {
       if (userToggled.current) return;
-      setCollapsed(window.innerWidth < 900);
+      onToggleCollapsed(window.innerWidth < 900);
     }
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [onToggleCollapsed]);
 
-  // Close the account menu on any outside click or Escape.
+  // Close whichever footer menu is open on any outside click or Escape.
   useEffect(() => {
-    if (!accountOpen) return;
+    if (!accountOpen && !businessOpen) return;
+    function closeAll() {
+      setAccountOpen(false);
+      setBusinessOpen(false);
+    }
     function onPointerDown(e: MouseEvent) {
-      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
-        setAccountOpen(false);
-      }
+      if (footerRef.current && !footerRef.current.contains(e.target as Node)) closeAll();
     }
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setAccountOpen(false);
+      if (e.key === "Escape") closeAll();
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -368,16 +512,14 @@ export function AppSidebar() {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [accountOpen]);
+  }, [accountOpen, businessOpen]);
 
   // Keep the highlighted group in sync with the URL — covers direct nav,
   // browser back/forward, not just clicks inside this component. Sub-paths
   // (e.g. /orders/history) highlight their parent group (/orders).
   useEffect(() => {
-    const match = Object.entries(ROUTES).find(
-      ([, path]) => path === location.pathname || (path !== "/" && location.pathname.startsWith(path + "/"))
-    );
-    if (match) setActiveGroup(match[0]);
+    const match = groupForPath(location.pathname);
+    if (match) setActiveGroup(match);
   }, [location.pathname]);
 
   // On load and on cross-module navigation, the group that owns the current
@@ -413,9 +555,13 @@ export function AppSidebar() {
   // dropdown, never navigates; only its sub-items (or a childless group like
   // Dashboard) do that.
   function handleGroupClick(group: NavGroup) {
+    // Nothing to navigate to and nothing to open — the entry is a signpost
+    // for a page that has not been built yet.
+    if (group.placeholder) return;
+
     if (collapsed) {
       setActiveGroup(group.id);
-      const path = ROUTES[group.id];
+      const path = GROUP_PATH[group.id];
       if (path) navigate(path);
       group.items ? openFlyout(group) : setFlyout(null);
       return;
@@ -425,7 +571,7 @@ export function AppSidebar() {
       return;
     }
     setActiveGroup(group.id);
-    const path = ROUTES[group.id];
+    const path = GROUP_PATH[group.id];
     if (path) navigate(path);
   }
 
@@ -449,23 +595,23 @@ export function AppSidebar() {
   return (
     <aside
       className={clsx(
-        "relative flex shrink-0 flex-col transition-[width]",
-        collapsed ? "w-[68px]" : "w-[258px]"
+        "relative flex shrink-0 flex-col transition-[width] bg-[#001E4B]",
+        collapsed ? "w-[64px]" : "w-[248px]"
       )}
       onMouseLeave={() => collapsed && setFlyout(null)}
     >
-      <div className={clsx("flex items-center py-4", collapsed ? "justify-center px-0" : "justify-between px-4")}>
+      <div className={clsx("flex items-center border-b border-white/12 py-4", collapsed ? "justify-center px-0" : "justify-between px-4")}>
         <div className="flex items-center gap-2">
-          <OctopusMark size={30} />
-          {!collapsed && <span className="text-sm font-bold tracking-tight text-[var(--octo-text-primary)]">OCTOPUS</span>}
+          <OctopusMark size={28} />
+          {!collapsed && <span className="text-[15px] font-extrabold tracking-tight text-white">OCTOPUS</span>}
         </div>
         {!collapsed && (
           <button
             onClick={() => { userToggled.current = true; setCollapsed(true); }}
-            className="grid h-7 w-7 place-items-center rounded-md text-[var(--octo-text-faint)] hover:bg-[var(--octo-hover)]"
+            className="grid h-7 w-7 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
             aria-label={t("sidebar.collapse")}
           >
-            <PanelLeft size={16} />
+            <PanelLeft size={18} strokeWidth={1.8} />
           </button>
         )}
       </div>
@@ -473,95 +619,113 @@ export function AppSidebar() {
       {collapsed && (
         <button
           onClick={() => { userToggled.current = true; setCollapsed(false); }}
-          className="mx-auto mb-2 grid h-8 w-8 place-items-center rounded-lg text-[var(--octo-text-faint)] hover:bg-[var(--octo-hover)]"
+          className="mx-auto my-1.5 grid h-8 w-8 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
           aria-label={t("sidebar.expand")}
         >
-          <Search size={15} />
+          <Search size={16} strokeWidth={1.8} />
         </button>
       )}
 
-      <nav className="octo-scroll flex-1 overflow-y-auto overflow-x-visible px-2 pb-2">
+      {/* The frame drops the uppercase section captions — the sections survive
+          purely as the vertical gaps that still group the nav. */}
+      <nav className={clsx("octo-scroll flex-1 overflow-y-auto overflow-x-visible pb-2 pt-2.5", collapsed ? "px-2" : "px-2.5")}>
         {visibleSections.map((section) => (
           <div key={section.label} className="mb-3">
-            {!collapsed && (
-              <p className="mb-1 px-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--octo-text-faint)]">
-                {t(labelKey(section.label))}
-              </p>
-            )}
             {section.groups.map(renderGroup)}
           </div>
         ))}
+        {visibleFooterGroups.map(renderGroup)}
       </nav>
 
-      <div className="border-t border-[var(--octo-border-card)] px-2 pt-2">
-        {visibleFooterGroups.map(renderGroup)}
-      </div>
+      <div ref={footerRef} className={clsx("flex flex-col gap-1.5 pb-3 pt-1", collapsed ? "px-2" : "px-2.5")}>
+        <FooterCard
+          collapsed={collapsed}
+          ariaLabel={t("sidebar.businessMenu")}
+          open={businessOpen}
+          onToggle={() => { setBusinessOpen((o) => !o); setAccountOpen(false); }}
+          title={accountName}
+          subtitle={businessSubtitle}
+          thumb={
+            businessType ? (
+              <img
+                src={typeThumb(businessType.image)}
+                alt=""
+                className="h-[34px] w-[34px] shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-white/15 text-white">
+                <Building2 size={16} />
+              </div>
+            )
+          }
+        >
+          {businesses.map((business: TenantConfig) => (
+            <button
+              key={business.id}
+              type="button"
+              onClick={() => { switchBusiness(business.id); setBusinessOpen(false); }}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <span className="min-w-0 flex-1 truncate">{business.businessName}</span>
+              {business.id === activeTenantId && <Check size={14} className="shrink-0 text-ocean-blue" />}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => { setBusinessOpen(false); navigate("/settings/businesses"); }}
+            className={clsx(
+              "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white",
+              businesses.length > 0 && "mt-1 border-t border-white/10 pt-2.5"
+            )}
+          >
+            <Building2 size={14} />
+            {t("sidebar.manageBusinesses")}
+          </button>
+        </FooterCard>
 
-      <div className={clsx("flex items-center gap-2.5 border-t border-[var(--octo-border-card)] py-3", collapsed ? "justify-center px-0" : "px-4")}>
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-deep-navy text-xs font-semibold text-white">
-          {accountInitials}
-        </div>
-        {!collapsed && (
-          <>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{accountName}</p>
-              <p className="truncate text-[11px] text-[var(--octo-text-muted)]">{accountEmail}</p>
+        <FooterCard
+          collapsed={collapsed}
+          ariaLabel={t("sidebar.accountMenu")}
+          open={accountOpen}
+          onToggle={() => { setAccountOpen((o) => !o); setBusinessOpen(false); }}
+          title={userName}
+          subtitle={roleLabel}
+          thumb={
+            <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-ocean-blue text-[12px] font-semibold text-white">
+              {userInitials}
             </div>
-            <div ref={accountRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setAccountOpen((o) => !o)}
-                aria-label={t("sidebar.accountMenu")}
-                aria-expanded={accountOpen}
-                className={clsx(
-                  "grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--octo-text-faint)] hover:bg-[var(--octo-hover)]",
-                  accountOpen && "bg-[var(--octo-hover)] text-[var(--octo-text-secondary)]"
-                )}
-              >
-                <MoreVertical size={14} />
-              </button>
-
-              {accountOpen && (
-                <div className="absolute bottom-full start-0 z-50 mb-1.5 w-56 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg">
-                  <div className="border-b border-[var(--octo-divider)] px-2 pb-2 pt-1">
-                    <p className="truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-                      {user?.name ?? "Merchant"}
-                    </p>
-                    <p className="truncate text-[11px] text-[var(--octo-text-muted)]">{accountEmail}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAccountOpen(false)}
-                    className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-[12.5px] font-medium text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-                  >
-                    <HelpCircle size={13} />
-                    {t("sidebar.helpSupport")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAccountOpen(false);
-                      signOut();
-                    }}
-                    className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-[12.5px] font-medium text-[#EF4444] hover:bg-red-50"
-                  >
-                    <LogOut size={13} />
-                    {t("common.signOut")}
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+          }
+        >
+          <div className="border-b border-white/10 px-2.5 pb-2 pt-1">
+            <p className="truncate text-[12.5px] font-semibold text-white">{userName}</p>
+            <p className="truncate text-[11px] text-white/60">{accountEmail}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAccountOpen(false)}
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <HelpCircle size={14} />
+            {t("sidebar.helpSupport")}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAccountOpen(false); signOut(); }}
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-[#FF8A8A] transition-colors hover:bg-white/10"
+          >
+            <LogOut size={14} />
+            {t("common.signOut")}
+          </button>
+        </FooterCard>
       </div>
 
       {collapsed && flyout && (
         <div
-          className="fixed z-50 w-56 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2 shadow-lg"
+          className="fixed z-50 w-56 rounded-xl border border-white/10 bg-[#001E4B] p-2 shadow-lg"
           style={{ top: flyout.top, left: flyout.left }}
           onMouseEnter={() => setFlyout(flyout)}
         >
-          <p className="mb-1 px-2 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--octo-text-faint)]">
+          <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">
             {t(labelKey(flyout.group.label))}
           </p>
           {flyout.group.items?.map((item) => (
@@ -572,7 +736,7 @@ export function AppSidebar() {
                 if (path) navigate(path);
                 setFlyout(null);
               }}
-              className="w-full rounded-md px-2 py-1.5 text-start text-[12.5px] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)] hover:text-[var(--octo-text-primary)]"
+              className="w-full rounded-lg px-2.5 py-1.5 text-start text-[12.5px] text-white/80 transition-colors hover:bg-white/10 hover:text-white"
             >
               {t(labelKey(item))}
             </button>

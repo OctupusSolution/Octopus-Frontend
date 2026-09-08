@@ -17,6 +17,16 @@ function modulesInNav(draft: SiteDraft): readonly PageModule[] {
   return PAGE_MODULES.filter((module) => navIds.has(module.id));
 }
 
+/** `WebNavPreview` and `MobileDrawerPreview` render the Navigation step's own
+ *  eye toggle (`navigation.hidden`) on top of `inNav` — a page can be in the
+ *  order list and still invisible in the rendered header/drawer nav, which is
+ *  exactly what that toggle is for. `DrawerNavPreview` (the Pages step) has no
+ *  such toggle to honour and keeps using `modulesInNav` unchanged. */
+function modulesInRenderedNav(draft: SiteDraft): readonly PageModule[] {
+  const hidden = new Set(draft.navigation.hidden);
+  return modulesInNav(draft).filter((module) => !hidden.has(module.id));
+}
+
 /** The dark sidebar mock from the Pages step: the drawer a customer opens on
  *  the storefront, showing only the pages the merchant has switched into
  *  navigation. */
@@ -67,7 +77,7 @@ export function DrawerNavPreview({ draft }: { draft: SiteDraft }) {
  *  actually reads them: left to right, icon-free. */
 export function WebNavPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
-  const modules = modulesInNav(draft);
+  const modules = modulesInRenderedNav(draft);
 
   return (
     <div
@@ -89,7 +99,7 @@ export function WebNavPreview({ draft }: { draft: SiteDraft }) {
  *  mock so the pair reads as one navigation shown at two sizes. */
 export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
-  const modules = modulesInNav(draft);
+  const modules = modulesInRenderedNav(draft);
 
   return (
     <div

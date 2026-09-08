@@ -12,6 +12,16 @@ export const LOGO_URL = url("Logo/OCTOPUS LOGO.svg");
 export const HERO_URL = url("Get Started/section image.webp");
 export const DASHBOARD_MOCKUP_URL = url("Review.webp");
 
+/** The mascot the Get Started screen leads with, ringed by the four module
+ *  tiles. A different picture from HERO_URL, which is the abstract cube. */
+export const SETUP_HERO_URL = url("Setup/octopus.png");
+
+/** The spinner and the stamp the payment step's two dialogs are built around.
+ *  Both are flat artwork rather than CSS: the frames draw a specific spinner
+ *  and a specific rubber stamp, neither of which a border-spin reproduces. */
+export const PAYMENT_SPINNER_URL = url("Setup/loading (3) 1.png");
+export const PAYMENT_STAMP_URL = url("login/stamp.gif");
+
 /** `apps/assets/onboarding-Business/<file>` — vertical cards, step 2. */
 export function verticalIcon(file: string): string {
   return url(`onboarding-Business/${file}`);
@@ -37,21 +47,5 @@ export function getStartedAsset(file: string): string {
   return url(`Get Started/${file}`);
 }
 
-/** `apps/customer/public/images/storefront/<file>` — the photography the
- *  customer storefront actually ships.
- *
- *  Step 8 depicts that exact page, so it shows those exact pictures rather
- *  than a second copy in `apps/assets`. Two copies would be seven megabytes
- *  of duplicated photographs that drift apart the first time one side is
- *  re-shot — which is precisely how step 8 ended up pointing at four category
- *  images that no longer existed. */
-export function storefrontAsset(file: string): string {
-  return new URL(`../../../../../customer/public/images/storefront/${file}`, import.meta.url).href;
-}
-
-// Only one real theme thumbnail exists. `elegant` uses it; `modern` and `warm`
-// fall back to a gradient built from the merchant's own palette. Returning
-// null is how a component learns to render that gradient instead of an <img>.
-export function themeThumb(id: string): string | null {
-  return id === "elegant" ? url("onboarding-Themes/Brand Theme.png") : null;
-}
+// Moved to shared/lib/storefront-assets.ts — see the note there.
+export * from "@/shared/lib/storefront-assets";

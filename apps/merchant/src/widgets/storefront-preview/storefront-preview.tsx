@@ -8,8 +8,11 @@
 // this file is the one that has to follow.
 //
 // What it does NOT copy is the content: the name, colours, typeface, style,
-// logo, currency, city, hours and section order all come from the merchant's
-// own draft, which is the entire point of showing it to them.
+// logo, currency, city, hours and section order all come from the host's own
+// resolved model, which is the entire point of showing it to them. Onboarding
+// and the Public Link Builder each adapt their own data into that model —
+// see `StorefrontPreviewModel` in ./model — which is what keeps this widget
+// free of either host's types.
 //
 // Laid out with logical properties throughout (start/end, ps/pe, text-start)
 // rather than left/right, so the page mirrors with the language instead of
@@ -28,15 +31,9 @@
 import { ChevronDown, ClipboardList, Globe, Heart, MapPin, Search, ShoppingBag, Star } from "lucide-react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { storefrontAsset } from "../_shared/assets";
-import { serviceCategoriesFor } from "../_shared/ai-insights";
-import {
-  CITIES, fontStack, readableOn, styleTokens, summarizeHours, type StyleTokens,
-} from "../_shared/brand-catalog";
-import { formatBrandPrice } from "../_shared/pricing";
-import { sectionLabelKey } from "./public-link-sections";
-import { dnsLabel } from "./public-link-tag";
-import type { OnboardingDraft } from "../_shared/draft";
+import { storefrontAsset } from "@/shared/lib/storefront-assets";
+import { fontStack, readableOn, styleTokens, type StyleTokens } from "@/shared/lib/brand-tokens";
+import type { StorefrontPreviewModel } from "./model";
 
 // Which storefront photograph belongs to which seeded category.
 //
@@ -70,26 +67,38 @@ const MOSAIC: readonly { area: string; tall?: boolean }[] = [
   { area: "2 / 3 / 3 / 4" },
 ];
 
-export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; mobile: boolean }) {
+export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) {
   const { t, locale } = useI18n();
-  const { brand, publicLink } = draft;
+  const mobile = model.device === "mobile";
 
-  const style = styleTokens(brand.themeTemplate);
-  const categories = serviceCategoriesFor(draft.type);
-  const city = CITIES.find((c) => c.id === brand.city);
-  const url = `${dnsLabel(publicLink.tag) || "restaurant"}.octopus.app`;
-  const onPrimary = readableOn(brand.primary);
-  const businessName = brand.businessName || t("onboarding.businessName");
+  const style = styleTokens(model.themeTemplate);
+  const onPrimary = readableOn(model.primary);
+  const businessName = model.businessName;
+
+  // Section ids and nav items are built from the same ordered list by every
+  // adapter, so a section's own heading can be read off the nav item at the
+  // same position rather than needing a second dictionary in this widget.
+  const labelKeyById = new Map<string, string>(
+    model.sections.map((id, i) => [id, model.navItems[i]?.labelKey ?? id])
+  );
+  function labelKeyFor(id: string): string {
+    return labelKeyById.get(id) ?? id;
+  }
+
+  const heroHeadline = model.hero.headline ?? businessName;
+  const heroSub = model.hero.sub ?? t("onboarding.publicLink.previewTagline");
+  const heroPrimaryCta = model.hero.primaryCta ?? t("onboarding.publicLink.previewOrder");
+  const heroSecondaryCta = model.hero.secondaryCta ?? t("onboarding.publicLink.previewMenu");
+  const heroImage = model.hero.imageUrl ?? storefrontAsset("hero.webp");
 
   // The storefront's soft tile surface is --octo-store-soft over in the
   // customer app; the merchant app has no such token, so the tint is mixed from
   // the brand colour here — which also makes the tiles the merchant's own
   // rather than a fixed grey.
-  const softTile = `color-mix(in srgb, ${brand.primary} 6%, var(--octo-hover))`;
-  const footerBg = `color-mix(in srgb, ${brand.primary} 7%, var(--octo-card))`;
+  const softTile = `color-mix(in srgb, ${model.primary} 6%, var(--octo-hover))`;
+  const footerBg = `color-mix(in srgb, ${model.primary} 7%, var(--octo-card))`;
 
   function productCard(index: number) {
-    const price = 45 + index * 5;
     return (
       <article
         key={index}
@@ -109,13 +118,13 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
         </div>
 
         <img
-          src={storefrontAsset(categoryImage(categories[index % categories.length]))}
+          src={storefrontAsset(categoryImage(model.categories[index % model.categories.length]))}
           alt=""
           className="mx-auto mt-1.5 h-[76px] w-auto max-w-full object-contain"
         />
 
         <p className="mt-2 truncate text-start text-[10px] font-bold text-[var(--octo-text-primary)]">
-          {t(categories[index % categories.length])}
+          {t(model.categories[index % model.categories.length])}
         </p>
         <p className="mt-1 line-clamp-2 text-start text-[8px] leading-[1.6] text-[var(--octo-text-muted)]">
           {t("onboarding.publicLink.previewDish")}
@@ -124,17 +133,17 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <span
             className="grid h-[20px] w-[20px] shrink-0 place-items-center rounded-full"
-            style={{ backgroundColor: brand.primary, color: onPrimary }}
+            style={{ backgroundColor: model.primary, color: onPrimary }}
             aria-hidden
           >
             <ShoppingBag size={10} />
           </span>
           <span className="min-w-0 text-end">
             <span className="block truncate text-[10px] font-bold text-[var(--octo-text-primary)]">
-              {formatBrandPrice(price, brand.currency, locale)}
+              {model.samplePrice}
             </span>
             <span className="block truncate text-[8px] text-[var(--octo-text-faint)] line-through">
-              {formatBrandPrice(Math.round(price * 1.4), brand.currency, locale)}
+              {model.sampleWasPrice}
             </span>
           </span>
         </div>
@@ -142,6 +151,9 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
     );
   }
 
+  // The widget switches structurally on the block kinds it knows how to draw,
+  // not on a host's own dictionary of section names — the second host's ids
+  // (reservations, testimonials, instagram, …) simply render nothing here.
   function section(id: string) {
     switch (id) {
       // Centred, over a top-to-bottom scrim, with two pills — the storefront
@@ -149,24 +161,22 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
       case "hero":
         return (
           <section key={id} className="relative isolate overflow-hidden">
-            <img src={storefrontAsset("hero.webp")} alt="" className="h-[190px] w-full object-cover" />
+            <img src={heroImage} alt="" className="h-[190px] w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" aria-hidden />
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-              <p className="max-w-[80%] text-[19px] font-bold leading-[1.4] text-white">{businessName}</p>
-              <p className="max-w-[70%] text-[9.5px] leading-[1.9] text-white/85">
-                {t("onboarding.publicLink.previewTagline")}
-              </p>
+              <p className="max-w-[80%] text-[19px] font-bold leading-[1.4] text-white">{heroHeadline}</p>
+              <p className="max-w-[70%] text-[9.5px] leading-[1.9] text-white/85">{heroSub}</p>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-2" aria-hidden>
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[9.5px] font-semibold"
-                  style={{ backgroundColor: brand.primary, color: onPrimary }}
+                  style={{ backgroundColor: model.primary, color: onPrimary }}
                 >
                   <ClipboardList size={11} />
-                  {t("onboarding.publicLink.previewOrder")}
+                  {heroPrimaryCta}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-white/70 px-4 py-1.5 text-[9.5px] text-white">
                   <ClipboardList size={11} />
-                  {t("onboarding.publicLink.previewMenu")}
+                  {heroSecondaryCta}
                 </span>
               </div>
             </div>
@@ -179,13 +189,13 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
       case "menu":
         return (
           <section key={id} className="px-4 pt-5">
-            <SectionHeading style={style} accent={brand.primary}>{t(sectionLabelKey(id))}</SectionHeading>
+            <SectionHeading style={style} accent={model.primary}>{t(labelKeyFor(id))}</SectionHeading>
             <div
               className={clsx("mt-3 grid gap-2", mobile ? "grid-cols-2" : "grid-cols-3")}
               style={mobile ? undefined : { gridTemplateRows: "88px 88px" }}
             >
               {MOSAIC.map((slot, i) => {
-                const key = categories[i % categories.length];
+                const key = model.categories[i % model.categories.length];
                 return (
                   <div
                     key={`${key}-${i}`}
@@ -224,15 +234,16 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
       case "offers":
         return (
           <section key={id} className="px-4 pt-5">
-            <SectionHeading style={style} accent={brand.primary}>{t(sectionLabelKey(id))}</SectionHeading>
+            <SectionHeading style={style} accent={model.primary}>{t(labelKeyFor(id))}</SectionHeading>
             <div className={clsx("mt-3 grid gap-2", mobile ? "grid-cols-2" : "grid-cols-4")}>
               {Array.from({ length: mobile ? 2 : 4 }, (_, i) => productCard(i))}
             </div>
           </section>
         );
 
-      // A draft can carry a section id this build no longer renders. Skip it
-      // rather than throwing: the customise list still shows and can remove it.
+      // A model can carry a section id this build no longer renders, or one
+      // that belongs to a different host entirely. Skip it rather than
+      // throwing.
       default:
         return null;
     }
@@ -246,15 +257,15 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
       )}
       // The merchant's typeface applies to the depicted page only — the wizard
       // chrome around it stays in the app's own face.
-      style={{ fontFamily: fontStack(brand.font, locale) }}
+      style={{ fontFamily: fontStack(model.font, locale) }}
     >
       <header className="flex items-center justify-between gap-4 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-2.5">
-        {brand.logoDataUrl ? (
-          <img src={brand.logoDataUrl} alt="" className="h-[22px] shrink-0 object-contain" />
+        {model.logoDataUrl ? (
+          <img src={model.logoDataUrl} alt="" className="h-[22px] shrink-0 object-contain" />
         ) : (
           <span
             className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg text-[10px] font-bold"
-            style={{ backgroundColor: brand.primary, color: onPrimary }}
+            style={{ backgroundColor: model.primary, color: onPrimary }}
           >
             {businessName.trim().charAt(0).toUpperCase() || "O"}
           </span>
@@ -268,18 +279,18 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
           <nav className="flex min-w-0 items-center gap-3.5 overflow-hidden text-[9px] text-[var(--octo-text-primary)]">
             {/* Home is the current page, marked the way SiteHeader marks the
                 active route: brand colour, bold, and a rule underneath. */}
-            <span className="relative whitespace-nowrap font-semibold" style={{ color: brand.primary }}>
+            <span className="relative whitespace-nowrap font-semibold" style={{ color: model.primary }}>
               {t("onboarding.publicLink.previewHome")}
               <span
                 className="absolute inset-x-0 -bottom-[11px] h-[2px]"
-                style={{ backgroundColor: brand.primary }}
+                style={{ backgroundColor: model.primary }}
                 aria-hidden
               />
             </span>
-            {publicLink.sections
-              .filter((id) => id !== "hero")
-              .map((id) => (
-                <span key={id} className="whitespace-nowrap">{t(sectionLabelKey(id))}</span>
+            {model.navItems
+              .filter((item) => item.visible)
+              .map((item, i) => (
+                <span key={i} className="whitespace-nowrap">{t(item.labelKey)}</span>
               ))}
             <span className="whitespace-nowrap">{t("onboarding.publicLink.previewAbout")}</span>
             <span className="whitespace-nowrap">{t("onboarding.publicLink.previewContact")}</span>
@@ -295,28 +306,28 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
           <Search size={11} className="text-[var(--octo-text-muted)]" />
           <span
             className="grid h-[24px] w-[24px] place-items-center rounded-[8px]"
-            style={{ backgroundColor: brand.primary, color: onPrimary }}
+            style={{ backgroundColor: model.primary, color: onPrimary }}
           >
             <ShoppingBag size={12} />
           </span>
         </span>
       </header>
 
-      <div className="pb-5">{publicLink.sections.map(section)}</div>
+      <div className="pb-5">{model.sections.map(section)}</div>
 
-      {/* Only what the draft already knows: the name, the sections, the city,
-          the hours from step 4 and the link being chosen on this very screen.
-          No invented phone numbers or social accounts. */}
+      {/* Only what the model already knows: the name, the sections, the city,
+          the hours and the link being shown on this very screen. No invented
+          phone numbers or social accounts. */}
       <footer className="px-4 py-4" style={{ backgroundColor: footerBg }}>
         <div className={clsx("grid gap-4", mobile ? "grid-cols-2" : "grid-cols-4")}>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              {brand.logoDataUrl ? (
-                <img src={brand.logoDataUrl} alt="" className="h-4 shrink-0 object-contain" />
+              {model.logoDataUrl ? (
+                <img src={model.logoDataUrl} alt="" className="h-4 shrink-0 object-contain" />
               ) : (
                 <span
                   className="grid h-4 w-4 shrink-0 place-items-center rounded text-[8px] font-bold"
-                  style={{ backgroundColor: brand.primary, color: onPrimary }}
+                  style={{ backgroundColor: model.primary, color: onPrimary }}
                 >
                   {businessName.trim().charAt(0).toUpperCase() || "O"}
                 </span>
@@ -329,35 +340,39 @@ export function PublicLinkPreview({ draft, mobile }: { draft: OnboardingDraft; m
           </div>
 
           <FooterColumn title={t("onboarding.publicLink.previewExplore")}>
-            {publicLink.sections.map((id) => (
-              <p key={id} className="truncate">{t(sectionLabelKey(id))}</p>
+            {model.navItems.map((item, i) => (
+              <p key={i} className="truncate">{t(item.labelKey)}</p>
             ))}
           </FooterColumn>
 
           <FooterColumn title={t("onboarding.publicLink.previewContact")}>
-            {city && (
+            {model.cityLabel && (
               <p className="inline-flex items-center gap-1">
                 <MapPin size={8} aria-hidden />
-                {t(city.labelKey)}
+                {model.cityLabel}
               </p>
             )}
-            <p className="truncate">{url}</p>
+            <p className="truncate">{model.url}</p>
           </FooterColumn>
 
           <div className="min-w-0">
-            <p className="text-start text-[9px] font-bold text-[var(--octo-text-primary)]">
-              {t("onboarding.details.hours")}
-            </p>
-            <p className="mt-1.5 text-start text-[8px] text-[var(--octo-text-muted)]">
-              {summarizeHours(brand.hours, t, locale)}
-            </p>
+            {model.hoursSummary && (
+              <>
+                <p className="text-start text-[9px] font-bold text-[var(--octo-text-primary)]">
+                  {t("onboarding.details.hours")}
+                </p>
+                <p className="mt-1.5 text-start text-[8px] text-[var(--octo-text-muted)]">
+                  {model.hoursSummary}
+                </p>
+              </>
+            )}
             <span className="mt-2 flex items-stretch gap-1" aria-hidden>
               <span className="min-w-0 flex-1 truncate rounded-[6px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-1.5 py-1 text-[8px] text-[var(--octo-text-faint)]">
                 {t("onboarding.publicLink.previewNewsletter")}
               </span>
               <span
                 className="shrink-0 rounded-[6px] px-2 py-1 text-[8px] font-semibold"
-                style={{ backgroundColor: brand.primary, color: onPrimary }}
+                style={{ backgroundColor: model.primary, color: onPrimary }}
               >
                 {t("onboarding.publicLink.previewSubscribe")}
               </span>

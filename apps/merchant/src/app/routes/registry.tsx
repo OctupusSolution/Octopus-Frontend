@@ -43,6 +43,8 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/menu/schedules").then(m => ({ default: m.MenuSchedulesPage }))) },
   { id: "menu-availability", path: "/menu/availability", section: "Menu", page: "Availability (86 board)",
     element: lazy(() => import("@/pages/menu/availability").then(m => ({ default: m.MenuAvailabilityPage }))) },
+  { id: "public-link", path: "/public-link", section: "Storefront", page: "Public Link Builder",
+    element: lazy(() => import("@/pages/public-link").then(m => ({ default: m.PublicLinkBuilderPage }))) },
   { id: "inventory",    path: "/inventory",    section: "Inventory",    page: "Ingredients & Stock",
     element: lazy(() => import("@/pages/inventory").then(m => ({ default: m.InventoryPage }))) },
   { id: "inventory-ingredients", path: "/inventory/ingredients", section: "Inventory", page: "Ingredients & Suppliers",
@@ -145,4 +147,6 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/settings/integrations").then(m => ({ default: m.IntegrationsSettingsPage }))) },
   { id: "login",        path: "/login",        section: "Account",     page: "Sign in",
     element: lazy(() => import("@/pages/login").then(m => ({ default: m.LoginPage }))) },
+  { id: "signup",       path: "/signup",       section: "Account",     page: "Create account",
+    element: lazy(() => import("@/pages/signup").then(m => ({ default: m.SignUpPage }))) },
 ];

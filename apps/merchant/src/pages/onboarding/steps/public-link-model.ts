@@ -7,7 +7,7 @@ import type { StorefrontPreviewModel, PreviewDevice } from "@/widgets/storefront
 import { CITIES, summarizeHours } from "../_shared/brand-catalog";
 import { serviceCategoriesFor } from "../_shared/ai-insights";
 import { formatBrandPrice } from "../_shared/pricing";
-import { sectionLabelKey } from "./public-link-sections";
+import { SECTION_LABELS, sectionLabelKey } from "./public-link-sections";
 import { dnsLabel } from "./public-link-tag";
 import type { OnboardingDraft } from "../_shared/draft";
 
@@ -34,6 +34,10 @@ export function previewModelFromOnboarding(
     font: brand.font,
     themeTemplate: brand.themeTemplate,
     sections: publicLink.sections,
+    // Explicit rather than positional — see the field's doc comment on
+    // StorefrontPreviewModel. Onboarding's own SECTION_LABELS is the single
+    // source for these headings.
+    sectionLabelKeys: SECTION_LABELS,
     // Home stands in for the hero section in the header nav, so it is left
     // out of `visible` there; the footer's Explore column still lists it.
     navItems: publicLink.sections.map((id) => ({

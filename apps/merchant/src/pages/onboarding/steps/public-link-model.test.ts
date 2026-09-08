@@ -36,4 +36,14 @@ describe("previewModelFromOnboarding", () => {
     expect(model.sampleWasPrices).toHaveLength(4);
     expect(model.sampleWasPrices[0]).not.toBe(model.sampleWasPrices[1]);
   });
+
+  it("resolves every section id to its own onboarding section label", () => {
+    const model = previewModelFromOnboarding(EMPTY_DRAFT, "desktop", t, "en");
+    expect(model.sectionLabelKeys).toEqual({
+      hero: "onboarding.publicLink.section.hero",
+      offers: "onboarding.publicLink.section.offers",
+      menu: "onboarding.publicLink.section.menu",
+      bestSeller: "onboarding.publicLink.section.bestSeller",
+    });
+  });
 });

@@ -75,14 +75,13 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
   const onPrimary = readableOn(model.primary);
   const businessName = model.businessName;
 
-  // Section ids and nav items are built from the same ordered list by every
-  // adapter, so a section's own heading can be read off the nav item at the
-  // same position rather than needing a second dictionary in this widget.
-  const labelKeyById = new Map<string, string>(
-    model.sections.map((id, i) => [id, model.navItems[i]?.labelKey ?? id])
-  );
+  // `sections` and `navItems` are derived independently by each adapter — the
+  // builder's `sections` is a filtered list of drawable blocks while its
+  // `navItems` is the full page list — so nothing guarantees a shared id sits
+  // at the same index in both. The heading therefore comes from the model's
+  // own explicit map, not a position lookup.
   function labelKeyFor(id: string): string {
-    return labelKeyById.get(id) ?? id;
+    return model.sectionLabelKeys[id] ?? id;
   }
 
   const heroHeadline = model.hero.headline ?? businessName;

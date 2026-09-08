@@ -20,9 +20,16 @@
 //     their length, so an empty array would render `undefined`. All three are
 //     therefore fixed-size and independent of the draft — never conditionally
 //     built down to nothing.
+//
+// `sectionLabelKeys` is built explicitly by id (SECTION_LABEL_KEYS below), not
+// read positionally off `navItems` — this builder's `sections` (drawable
+// blocks, after Ruling B) and `navItems` (page modules) come from different
+// lists of different lengths, so a shared id is not guaranteed to share an
+// index between them.
 import type { StorefrontPreviewModel, PreviewDevice } from "@/widgets/storefront-preview";
 import { dnsLabel } from "@/pages/onboarding/steps/public-link-tag";
 import { PAGE_MODULES } from "./page-catalog";
+import { SITE_SECTIONS } from "./section-catalog";
 import { SITE_THEMES } from "./theme-catalog";
 import type { SiteDraft } from "./site-draft";
 
@@ -50,6 +57,17 @@ const SECTION_WIDGET_MAP: Record<string, string> = {
   menu: "menu",
   offers: "offers",
 };
+
+// Explicit id -> heading map, keyed by widget id, sourced from SITE_SECTIONS's
+// own labels — not read positionally off `navItems`. `sections` (drawable
+// blocks) and `navItems` (page modules) are unrelated lists here, so nothing
+// guarantees a shared id lands at the same index in both.
+const SECTION_LABEL_KEYS: Readonly<Record<string, string>> = Object.fromEntries(
+  SITE_SECTIONS.flatMap((section) => {
+    const widgetId = SECTION_WIDGET_MAP[section.id];
+    return widgetId ? [[widgetId, section.labelKey]] : [];
+  })
+);
 
 function formatSitePrice(amount: number, locale: string): string {
   return new Intl.NumberFormat(locale === "ar" ? "ar" : "en-US", {
@@ -98,6 +116,7 @@ export function previewModelFromSite(
     font: brand.typography[locale === "ar" ? "ar" : "en"].titles,
     themeTemplate: activeTheme?.styleId ?? null,
     sections,
+    sectionLabelKeys: SECTION_LABEL_KEYS,
     navItems,
     categories: CATEGORY_KEYS,
     cityLabel: "",

@@ -33,6 +33,10 @@ export interface StorefrontPreviewModel {
   themeTemplate: string | null;
   /** Section ids in display order. Hidden sections are absent, not flagged. */
   sections: readonly string[];
+  /** Heading i18n key per section id. Explicit rather than positional: the two
+   *  hosts derive `sections` and `navItems` from different lists, so nothing
+   *  guarantees the same id sits at the same index in both. */
+  sectionLabelKeys: Readonly<Record<string, string>>;
   navItems: readonly PreviewNavItem[];
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];

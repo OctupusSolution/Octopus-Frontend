@@ -16,11 +16,29 @@ export interface BuilderShellProps {
   dispatch: (action: SiteAction) => void;
   save: () => void;
   children: ReactNode;
+  /** Lets the current step override what the footer's primary button does
+   *  and whether it may be pressed — only the Publish step (task 21) uses
+   *  this, to dispatch `patchPublish` instead of `next` and to stay disabled
+   *  until `goLiveReady(draft)`. Every other step leaves both undefined and
+   *  keeps the shell's own `next` behaviour. */
+  primaryDisabled?: boolean;
+  onPrimaryClick?: () => void;
+  /** Shown beside the primary button while it's disabled, naming the reason
+   *  rather than leaving a merchant to guess why "Publish Now" won't press. */
+  primaryHint?: string;
 }
 
 const LABEL_KEYS = SITE_STEPS.map((s) => s.labelKey);
 
-export function BuilderShell({ draft, dispatch, save, children }: BuilderShellProps) {
+export function BuilderShell({
+  draft,
+  dispatch,
+  save,
+  children,
+  primaryDisabled,
+  onPrimaryClick,
+  primaryHint,
+}: BuilderShellProps) {
   const { t } = useI18n();
   const current = SITE_STEPS[draft.step - 1];
   const isLast = draft.step === SITE_STEPS.length;
@@ -68,6 +86,9 @@ export function BuilderShell({ draft, dispatch, save, children }: BuilderShellPr
             {note}
           </p>
         )}
+        {primaryDisabled && primaryHint && (
+          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{primaryHint}</p>
+        )}
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           {draft.step > 1 && (
             <Button variant="secondary" onClick={() => dispatch({ type: "back" })} className="shrink-0">
@@ -88,7 +109,13 @@ export function BuilderShell({ draft, dispatch, save, children }: BuilderShellPr
             <Button variant="secondary" onClick={handleSaveDraft} className="w-full justify-center">
               {t("publicLink.saveDraft")}
             </Button>
-            <Button variant="primary" onClick={() => dispatch({ type: "next" })} className="w-full justify-center">
+            <Button
+              variant="primary"
+              disabled={primaryDisabled}
+              title={primaryDisabled ? primaryHint : undefined}
+              onClick={onPrimaryClick ?? (() => dispatch({ type: "next" }))}
+              className="w-full justify-center"
+            >
               {t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
               <ArrowRight size={14} className="rtl:rotate-180" />
             </Button>

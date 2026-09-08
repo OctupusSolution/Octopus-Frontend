@@ -3461,4 +3461,11 @@ export const en = {
   "publicLink.nav.bookTable": "Book a Table",
   "publicLink.nav.viewMenu": "View Menu",
   "publicLink.pages.enabledCount": "{n} of {total} pages enabled",
+  "publicLink.stepTitle.pages": "Choose Your Pages",
+  "publicLink.pages.subtitle": "Select the modules you want to include in your Public Link.",
+  "publicLink.pages.pageModule": "Page Module",
+  "publicLink.pages.showInNav": "Show in Nav",
+  "publicLink.pages.showOnHome": "Show on Home",
+  "publicLink.pages.customize": "Customize",
+  "publicLink.pages.tip": "Tip: You can change the order of pages in your navigation",
 } as const;

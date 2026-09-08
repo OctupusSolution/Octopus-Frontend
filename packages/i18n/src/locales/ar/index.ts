@@ -3461,4 +3461,11 @@ export const ar = {
   "publicLink.nav.bookTable": "احجز طاولة",
   "publicLink.nav.viewMenu": "عرض القائمة",
   "publicLink.pages.enabledCount": "{n} من {total} صفحات مفعّلة",
+  "publicLink.stepTitle.pages": "اختر صفحاتك",
+  "publicLink.pages.subtitle": "اختر الوحدات التي تريد تضمينها في رابطك العام.",
+  "publicLink.pages.pageModule": "وحدة الصفحة",
+  "publicLink.pages.showInNav": "إظهار في التنقل",
+  "publicLink.pages.showOnHome": "إظهار في الصفحة الرئيسية",
+  "publicLink.pages.customize": "تخصيص",
+  "publicLink.pages.tip": "نصيحة: يمكنك تغيير ترتيب الصفحات في قائمة التنقل",
 } as const;

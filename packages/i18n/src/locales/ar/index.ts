@@ -3343,4 +3343,8 @@ export const ar = {
   "publicLink.publishNow": "انشر الآن",
   "publicLink.livePreview": "معاينة مباشرة",
   "publicLink.draftSaved": "تم حفظ المسودة",
+  "publicLink.device.desktop": "سطح المكتب",
+  "publicLink.device.tablet": "لوحي",
+  "publicLink.device.mobile": "جوال",
+  "publicLink.preview.refresh": "تحديث",
 } as const;

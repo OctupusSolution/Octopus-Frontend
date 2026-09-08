@@ -3343,4 +3343,8 @@ export const en = {
   "publicLink.publishNow": "Publish Now",
   "publicLink.livePreview": "Live Preview",
   "publicLink.draftSaved": "Draft saved",
+  "publicLink.device.desktop": "Desktop",
+  "publicLink.device.tablet": "Tablet",
+  "publicLink.device.mobile": "Mobile",
+  "publicLink.preview.refresh": "Refresh",
 } as const;

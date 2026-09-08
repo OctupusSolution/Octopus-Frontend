@@ -18,9 +18,16 @@ import { SITE_THEMES, THEME_FILTERS, type SiteTheme } from "../_shared/theme-cat
 import { DeviceFrame } from "../ui/device-frame";
 import type { StepProps } from "../_shared/steps";
 
-function ThemeCard({ theme, active, primary, onSelect }: { theme: SiteTheme; active: boolean; primary: string; onSelect: () => void }) {
+function ThemeCard({ theme, active, onSelect }: { theme: SiteTheme; active: boolean; onSelect: () => void }) {
   const { t } = useI18n();
-  const thumb = themeThumb(theme.styleId);
+  // `themeThumb` only ships one real asset today (the "elegant" style) — the
+  // frames themselves show all six cards sharing that same storefront
+  // thumbnail and rely on the name/description below it to tell the cards
+  // apart, rather than a distinct photo per theme. Fall back to that asset
+  // instead of a flat gradient block so a merchant sees a design, not a
+  // broken-looking colour swatch. Do not "fix" this back to a gradient —
+  // it would be regressing to the wrong answer.
+  const thumb = themeThumb(theme.styleId) ?? themeThumb("elegant");
 
   return (
     <button
@@ -32,13 +39,7 @@ function ThemeCard({ theme, active, primary, onSelect }: { theme: SiteTheme; act
       )}
     >
       <div className="relative">
-        {thumb ? (
-          <img src={thumb} alt="" className="h-28 w-full object-cover" />
-        ) : (
-          // No photo for this theme yet — a gradient from the merchant's own
-          // palette, exactly as onboarding's theme cards do.
-          <div className="h-28 w-full" style={{ background: `linear-gradient(135deg, ${primary} 0%, ${primary} 100%)` }} />
-        )}
+        <img src={thumb ?? undefined} alt="" className="h-28 w-full object-cover" />
 
         {theme.recommended && (
           <span className="absolute start-2 top-2 rounded-full bg-[#0D6EFD] px-2 py-0.5 text-[10px] font-medium text-white">
@@ -113,7 +114,6 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
                 key={theme.id}
                 theme={theme}
                 active={draft.theme.id === theme.id}
-                primary={draft.brand.colors.primary}
                 onSelect={() => dispatch({ type: "patchTheme", patch: { id: theme.id } })}
               />
             ))}

@@ -3485,6 +3485,8 @@ export const ar = {
   "publicLink.navigation.pageOrder": "ترتيب الصفحات",
   "publicLink.navigation.pageOrderHint": "اسحب لإعادة الترتيب. اضغط على أيقونة العين للإظهار/الإخفاء",
   "publicLink.navigation.updatesInstantly": "تُحدَّث تغييرات التنقل فورًا في رابطك العام",
+  "publicLink.navigation.webPreviewCaption": "معاينة تنقل الويب",
+  "publicLink.navigation.mobilePreviewCaption": "معاينة قائمة الجوال",
   "publicLink.nav.hidePage": "إخفاء من التنقل",
   "publicLink.nav.showPage": "إظهار في التنقل",
   "publicLink.stepTitle.customize": "تخصيص الأقسام",

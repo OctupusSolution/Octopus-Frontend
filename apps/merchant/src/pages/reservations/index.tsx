@@ -1,102 +1,92 @@
-import { useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { CalendarDays, ChefHat, Clock, LayoutGrid, ListChecks, Users } from "lucide-react";
-import { reservations, TODAY, type Reservation, type ReservationStatus } from "@/shared/api/mock-reservations";
+// The Reservations list — the module's home screen. Assembles the pieces
+// built in Tasks 1-7 (fixture, model, KPI cards, filter bar, row) into the
+// page the sidebar's "Reservations" link opens. Replaces the old KPI-tiles
+// + quick-links hub outright.
+import { useMemo, useState } from "react";
+import { Plus, Printer, Search } from "lucide-react";
+import { Button, EmptyState, Input, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import {
+  reservations as initialReservations,
+  type Reservation,
+  type ReservationStatus,
+} from "@/shared/api/mock-reservations";
+import { KpiCards } from "./_shared/kpi-cards";
+import { FilterBar } from "./_shared/filter-bar";
+import { EMPTY_FILTERS, deriveKpis, visibleRows, type ListFilters, type SortKey } from "./_shared/model";
+import { ReservationRow, type RowMenu } from "./_shared/reservation-row";
 
-const STATUS_COLOR: Record<ReservationStatus, string> = {
-  Pending: "#F59E0B",
-  Confirmed: "#0D6EFD",
-  Arrived: "#6366F1",
-  Seated: "#22C55E",
-  Completed: "#a9a9b2",
-  "No-show": "#EF4444",
-  Cancelled: "#9ca3af",
-};
-
-// Fixed 14:30 reference point, matching the calendar's mock "now" on TODAY.
-const NOW_MINUTES = 870;
-
-// hour < 10 means "after midnight", stored as the next-day offset (24 + hour).
-function clock(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const displayHour = h % 24;
-  return `${String(displayHour).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-[9px] border border-[var(--octo-divider)] bg-[var(--octo-track)] px-3 py-2.5">
-      <span className="block text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
-        {label}
-      </span>
-      <span className="mt-0.5 block text-[22px] font-bold leading-none text-[var(--octo-text-primary)]">{value}</span>
-    </div>
-  );
-}
-
-function UpcomingRow({ row }: { row: Reservation }) {
-  return (
-    <li className="flex items-center justify-between gap-2 rounded-[9px] border border-[var(--octo-divider)] px-2.5 py-2">
-      <span className="flex items-center gap-2 text-[12px] font-medium text-[var(--octo-text-primary)]">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLOR[row.status] }} />
-        <Clock size={12} className="text-[var(--octo-text-faint)]" />
-        {clock(row.startMinutes)}
-        <span className="text-[var(--octo-text-primary)]">{row.guest}</span>
-      </span>
-      <span className="text-[11px] text-[var(--octo-text-muted)]">
-        <Users size={11} className="inline align-[-1px]" /> {row.partySize} · {row.table}
-      </span>
-    </li>
-  );
-}
-
-const QUICK_LINKS = [
-  {
-    id: "calendar",
-    path: "/reservations/calendar",
-    icon: CalendarDays,
-    titleKey: "reservations.hub.quick.calendar",
-    descKey: "reservations.hub.quick.calendarDesc",
-  },
-  {
-    id: "floor-plan",
-    path: "/reservations/floor-plan",
-    icon: LayoutGrid,
-    titleKey: "reservations.hub.quick.floorPlan",
-    descKey: "reservations.hub.quick.floorPlanDesc",
-  },
-  {
-    id: "waitlist",
-    path: "/reservations/waitlist",
-    icon: ListChecks,
-    titleKey: "reservations.hub.quick.waitlist",
-    descKey: "reservations.hub.quick.waitlistDesc",
-  },
-  {
-    id: "events",
-    path: "/reservations/events",
-    icon: ChefHat,
-    titleKey: "reservations.hub.quick.events",
-    descKey: "reservations.hub.quick.eventsDesc",
-  },
+const SORT_OPTIONS: readonly { value: SortKey; labelKey: string }[] = [
+  { value: "time-asc", labelKey: "reservations.list.sort.timeEarliest" },
+  { value: "time-desc", labelKey: "reservations.list.sort.timeLatest" },
+  { value: "party", labelKey: "reservations.list.sort.partySize" },
+  { value: "status", labelKey: "reservations.list.sort.status" },
 ];
+
+// Only one row's Status/Actions popover is open at a time, across the whole
+// list — held here rather than inside each row (see reservation-row.tsx).
+type OpenMenu = { id: string; menu: "status" | "actions" } | null;
+
+// The next free "RSV-xxxx" ref, scanned off whatever is currently in state
+// (not the static fixture) so repeated duplicates keep incrementing.
+function nextRef(rows: readonly Reservation[]): string {
+  let max = 0;
+  for (const r of rows) {
+    const match = /^RSV-(\d+)$/.exec(r.ref);
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `RSV-${max + 1}`;
+}
 
 export function ReservationsPage() {
   const { t } = useI18n();
-  const navigate = useNavigate();
+  const [rows, setRows] = useState<Reservation[]>(initialReservations);
+  const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS);
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
-  const todayRows = useMemo(() => reservations.filter((r) => r.date === TODAY), []);
-  const covers = todayRows
-    .filter((r) => r.status !== "Cancelled" && r.status !== "No-show")
-    .reduce((sum, r) => sum + r.partySize, 0);
-  const confirmedCount = todayRows.filter((r) => r.status === "Confirmed").length;
-  const seatedCount = todayRows.filter((r) => r.status === "Seated").length;
-  const noShowCount = todayRows.filter((r) => r.status === "No-show").length;
-  const upcoming = [...todayRows]
-    .filter((r) => r.status === "Confirmed" && r.startMinutes > NOW_MINUTES)
-    .sort((a, b) => a.startMinutes - b.startMinutes);
+  const visible = useMemo(() => visibleRows(rows, filters), [rows, filters]);
+  const kpis = useMemo(() => deriveKpis(visible), [visible]);
+  const areas = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.area))).sort((a, b) => a.localeCompare(b)),
+    [rows]
+  );
+
+  // TODO(task-12): this should open the cancel dialog (built in Task 11)
+  // instead of doing nothing. Both the row's Status menu and its "..." menu
+  // route their Cancel choice through here rather than setting
+  // status: "Cancelled" directly, so neither silently cancels a booking.
+  function requestCancel(_id: string) {
+    // no-op until Task 12 wires the cancel dialog to this seam
+  }
+
+  function handleStatus(id: string, status: ReservationStatus) {
+    if (status === "Cancelled") {
+      requestCancel(id);
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+  }
+
+  function handleDuplicate(id: string) {
+    setRows((prev) => {
+      const index = prev.findIndex((r) => r.id === id);
+      if (index === -1) return prev;
+      const copy: Reservation = { ...prev[index], id: crypto.randomUUID(), ref: nextRef(prev) };
+      const next = [...prev];
+      next.splice(index + 1, 0, copy);
+      return next;
+    });
+  }
+
+  // Stubs for the pieces later tasks still have to build: the detail dialog
+  // (row click / Edit) and sharing a payment link. Wiring them here now
+  // would mean inventing UI this task was not asked to build.
+  function openDetail(_id: string) {}
+  function openEdit(_id: string) {}
+  function openAddReservation() {}
+  function sharePaymentLink(_id: string) {}
+
+  const allCountText = t("reservations.list.allCount").replace("{n}", String(visible.length));
 
   return (
     <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
@@ -109,65 +99,70 @@ export function ReservationsPage() {
             {t("reservations.subtitle")}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" icon={<Printer size={14} />} onClick={() => window.print()}>
+            {t("reservations.list.print")}
+          </Button>
+          <Button variant="primary" icon={<Plus size={14} />} onClick={openAddReservation}>
+            {t("reservations.list.addNew")}
+          </Button>
+        </div>
       </header>
 
-      <section className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
-            {t("reservations.hub.scheduleTitle")}
-          </h2>
-          <span className="text-[11px] text-[var(--octo-text-muted)]">{t("reservations.calendar.today")}</span>
-        </div>
+      <div className="mt-4">
+        <KpiCards kpis={kpis} />
+      </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label={t("reservations.calendar.rail.covers")} value={covers} />
-          <Stat label={t("reservations.calendar.rail.confirmed")} value={confirmedCount} />
-          <Stat label={t("reservations.calendar.rail.seated")} value={seatedCount} />
-          <Stat label={t("reservations.calendar.rail.noShow")} value={noShowCount} />
-        </div>
+      <div className="mt-4">
+        <FilterBar filters={filters} onChange={setFilters} areas={areas} />
+      </div>
 
-        <div className="mt-4 border-t border-[var(--octo-divider)] pt-3">
-          <h3 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
-            {t("reservations.calendar.rail.upcoming")}
-          </h3>
-          {upcoming.length > 0 ? (
-            <ul className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {upcoming.map((row) => (
-                <UpcomingRow key={row.id} row={row} />
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("reservations.hub.scheduleEmpty")}</p>
-          )}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{allCountText}</p>
+        <div className="order-3 w-full sm:order-none sm:max-w-[360px] sm:flex-1 sm:px-6">
+          <Input
+            icon={<Search size={14} />}
+            placeholder={t("common.search")}
+            value={filters.query}
+            onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+          />
         </div>
-      </section>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-[var(--octo-text-muted)]">{t("reservations.list.sortedBy")}</span>
+          <Select
+            value={filters.sort}
+            onChange={(e) => setFilters({ ...filters, sort: e.target.value as SortKey })}
+            className="!w-auto !py-[7px]"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {t(option.labelKey)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
 
-      <section className="mt-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-        <h2 className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.hub.quickTitle")}</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {QUICK_LINKS.map((link) => {
-            const Icon = link.icon;
-            return (
-              <button
-                key={link.id}
-                type="button"
-                onClick={() => navigate(link.path)}
-                className="group flex flex-col gap-2 rounded-[9px] border border-[var(--octo-divider)] p-3 text-start transition-colors hover:bg-[var(--octo-hover)]"
-              >
-                <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-[var(--octo-track)] text-[var(--octo-text-secondary)] transition-colors group-hover:bg-[#0D6EFD]/10 group-hover:text-[#0D6EFD]">
-                  <Icon size={15} />
-                </span>
-                <span>
-                  <span className="block text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-                    {t(link.titleKey)}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] text-[var(--octo-text-muted)]">{t(link.descKey)}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      <div className="mt-3 flex flex-col gap-2.5">
+        {visible.length === 0 ? (
+          <EmptyState title={t("reservations.list.empty")} />
+        ) : (
+          visible.map((reservation) => (
+            <ReservationRow
+              key={reservation.id}
+              reservation={reservation}
+              menu={openMenu?.id === reservation.id ? openMenu.menu : "none"}
+              onOpenMenu={(menu: RowMenu) => setOpenMenu(menu === "none" ? null : { id: reservation.id, menu })}
+              onOpen={() => openDetail(reservation.id)}
+              onEdit={() => openEdit(reservation.id)}
+              onStatus={(status) => handleStatus(reservation.id, status)}
+              onDuplicate={() => handleDuplicate(reservation.id)}
+              onSharePaymentLink={() => sharePaymentLink(reservation.id)}
+              onCancel={() => requestCancel(reservation.id)}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }

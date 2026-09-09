@@ -110,52 +110,55 @@ function phoneFor(index: number): string {
 // show without needing generated filler.
 export const reservations: Reservation[] = [
   // --- Sat 8 Aug (today) — one row per status, one row per deposit state ---
-  { id: "res-041", date: "2026-08-08", startMinutes: at(12, 0), durationMinutes: 90, ref: "RSV-1041", guest: "Faisal Al-Otaibi", phone: phoneFor(1), partySize: 4, area: "Main Dining", table: "T-12", branch: "Riyadh - Olaya", source: "Direct Booking", status: "Completed",
+  { id: "res-041", date: "2026-08-08", startMinutes: at(12, 0), durationMinutes: 90, ref: "RSV-1041", guest: "Faisal Al-Otaibi", phone: phoneFor(1), email: "faisal.alotaibi@example.com", partySize: 4, area: "Main Dining", table: "T-12", branch: "Riyadh - Olaya", source: "Direct Booking", status: "Completed",
     deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "paid", paidOn: "Aug 6, 2026 - 3:20 PM", method: "mada **** 1236", txnId: "PAY-123654789" } },
-  { id: "res-042", date: "2026-08-08", startMinutes: at(12, 30), durationMinutes: 60, ref: "RSV-1042", guest: "Noura Al-Harbi", phone: phoneFor(2), partySize: 2, area: "Terrace", table: "T-04", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed",
+  { id: "res-042", date: "2026-08-08", startMinutes: at(12, 30), durationMinutes: 60, ref: "RSV-1042", guest: "Noura Al-Harbi", phone: phoneFor(2), email: "noura.alharbi@example.com", partySize: 2, area: "Terrace", table: "T-04", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed",
     deposit: { amount: 150, currency: "SAR", type: "Per Guest", state: "paid", paidOn: "Aug 7, 2026 - 10:05 AM", method: "Visa **** 4521", txnId: "PAY-198234567" },
     confirmedOn: "Aug 7, 2026 - 10:06 AM", confirmedMethod: "AUTO (Deposit Paid)" },
-  { id: "res-043", date: "2026-08-08", startMinutes: at(13, 0), durationMinutes: 120, ref: "RSV-1043", guest: "Abdullah Al-Qahtani", phone: phoneFor(3), partySize: 6, area: "Family Section", table: "T-21", branch: "Riyadh - Narjis", source: "Walk In", status: "Pending",
+  { id: "res-043", date: "2026-08-08", startMinutes: at(13, 0), durationMinutes: 120, ref: "RSV-1043", guest: "Abdullah Al-Qahtani", phone: phoneFor(3), email: "abdullah.alqahtani@example.com", partySize: 6, area: "Family Section", table: "T-21", branch: "Riyadh - Narjis", source: "Walk In", status: "Pending",
     deposit: { amount: 200, currency: "SAR", type: "Full Prepayment", state: "unpaid", dueBy: "Aug 8, 2026 - 6:00 PM" } },
-  { id: "res-044", date: "2026-08-08", startMinutes: at(13, 15), durationMinutes: 90, ref: "RSV-1044", guest: "Sara Al-Dosari", phone: phoneFor(4), partySize: 3, area: "Main Dining", table: "T-08", branch: "Dammam - Corniche", source: "Instagram", status: "Confirmed", notes: "Prefers a quiet corner table.", allergyTags: ["Shellfish"],
+  { id: "res-044", date: "2026-08-08", startMinutes: at(13, 15), durationMinutes: 90, ref: "RSV-1044", guest: "Sara Al-Dosari", phone: phoneFor(4), email: "sara.aldosari@example.com", partySize: 3, area: "Main Dining", table: "T-08", branch: "Dammam - Corniche", source: "Instagram", status: "Confirmed", notes: "Prefers a quiet corner table.", allergyTags: ["Shellfish"],
     deposit: { amount: 120, currency: "SAR", type: "Pre Reservation", state: "link-sent", dueBy: "Aug 8, 2026 - 8:00 PM" },
     paymentLink: { url: "https://pay.octopus.app/r/RSV-1044", sentVia: "WhatsApp", sentTo: phoneFor(4), sentOn: "Aug 8, 2026 - 9:00 AM", expiresOn: "Aug 9, 2026 - 9:00 AM" } },
-  { id: "res-045", date: "2026-08-08", startMinutes: at(14, 0), durationMinutes: 60, ref: "RSV-1045", guest: "Maha Al-Shammari", phone: phoneFor(5), partySize: 2, area: "Terrace", table: "T-02", branch: "Jeddah - Corniche", source: "Phone", status: "Pending",
+  { id: "res-045", date: "2026-08-08", startMinutes: at(14, 0), durationMinutes: 60, ref: "RSV-1045", guest: "Maha Al-Shammari", phone: phoneFor(5), email: "maha.alshammari@example.com", partySize: 2, area: "Terrace", table: "T-02", branch: "Jeddah - Corniche", source: "Phone", status: "Pending",
     deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "expired", dueBy: "Aug 6, 2026 - 4:00 PM" },
     paymentLink: { url: "https://pay.octopus.app/r/RSV-1045", sentVia: "SMS", sentTo: phoneFor(5), sentOn: "Aug 5, 2026 - 4:00 PM", expiresOn: "Aug 6, 2026 - 4:00 PM" } },
+  // Deliberately no `email` — keeps the row's disabled Email contact control
+  // reachable on the default Today view (Task 8's fixture-gap fix).
   { id: "res-046", date: "2026-08-08", startMinutes: at(18, 30), durationMinutes: 120, ref: "RSV-1046", guest: "Omar Al-Ghamdi", phone: phoneFor(6), partySize: 8, area: "Private Rooms", table: "T-30", branch: "Riyadh - Narjis", source: "Website", status: "Pending", tags: ["Birthday", "VIP"], notes: "Birthday — requested a small cake at the table.",
     deposit: { amount: 300, currency: "SAR", type: "Full Prepayment", state: "failed" } },
-  { id: "res-047", date: "2026-08-08", startMinutes: at(19, 0), durationMinutes: 90, ref: "RSV-1047", guest: "Lama Al-Zahrani", phone: phoneFor(7), partySize: 4, area: "Main Dining", table: "T-11", branch: "Dammam - Corniche", source: "Instagram", status: "Cancelled",
+  { id: "res-047", date: "2026-08-08", startMinutes: at(19, 0), durationMinutes: 90, ref: "RSV-1047", guest: "Lama Al-Zahrani", phone: phoneFor(7), email: "lama.alzahrani@example.com", partySize: 4, area: "Main Dining", table: "T-11", branch: "Dammam - Corniche", source: "Instagram", status: "Cancelled",
     deposit: { amount: 150, currency: "SAR", type: "Per Guest", state: "refunded", paidOn: "Aug 4, 2026 - 1:00 PM", method: "mada **** 7789", txnId: "PAY-100234567" },
     cancelledAt: "Aug 7, 2026 - 5:30 PM", cancelReason: "Guest requested cancellation" },
-  { id: "res-048", date: "2026-08-08", startMinutes: at(19, 15), durationMinutes: 60, ref: "RSV-1048", guest: "Turki Al-Anazi", phone: phoneFor(8), partySize: 2, area: "Terrace", table: "T-06", branch: "Riyadh - Olaya", source: "Walk In", status: "Cancelled",
+  { id: "res-048", date: "2026-08-08", startMinutes: at(19, 15), durationMinutes: 60, ref: "RSV-1048", guest: "Turki Al-Anazi", phone: phoneFor(8), email: "turki.alanazi@example.com", partySize: 2, area: "Terrace", table: "T-06", branch: "Riyadh - Olaya", source: "Walk In", status: "Cancelled",
     deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" },
     cancelledAt: "Aug 7, 2026 - 8:10 PM" },
-  { id: "res-049", date: "2026-08-08", startMinutes: at(20, 30), durationMinutes: 90, ref: "RSV-1049", guest: "Hessa Al-Amri", phone: phoneFor(9), partySize: 2, area: "Family Section", table: "T-01", branch: "Dammam - Corniche", source: "Website", status: "Arrived", allergyTags: ["Nuts", "Gluten"],
+  { id: "res-049", date: "2026-08-08", startMinutes: at(20, 30), durationMinutes: 90, ref: "RSV-1049", guest: "Hessa Al-Amri", phone: phoneFor(9), email: "hessa.alamri@example.com", partySize: 2, area: "Family Section", table: "T-01", branch: "Dammam - Corniche", source: "Website", status: "Arrived", allergyTags: ["Nuts", "Gluten"],
     deposit: { amount: 120, currency: "SAR", type: "Pre Reservation", state: "paid", paidOn: "Aug 8, 2026 - 8:05 PM", method: "mada **** 3345", txnId: "PAY-155234789" } },
-  { id: "res-050", date: "2026-08-08", startMinutes: at(20, 45), durationMinutes: 120, ref: "RSV-1050", guest: "Yousef Al-Harthi", phone: phoneFor(10), partySize: 5, area: "Private Rooms", table: "T-15", branch: "Khobar - Rakah", source: "Phone", status: "Seated",
+  { id: "res-050", date: "2026-08-08", startMinutes: at(20, 45), durationMinutes: 120, ref: "RSV-1050", guest: "Yousef Al-Harthi", phone: phoneFor(10), email: "yousef.alharthi@example.com", partySize: 5, area: "Private Rooms", table: "T-15", branch: "Khobar - Rakah", source: "Phone", status: "Seated",
     deposit: { amount: 250, currency: "SAR", type: "Full Prepayment", state: "paid", paidOn: "Aug 8, 2026 - 8:40 PM", method: "Visa **** 9012", txnId: "PAY-177234890" } },
+  // Deliberately no `email` — same reason as res-046 above.
   { id: "res-051", date: "2026-08-08", startMinutes: at(21, 0), durationMinutes: 60, ref: "RSV-1051", guest: "Amal Al-Enezi", phone: phoneFor(11), partySize: 3, area: "Main Dining", table: "T-09", branch: "Riyadh - Olaya", source: "Direct Booking", status: "No-show",
     deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "unpaid" } },
-  { id: "res-052", date: "2026-08-08", startMinutes: at(21, 30), durationMinutes: 90, ref: "RSV-1052", guest: "Nawaf Al-Qarni", phone: phoneFor(12), partySize: 4, area: "Terrace", table: "T-17", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed", tags: ["Birthday", "VIP"] },
+  { id: "res-052", date: "2026-08-08", startMinutes: at(21, 30), durationMinutes: 90, ref: "RSV-1052", guest: "Nawaf Al-Qarni", phone: phoneFor(12), email: "nawaf.alqarni@example.com", partySize: 4, area: "Terrace", table: "T-17", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed", tags: ["Birthday", "VIP"] },
 
   // --- Sun 9 Aug ---
-  { id: "res-010", date: "2026-08-09", startMinutes: at(12, 30), durationMinutes: 90, ref: "RSV-1053", guest: "Fahad Al-Rashidi", phone: phoneFor(10), partySize: 2, area: "Main Dining", table: "T-05", branch: "Riyadh - Olaya", source: "Website", status: "Confirmed" },
+  { id: "res-010", date: "2026-08-09", startMinutes: at(12, 30), durationMinutes: 90, ref: "RSV-1053", guest: "Fahad Al-Rashidi", phone: phoneFor(10), email: "fahad.alrashidi@example.com", partySize: 2, area: "Main Dining", table: "T-05", branch: "Riyadh - Olaya", source: "Website", status: "Confirmed" },
 
   // --- Mon 10 Aug ---
-  { id: "res-011", date: "2026-08-10", startMinutes: at(13, 0), durationMinutes: 90, ref: "RSV-1054", guest: "Dana Al-Balawi", phone: phoneFor(16), partySize: 4, area: "Terrace", table: "T-16", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed" },
+  { id: "res-011", date: "2026-08-10", startMinutes: at(13, 0), durationMinutes: 90, ref: "RSV-1054", guest: "Dana Al-Balawi", phone: phoneFor(16), email: "dana.albalawi@example.com", partySize: 4, area: "Terrace", table: "T-16", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed" },
 
   // --- Tue 11 Aug ---
-  { id: "res-012", date: "2026-08-11", startMinutes: at(19, 30), durationMinutes: 105, ref: "RSV-1055", guest: "Khalid Al-Mutairi", phone: phoneFor(18), partySize: 4, area: "Family Section", table: "T-13", branch: "Riyadh - Narjis", source: "Instagram", status: "Confirmed" },
+  { id: "res-012", date: "2026-08-11", startMinutes: at(19, 30), durationMinutes: 105, ref: "RSV-1055", guest: "Khalid Al-Mutairi", phone: phoneFor(18), email: "khalid.almutairi@example.com", partySize: 4, area: "Family Section", table: "T-13", branch: "Riyadh - Narjis", source: "Instagram", status: "Confirmed" },
 
   // --- Wed 12 Aug ---
-  { id: "res-013", date: "2026-08-12", startMinutes: at(12, 0), durationMinutes: 90, ref: "RSV-1056", guest: "Omar Al-Ghamdi", phone: phoneFor(6), partySize: 4, area: "Private Rooms", table: "T-15", branch: "Riyadh - Olaya", source: "Phone", status: "Confirmed" },
+  { id: "res-013", date: "2026-08-12", startMinutes: at(12, 0), durationMinutes: 90, ref: "RSV-1056", guest: "Omar Al-Ghamdi", phone: phoneFor(6), email: "omar.alghamdi@example.com", partySize: 4, area: "Private Rooms", table: "T-15", branch: "Riyadh - Olaya", source: "Phone", status: "Confirmed" },
 
   // --- Thu 13 Aug ---
-  { id: "res-014", date: "2026-08-13", startMinutes: at(19, 30), durationMinutes: 120, ref: "RSV-1057", guest: "Nawaf Al-Qarni", phone: phoneFor(13), partySize: 8, area: "Main Dining", table: "T-28", branch: "Riyadh - Narjis", source: "Website", status: "Confirmed", notes: "Corporate dinner — needs the bill split three ways." },
+  { id: "res-014", date: "2026-08-13", startMinutes: at(19, 30), durationMinutes: 120, ref: "RSV-1057", guest: "Nawaf Al-Qarni", phone: phoneFor(13), email: "nawaf.alqarni@example.com", partySize: 8, area: "Main Dining", table: "T-28", branch: "Riyadh - Narjis", source: "Website", status: "Confirmed", notes: "Corporate dinner — needs the bill split three ways." },
 
   // --- Fri 14 Aug ---
-  { id: "res-015", date: "2026-08-14", startMinutes: at(20, 0), durationMinutes: 150, ref: "RSV-1058", guest: "Abdullah Al-Qahtani", phone: phoneFor(3), partySize: 10, area: "Terrace", table: "T-30", branch: "Khobar - Rakah", source: "Website", status: "Confirmed", notes: "Family gathering, needs two tables joined." },
+  { id: "res-015", date: "2026-08-14", startMinutes: at(20, 0), durationMinutes: 150, ref: "RSV-1058", guest: "Abdullah Al-Qahtani", phone: phoneFor(3), email: "abdullah.alqahtani@example.com", partySize: 10, area: "Terrace", table: "T-30", branch: "Khobar - Rakah", source: "Website", status: "Confirmed", notes: "Family gathering, needs two tables joined." },
 ];
 
 /* ================================================================ Floor plan */

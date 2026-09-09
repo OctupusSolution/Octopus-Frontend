@@ -55,6 +55,7 @@ export const ar = {
   "sidebar.liveOrders": "الطلبات المباشرة (جميع القنوات)",
   "sidebar.orderHistory": "سجل الطلبات",
   "sidebar.preOrders": "الطلبات المسبقة والمجدولة",
+  "sidebar.allReservations": "كل الحجوزات",
   "sidebar.calendarTimeline": "التقويم / الخط الزمني",
   "sidebar.floorPlan": "مخطط القاعة",
   "sidebar.waitlist": "قائمة الانتظار",

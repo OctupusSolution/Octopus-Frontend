@@ -7,7 +7,7 @@
 import { Calendar, Clock, Users, Utensils } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
-import { clock12, tableLabel } from "./model";
+import { clock12, guestsText, tableLabel } from "./model";
 
 // Same "ISO date -> Aug 8, 2026" formatting reservation-row.tsx uses for a
 // date outside today/tomorrow.
@@ -27,28 +27,25 @@ export interface MetaRowProps {
 export function MetaRow({ reservation }: MetaRowProps) {
   const { t, locale } = useI18n();
 
-  const guestsText =
-    reservation.partySize === 1
-      ? t("reservations.list.row.guestOne")
-      : t("reservations.list.row.guests").replace("{n}", String(reservation.partySize));
-
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-[var(--octo-text-secondary)]">
       <span className="inline-flex items-center gap-1.5">
         <Users size={13} className="shrink-0" />
-        {guestsText}
+        {guestsText(t, reservation.partySize)}
       </span>
       <span className="inline-flex items-center gap-1.5">
         <Calendar size={13} className="shrink-0" />
         {formatDate(reservation.date, locale)}
       </span>
+      {/* dir="ltr" (fix round 4, finding 18) — same bidi reversal as the
+          row's time cell in an RTL container. */}
       <span className="inline-flex items-center gap-1.5">
         <Clock size={13} className="shrink-0" />
-        {clock12(reservation.startMinutes)}
+        <span dir="ltr">{clock12(reservation.startMinutes)}</span>
       </span>
       <span className="inline-flex items-center gap-1.5">
         <Utensils size={13} className="shrink-0" />
-        {reservation.area} - {tableLabel(reservation.table)}
+        {reservation.area} - {reservation.table ? tableLabel(reservation.table) : t("reservations.form.tableAny")}
       </span>
     </div>
   );

@@ -19,7 +19,7 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/preorders").then(m => ({ default: m.PreOrdersPage }))) },
   { id: "kds",          path: "/kds",          section: "Orders",       page: "Kitchen Display",
     element: lazy(() => import("@/pages/kds").then(m => ({ default: m.KdsPage }))) },
-  { id: "reservations", path: "/reservations", section: "Reservations", page: "Calendar",
+  { id: "reservations", path: "/reservations", section: "Reservations", page: "Reservations",
     element: lazy(() => import("@/pages/reservations").then(m => ({ default: m.ReservationsPage }))) },
   { id: "reservations-calendar", path: "/reservations/calendar", section: "Reservations", page: "Calendar / Timeline",
     element: lazy(() => import("@/pages/reservations/calendar").then(m => ({ default: m.ReservationCalendarPage }))) },

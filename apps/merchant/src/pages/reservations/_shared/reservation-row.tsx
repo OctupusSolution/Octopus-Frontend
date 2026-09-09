@@ -5,11 +5,11 @@
 // pre-formatted (ref, table, deposit amounts, cancelledAt).
 import clsx from "clsx";
 import { Link2, Mail, MessageCircle, Phone, SquarePen, Users, Utensils } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation, ReservationStatus } from "@/shared/api/mock-reservations";
 import { GuestAvatar } from "./guest-avatar";
-import { clock12, dayLabel, isPaid, tableLabel } from "./model";
+import { clock12, dayLabel, formatDisplayDate, guestsText, isPaid, sourceLabel, tableLabel } from "./model";
 import { RowActionsMenu } from "./row-actions-menu";
 import { StatusMenu } from "./status-menu";
 import { StatusPill } from "./status-pill";
@@ -83,15 +83,6 @@ function Cell({
   );
 }
 
-function formatOtherDate(date: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    numberingSystem: "latn",
-  }).format(new Date(`${date}T00:00:00`));
-}
-
 // Contact icon+label mini-buttons (WhatsApp / Call / Email) share the same
 // shape — a small vertical stack, icon over label.
 function ContactLink({
@@ -150,12 +141,9 @@ export function ReservationRow({
       ? t("reservations.list.filter.today")
       : day === "tomorrow"
         ? t("reservations.list.filter.tomorrow")
-        : formatOtherDate(reservation.date, locale);
+        : formatDisplayDate(reservation.date, locale);
 
-  const guestsText =
-    reservation.partySize === 1
-      ? t("reservations.list.row.guestOne")
-      : t("reservations.list.row.guests").replace("{n}", String(reservation.partySize));
+  const guestsLabel = guestsText(t, reservation.partySize);
 
   const paid = isPaid(reservation);
   const isCancelled = reservation.status === "Cancelled";
@@ -168,41 +156,66 @@ export function ReservationRow({
 
   const digits = reservation.phone.replace(/\D/g, "");
 
+  // Enter/Space opens the detail dialog the same as a click (fix round 4,
+  // finding 24) — the design gives no other entry point, so without this a
+  // keyboard/screen-reader user simply cannot open a reservation. Guarded
+  // to the row's own keydown (not one bubbling up from a focused nested
+  // button/menu — Edit, Status, contact links, More — each of which
+  // already handles its own Enter/Space as a native <button>/<a>).
+  function onRowKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpen();
+    }
+  }
+
   return (
     <div
       onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={onRowKeyDown}
+      // The row's own text content would otherwise be the accessible name —
+      // every cell's text concatenated — so name it explicitly instead,
+      // reusing the detail dialog's own title key rather than adding a new
+      // one just for this label.
+      aria-label={t("reservations.detail.title").replace("{ref}", reservation.ref)}
       // No items-center here (fix round 3): grid items default to
       // align-self: stretch, so every Cell's box — and its border-s
       // divider — runs the full height of the row, matching the frame's
       // dividers running edge-to-edge. Each cell centers its own content
       // internally (see the per-cell "flex items-center" below).
       className={clsx(
-        "grid cursor-pointer rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30",
+        "grid cursor-pointer rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
         ROW_GRID_COLUMNS
       )}
     >
-      {/* 1. Time */}
+      {/* 1. Time — dir="ltr" (fix round 4, finding 18): a bare "7:00 PM" in
+          an RTL container reverses to "PM 7:00", the AM/PM token bidi-swapped
+          in front of the digits. */}
       <Cell divider={false}>
-        <p className="text-[15px] font-bold text-[#0D6EFD]">{clock12(reservation.startMinutes)}</p>
+        <p className="text-[15px] font-bold text-[#0D6EFD]" dir="ltr">{clock12(reservation.startMinutes)}</p>
         <p className="text-[11.5px] text-[var(--octo-text-muted)]">{dayText}</p>
         <p className="text-[11px] text-[var(--octo-text-faint)]">
           {t("reservations.list.row.ref").replace("{ref}", reservation.ref)}
         </p>
       </Cell>
 
-      {/* 2. Guest */}
+      {/* 2. Guest — same dir="ltr" fix for the phone number (a "+" plus
+          digits gets its own bidi reversal in RTL, e.g. "966510000137+"). */}
       <Cell className="flex items-center gap-2">
         <GuestAvatar name={reservation.guest} />
         <div>
           <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{reservation.guest}</p>
-          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{reservation.phone}</p>
+          <p className="text-[11.5px] text-[var(--octo-text-muted)]" dir="ltr">{reservation.phone}</p>
         </div>
       </Cell>
 
       {/* 3. Party */}
       <Cell className="flex items-center gap-1.5">
         <Users size={14} className="shrink-0 text-[var(--octo-text-muted)]" />
-        <span className="text-[12px] text-[var(--octo-text-secondary)]">{guestsText}</span>
+        <span className="text-[12px] text-[var(--octo-text-secondary)]">{guestsLabel}</span>
       </Cell>
 
       {/* 4. Seating */}
@@ -210,14 +223,17 @@ export function ReservationRow({
         <Utensils size={14} className="shrink-0 text-[var(--octo-text-muted)]" />
         <div>
           <p className="text-[12px] text-[var(--octo-text-primary)]">{reservation.area}</p>
-          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tableLabel(reservation.table)}</p>
+          <p className="text-[11.5px] text-[var(--octo-text-muted)]">
+            {reservation.table ? tableLabel(reservation.table) : t("reservations.form.tableAny")}
+          </p>
         </div>
       </Cell>
 
-      {/* 5. Source */}
+      {/* 5. Source — translated (fix round 4, finding 6); this used to
+          print the raw English source value even on the Arabic page. */}
       <Cell className="flex items-center gap-1.5">
         <Link2 size={14} className="shrink-0 text-[var(--octo-text-muted)]" />
-        <span className="text-[12px] text-[var(--octo-text-primary)]">{reservation.source}</span>
+        <span className="text-[12px] text-[var(--octo-text-primary)]">{sourceLabel(t, reservation.source)}</span>
       </Cell>
 
       {/* 6. Payment */}
@@ -234,13 +250,21 @@ export function ReservationRow({
               <>
                 <p className="text-[11.5px] text-[var(--octo-text-secondary)]">
                   {depositPrefix}
-                  <span className="font-bold text-[#0D6EFD]">{amountText}</span>
+                  {/* Bold blue only once it's actually paid (fix round 4,
+                      finding 15) — every other row (unpaid, link-sent,
+                      expired, failed) showed the amount the same bold blue
+                      as a paid one, which the frame only ever does for PAID. */}
+                  <span className={paid ? "font-bold text-[#0D6EFD]" : "font-normal text-[var(--octo-text-secondary)]"}>
+                    {amountText}
+                  </span>
                   {depositSuffix}
                 </p>
                 <span
                   className={clsx(
                     "rounded-full px-2 py-0.5 text-[10.5px] font-semibold",
-                    paid ? "bg-[#16A34A]/10 text-[#15803D]" : "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"
+                    paid
+                      ? "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]"
+                      : "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"
                   )}
                 >
                   {paid ? t("reservations.list.row.paid") : t("reservations.list.row.unpaid")}
@@ -300,7 +324,11 @@ export function ReservationRow({
           onDuplicate={onDuplicate}
           onSharePaymentLink={onSharePaymentLink}
           onCancel={onCancel}
-          canShareLink={Boolean(reservation.paymentLink)}
+          // Enabled whenever there's a deposit to share a link for (fix
+          // round 4, finding 8) — not `Boolean(reservation.paymentLink)`,
+          // which only let a *second* link ever be shared and greyed out
+          // exactly the pending, never-yet-sent rows that most need it.
+          canShareLink={Boolean(reservation.deposit)}
           open={menu === "actions"}
           onOpenChange={(open) => onOpenMenu(open ? "actions" : "none")}
         />

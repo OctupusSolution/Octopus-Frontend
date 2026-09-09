@@ -9,7 +9,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import {
   AlertCircle,
-  Banknote,
   Calendar,
   CheckCircle2,
   CircleDashed,
@@ -22,6 +21,7 @@ import {
   Phone,
   Users,
   Utensils,
+  Vault,
 } from "lucide-react";
 import { Button, Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -48,6 +48,12 @@ const BANNER_CLASS: Record<DetailState, string> = {
   failed: "bg-[#EF4444]/10 text-[#DC2626]",
   expired: "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
   "payment-cancelled": "bg-[#EF4444]/10 text-[#DC2626]",
+  // Fix round 1, finding 2 — not one of the eight frames. A cancelled
+  // reservation (status === "Cancelled") always wins over whatever its
+  // deposit is doing; see detailState() in _shared/model.ts. Same red
+  // treatment as "failed" since there's no cancelled-specific frame to
+  // draw the banner language from.
+  cancelled: "bg-[#EF4444]/10 text-[#DC2626]",
 };
 
 const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
@@ -58,6 +64,7 @@ const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
   failed: AlertCircle,
   expired: AlertCircle,
   "payment-cancelled": AlertCircle,
+  cancelled: AlertCircle,
 };
 
 const BANNER_LABEL_KEY: Record<DetailState, string> = {
@@ -68,6 +75,9 @@ const BANNER_LABEL_KEY: Record<DetailState, string> = {
   failed: "reservations.detail.state.failed",
   expired: "reservations.detail.state.expired",
   "payment-cancelled": "reservations.detail.state.paymentCancelled",
+  // No "reservations.detail.state.cancelled" key exists (this state isn't
+  // in the brief's key list either) — reuse the row pill's own label.
+  cancelled: "reservations.state.cancelled",
 };
 
 // Same "ISO date -> Aug 8, 2026" formatting reservation-row.tsx uses for a
@@ -126,18 +136,18 @@ function MessageBox({ tone, children }: { tone: string; children: ReactNode }) {
   );
 }
 
-// The "Send Message" popover from the eighth frame — WhatsApp / Call / Email,
-// each a link to the same targets reservation-row.tsx's contact icons use.
-function SendMessagePopover({
-  reservation,
-  onClose,
-  t,
-}: {
-  reservation: Reservation;
-  onClose: () => void;
-  t: (key: string) => string;
-}) {
-  const ref = useDismiss(true, onClose);
+// The "Send Message" button + popover from the eighth frame — WhatsApp /
+// Call / Email, each a link to the same targets reservation-row.tsx's
+// contact icons use. Self-contained (owns its own open state) so the
+// `useDismiss` ref can wrap *both* the toggle button and the popover panel
+// in one subtree — matching MoreMenuButton's shape below. Splitting the
+// trigger and the panel across two refs (fix round 1, finding 1) meant the
+// button sat outside the dismiss subtree: its own mousedown fired the
+// dismiss handler first (closing the popover), then its onClick re-opened
+// it, so the button could never close what it opened.
+function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (key: string) => string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
   const digits = reservation.phone.replace(/\D/g, "");
 
   const items = [
@@ -152,37 +162,50 @@ function SendMessagePopover({
   ];
 
   return (
-    <div
-      ref={ref}
-      role="menu"
-      className="absolute top-full start-0 z-20 mt-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
-    >
-      {items.map((item) =>
-        item.href ? (
-          <a
-            key={item.key}
-            href={item.href}
-            target={item.href.startsWith("http") ? "_blank" : undefined}
-            rel={item.href.startsWith("http") ? "noreferrer" : undefined}
-            role="menuitem"
-            onClick={onClose}
-            className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
-            {item.icon}
-            {item.label}
-          </a>
-        ) : (
-          <span
-            key={item.key}
-            role="menuitem"
-            aria-disabled="true"
-            title={t("reservations.list.actions.noBackend")}
-            className="flex w-full cursor-not-allowed items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-faint)]"
-          >
-            {item.icon}
-            {item.label}
-          </span>
-        )
+    <div ref={ref} className="relative">
+      <Button
+        variant="secondary"
+        className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {t("reservations.detail.sendMessage")}
+      </Button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute top-full start-0 z-20 mt-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+        >
+          {items.map((item) =>
+            item.href ? (
+              <a
+                key={item.key}
+                href={item.href}
+                target={item.href.startsWith("http") ? "_blank" : undefined}
+                rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+              >
+                {item.icon}
+                {item.label}
+              </a>
+            ) : (
+              // Disabled because this guest has no email on file — not
+              // because the action lacks a backend, so (fix round 1,
+              // finding 4) this gets no title, matching
+              // reservation-row.tsx's ContactLink for the same case.
+              <span
+                key={item.key}
+                role="menuitem"
+                aria-disabled="true"
+                className="flex w-full cursor-not-allowed items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-faint)]"
+              >
+                {item.icon}
+                {item.label}
+              </span>
+            )
+          )}
+        </div>
       )}
     </div>
   );
@@ -238,15 +261,15 @@ export function ReservationDetailModal({
   onShareLink,
 }: ReservationDetailModalProps) {
   const { t, locale } = useI18n();
-  const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset transient UI state whenever a fresh reservation is opened, so a
-  // second "view" after a first doesn't inherit a stuck popover or label.
+  // second "view" after a first doesn't inherit a stuck copy label. (The
+  // Send Message button owns its own open state now — see
+  // SendMessageButton above — so it resets on its own remount.)
   useEffect(() => {
     if (open) {
-      setSendMessageOpen(false);
       setCopied(false);
     }
   }, [open, reservation?.id]);
@@ -365,7 +388,7 @@ export function ReservationDetailModal({
                 valueClassName="!text-[#B45309]"
               />
               <DetailRow
-                icon={<Banknote size={14} className="text-[var(--octo-text-muted)]" />}
+                icon={<Vault size={14} className="text-[var(--octo-text-muted)]" />}
                 label={t("reservations.detail.depositAmount")}
                 value={`${deposit?.currency ?? "SAR"} ${deposit?.amount ?? 0}`}
               />
@@ -454,6 +477,22 @@ export function ReservationDetailModal({
     case "payment-cancelled":
       panel = <MessageBox tone="#DC2626">{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
       break;
+
+    // Fix round 1, finding 2 — not one of the eight frames (there's no
+    // "cancelled reservation" frame among them). Built from the same
+    // single message-box shape failed/expired/payment-cancelled already
+    // use, rather than inventing new furniture for a state the design
+    // never drew.
+    case "cancelled":
+      panel = (
+        <MessageBox tone="#DC2626">
+          {t("reservations.list.row.cancelledOn").replace("{when}", reservation.cancelledAt ?? "—")}
+          {reservation.cancelReason && (
+            <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
+          )}
+        </MessageBox>
+      );
+      break;
   }
 
   let footer: ReactNode;
@@ -462,18 +501,7 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <div className="relative">
-            <Button
-              variant="secondary"
-              className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
-              onClick={() => setSendMessageOpen((v) => !v)}
-            >
-              {t("reservations.detail.sendMessage")}
-            </Button>
-            {sendMessageOpen && (
-              <SendMessagePopover reservation={reservation} onClose={() => setSendMessageOpen(false)} t={t} />
-            )}
-          </div>
+          <SendMessageButton reservation={reservation} t={t} />
           <Button variant="primary" className="flex-1 justify-center" onClick={onEdit}>
             {t("reservations.detail.editReservation")}
           </Button>
@@ -581,6 +609,17 @@ export function ReservationDetailModal({
       footer = (
         <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
           {t("reservations.detail.resendNewLink")}
+        </Button>
+      );
+      break;
+
+    // Fix round 1, finding 2 — no payment action makes sense on a
+    // cancelled reservation (nothing to resend a link or receipt for), so
+    // this is the one footer that's just an edit affordance.
+    case "cancelled":
+      footer = (
+        <Button variant="secondary" className="w-full justify-center" onClick={onEdit}>
+          {t("reservations.detail.editReservation")}
         </Button>
       );
       break;

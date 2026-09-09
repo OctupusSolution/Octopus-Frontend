@@ -218,12 +218,24 @@ export function combinePhone(digits: string): string {
 
 /* ============================================================ Task 10 detail */
 // Pure derivation for the reservation detail dialog (reservation-detail-modal.tsx).
-// Which of the eight frames a given reservation renders as.
+// Which of the eight frames — plus the ninth, un-designed "cancelled" state
+// (fix round 1, finding 2) — a given reservation renders as.
 
 export type DetailState =
-  | "confirmed" | "pending" | "link-sent" | "paid" | "failed" | "expired" | "payment-cancelled";
+  | "confirmed" | "pending" | "link-sent" | "paid" | "failed" | "expired" | "payment-cancelled" | "cancelled";
 
 export function detailState(r: Reservation): DetailState {
+  // A cancelled reservation wins over any deposit state — including a
+  // "refunded" or still-"paid" deposit left over from before it was
+  // cancelled — exactly the precedence displayState() already gives
+  // r.status === "Cancelled" over its own DEPOSIT_OVERRIDES map above.
+  // Fixture res-047 is the case this guards: status "Cancelled" with a
+  // deposit.state of "refunded", which used to fall through to "pending"
+  // (no branch below claims "refunded") and show a bogus "Deposit
+  // Required / UNPAID" panel on an already-cancelled, already-refunded
+  // booking.
+  if (r.status === "Cancelled") return "cancelled";
+
   switch (r.deposit?.state) {
     case "link-sent":
     case "paid":

@@ -30,6 +30,22 @@ export interface BuilderShellProps {
 
 const LABEL_KEYS = SITE_STEPS.map((s) => s.labelKey);
 
+const TICK_MS = 30_000;
+
+// The chip used to always say "Autosaved just now" — true for the first 400ms
+// after a save, and then permanently, indefinitely false afterwards,
+// including the moment a merchant reopens a draft they last touched days ago
+// (final review finding F6). Reporting how long ago the save actually was
+// keeps the claim honest either way.
+function autosaveLabel(savedAt: number | null, t: (key: string) => string): string | null {
+  if (savedAt === null) return null;
+  const minutes = Math.floor(Math.max(0, Date.now() - savedAt) / 60_000);
+  if (minutes < 1) return t("publicLink.autosaved");
+  if (minutes < 60) return t("publicLink.autosavedMinutesAgo").replace("{n}", String(minutes));
+  const hours = Math.floor(minutes / 60);
+  return t("publicLink.autosavedHoursAgo").replace("{n}", String(hours));
+}
+
 export function BuilderShell({
   draft,
   dispatch,
@@ -52,6 +68,17 @@ export function BuilderShell({
     return () => window.clearTimeout(id);
   }, [note]);
 
+  // Re-renders periodically so "Autosaved 3m ago" keeps advancing on a page a
+  // merchant leaves open and idle, rather than freezing at whatever it said
+  // the moment they last typed.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (draft.savedAt === null) return;
+    const id = window.setInterval(() => tick((n) => n + 1), TICK_MS);
+    return () => window.clearInterval(id);
+  }, [draft.savedAt]);
+  const savedLabel = autosaveLabel(draft.savedAt, t);
+
   function handleSaveDraft() {
     save();
     setNote(t("publicLink.draftSaved"));
@@ -61,10 +88,10 @@ export function BuilderShell({
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-[21px] font-bold text-[var(--octo-text-primary)]">{t("publicLink.title")}</h1>
-        {draft.savedAt !== null && (
+        {savedLabel && (
           <span className="flex items-center gap-1.5 text-[12px] text-[#16a34a]">
             <CheckCircle2 size={13} />
-            {t("publicLink.autosaved")}
+            {savedLabel}
           </span>
         )}
       </div>

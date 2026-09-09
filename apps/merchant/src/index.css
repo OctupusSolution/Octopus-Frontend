@@ -9,11 +9,23 @@
  * through these variables. `:root` holds the light palette; `[data-theme=dark]`
  * swaps the values so components (which only ever reference the var) adapt
  * automatically. Set by app/providers/theme-provider.tsx on <html>.
+ *
+ * The light palette is also keyed to `[data-theme="light"]`, so any subtree
+ * can opt back into light while <html> stays dark — custom properties
+ * inherit, so the nearest declaring ancestor wins. The Setup wizard uses
+ * this: its frames are drawn light-only, and it must not drag the whole
+ * console's theme choice with it.
  */
-:root {
+:root,
+[data-theme="light"] {
   color-scheme: light;
 
   --octo-page-bg: #e9eaec;
+  /* The ground the whole app shell paints, behind sidebar + routed content.
+     Distinct from --octo-page-bg on purpose: light mode has always shown the
+     console on white, and moving it to the page grey pushes muted body text
+     down to ~2.8:1. Dark mode gets the real dark ground. */
+  --octo-app-bg: #ffffff;
   --octo-shell: #f4f4f5;
   --octo-card: #ffffff;
   --octo-border-card: #ececf0;
@@ -40,12 +52,37 @@
   --octo-text-secondary: #6b6b74;
   --octo-text-muted: #8b8b93;
   --octo-text-faint: #a9a9b2;
+
+  /* Semantic "tone" chips/badges — a status pill, a paid/unpaid chip, a
+     policy-preview result chip — every one of them a ~10% tint of the hue
+     behind text in the same hue. Sampled from the Reservations frames for
+     light mode (fix round 4, finding 27); the bg tint stays put in dark
+     mode (it's already dark against `--octo-card`) but the text shade
+     lifts several steps so it clears WCAG contrast against that tint
+     instead of reading near-black. Anything drawing one of these chips
+     should reference these vars, not a literal hex, so dark mode never
+     needs patching per-component again. */
+  --octo-tone-success-bg: rgb(22 163 74 / 0.1);
+  --octo-tone-success-text: #15803d;
+  --octo-tone-warning-bg: rgb(245 158 11 / 0.1);
+  --octo-tone-warning-text: #b45309;
+  --octo-tone-info-bg: rgb(13 110 253 / 0.1);
+  --octo-tone-info-text: #0d6efd;
+  --octo-tone-danger-bg: rgb(239 68 68 / 0.1);
+  --octo-tone-danger-text: #dc2626;
+  --octo-tone-violet-bg: rgb(124 58 237 / 0.1);
+  --octo-tone-violet-text: #6d28d9;
+  --octo-tone-gold-bg: rgb(175 147 3 / 0.1);
+  --octo-tone-gold-text: #8a7502;
+  --octo-tone-slate-bg: rgb(88 96 108 / 0.1);
+  --octo-tone-slate-text: #58606c;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
   --octo-page-bg: #0d1017;
+  --octo-app-bg: #0d1017;
   --octo-shell: #131722;
   --octo-card: #1a1f2b;
   --octo-border-card: #2a3140;
@@ -72,6 +109,24 @@
   --octo-text-secondary: #a7adbb;
   --octo-text-muted: #8b93a3;
   --octo-text-faint: #6b7384;
+
+  /* Same ~10% tint backgrounds as light mode (already dark, so they don't
+     need to move) — only the text shade lifts, several steps lighter than
+     the light-mode value, to clear contrast against `--octo-card` #1a1f2b. */
+  --octo-tone-success-bg: rgb(22 163 74 / 0.16);
+  --octo-tone-success-text: #4ade80;
+  --octo-tone-warning-bg: rgb(245 158 11 / 0.16);
+  --octo-tone-warning-text: #fbbf24;
+  --octo-tone-info-bg: rgb(13 110 253 / 0.18);
+  --octo-tone-info-text: #6ea8fe;
+  --octo-tone-danger-bg: rgb(239 68 68 / 0.16);
+  --octo-tone-danger-text: #f87171;
+  --octo-tone-violet-bg: rgb(124 58 237 / 0.18);
+  --octo-tone-violet-text: #a78bfa;
+  --octo-tone-gold-bg: rgb(175 147 3 / 0.16);
+  --octo-tone-gold-text: #eab308;
+  --octo-tone-slate-bg: rgb(88 96 108 / 0.2);
+  --octo-tone-slate-text: #9ca3af;
 }
 
 body {
@@ -180,6 +235,14 @@ body {
   background-image: linear-gradient(120deg, #0a5ce0, #0d6efd 35%, #7a5bff 68%, #6c4dff);
   background-size: 220% 220%;
   animation: octo-tide 16s ease-in-out infinite;
+}
+
+/* The auth brand panel — a vertical wash from full brand blue at the top to
+   near-white at the bottom, so the dark heading sitting at the foot of the
+   panel keeps its contrast. Static: this one carries a product screenshot,
+   and animating behind it would read as a glitch rather than as water. */
+.octo-auth-gradient {
+  background-image: linear-gradient(180deg, #1878F5 0%, #4E9BFA 38%, #A8CDFB 70%, #E4EEFD 100%);
 }
 
 @keyframes octo-wave-drift {

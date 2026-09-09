@@ -24,17 +24,29 @@ function GlobalOptionRow({
   note,
   checked,
   onChange,
+  connected = true,
 }: {
   label: string;
   note: string;
   checked: boolean;
   onChange: () => void;
+  /** Whether this toggle actually changes anything the merchant can see.
+   *  `stickyHeader`, `activeIndicator` and `sameTab` have no consumer this
+   *  build can honour without new model surface (final review finding F5) —
+   *  rather than leave them silently dead under a banner promising instant
+   *  updates, they carry this note so the control is honest about its own
+   *  state. */
+  connected?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex flex-col gap-0.5">
         <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{label}</span>
         <span className="text-[11px] text-[var(--octo-text-muted)]">{note}</span>
+        {!connected && (
+          <span className="text-[10.5px] text-[var(--octo-text-faint)]">{t("publicLink.navigation.notConnectedYet")}</span>
+        )}
       </div>
       <Switch checked={checked} onChange={onChange} label={label} />
     </div>
@@ -123,12 +135,14 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
               note={t("publicLink.navigation.stickyHeaderNote")}
               checked={navigation.stickyHeader}
               onChange={() => patchNav({ stickyHeader: !navigation.stickyHeader })}
+              connected={false}
             />
             <GlobalOptionRow
               label={t("publicLink.navigation.activeIndicator")}
               note={t("publicLink.navigation.activeIndicatorNote")}
               checked={navigation.activeIndicator}
               onChange={() => patchNav({ activeIndicator: !navigation.activeIndicator })}
+              connected={false}
             />
             <GlobalOptionRow
               label={t("publicLink.navigation.showIcons")}
@@ -141,6 +155,7 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
               note={t("publicLink.navigation.sameTabNote")}
               checked={navigation.sameTab}
               onChange={() => patchNav({ sameTab: !navigation.sameTab })}
+              connected={false}
             />
           </div>
         </div>

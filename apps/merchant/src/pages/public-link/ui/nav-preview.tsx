@@ -74,9 +74,22 @@ export function DrawerNavPreview({ draft }: { draft: SiteDraft }) {
 
 /** The scaled desktop header strip from the Navigation step — the same
  *  enabled pages as `DrawerNavPreview`, laid out the way a storefront header
- *  actually reads them: left to right, icon-free. */
+ *  actually reads them: left to right, icon-free. Honours "Show in Header"
+ *  (final review finding F5) by standing in for the whole header nav being
+ *  switched off, rather than silently drawing it unchanged either way. */
 export function WebNavPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
+  if (!draft.navigation.showInHeader) {
+    return (
+      <div
+        aria-hidden
+        className="flex items-center justify-center rounded-xl border border-dashed border-[var(--octo-border-input)] bg-[var(--octo-card)] px-[18px] py-[15px] text-center text-[11px] text-[var(--octo-text-faint)]"
+      >
+        {t("publicLink.navigation.headerPreviewOff")}
+      </div>
+    );
+  }
+
   const modules = modulesInRenderedNav(draft);
 
   return (
@@ -96,10 +109,25 @@ export function WebNavPreview({ draft }: { draft: SiteDraft }) {
 
 /** The phone-shaped drawer beside it: the same navigation, stacked the way it
  *  opens on a mobile storefront, with icons carried over from the drawer
- *  mock so the pair reads as one navigation shown at two sizes. */
+ *  mock so the pair reads as one navigation shown at two sizes. Honours both
+ *  "Show in Drawer Menu" (stands in for the whole drawer being switched off)
+ *  and "Show Icons" (final review finding F5 — both had no consumer at all
+ *  before this fix). */
 export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
+  if (!draft.navigation.showInDrawer) {
+    return (
+      <div
+        aria-hidden
+        className="mx-auto flex w-[140px] items-center justify-center rounded-[20px] border border-dashed border-[var(--octo-border-input)] bg-[var(--octo-card)] p-3 text-center text-[10.5px] text-[var(--octo-text-faint)]"
+      >
+        {t("publicLink.navigation.drawerPreviewOff")}
+      </div>
+    );
+  }
+
   const modules = modulesInRenderedNav(draft);
+  const showIcons = draft.navigation.showIcons;
 
   return (
     <div
@@ -115,7 +143,7 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
           const Icon: LucideIcon = module.icon;
           return (
             <li key={module.id} className="flex items-center gap-1.5 text-[10.5px] text-[var(--octo-text-secondary)]">
-              <Icon size={11} className="text-[var(--octo-text-faint)]" />
+              {showIcons && <Icon size={11} className="text-[var(--octo-text-faint)]" />}
               {t(module.labelKey)}
             </li>
           );

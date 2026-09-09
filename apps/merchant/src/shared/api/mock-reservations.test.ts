@@ -51,4 +51,31 @@ describe("reservations fixture", () => {
       }
     }
   });
+
+  // Fix round 4, finding 17 — two data-quality bugs in the fixture: the
+  // same guest ended up with two different phone numbers across rows, and
+  // a phoneFor() index collision gave two unrelated guests the same number.
+  it("gives the same guest the same phone number on every row", () => {
+    const byGuest = new Map<string, Set<string>>();
+    for (const r of reservations) {
+      const numbers = byGuest.get(r.guest) ?? new Set<string>();
+      numbers.add(r.phone);
+      byGuest.set(r.guest, numbers);
+    }
+    for (const [guest, numbers] of byGuest) {
+      expect(numbers.size, `${guest} has ${numbers.size} different phone numbers`).toBe(1);
+    }
+  });
+
+  it("never gives two different guests the same phone number", () => {
+    const byPhone = new Map<string, Set<string>>();
+    for (const r of reservations) {
+      const guests = byPhone.get(r.phone) ?? new Set<string>();
+      guests.add(r.guest);
+      byPhone.set(r.phone, guests);
+    }
+    for (const [phone, guests] of byPhone) {
+      expect(guests.size, `${phone} is shared by ${[...guests].join(", ")}`).toBe(1);
+    }
+  });
 });

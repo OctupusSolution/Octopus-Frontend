@@ -2,7 +2,13 @@
 // sorting, KPI derivation and refund policy. No DOM, no React — every later
 // screen (Calendar, Floor Plan, Waitlist, Private Rooms & Events) reads the
 // mock rows through these functions so the rules live in exactly one place.
-import { TODAY, type DepositState, type Reservation, type ReservationStatus } from "@/shared/api/mock-reservations";
+import {
+  TODAY,
+  type DepositState,
+  type Reservation,
+  type ReservationPaymentLink,
+  type ReservationStatus,
+} from "@/shared/api/mock-reservations";
 
 export type DisplayState = ReservationStatus | "Link Sent" | "Expired" | "Failed" | "Refunded";
 export type SortKey = "time-asc" | "time-desc" | "party" | "status";
@@ -91,7 +97,7 @@ export function clock12(startMinutes: number): string {
   return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
 }
 
-function addDays(date: string, days: number): string {
+export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
@@ -228,6 +234,45 @@ export function phoneDigitsFrom(phone: string): string {
 
 export function combinePhone(digits: string): string {
   return `+966${digits}`;
+}
+
+/* ============================================================== Task 12 wiring */
+// Pure helpers for the Reservations list page (pages/reservations/index.tsx):
+// timestamps stamped by list-driven state changes (cancel, share/resend
+// link) that need to read like the rest of the fixture's pre-formatted
+// strings (e.g. "Aug 7, 2026 - 5:30 PM") without reaching for `Date.now()`.
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** "2026-08-08" + 870 ("14:30") -> "Aug 8, 2026 - 2:30 PM" — the fixture's
+ *  own timestamp shape, built from a date + a minutes-from-midnight value
+ *  instead of `Date.now()` so it stays deterministic. */
+export function formatTimestamp(dateIso: string, minutes: number): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${d}, ${y} - ${clock12(minutes)}`;
+}
+
+/** The module's fixed "now" (see `NOW_MINUTES`), formatted the same way. */
+export function nowTimestampLabel(): string {
+  return formatTimestamp(TODAY, NOW_MINUTES);
+}
+
+/** A freshly-"sent" payment link for Share Link / Resend Link — stamped
+ *  "now" and expiring a day later, addressed to whichever channel the form
+ *  last recorded (falling back to WhatsApp/phone for a reservation that
+ *  never went through the form, e.g. the static fixture rows). */
+export function freshPaymentLink(r: Reservation): ReservationPaymentLink {
+  const sentVia = r.sendLinkChannels?.[0] ?? "WhatsApp";
+  const sentTo = sentVia === "Email" ? (r.email ?? r.phone) : r.phone;
+  return {
+    url: `https://pay.octopus.app/r/${r.ref}`,
+    sentVia,
+    sentTo,
+    sentOn: nowTimestampLabel(),
+    expiresOn: formatTimestamp(addDays(TODAY, 1), NOW_MINUTES),
+  };
 }
 
 /* ============================================================ Task 10 detail */

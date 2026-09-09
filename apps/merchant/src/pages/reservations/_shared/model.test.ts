@@ -191,9 +191,9 @@ describe("detailState", () => {
     expect(at("expired")).toBe("expired");
   });
 
-  it("maps a cancelled deposit to payment-cancelled", () => {
+  it("maps a cancelled deposit to payment-cancelled when the reservation itself isn't cancelled", () => {
     expect(
-      detailState(row({ status: "Cancelled", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" } }))
+      detailState(row({ status: "Pending", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" } }))
     ).toBe("payment-cancelled");
   });
 
@@ -207,6 +207,20 @@ describe("detailState", () => {
     expect(
       detailState(row({ status: "Pending", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "unpaid" } }))
     ).toBe("pending");
+  });
+
+  it("lets a cancelled reservation win over any deposit state, mirroring displayState's own precedence (fix round 1)", () => {
+    const at = (deposit?: Reservation["deposit"]) => detailState(row({ status: "Cancelled", deposit }));
+    // res-047: cancelled with a refunded deposit — this used to fall
+    // through to "pending" since "refunded" matches none of the four
+    // direct-mapped deposit states, showing a bogus "Deposit Required"
+    // panel on an already-cancelled, already-refunded booking.
+    expect(at({ amount: 150, currency: "SAR", type: "Per Guest", state: "refunded" })).toBe("cancelled");
+    // Even a deposit that's still (or again) "paid" shouldn't reopen a
+    // payment-confirmed panel on a reservation that's cancelled.
+    expect(at({ amount: 150, currency: "SAR", type: "Per Guest", state: "paid" })).toBe("cancelled");
+    // No deposit at all.
+    expect(at(undefined)).toBe("cancelled");
   });
 });
 

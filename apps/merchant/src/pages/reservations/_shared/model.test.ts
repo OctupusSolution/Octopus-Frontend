@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { reservations, TODAY, type Reservation } from "@/shared/api/mock-reservations";
-import { clock12, deriveKpis, displayState, EMPTY_FILTERS, isPaid, refundPolicy, visibleRows } from "./model";
+import { clock12, deriveKpis, displayState, EMPTY_FILTERS, isPaid, refundPolicy, tableLabel, visibleRows } from "./model";
 
 function row(over: Partial<Reservation> = {}): Reservation {
   return {
@@ -51,6 +51,21 @@ describe("clock12", () => {
   });
   it("wraps a past-midnight slot back onto the clock", () => {
     expect(clock12(25 * 60)).toBe("1:00 AM");
+  });
+});
+
+describe("tableLabel", () => {
+  it("formats a T-NN id into a human label", () => {
+    expect(tableLabel("T-12")).toBe("Table 12");
+  });
+
+  it("strips a leading zero", () => {
+    expect(tableLabel("T-02")).toBe("Table 2");
+  });
+
+  it("returns anything that isn't T-NN unchanged, rather than throwing", () => {
+    expect(tableLabel("Room A")).toBe("Room A");
+    expect(tableLabel("")).toBe("");
   });
 });
 

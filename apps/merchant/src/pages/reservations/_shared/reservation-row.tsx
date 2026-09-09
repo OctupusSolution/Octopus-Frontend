@@ -9,12 +9,25 @@ import type { MouseEvent, ReactNode } from "react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation, ReservationStatus } from "@/shared/api/mock-reservations";
 import { GuestAvatar } from "./guest-avatar";
-import { clock12, dayLabel, isPaid } from "./model";
+import { clock12, dayLabel, isPaid, tableLabel } from "./model";
 import { RowActionsMenu } from "./row-actions-menu";
 import { StatusMenu } from "./status-menu";
 import { StatusPill } from "./status-pill";
 
 export type RowMenu = "none" | "status" | "actions";
+
+// Fixed grid tracks so Edit/Status/contact icons land at the same x-position
+// on every row (fix round 1). Content-width flex cells drifted per-row once
+// real, varying guest names and party sizes replaced the frame's single
+// repeated mock guest. Guest is the only flexible track — every other cell
+// holds a short, roughly bounded value (a count, an id, an icon label).
+const ROW_GRID_COLUMNS =
+  "grid-cols-[124px_1fr_104px_148px_128px_180px_88px_128px_180px_40px]";
+// Sum of the fixed tracks above, plus a floor for the flexible Guest column,
+// so the row scrolls horizontally on narrow laptop widths instead of
+// squeezing its columns out of alignment. The page wraps the row list in a
+// horizontally-scrolling container sized to this.
+export const ROW_LIST_MIN_WIDTH = "min-w-[1340px]";
 
 export interface ReservationRowProps {
   reservation: Reservation;
@@ -144,7 +157,10 @@ export function ReservationRow({
   return (
     <div
       onClick={onOpen}
-      className="flex cursor-pointer flex-wrap items-center rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30"
+      className={clsx(
+        "grid cursor-pointer items-center rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30",
+        ROW_GRID_COLUMNS
+      )}
     >
       {/* 1. Time */}
       <Cell divider={false}>
@@ -175,7 +191,7 @@ export function ReservationRow({
         <Utensils size={14} className="shrink-0 text-[var(--octo-text-muted)]" />
         <div>
           <p className="text-[12px] text-[var(--octo-text-primary)]">{reservation.area}</p>
-          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{reservation.table}</p>
+          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tableLabel(reservation.table)}</p>
         </div>
       </Cell>
 

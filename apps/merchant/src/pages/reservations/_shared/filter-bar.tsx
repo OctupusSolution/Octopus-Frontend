@@ -39,6 +39,22 @@ const PILL_BASE = "inline-flex items-center gap-1.5 rounded-[9px] border px-3 py
 const PILL_OUTLINE = "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
 const PILL_ACTIVE = "border-[#0D6EFD] bg-[#0D6EFD] text-white";
 
+// The frame draws the picked date as "Fri, Aug 14, 2026"; a bare
+// <input type="date"> renders the browser's own locale-native format
+// instead ("08/08/2026" in Chrome/en) (fix round 1). Format it ourselves
+// for display and lay the real input on top, invisible but still
+// focusable/clickable, so the native picker still opens from anywhere on
+// the pill and the control stays keyboard-reachable.
+function formatDatePill(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    numberingSystem: "latn",
+  }).format(new Date(`${date}T00:00:00`));
+}
+
 export interface FilterBarProps {
   filters: ListFilters;
   onChange: (next: ListFilters) => void;
@@ -46,7 +62,7 @@ export interface FilterBarProps {
 }
 
 export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -68,13 +84,16 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
         {t("reservations.list.filter.tomorrow")}
       </button>
 
-      <label className={clsx(PILL_BASE, "cursor-pointer", filters.day === "date" ? PILL_ACTIVE : PILL_OUTLINE)}>
+      <label
+        className={clsx(PILL_BASE, "relative cursor-pointer", filters.day === "date" ? PILL_ACTIVE : PILL_OUTLINE)}
+      >
         <CalendarDays size={13} />
+        <span>{formatDatePill(filters.date, locale)}</span>
         <input
           type="date"
           value={filters.date}
           onChange={(e) => onChange({ ...filters, day: "date", date: e.target.value })}
-          className="bg-transparent text-[12px] outline-none"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         />
       </label>
 

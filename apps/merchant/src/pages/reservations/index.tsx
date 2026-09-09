@@ -3,6 +3,7 @@
 // page the sidebar's "Reservations" link opens. Replaces the old KPI-tiles
 // + quick-links hub outright.
 import { useMemo, useState } from "react";
+import clsx from "clsx";
 import { Plus, Printer, Search } from "lucide-react";
 import { Button, EmptyState, Input, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -14,7 +15,7 @@ import {
 import { KpiCards } from "./_shared/kpi-cards";
 import { FilterBar } from "./_shared/filter-bar";
 import { EMPTY_FILTERS, deriveKpis, visibleRows, type ListFilters, type SortKey } from "./_shared/model";
-import { ReservationRow, type RowMenu } from "./_shared/reservation-row";
+import { ReservationRow, ROW_LIST_MIN_WIDTH, type RowMenu } from "./_shared/reservation-row";
 
 const SORT_OPTIONS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "time-asc", labelKey: "reservations.list.sort.timeEarliest" },
@@ -78,12 +79,15 @@ export function ReservationsPage() {
     });
   }
 
-  // Stubs for the pieces later tasks still have to build: the detail dialog
-  // (row click / Edit) and sharing a payment link. Wiring them here now
-  // would mean inventing UI this task was not asked to build.
+  // Stubs for the pieces later tasks still have to build. Wiring them here
+  // now would mean inventing UI this task was not asked to build.
+  // TODO(task-10): open the reservation detail dialog.
   function openDetail(_id: string) {}
+  // TODO(task-9): open the edit form, pre-filled for this reservation.
   function openEdit(_id: string) {}
+  // TODO(task-9): open the add-reservation form.
   function openAddReservation() {}
+  // TODO(task-12): actually share the payment link (SMS/WhatsApp/email).
   function sharePaymentLink(_id: string) {}
 
   const allCountText = t("reservations.list.allCount").replace("{n}", String(visible.length));
@@ -143,24 +147,31 @@ export function ReservationsPage() {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2.5">
+      <div className="mt-3">
         {visible.length === 0 ? (
           <EmptyState title={t("reservations.list.empty")} />
         ) : (
-          visible.map((reservation) => (
-            <ReservationRow
-              key={reservation.id}
-              reservation={reservation}
-              menu={openMenu?.id === reservation.id ? openMenu.menu : "none"}
-              onOpenMenu={(menu: RowMenu) => setOpenMenu(menu === "none" ? null : { id: reservation.id, menu })}
-              onOpen={() => openDetail(reservation.id)}
-              onEdit={() => openEdit(reservation.id)}
-              onStatus={(status) => handleStatus(reservation.id, status)}
-              onDuplicate={() => handleDuplicate(reservation.id)}
-              onSharePaymentLink={() => sharePaymentLink(reservation.id)}
-              onCancel={() => requestCancel(reservation.id)}
-            />
-          ))
+          // Rows are a fixed-column grid (see reservation-row.tsx) so they
+          // scan as a table; this scrolls horizontally on narrow laptop
+          // widths instead of squeezing the columns out of alignment.
+          <div className="overflow-x-auto">
+            <div className={clsx("flex flex-col gap-2.5", ROW_LIST_MIN_WIDTH)}>
+              {visible.map((reservation) => (
+                <ReservationRow
+                  key={reservation.id}
+                  reservation={reservation}
+                  menu={openMenu?.id === reservation.id ? openMenu.menu : "none"}
+                  onOpenMenu={(menu: RowMenu) => setOpenMenu(menu === "none" ? null : { id: reservation.id, menu })}
+                  onOpen={() => openDetail(reservation.id)}
+                  onEdit={() => openEdit(reservation.id)}
+                  onStatus={(status) => handleStatus(reservation.id, status)}
+                  onDuplicate={() => handleDuplicate(reservation.id)}
+                  onSharePaymentLink={() => sharePaymentLink(reservation.id)}
+                  onCancel={() => requestCancel(reservation.id)}
+                />
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

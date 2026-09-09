@@ -39,7 +39,9 @@ const ROWS = (TIME_END - TIME_START) / ROW_MINUTES;
 const NOW_MINUTES = 870; // fixed 14:30 reference point for "upcoming" on the mock's TODAY
 
 const STATUS_COLOR: Record<ReservationStatus, string> = {
+  Pending: "#F59E0B",
   Confirmed: "#0D6EFD",
+  Arrived: "#6366F1",
   Seated: "#22C55E",
   Completed: "#a9a9b2",
   "No-show": "#EF4444",
@@ -47,7 +49,9 @@ const STATUS_COLOR: Record<ReservationStatus, string> = {
 };
 
 const STATUS_TONE: Record<ReservationStatus, "success" | "error" | "warning" | "info" | "neutral"> = {
+  Pending: "warning",
   Confirmed: "info",
+  Arrived: "info",
   Seated: "success",
   Completed: "neutral",
   "No-show": "error",
@@ -55,7 +59,9 @@ const STATUS_TONE: Record<ReservationStatus, "success" | "error" | "warning" | "
 };
 
 const STATUS_KEY: Record<ReservationStatus, string> = {
+  Pending: "status.pending",
   Confirmed: "status.confirmed",
+  Arrived: "status.arrived",
   Seated: "status.seated",
   Completed: "status.completed",
   "No-show": "status.noShow",
@@ -63,11 +69,11 @@ const STATUS_KEY: Record<ReservationStatus, string> = {
 };
 
 const SOURCE_KEY: Record<ReservationSource, string> = {
-  Phone: "reservations.source.phone",
+  "Direct Booking": "reservations.source.directBooking",
   Website: "reservations.source.website",
-  "Walk-in": "reservations.source.walkIn",
-  "Mobile App": "reservations.source.mobileApp",
-  Aggregator: "reservations.source.aggregator",
+  "Walk In": "reservations.source.walkIn",
+  Phone: "reservations.source.phone",
+  Instagram: "reservations.source.instagram",
 };
 
 function pad2(n: number): string {
@@ -214,9 +220,11 @@ export function ReservationCalendarPage() {
       date: form.date || TODAY,
       startMinutes: timeToMinutes(form.time || "19:00"),
       durationMinutes: 90,
+      ref: "RSV-NEW",
       guest: form.guest,
       phone: form.phone || "+9665XXXXXXXX",
       partySize: Number(form.partySize) || 2,
+      area: "Main Dining",
       table: form.table || "T-01",
       branch: form.branch,
       source: "Phone",

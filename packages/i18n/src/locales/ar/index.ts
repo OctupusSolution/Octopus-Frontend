@@ -149,6 +149,7 @@ export const ar = {
   "status.available": "متوفر",
   "status.86d": "غير متوفر (86)",
   "status.confirmed": "مؤكد",
+  "status.arrived": "وصل",
   "status.seated": "جالس",
   "status.noShow": "لم يحضر",
   "status.waitlisted": "في قائمة الانتظار",
@@ -306,8 +307,9 @@ export const ar = {
   "reservations.col.status": "الحالة",
   "reservations.source.phone": "الهاتف",
   "reservations.source.website": "الموقع الإلكتروني",
-  "reservations.source.walkIn": "حضور مباشر",
-  "reservations.source.mobileApp": "التطبيق",
+  "reservations.source.walkIn": "زيارة مباشرة",
+  "reservations.source.directBooking": "حجز مباشر",
+  "reservations.source.instagram": "إنستغرام",
 
   /* ---------------------------------------------------------------------- menu */
   "menu.title": "القائمة",
@@ -1300,7 +1302,6 @@ export const ar = {
   "customers.feedback.detail.notFound": "الملاحظة غير موجودة.",
 
   /* --- reservations (W2-01) --- */
-  "reservations.source.aggregator": "تطبيقات التوصيل",
   "reservations.waitlistPage.delta.vsLastHour": "مقارنة بالساعة الماضية",
 
   "reservations.calendar.title": "التقويم / الخط الزمني",

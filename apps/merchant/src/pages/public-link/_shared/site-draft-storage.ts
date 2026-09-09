@@ -47,6 +47,11 @@ function isSiteDraftShape(value: unknown): value is SiteDraft {
   if (typeof value.step !== "number") return false;
   if (!isRecord(value.theme)) return false;
   if (!isRecord(value.brand) || !isRecord(value.brand.colors) || !isRecord(value.brand.typography)) return false;
+  // `preview-model.ts` reads `brand.typography.en.titles` / `.ar.titles` —
+  // final review finding F2. `isRecord(value.brand.typography)` alone lets a
+  // draft with `typography: {}` (or `typography: { en: 3 }`) through, which
+  // crashes there at mount with no boundary to catch it.
+  if (!isRecord(value.brand.typography.en) || !isRecord(value.brand.typography.ar)) return false;
 
   if (!isIdEntryArray(value.pages)) return false;
   if (!isIdEntryArray(value.sections)) return false;
@@ -78,7 +83,14 @@ export function parseDraft(raw: string | null): SiteDraft | null {
     const parsed = JSON.parse(raw) as { version?: number; draft?: unknown };
     if (parsed.version !== DRAFT_VERSION) return null;
     if (!isSiteDraftShape(parsed.draft)) return null;
-    const step = Math.min(STEP_COUNT, Math.max(1, parsed.draft.step ?? 1));
+    // Floored, not just clamped (final review finding F2): a fractional step
+    // (e.g. 3.5, from a hand-edited or corrupted value) survives
+    // `Math.min`/`Math.max` unchanged, and `SITE_STEPS[3.5 - 1]` is
+    // `undefined` — `index.tsx` then throws reading `.Component` off it.
+    // `Number.isFinite` guards the NaN case the same way (`??` alone would
+    // not, since `NaN ?? 1` is still `NaN`).
+    const rawStep = parsed.draft.step;
+    const step = Number.isFinite(rawStep) ? Math.floor(Math.min(STEP_COUNT, Math.max(1, rawStep))) : 1;
     return { ...EMPTY_SITE_DRAFT, ...parsed.draft, step };
   } catch {
     return null;

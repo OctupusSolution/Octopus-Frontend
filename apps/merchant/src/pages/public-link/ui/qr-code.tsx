@@ -9,20 +9,39 @@ export interface QrCodeProps {
   size?: number;
 }
 
+// ISO/IEC 18004:2015 §6.3.9 requires a "quiet zone" of at least four light
+// modules on every side of the symbol — without it, many scanners cannot lock
+// onto the finder patterns. Final review finding F3: the symbol used to sit
+// flush against its card with none.
+const QUIET_ZONE = 4;
+
 export function QrCode({ value, size = 96 }: QrCodeProps) {
-  const matrix = encodeQr(value);
+  // `encodeQr` throws once `value`'s UTF-8 encoding exceeds this shape's
+  // 78-byte capacity. Every caller now caps what it hands in (final review
+  // finding F1), but this component's only job is decoration — it must never
+  // be able to unmount the rest of the app if a cap is ever missed elsewhere.
+  // Render nothing rather than let the throw escape.
+  let matrix: boolean[][] | null;
+  try {
+    matrix = encodeQr(value);
+  } catch {
+    matrix = null;
+  }
+  if (!matrix) return null;
+
   const modules = matrix.length;
+  const viewSize = modules + QUIET_ZONE * 2;
 
   return (
     <svg
-      viewBox={`0 0 ${modules} ${modules}`}
+      viewBox={`-${QUIET_ZONE} -${QUIET_ZONE} ${viewSize} ${viewSize}`}
       width={size}
       height={size}
       role="img"
       shapeRendering="crispEdges"
     >
       <title>{value}</title>
-      <rect x={0} y={0} width={modules} height={modules} fill="#ffffff" />
+      <rect x={-QUIET_ZONE} y={-QUIET_ZONE} width={viewSize} height={viewSize} fill="#ffffff" />
       {matrix.map((row, r) =>
         row.map((dark, c) => (dark ? <rect key={`${r}-${c}`} x={c} y={r} width={1} height={1} fill="#16161d" /> : null))
       )}

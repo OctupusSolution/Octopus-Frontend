@@ -24,7 +24,7 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
 import { GuestCard } from "../_shared/guest-card";
 import { MetaRow } from "../_shared/meta-row";
-import { detailState, type DetailState } from "../_shared/model";
+import { channelLabel, DEPOSIT_STATE_LABEL_KEY, detailState, STATE_LABEL_KEY, type DetailState } from "../_shared/model";
 import { useDismiss } from "../_shared/use-dismiss";
 
 export interface ReservationDetailModalProps {
@@ -37,20 +37,29 @@ export interface ReservationDetailModalProps {
   onShareLink: () => void;
 }
 
+// Every tone reads off the `--octo-tone-*` tokens in index.css (fix round
+// 4, finding 27) instead of a literal hex — dark mode's contrast fix lives
+// in that one place, light stays byte-identical to the frames.
 const BANNER_CLASS: Record<DetailState, string> = {
-  confirmed: "bg-[#16A34A]/10 text-[#15803D]",
-  pending: "bg-[#F59E0B]/10 text-[#B45309]",
-  "link-sent": "bg-[#7C3AED]/10 text-[#6D28D9]",
-  paid: "bg-[#16A34A]/10 text-[#15803D]",
-  failed: "bg-[#EF4444]/10 text-[#DC2626]",
+  confirmed: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
+  pending: "bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
+  "link-sent": "bg-[var(--octo-tone-violet-bg)] text-[var(--octo-tone-violet-text)]",
+  paid: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
+  failed: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
   expired: "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
-  "payment-cancelled": "bg-[#EF4444]/10 text-[#DC2626]",
+  "payment-cancelled": "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
   // Fix round 1, finding 2 — not one of the eight frames. A cancelled
   // reservation (status === "Cancelled") always wins over whatever its
   // deposit is doing; see detailState() in _shared/model.ts. Same red
   // treatment as "failed" since there's no cancelled-specific frame to
   // draw the banner language from.
-  cancelled: "bg-[#EF4444]/10 text-[#DC2626]",
+  cancelled: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
+  // Fix round 4, finding 5 — also not one of the eight frames. "progressed"
+  // (Arrived/Seated/Completed) reuses the same green as "confirmed"; the
+  // booking is further along than confirmed, not in any kind of trouble.
+  // "no-show" gets the same neutral slate as the row pill's own No-show tone.
+  progressed: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
+  "no-show": "bg-[var(--octo-tone-slate-bg)] text-[var(--octo-tone-slate-text)]",
 };
 
 const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
@@ -62,9 +71,18 @@ const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
   expired: AlertCircle,
   "payment-cancelled": AlertCircle,
   cancelled: AlertCircle,
+  progressed: CheckCircle2,
+  "no-show": AlertCircle,
 };
 
-const BANNER_LABEL_KEY: Record<DetailState, string> = {
+// The eight frames' own banner copy — distinct from the row pill's plainer
+// state labels (e.g. "Payment Link Sent" here vs. "Link Sent" on the pill).
+// "progressed" and "no-show" (fix round 4, finding 5) aren't in this map —
+// build only from existing i18n keys and the design language already
+// established (there are no frames for these two), so their banner text is
+// resolved from the reservation's own status via STATE_LABEL_KEY instead;
+// see the `banner` JSX below.
+const BANNER_LABEL_KEY: Partial<Record<DetailState, string>> = {
   confirmed: "reservations.detail.state.confirmed",
   pending: "reservations.detail.state.pending",
   "link-sent": "reservations.detail.state.linkSent",
@@ -150,7 +168,7 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
     <div ref={ref} className="relative">
       <Button
         variant="secondary"
-        className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+        className="!border-transparent !bg-[var(--octo-tone-info-bg)] !text-[var(--octo-tone-info-text)] hover:!bg-[var(--octo-tone-info-bg)]"
         onClick={() => setOpen((v) => !v)}
       >
         {t("reservations.detail.sendMessage")}
@@ -285,11 +303,16 @@ export function ReservationDetailModal({
   }
 
   const BannerIcon = BANNER_ICON[state];
+  // "progressed"/"no-show" have no frame-specific banner copy (fix round
+  // 4, finding 5) — their label is the reservation's own status label
+  // (Arrived/Seated/Completed/No-show), reusing STATE_LABEL_KEY rather
+  // than inventing new detail-only copy.
+  const bannerLabelKey = BANNER_LABEL_KEY[state] ?? STATE_LABEL_KEY[reservation.status];
 
   const banner = (
     <div className={clsx("flex items-center gap-2 rounded-[9px] px-3.5 py-2.5 text-[13px] font-semibold", BANNER_CLASS[state])}>
       <BannerIcon size={16} className="shrink-0" />
-      {t(BANNER_LABEL_KEY[state])}
+      {t(bannerLabelKey)}
     </div>
   );
 
@@ -299,10 +322,15 @@ export function ReservationDetailModal({
   let panel: ReactNode;
   switch (state) {
     case "confirmed":
+    // Fix round 4, finding 5 — "progressed" (Arrived/Seated/Completed)
+    // reuses this exact panel shape: no frame covers those three statuses,
+    // and the booking already went through everything this panel shows
+    // (it was confirmed, then progressed further).
+    case "progressed":
       panel = (
         <Panel>
           <PanelHeading>
-            <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[#15803D]">
+            <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[var(--octo-tone-success-text)]">
               <CheckCircle2 size={16} />
               {t("reservations.detail.confirmedPanel")}
             </span>
@@ -317,6 +345,13 @@ export function ReservationDetailModal({
 
     case "pending": {
       const deposit = reservation.deposit;
+      // The real deposit state, not a hardcoded "UNPAID" (fix round 4,
+      // finding 5) — every reservation.deposit?.state that can still reach
+      // "pending" (none, unpaid, absent, or an odd leftover like
+      // "refunded") maps through the same table the edit form's Deposit
+      // Status select uses, defaulting to "unpaid" when there's no deposit
+      // at all.
+      const depositStateKey = DEPOSIT_STATE_LABEL_KEY[deposit && deposit.state !== "none" ? deposit.state : "unpaid"];
       panel = (
         <>
           <Panel>
@@ -333,8 +368,8 @@ export function ReservationDetailModal({
               <DetailRow
                 icon={<CircleDashed size={14} className="text-[var(--octo-text-muted)]" />}
                 label={t("reservations.detail.status")}
-                value={t("reservations.list.row.unpaid")}
-                valueClassName="!text-[#B45309]"
+                value={t(depositStateKey)}
+                valueClassName="!text-[var(--octo-tone-warning-text)]"
               />
               <DetailRow
                 icon={<Vault size={14} className="text-[var(--octo-text-muted)]" />}
@@ -348,7 +383,7 @@ export function ReservationDetailModal({
               />
             </div>
           </Panel>
-          <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-[#F59E0B]/10 px-3.5 py-2.5 text-[12px] text-[#B45309]">
+          <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-[var(--octo-tone-warning-bg)] px-3.5 py-2.5 text-[12px] text-[var(--octo-tone-warning-text)]">
             <AlertCircle size={14} className="shrink-0" />
             {t("reservations.detail.autoConfirmNote")}
           </div>
@@ -365,26 +400,32 @@ export function ReservationDetailModal({
             <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.detail.linkPanel")}</span>
           </PanelHeading>
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[#0D6EFD]/20 bg-[#0D6EFD]/[0.06] px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[var(--octo-tone-info-text)]/20 bg-[var(--octo-tone-info-bg)] px-3 py-2.5">
               <a
                 href={link?.url ?? "#"}
                 target="_blank"
                 rel="noreferrer"
-                className="truncate text-[12.5px] font-semibold text-[#0D6EFD] hover:underline"
+                className="truncate text-[12.5px] font-semibold text-[var(--octo-tone-info-text)] hover:underline"
               >
                 {link?.url}
               </a>
               <button
                 type="button"
                 onClick={copyLink}
-                className="shrink-0 text-[11.5px] font-medium text-[#0D6EFD] transition-opacity hover:opacity-75"
+                className="shrink-0 text-[11.5px] font-medium text-[var(--octo-tone-info-text)] transition-opacity hover:opacity-75"
                 aria-label={t("reservations.detail.copyLink")}
               >
                 {copied ? t("reservations.detail.copied") : <Copy size={14} />}
               </button>
             </div>
             <div className="space-y-2.5">
-              <DetailRow label={t("reservations.detail.sentVia")} value={link?.sentVia ?? "—"} />
+              {/* sentVia translated (fix round 4, finding 6) — this used to
+                  print the raw "WhatsApp"/"SMS"/"Email" value even on the
+                  Arabic page. */}
+              <DetailRow
+                label={t("reservations.detail.sentVia")}
+                value={link ? channelLabel(t, link.sentVia) : "—"}
+              />
               <DetailRow label={t("reservations.detail.sentTo")} value={link?.sentTo ?? "—"} />
               <DetailRow label={t("reservations.detail.sentOn")} value={link?.sentOn ?? "—"} />
               <DetailRow label={t("reservations.detail.expireOn")} value={link?.expiresOn ?? "—"} />
@@ -416,15 +457,15 @@ export function ReservationDetailModal({
     }
 
     case "failed":
-      panel = <MessageBox tone="#DC2626">{t("reservations.detail.noAmountCaptured")}</MessageBox>;
+      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.noAmountCaptured")}</MessageBox>;
       break;
 
     case "expired":
-      panel = <MessageBox tone="#DC2626">{t("reservations.detail.linkNoLongerValid")}</MessageBox>;
+      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.linkNoLongerValid")}</MessageBox>;
       break;
 
     case "payment-cancelled":
-      panel = <MessageBox tone="#DC2626">{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
+      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
       break;
 
     // Fix round 1, finding 2 — not one of the eight frames (there's no
@@ -434,8 +475,23 @@ export function ReservationDetailModal({
     // never drew.
     case "cancelled":
       panel = (
-        <MessageBox tone="#DC2626">
+        <MessageBox tone="var(--octo-tone-danger-text)">
           {t("reservations.list.row.cancelledOn").replace("{when}", reservation.cancelledAt ?? "—")}
+          {reservation.cancelReason && (
+            <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
+          )}
+        </MessageBox>
+      );
+      break;
+
+    // Fix round 4, finding 5 — also not one of the eight frames. Same
+    // message-box shape as "cancelled" above, reusing the row pill's own
+    // No-show label as the message and, when the cancel dialog recorded a
+    // reason/note for it (see model.ts's applyCancel), showing that too.
+    case "no-show":
+      panel = (
+        <MessageBox tone="var(--octo-tone-slate-text)">
+          {t("reservations.state.noShow")}
           {reservation.cancelReason && (
             <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
           )}
@@ -444,9 +500,19 @@ export function ReservationDetailModal({
       break;
   }
 
+  // Every tinted footer button below reads off the `--octo-tone-*` tokens
+  // (fix round 4, finding 27), not a literal hex, for the same dark-mode
+  // contrast reason as BANNER_CLASS above.
+  const tintedBlue = "!border-transparent !bg-[var(--octo-tone-info-bg)] !text-[var(--octo-tone-info-text)] hover:!bg-[var(--octo-tone-info-bg)]";
+  const tintedRed = "!border-transparent !bg-[var(--octo-tone-danger-bg)] !text-[var(--octo-tone-danger-text)] hover:!bg-[var(--octo-tone-danger-bg)]";
+
   let footer: ReactNode;
   switch (state) {
     case "confirmed":
+    // Fix round 4, finding 5 — same footer shape as "confirmed": cancel,
+    // message the guest, or edit all still make sense once the booking has
+    // progressed further (Arrived/Seated/Completed).
+    case "progressed":
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
@@ -462,14 +528,20 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <Button
-            variant="secondary"
-            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
-            onClick={onEdit}
-          >
+          <Button variant="secondary" className={tintedBlue} onClick={onEdit}>
             {t("reservations.detail.editReservation")}
           </Button>
-          <Button variant="primary" className="flex-1 justify-center" onClick={onShareLink}>
+          <Button
+            variant="primary"
+            className="flex-1 justify-center"
+            // No deposit, no link to share (fix round 4, finding 9) —
+            // disabled with a reason instead of the silent no-op this used
+            // to be (onShareLink returned early with nothing visible
+            // changing).
+            disabled={!reservation.deposit}
+            title={reservation.deposit ? undefined : t("reservations.detail.noDepositToShare")}
+            onClick={onShareLink}
+          >
             {t("reservations.detail.shareLink")}
           </Button>
         </>
@@ -480,11 +552,7 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <Button
-            variant="secondary"
-            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
-            onClick={onEdit}
-          >
+          <Button variant="secondary" className={tintedBlue} onClick={onEdit}>
             {t("reservations.detail.editReservation")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
@@ -503,7 +571,7 @@ export function ReservationDetailModal({
             icon={<FileDown size={14} />}
             disabled
             title={noBackend}
-            className="!flex-1 !justify-center !border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+            className={clsx("!flex-1 !justify-center", tintedBlue)}
           >
             {t("reservations.detail.downloadReceipt")}
           </Button>
@@ -514,19 +582,10 @@ export function ReservationDetailModal({
     case "failed":
       footer = (
         <>
-          <Button
-            variant="secondary"
-            className="!border-transparent !bg-[#EF4444]/10 !text-[#DC2626] hover:!bg-[#EF4444]/15"
-            onClick={onCancel}
-          >
+          <Button variant="secondary" className={tintedRed} onClick={onCancel}>
             {t("reservations.detail.cancelReservation")}
           </Button>
-          <Button
-            variant="secondary"
-            disabled
-            title={noBackend}
-            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
-          >
+          <Button variant="secondary" disabled title={noBackend} className={tintedBlue}>
             {t("reservations.detail.notifyGuest")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
@@ -539,12 +598,7 @@ export function ReservationDetailModal({
     case "expired":
       footer = (
         <>
-          <Button
-            variant="secondary"
-            disabled
-            title={noBackend}
-            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
-          >
+          <Button variant="secondary" disabled title={noBackend} className={tintedBlue}>
             {t("reservations.detail.notifyGuest")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
@@ -566,6 +620,9 @@ export function ReservationDetailModal({
     // cancelled reservation (nothing to resend a link or receipt for), so
     // this is the one footer that's just an edit affordance.
     case "cancelled":
+    // Fix round 4, finding 5 — same reasoning for No-show: no payment or
+    // messaging action fits a guest who never arrived.
+    case "no-show":
       footer = (
         <Button variant="secondary" className="w-full justify-center" onClick={onEdit}>
           {t("reservations.detail.editReservation")}

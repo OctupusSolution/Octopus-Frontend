@@ -23,6 +23,11 @@ export function RowActionsMenu({
   const { t } = useI18n();
   const ref = useDismiss(open, () => onOpenChange(false));
   const noBackend = t("reservations.list.actions.noBackend");
+  // Fix round 4, finding 8 — disabled here means "no deposit on this
+  // reservation to share a link for", not "needs a backend" (this action
+  // works fine once canShareLink is true); the two reasons need different
+  // copy.
+  const noDeposit = t("reservations.list.actions.noDepositToShare");
 
   return (
     <div ref={ref} className="relative">
@@ -93,7 +98,7 @@ export function RowActionsMenu({
             type="button"
             role="menuitem"
             disabled={!canShareLink}
-            title={canShareLink ? undefined : noBackend}
+            title={canShareLink ? undefined : noDeposit}
             onClick={() => {
               if (!canShareLink) return;
               onSharePaymentLink();

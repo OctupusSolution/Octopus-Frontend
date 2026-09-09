@@ -2,34 +2,12 @@ import clsx from "clsx";
 import { CalendarDays, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import type { ReservationSource, ReservationStatus } from "@/shared/api/mock-reservations";
-import type { ListFilters } from "./model";
-
-const STATUS_OPTIONS: readonly ReservationStatus[] = [
-  "Pending", "Confirmed", "Arrived", "Seated", "Completed", "No-show", "Cancelled",
-];
-
-const STATUS_LABEL_KEY: Record<ReservationStatus, string> = {
-  Pending: "reservations.state.pending",
-  Confirmed: "reservations.state.confirmed",
-  Arrived: "reservations.state.arrived",
-  Seated: "reservations.state.seated",
-  Completed: "reservations.state.completed",
-  "No-show": "reservations.state.noShow",
-  Cancelled: "reservations.state.cancelled",
-};
+import type { ReservationSource } from "@/shared/api/mock-reservations";
+import { DISPLAY_STATE_OPTIONS, SOURCE_LABEL_KEY, STATE_LABEL_KEY, type ListFilters } from "./model";
 
 const SOURCE_OPTIONS: readonly ReservationSource[] = [
   "Direct Booking", "Website", "Walk In", "Phone", "Instagram",
 ];
-
-const SOURCE_LABEL_KEY: Record<ReservationSource, string> = {
-  "Direct Booking": "reservations.source.directBooking",
-  Website: "reservations.source.website",
-  "Walk In": "reservations.source.walkIn",
-  Phone: "reservations.source.phone",
-  Instagram: "reservations.source.instagram",
-};
 
 // Shared outline pill style for Today / Tomorrow / the date input. Split into
 // a base (layout) and two full colour variants rather than layering an
@@ -97,15 +75,19 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
         />
       </label>
 
+      {/* Filters on displayState (fix round 4, finding 20) — the pill the
+          row actually shows — so "Confirmed" never returns a row whose
+          pill reads "Link Sent", and Link Sent / Expired / Failed /
+          Refunded / Payment Cancelled are all reachable here too. */}
       <Select
         value={filters.status}
         onChange={(e) => onChange({ ...filters, status: e.target.value })}
         className="!w-auto !py-[7px]"
       >
         <option value="">{t("reservations.list.filter.allStatus")}</option>
-        {STATUS_OPTIONS.map((status) => (
+        {DISPLAY_STATE_OPTIONS.map((status) => (
           <option key={status} value={status}>
-            {t(STATUS_LABEL_KEY[status])}
+            {t(STATE_LABEL_KEY[status])}
           </option>
         ))}
       </Select>

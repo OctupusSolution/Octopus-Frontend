@@ -20,7 +20,9 @@ export function GuestCard({ reservation }: GuestCardProps) {
         <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{reservation.guest}</p>
         <p className="inline-flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
           <MessageCircle size={12} className="text-[#25D366]" />
-          {reservation.phone}
+          {/* dir="ltr" (fix round 4, finding 18) — same bidi reversal the
+              row and meta row have for a phone number in an RTL container. */}
+          <span dir="ltr">{reservation.phone}</span>
         </p>
       </div>
     </div>

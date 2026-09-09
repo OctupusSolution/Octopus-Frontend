@@ -58,10 +58,12 @@ const RESULT_LABEL_KEY: Record<Tier, string> = {
 
 // Green outline / amber / grey — the same hue families the detail dialog's
 // BANNER_CLASS already uses for confirmed/pending/expired, just with a
-// visible border added for the "outline chip" look the frame draws.
+// visible border added for the "outline chip" look the frame draws. Every
+// tone reads off the `--octo-tone-*` tokens in index.css (fix round 4,
+// finding 27), not a literal hex, for dark-mode contrast.
 const RESULT_CHIP_CLASS: Record<Tier, string> = {
-  full: "border border-[#16A34A]/30 bg-[#16A34A]/10 text-[#15803D]",
-  partial: "border border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#B45309]",
+  full: "border border-[var(--octo-tone-success-text)]/30 bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
+  partial: "border border-[var(--octo-tone-warning-text)]/30 bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
   none: "border border-[var(--octo-border-card)] bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
 };
 
@@ -191,30 +193,52 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
           />
         </Field>
 
-        <div className="rounded-[9px] bg-[#0D6EFD]/[0.04] px-3.5 py-3">
-          <div className="mb-2.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-[#0D6EFD]">
-            <Info size={14} />
-            {t("reservations.cancel.policyPreview")}
+        {/* No refund policy applies to a no-show (fix round 4, finding 3) —
+            it isn't a cancellation and no deposit is ever taken for it —
+            so the whole preview is hidden rather than showing "Result:
+            FULL REFUND" on a branch that refunds nothing. */}
+        {actionType !== "no-show" && (
+          <div className="rounded-[9px] bg-[var(--octo-tone-info-bg)] px-3.5 py-3">
+            <div className="mb-2.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-tone-info-text)]">
+              <Info size={14} />
+              {t("reservations.cancel.policyPreview")}
+            </div>
+            <div className="space-y-2">
+              <PolicyRow label={t("reservations.cancel.timeToEvent")} value={timeToEventText} />
+              <PolicyRow label={t("reservations.cancel.policy")} value={t(POLICY_SENTENCE_KEY[policy.tier])} />
+              <PolicyRow label={t("reservations.cancel.deposit")} value={depositText} />
+              <PolicyRow
+                label={t("reservations.cancel.result")}
+                value={
+                  // No deposit at all means there's nothing to refund,
+                  // full stop — say so plainly instead of running it
+                  // through the refund-tier wording, which used to read
+                  // "FULL REFUND" on seven of eighteen fixture rows that
+                  // carry no deposit (fix round 4, finding 4).
+                  reservation.deposit ? (
+                    <span
+                      className={clsx(
+                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                        RESULT_CHIP_CLASS[policy.tier]
+                      )}
+                    >
+                      {t(RESULT_LABEL_KEY[policy.tier])}
+                    </span>
+                  ) : (
+                    <span
+                      className={clsx(
+                        "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                        RESULT_CHIP_CLASS.none
+                      )}
+                    >
+                      {t("reservations.cancel.resultNoDeposit")}
+                    </span>
+                  )
+                }
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <PolicyRow label={t("reservations.cancel.timeToEvent")} value={timeToEventText} />
-            <PolicyRow label={t("reservations.cancel.policy")} value={t(POLICY_SENTENCE_KEY[policy.tier])} />
-            <PolicyRow label={t("reservations.cancel.deposit")} value={depositText} />
-            <PolicyRow
-              label={t("reservations.cancel.result")}
-              value={
-                <span
-                  className={clsx(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                    RESULT_CHIP_CLASS[policy.tier]
-                  )}
-                >
-                  {t(RESULT_LABEL_KEY[policy.tier])}
-                </span>
-              }
-            />
-          </div>
-        </div>
+        )}
       </div>
     </Modal>
   );

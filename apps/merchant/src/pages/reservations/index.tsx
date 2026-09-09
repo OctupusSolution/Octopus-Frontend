@@ -16,13 +16,15 @@ import {
 import { KpiCards } from "./_shared/kpi-cards";
 import { FilterBar } from "./_shared/filter-bar";
 import {
-  EMPTY_FILTERS,
+  applyCancel,
+  applyDuplicate,
+  applyFormSubmit,
+  applyShareLink,
   deriveKpis,
-  freshPaymentLink,
-  NOW_MINUTES,
-  nowTimestampLabel,
-  refundPolicy,
+  EMPTY_FILTERS,
+  formatDisplayDate,
   visibleRows,
+  type CancelPayload,
   type ListFilters,
   type SortKey,
 } from "./_shared/model";
@@ -30,11 +32,6 @@ import { ReservationRow, ROW_LIST_MIN_WIDTH, type RowMenu } from "./_shared/rese
 import { ReservationFormModal } from "./modals/reservation-form-modal";
 import { ReservationDetailModal } from "./modals/reservation-detail-modal";
 import { CancelReservationModal } from "./modals/cancel-reservation-modal";
-
-// Mirrors CancelReservationModal's onConfirm payload shape (not exported
-// from that file, so restated here rather than widening its module surface
-// for a single consumer).
-type CancelPayload = { actionType: "guest" | "restaurant" | "no-show"; reason: string; note: string };
 
 const SORT_OPTIONS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "time-asc", labelKey: "reservations.list.sort.timeEarliest" },
@@ -52,19 +49,8 @@ type OpenMenu = { id: string; menu: "status" | "actions" } | null;
 // other two, rather than each dialog tracking its own independent flag.
 type FormState = { mode: "add" } | { mode: "edit"; id: string } | null;
 
-// The next free "RSV-xxxx" ref, scanned off whatever is currently in state
-// (not the static fixture) so repeated duplicates keep incrementing.
-function nextRef(rows: readonly Reservation[]): string {
-  let max = 0;
-  for (const r of rows) {
-    const match = /^RSV-(\d+)$/.exec(r.ref);
-    if (match) max = Math.max(max, Number(match[1]));
-  }
-  return `RSV-${max + 1}`;
-}
-
 export function ReservationsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [rows, setRows] = useState<Reservation[]>(initialReservations);
   const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
@@ -124,68 +110,43 @@ export function ReservationsPage() {
     setCancelId(null);
   }
 
+  // Every state transition below is a pure `(rows, ...) => Reservation[]`
+  // reducer imported from _shared/model.ts (fix round 4, task A) — these
+  // handlers just route the page's dialog-driven events into them and
+  // manage which dialog is open. See model.test.ts for the transitions
+  // themselves under test.
   function handleStatus(id: string, status: ReservationStatus) {
     if (status === "Cancelled") {
       requestCancel(id);
       return;
     }
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
-  }
-
-  function handleDuplicate(id: string) {
-    setRows((prev) => {
-      const index = prev.findIndex((r) => r.id === id);
-      if (index === -1) return prev;
-      const copy: Reservation = { ...prev[index], id: crypto.randomUUID(), ref: nextRef(prev) };
-      const next = [...prev];
-      next.splice(index + 1, 0, copy);
-      return next;
-    });
-  }
-
-  // Form submit — add inserts a new row, edit replaces the existing one in
-  // place. The form leaves `id`/`ref` as empty strings in add mode (it has
-  // no fields for them), so real values are assigned here, reusing the same
-  // `nextRef` helper Duplicate uses. `intent` decides the resulting status
-  // regardless of what mode produced the draft: "confirm" -> Confirmed,
-  // "pending" -> Pending — the edit form only ever submits "confirm" (it has
-  // no "save as pending" footer button), so saving an edit always confirms.
-  function handleFormSubmit(draft: Reservation, intent: "pending" | "confirm") {
-    const status: ReservationStatus = intent === "confirm" ? "Confirmed" : "Pending";
-    if (formState?.mode === "add") {
-      const row: Reservation = { ...draft, id: crypto.randomUUID(), ref: nextRef(rows), status };
-      setRows((prev) => [...prev, row]);
-    } else if (formState?.mode === "edit") {
-      setRows((prev) => prev.map((r) => (r.id === formState.id ? { ...draft, id: r.id, ref: r.ref, status } : r)));
-    }
-    closeDialogs();
-  }
-
-  // Cancel confirm. "no-show" is not a cancellation — it sets status to
-  // "No-show" and leaves the deposit untouched. A genuine cancellation
-  // ("guest"/"restaurant") sets status: "Cancelled" with a cancelledAt
-  // timestamp and the chosen reason, and refunds the deposit only when the
-  // refund policy's tier is "full" or "partial" (never for "none", and
-  // never when there's no deposit to refund).
-  function handleCancelConfirm(id: string, payload: CancelPayload) {
     setRows((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
-        if (payload.actionType === "no-show") {
-          return { ...r, status: "No-show" };
+        // Leaving Cancelled through the Status menu (fix round 4, finding
+        // 1) — the only other way a reservation's status changes outside
+        // the form/cancel dialogs — clears the now-stale cancellation
+        // record rather than carrying a cancelledAt/cancelReason forward
+        // onto a booking that isn't cancelled anymore.
+        if (r.status === "Cancelled") {
+          return { ...r, status, cancelledAt: undefined, cancelReason: undefined };
         }
-        const tier = refundPolicy(r, NOW_MINUTES).tier;
-        const deposit =
-          r.deposit && (tier === "full" || tier === "partial") ? { ...r.deposit, state: "refunded" as const } : r.deposit;
-        return {
-          ...r,
-          status: "Cancelled" as const,
-          cancelledAt: nowTimestampLabel(),
-          cancelReason: payload.reason,
-          deposit,
-        };
+        return { ...r, status };
       })
     );
+  }
+
+  function handleDuplicate(id: string) {
+    setRows((prev) => applyDuplicate(prev, id));
+  }
+
+  function handleFormSubmit(draft: Reservation, intent: "pending" | "confirm") {
+    setRows((prev) => applyFormSubmit(prev, draft, intent, formState?.mode ?? "add", formState?.mode === "edit" ? formState.id : null));
+    closeDialogs();
+  }
+
+  function handleCancelConfirm(id: string, payload: CancelPayload) {
+    setRows((prev) => applyCancel(prev, id, payload));
     closeDialogs();
   }
 
@@ -194,15 +155,20 @@ export function ReservationsPage() {
   // payment link and move the deposit to "link-sent" — so the detail
   // dialog, if open, visibly moves to its link-sent state.
   function shareOrResendLink(id: string) {
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== id || !r.deposit) return r;
-        return { ...r, deposit: { ...r.deposit, state: "link-sent" }, paymentLink: freshPaymentLink(r) };
-      })
-    );
+    setRows((prev) => applyShareLink(prev, id));
   }
 
   const allCountText = t("reservations.list.allCount").replace("{n}", String(visible.length));
+
+  // The KPI card's own day label (fix round 4, finding 12) — it used to
+  // hardcode "Today's Reservations" even while `visible`/`kpis` (below) was
+  // already correctly scoped to whatever day filter was picked.
+  const kpiDayLabel =
+    filters.day === "today"
+      ? t("reservations.list.filter.today")
+      : filters.day === "tomorrow"
+        ? t("reservations.list.filter.tomorrow")
+        : formatDisplayDate(filters.date, locale);
 
   return (
     <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
@@ -226,7 +192,7 @@ export function ReservationsPage() {
       </header>
 
       <div className="mt-4">
-        <KpiCards kpis={kpis} />
+        <KpiCards kpis={kpis} dayLabel={kpiDayLabel} />
       </div>
 
       <div className="mt-4">

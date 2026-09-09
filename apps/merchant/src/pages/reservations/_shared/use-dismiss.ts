@@ -19,6 +19,13 @@ export function useDismiss(open: boolean, close: () => void): RefObject<HTMLDivE
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        // Stop this Escape here (fix round 4, finding 22) — Modal (see
+        // packages/ui/src/primitives/modal.tsx, not ours to edit) listens
+        // on `window`, this hook listens on `document`; a bubbling keydown
+        // reaches `document` before it reaches `window`, so without this
+        // one Escape press would close the popover *and* the dialog behind
+        // it in the same keystroke.
+        event.stopPropagation();
         close();
       }
     }

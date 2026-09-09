@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import clsx from "clsx";
 import {
   ChevronLeft,
   ChevronRight,
@@ -30,6 +31,8 @@ import {
   type ReservationSource,
 } from "@/shared/api/mock-reservations";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { nextId, nextRef } from "../_shared/model";
+import { TONE } from "../_shared/status-pill";
 
 const TIME_START = 600; // 10:00
 const TIME_END = 1560; // 02:00 the next day
@@ -38,15 +41,11 @@ const ROW_HEIGHT = 28;
 const ROWS = (TIME_END - TIME_START) / ROW_MINUTES;
 const NOW_MINUTES = 870; // fixed 14:30 reference point for "upcoming" on the mock's TODAY
 
-const STATUS_COLOR: Record<ReservationStatus, string> = {
-  Pending: "#F59E0B",
-  Confirmed: "#0D6EFD",
-  Arrived: "#6366F1",
-  Seated: "#22C55E",
-  Completed: "#a9a9b2",
-  "No-show": "#EF4444",
-  Cancelled: "#9ca3af",
-};
+// The row pill's own colour map (fix round 4, finding 13) — this file used
+// to keep a second, independently-drifted copy (Confirmed blue here vs.
+// gold on the list, No-show red here vs. slate on the list); TONE in
+// _shared/status-pill.tsx is the one sampled from the frames and is
+// authoritative.
 
 const STATUS_TONE: Record<ReservationStatus, "success" | "error" | "warning" | "info" | "neutral"> = {
   Pending: "warning",
@@ -216,11 +215,17 @@ export function ReservationCalendarPage() {
 
   const createReservation = () => {
     const newReservation: Reservation = {
-      id: `res-${Date.now()}`,
+      // Deterministic ids/refs (fix round 4, findings 14 and 21) — this
+      // used to be `res-${Date.now()}` (the module's "now" is NOW_MINUTES,
+      // not the wall clock) and a hardcoded "RSV-NEW" ref shared by every
+      // reservation created here, which nextRef's own regex can't advance
+      // past. Both are scanned off current state the same way the list
+      // page's Add/Duplicate do.
+      id: nextId(rows),
       date: form.date || TODAY,
       startMinutes: timeToMinutes(form.time || "19:00"),
       durationMinutes: 90,
-      ref: "RSV-NEW",
+      ref: nextRef(rows),
       guest: form.guest,
       phone: form.phone || "+9665XXXXXXXX",
       partySize: Number(form.partySize) || 2,
@@ -410,7 +415,7 @@ export function ReservationCalendarPage() {
                           {formatClock(r.startMinutes)} · {r.table} · {r.partySize}
                         </span>
                       </span>
-                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLOR[r.status] }} />
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: TONE[r.status].dot }} />
                     </button>
                   </li>
                 ))}
@@ -556,7 +561,7 @@ function ReservationBlock({
 }) {
   const top = ((reservation.startMinutes - TIME_START) / ROW_MINUTES) * ROW_HEIGHT;
   const height = Math.max((reservation.durationMinutes / ROW_MINUTES) * ROW_HEIGHT - 2, 18);
-  const color = STATUS_COLOR[reservation.status];
+  const tone = TONE[reservation.status];
   const cancelled = reservation.status === "Cancelled";
   const width = `calc(${100 / reservation.cols}% - 4px)`;
   const insetInlineStart = `calc(${(100 / reservation.cols) * reservation.col}% + 2px)`;
@@ -566,20 +571,22 @@ function ReservationBlock({
     <button
       type="button"
       onClick={() => onSelect(reservation.id)}
-      className="absolute overflow-hidden rounded-[6px] border px-1.5 py-1 text-start shadow-sm transition-opacity hover:opacity-90"
+      className={clsx(
+        "absolute overflow-hidden rounded-[6px] border px-1.5 py-1 text-start shadow-sm transition-opacity hover:opacity-90",
+        cancelled ? "bg-[var(--octo-track)]" : tone.bg
+      )}
       style={{
         top,
         height,
         width,
         insetInlineStart,
-        borderColor: color,
-        backgroundColor: cancelled ? "var(--octo-track)" : `${color}1A`,
+        borderColor: cancelled ? "var(--octo-border-input)" : tone.dot,
         backgroundImage: cancelled
           ? "repeating-linear-gradient(45deg, var(--octo-border-input) 0, var(--octo-border-input) 3px, var(--octo-track) 3px, var(--octo-track) 7px)"
           : undefined,
       }}
     >
-      <span className="block truncate text-[10.5px] font-semibold" style={{ color: cancelled ? "var(--octo-text-secondary)" : color }}>
+      <span className={clsx("block truncate text-[10.5px] font-semibold", cancelled ? "text-[var(--octo-text-secondary)]" : tone.text)}>
         {formatClock(reservation.startMinutes)} · {reservation.guest}
       </span>
       {!dense && (
@@ -766,8 +773,7 @@ function MonthGrid({
                     key={r.id}
                     type="button"
                     onClick={() => onSelect(r.id)}
-                    className="truncate rounded-[4px] px-1 py-0.5 text-start text-[10px] font-medium"
-                    style={{ backgroundColor: `${STATUS_COLOR[r.status]}1A`, color: STATUS_COLOR[r.status] }}
+                    className={clsx("truncate rounded-[4px] px-1 py-0.5 text-start text-[10px] font-medium", TONE[r.status].bg, TONE[r.status].text)}
                   >
                     {formatClock(r.startMinutes)} {r.guest}
                   </button>

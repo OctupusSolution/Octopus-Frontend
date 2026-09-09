@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { ChevronDown } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { ReservationStatus } from "@/shared/api/mock-reservations";
+import { STATE_LABEL_KEY } from "./model";
 import { TONE } from "./status-pill";
 import { useDismiss } from "./use-dismiss";
 
@@ -9,16 +10,6 @@ import { useDismiss } from "./use-dismiss";
 const STATUS_OPTIONS: readonly ReservationStatus[] = [
   "Pending", "Confirmed", "Arrived", "Seated", "Completed", "No-show", "Cancelled",
 ];
-
-const LABEL_KEY: Record<ReservationStatus, string> = {
-  Pending: "reservations.state.pending",
-  Confirmed: "reservations.state.confirmed",
-  Arrived: "reservations.state.arrived",
-  Seated: "reservations.state.seated",
-  Completed: "reservations.state.completed",
-  "No-show": "reservations.state.noShow",
-  Cancelled: "reservations.state.cancelled",
-};
 
 export interface StatusMenuProps {
   value: ReservationStatus;
@@ -68,7 +59,7 @@ export function StatusMenu({ value, onSelect, open, onOpenChange }: StatusMenuPr
                 )}
               >
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tone.dot }} />
-                {t(LABEL_KEY[status])}
+                {t(STATE_LABEL_KEY[status])}
               </button>
             );
           })}

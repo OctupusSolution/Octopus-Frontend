@@ -19,7 +19,18 @@ import {
   type ReservationDeposit,
   type ReservationSource,
 } from "@/shared/api/mock-reservations";
-import { availableTagPresets, combinePhone, NOW_MINUTES, phoneDigitsFrom, timeSlotOptions } from "../_shared/model";
+import {
+  availableTagPresets,
+  combinePhone,
+  DEPOSIT_STATE_LABEL_KEY,
+  durationMinuteOptions,
+  guestsText,
+  hoursMinutesParts,
+  NOW_MINUTES,
+  phoneDigitsFrom,
+  SOURCE_LABEL_KEY,
+  timeSlotOptions,
+} from "../_shared/model";
 
 export interface ReservationFormModalProps {
   open: boolean;
@@ -36,14 +47,6 @@ const SOURCE_OPTIONS: readonly ReservationSource[] = [
   "Direct Booking", "Website", "Walk In", "Phone", "Instagram",
 ];
 
-const SOURCE_LABEL_KEY: Record<ReservationSource, string> = {
-  "Direct Booking": "reservations.source.directBooking",
-  Website: "reservations.source.website",
-  "Walk In": "reservations.source.walkIn",
-  Phone: "reservations.source.phone",
-  Instagram: "reservations.source.instagram",
-};
-
 const DEPOSIT_TYPE_OPTIONS: readonly DepositType[] = ["Pre Reservation", "Per Guest", "Full Prepayment"];
 
 const DEPOSIT_TYPE_LABEL_KEY: Record<DepositType, string> = {
@@ -58,26 +61,25 @@ const DEPOSIT_STATUS_OPTIONS: readonly Exclude<DepositState, "none">[] = [
   "unpaid", "paid", "link-sent", "expired", "failed", "refunded", "cancelled",
 ];
 
-const DEPOSIT_STATUS_LABEL_KEY: Record<Exclude<DepositState, "none">, string> = {
-  unpaid: "reservations.list.row.unpaid",
-  paid: "reservations.list.row.paid",
-  "link-sent": "reservations.state.linkSent",
-  expired: "reservations.state.expired",
-  failed: "reservations.state.failed",
-  refunded: "reservations.state.refunded",
-  cancelled: "reservations.state.cancelled",
-};
-
 // Seating areas offered as a preference — the same set the fixture's rows
 // use, since there's no separate "areas" prop for this form to receive.
 const AREA_OPTIONS = ["Main Dining", "Terrace", "Family Section", "Private Rooms"];
 
-// Table preference options come from the floor plan's own table numbers so
-// they line up with what Floor Plan actually has, deduped and sorted.
-const TABLE_OPTIONS = Array.from(new Set(floorTables.map((table) => table.number))).sort();
+// Table preference options come from the floor plan's own table numbers,
+// deduped and sorted, so they line up with what Floor Plan actually has —
+// plus (fix round 4, finding 7) whatever table the reservation being
+// edited is already on, even if that table isn't one floorTables lists at
+// all (six fixture rows sit on T-09/T-11/T-12/T-28/T-30, none of which
+// floorTables has). Without it the controlled <select> fell back to the
+// blank "Any Available" option on open, and touching the select at all
+// lost the real table — it was never among the options to begin with.
+function tableOptionsFor(reservation: Reservation | null): string[] {
+  const base = new Set(floorTables.map((table) => table.number));
+  if (reservation?.table) base.add(reservation.table);
+  return Array.from(base).sort();
+}
 
 const PARTY_SIZE_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 1);
-const DURATION_HOUR_OPTIONS = [1, 2, 3, 4];
 
 type Channel = "WhatsApp" | "SMS" | "Email";
 const CHANNELS: readonly Channel[] = ["WhatsApp", "SMS", "Email"];
@@ -86,7 +88,7 @@ interface DraftState {
   date: string;
   time: number;
   partySize: number;
-  durationHours: number;
+  durationMinutes: number;
   area: string;
   table: string;
   source: ReservationSource;
@@ -104,11 +106,6 @@ interface DraftState {
   notifyGuest: boolean;
 }
 
-function hoursFromMinutes(minutes: number): number {
-  const hours = Math.round(minutes / 60);
-  return Math.min(4, Math.max(1, hours || 1));
-}
-
 function initDraft(mode: "add" | "edit", reservation: Reservation | null): DraftState {
   if (mode === "edit" && reservation) {
     const [firstName, ...rest] = reservation.guest.split(" ");
@@ -116,7 +113,11 @@ function initDraft(mode: "add" | "edit", reservation: Reservation | null): Draft
       date: reservation.date,
       time: reservation.startMinutes,
       partySize: reservation.partySize,
-      durationHours: hoursFromMinutes(reservation.durationMinutes),
+      // The real value, not rounded to a whole hour (fix round 4, finding
+      // 11) — nine fixture rows are 90-minute bookings; rounding this to
+      // "2 Hours" on open and saving wrote 120 back, silently growing every
+      // one of them by half an hour.
+      durationMinutes: reservation.durationMinutes,
       area: reservation.area || AREA_OPTIONS[0],
       table: reservation.table || "",
       source: reservation.source,
@@ -141,7 +142,7 @@ function initDraft(mode: "add" | "edit", reservation: Reservation | null): Draft
     date: TODAY,
     time: NOW_MINUTES,
     partySize: 2,
-    durationHours: 2,
+    durationMinutes: 120,
     area: AREA_OPTIONS[0],
     table: "",
     source: "Direct Booking",
@@ -302,6 +303,8 @@ export function ReservationFormModal({
   }, [open, mode, reservation?.id]);
 
   const timeOptions = useMemo(() => timeSlotOptions(draft.time), [draft.time]);
+  const durationOptions = useMemo(() => durationMinuteOptions(draft.durationMinutes), [draft.durationMinutes]);
+  const tableOptions = useMemo(() => tableOptionsFor(reservation), [reservation]);
   const remainingTagPresets = useMemo(() => availableTagPresets(draft.tags), [draft.tags]);
 
   const hasName = draft.firstName.trim() !== "" && draft.lastName.trim() !== "";
@@ -346,14 +349,19 @@ export function ReservationFormModal({
       id: reservation?.id ?? "",
       date: draft.date,
       startMinutes: draft.time,
-      durationMinutes: draft.durationHours * 60,
+      durationMinutes: draft.durationMinutes,
       ref: reservation?.ref ?? "",
       guest,
       phone: combinePhone(draft.phoneDigits.trim()),
       email: draft.email.trim() || undefined,
       partySize: draft.partySize,
       area: draft.area,
-      table: draft.table || "Any Available",
+      // Empty string ("no preference"), not the English literal "Any
+      // Available" (fix round 4, finding 6) — that used to get persisted
+      // into the model verbatim and print untranslated on the Arabic page.
+      // Every renderer treats an empty table the same way now: fall back
+      // to t("reservations.form.tableAny") instead of showing raw text.
+      table: draft.table,
       branch: reservation?.branch ?? branches[0],
       source: draft.source,
       status: mode === "edit" && reservation ? reservation.status : intent === "confirm" ? "Confirmed" : "Pending",
@@ -416,11 +424,17 @@ export function ReservationFormModal({
     </Field>
   );
 
+  // Edit Reservations.png shows only "Notify Guest (Optional)" over these
+  // pills — no "Send Payment Link with" heading of its own (fix round 4,
+  // finding 16). The heading (and the blue link-sent notice further down)
+  // stay for Add, where the frame does draw both.
   const sendLinkSection = (
     <div>
-      <p className="mb-2 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-        {t("reservations.form.sendLinkWith")}
-      </p>
+      {mode === "add" && (
+        <p className="mb-2 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+          {t("reservations.form.sendLinkWith")}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {CHANNELS.map((channel) => (
           <ChannelPill
@@ -466,7 +480,7 @@ export function ReservationFormModal({
         <Button
           variant="secondary"
           onClick={onRequestCancel}
-          className="!border-transparent !bg-[#EF4444]/10 !text-[#DC2626] hover:!bg-[#EF4444]/15"
+          className="!border-transparent !bg-[var(--octo-tone-danger-bg)] !text-[var(--octo-tone-danger-text)] hover:!bg-[var(--octo-tone-danger-bg)]"
         >
           {t("reservations.form.cancelReservation")}
         </Button>
@@ -507,19 +521,23 @@ export function ReservationFormModal({
                 <Select value={String(draft.partySize)} onChange={(e) => update("partySize", Number(e.target.value))}>
                   {PARTY_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>
-                      {n === 1 ? t("reservations.list.row.guestOne") : t("reservations.list.row.guests").replace("{n}", String(n))}
+                      {guestsText(t, n)}
                     </option>
                   ))}
                 </Select>
               </Field>
               <Field label={t("reservations.form.duration")}>
                 <Select
-                  value={String(draft.durationHours)}
-                  onChange={(e) => update("durationHours", Number(e.target.value))}
+                  value={String(draft.durationMinutes)}
+                  onChange={(e) => update("durationMinutes", Number(e.target.value))}
                 >
-                  {DURATION_HOUR_OPTIONS.map((h) => (
-                    <option key={h} value={h}>
-                      {t("reservations.form.durationHours").replace("{n}", String(h))}
+                  {durationOptions.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes % 60 === 0
+                        ? t("reservations.form.durationHours").replace("{n}", String(minutes / 60))
+                        : t("reservations.cancel.hoursMinutes")
+                            .replace("{h}", String(hoursMinutesParts(minutes).h))
+                            .replace("{m}", String(hoursMinutesParts(minutes).m))}
                     </option>
                   ))}
                 </Select>
@@ -537,7 +555,7 @@ export function ReservationFormModal({
               <Field label={t("reservations.form.tablePreference")}>
                 <Select value={draft.table} onChange={(e) => update("table", e.target.value)}>
                   <option value="">{t("reservations.form.tableAny")}</option>
-                  {TABLE_OPTIONS.map((table) => (
+                  {tableOptions.map((table) => (
                     <option key={table} value={table}>
                       {table}
                     </option>
@@ -617,13 +635,13 @@ export function ReservationFormModal({
                           className={clsx(
                             "!w-auto !rounded-full !border-none !py-1 !text-[11px] !font-semibold",
                             draft.depositState === "paid"
-                              ? "!bg-[#16A34A]/10 !text-[#15803D]"
+                              ? "!bg-[var(--octo-tone-success-bg)] !text-[var(--octo-tone-success-text)]"
                               : "!bg-[var(--octo-track)] !text-[var(--octo-text-muted)]"
                           )}
                         >
                           {DEPOSIT_STATUS_OPTIONS.map((state) => (
                             <option key={state} value={state}>
-                              {t(DEPOSIT_STATUS_LABEL_KEY[state]).toUpperCase()}
+                              {t(DEPOSIT_STATE_LABEL_KEY[state]).toUpperCase()}
                             </option>
                           ))}
                         </Select>
@@ -756,8 +774,10 @@ export function ReservationFormModal({
         {activeTab === "notes" && noteField}
       </div>
 
-      {draft.depositEnabled && (
-        <div className="mt-4 flex items-center gap-2 rounded-[9px] bg-[#0D6EFD]/[0.06] px-3 py-2.5 text-[12px] text-[#0D6EFD]">
+      {/* Add only (fix round 4, finding 16) — Edit Reservations.png has no
+          equivalent notice; a link only ever goes out once, on creation. */}
+      {mode === "add" && draft.depositEnabled && (
+        <div className="mt-4 flex items-center gap-2 rounded-[9px] bg-[var(--octo-tone-info-bg)] px-3 py-2.5 text-[12px] text-[var(--octo-tone-info-text)]">
           <Info size={14} className="shrink-0" />
           {t("reservations.form.linkNotice")}
         </div>

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the menu library — a grid of menu cards with filters, per-card actions, a schedule modal, and the Create New Menu method chooser — on top of a new `entities/menu` model.
+**Goal:** Build the menu library — a grid of menu cards with filters, per-card actions, a schedule modal, the Create New Menu method chooser, and the deferred AI branch's landing page — on top of a new `entities/menu` model.
 
-**Architecture:** A new `entities/menu` layer owns the types, the pure operations over a menu collection, and versioned localStorage persistence. Two pages consume it: `/menu` (the library) and `/menu/new` (the method chooser). No wizard yet — `Create From Scratch` routes to a path the next plan fills in, and `Import Menu (AI)` renders disabled.
+**Architecture:** A new `entities/menu` layer owns the types and the pure operations over a menu collection. The library lives in React state over a seed fixture — the same in-memory posture as every other merchant module; `use-menu-library` is the single seam a real backend later replaces. Three pages consume it: `/menu` (the library), `/menu/new` (the method chooser) and `/menu/import` (the AI branch's landing). No wizard yet — `Create From Scratch` routes to a path the next plan fills in.
 
 **Tech Stack:** React 18, react-router-dom 6, TypeScript 5.5, Vitest 2, Tailwind 3, `@octopus/ui` primitives, `@i18n` flat dictionaries.
 
@@ -706,175 +706,7 @@ git commit -m "Add pure library operations over a menu collection"
 
 ---
 
-### Task 3: Versioned persistence
-
-**Files:**
-- Create: `apps/merchant/src/entities/menu/menu-storage.ts`
-- Test: `apps/merchant/src/entities/menu/menu-storage.test.ts`
-
-**Interfaces:**
-- Consumes: `Menu` from `./menu`
-- Produces: `MENUS_KEY`, `MENUS_VERSION`, `serializeMenus(menus): string`, `parseMenus(raw: string | null): Menu[] | null`
-
-Mirrors `pages/public-link/_shared/site-draft-storage.ts`: a versioned envelope
-and a shape guard, so a hand-edited or truncated localStorage value falls back
-to the seed instead of crashing the page. localStorage rather than session
-storage — a half-built menu is a business asset the merchant expects tomorrow.
-
-- [ ] **Step 1: Write the failing test**
-
-Create `apps/merchant/src/entities/menu/menu-storage.test.ts`:
-
-```ts
-import { describe, expect, it } from "vitest";
-import { MENUS_VERSION, parseMenus, serializeMenus } from "./menu-storage";
-import { WEEKDAYS, type Menu } from "./menu";
-
-const MENU: Menu = {
-  id: "a",
-  name: "All Day Menu",
-  cover: null,
-  status: "active",
-  branchId: "jeddah",
-  sections: [
-    {
-      id: "s1", kind: "items", name: "Breakfast", image: null, description: "",
-      visibility: "visible", displayStyle: "list", color: null, entries: [],
-    },
-  ],
-  theme: {
-    presetId: "elegant", navStyle: "top-bar", categoryStyle: "icon-text",
-    cardStyle: "classic", itemDetails: "same-page",
-    stickyAddToCart: true, showItemTags: true,
-  },
-  schedule: {
-    type: "all-day", start: "00:00", end: "23:59", days: [...WEEKDAYS],
-    timezone: "Asia/Riyadh", branchIds: ["jeddah"],
-    fallbackMenuId: null, allowPreorderOutsideSchedule: false,
-  },
-  channels: { pos: "live", publicLink: "live", tableQr: "live" },
-  updatedAt: "2026-05-12T10:30:00.000Z",
-  publishedAt: null,
-  version: 1,
-};
-
-describe("serializeMenus / parseMenus", () => {
-  it("round-trips a library", () => {
-    expect(parseMenus(serializeMenus([MENU]))).toEqual([MENU]);
-  });
-
-  it("round-trips an empty library", () => {
-    expect(parseMenus(serializeMenus([]))).toEqual([]);
-  });
-
-  it("returns null for a missing value", () => {
-    expect(parseMenus(null)).toBeNull();
-  });
-
-  it("returns null for a non-JSON value", () => {
-    expect(parseMenus("{{{")).toBeNull();
-  });
-
-  it("returns null for a different version", () => {
-    const stale = JSON.stringify({ version: MENUS_VERSION + 1, menus: [MENU] });
-    expect(parseMenus(stale)).toBeNull();
-  });
-
-  it("returns null when the payload is not an array", () => {
-    expect(parseMenus(JSON.stringify({ version: MENUS_VERSION, menus: { id: "a" } }))).toBeNull();
-  });
-
-  it("returns null when a menu is missing a required field", () => {
-    const { name, ...withoutName } = MENU;
-    const broken = JSON.stringify({ version: MENUS_VERSION, menus: [withoutName] });
-    expect(parseMenus(broken)).toBeNull();
-  });
-
-  it("returns null when sections is not an array", () => {
-    const broken = JSON.stringify({ version: MENUS_VERSION, menus: [{ ...MENU, sections: "nope" }] });
-    expect(parseMenus(broken)).toBeNull();
-  });
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `cd apps/merchant && npx vitest run src/entities/menu/menu-storage.test.ts`
-Expected: FAIL — `Failed to resolve import "./menu-storage"`
-
-- [ ] **Step 3: Write the implementation**
-
-Create `apps/merchant/src/entities/menu/menu-storage.ts`:
-
-```ts
-// localStorage, not sessionStorage: a half-built menu is a business asset, and
-// the merchant expects to find it tomorrow.
-//
-// Everything is validated on the way back in. A hand-edited or truncated value
-// returns null rather than a half-typed object, and the caller falls back to
-// the seed — the same posture as site-draft-storage.ts.
-
-import type { Menu } from "./menu";
-
-export const MENUS_KEY = "octo.menus";
-export const MENUS_VERSION = 1;
-
-export function serializeMenus(menus: readonly Menu[]): string {
-  return JSON.stringify({ version: MENUS_VERSION, menus });
-}
-
-function isMenuShape(value: unknown): value is Menu {
-  if (typeof value !== "object" || value === null) return false;
-  const menu = value as Record<string, unknown>;
-  return (
-    typeof menu.id === "string" &&
-    typeof menu.name === "string" &&
-    typeof menu.status === "string" &&
-    typeof menu.branchId === "string" &&
-    typeof menu.updatedAt === "string" &&
-    typeof menu.version === "number" &&
-    Array.isArray(menu.sections) &&
-    typeof menu.theme === "object" && menu.theme !== null &&
-    typeof menu.schedule === "object" && menu.schedule !== null &&
-    typeof menu.channels === "object" && menu.channels !== null
-  );
-}
-
-export function parseMenus(raw: string | null): Menu[] | null {
-  if (!raw) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const envelope = parsed as Record<string, unknown>;
-  if (envelope.version !== MENUS_VERSION) return null;
-  if (!Array.isArray(envelope.menus)) return null;
-  if (!envelope.menus.every(isMenuShape)) return null;
-
-  return envelope.menus as Menu[];
-}
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `cd apps/merchant && npx vitest run src/entities/menu/menu-storage.test.ts`
-Expected: PASS, 8 tests
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add apps/merchant/src/entities/menu/menu-storage.ts apps/merchant/src/entities/menu/menu-storage.test.ts
-git commit -m "Persist the menu library behind a versioned, validated envelope"
-```
-
----
-
-### Task 4: Seed data and the library hook
+### Task 3: Seed data and the library hook
 
 **Files:**
 - Create: `apps/merchant/src/entities/menu/seed.ts`
@@ -883,7 +715,7 @@ git commit -m "Persist the menu library behind a versioned, validated envelope"
 - Test: `apps/merchant/src/entities/menu/seed.test.ts`
 
 **Interfaces:**
-- Consumes: everything from `./menu`, `./library`, `./menu-storage`
+- Consumes: everything from `./menu`, `./library`
 - Produces: `SEED_MENUS: Menu[]`, `SEED_BRANCHES: readonly { id: string; label: string }[]`, `useMenuLibrary(): { menus: Menu[]; setMenus: (next: Menu[]) => void }`, and the barrel `entities/menu/index.ts` re-exporting all of it
 
 The nine seeded menus are the nine cards the frame draws, with the frame's own
@@ -899,7 +731,6 @@ Create `apps/merchant/src/entities/menu/seed.test.ts`:
 import { describe, expect, it } from "vitest";
 import { SEED_BRANCHES, SEED_MENUS } from "./seed";
 import { entryCount, sectionCount } from "./menu";
-import { parseMenus, serializeMenus } from "./menu-storage";
 
 describe("SEED_MENUS", () => {
   it("seeds the nine menus the frame draws", () => {
@@ -940,10 +771,6 @@ describe("SEED_MENUS", () => {
 
   it("uses unique ids", () => {
     expect(new Set(SEED_MENUS.map((m) => m.id)).size).toBe(SEED_MENUS.length);
-  });
-
-  it("survives a storage round-trip", () => {
-    expect(parseMenus(serializeMenus(SEED_MENUS))).toEqual(SEED_MENUS);
   });
 
   it("points every menu at a known branch", () => {
@@ -1112,42 +939,27 @@ Expected: PASS, 7 tests
 Create `apps/merchant/src/entities/menu/use-menu-library.ts`:
 
 ```ts
-// Holds the library in state, hydrates it from localStorage once on mount, and
-// writes back on every change. Hydration happens in an effect rather than in
-// the useState initialiser so a browser with storage blocked renders the seed
-// instead of throwing during render.
+// The library's single owner. React state over the seed, nothing more — the
+// same posture as mock-reservations and every other merchant module, because
+// the backend has not published a menus endpoint to write against yet.
+//
+// This is deliberately the ONLY place the collection is read or written. Every
+// page and action goes through it, so replacing the body with localStorage, or
+// with a TanStack Query cache once /menus exists, edits this file and no other.
+// Callers already treat `menus` as owned elsewhere and `setMenus` as the only
+// way to change it, which is exactly the contract a query hook offers.
+//
+// Known cost, accepted for this stage: the library resets on reload, so a menu
+// saved as a draft is gone after F5. The spec's Persistence section records
+// why that trade was taken rather than papering over it.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { Menu } from "./menu";
-import { MENUS_KEY, parseMenus, serializeMenus } from "./menu-storage";
 import { SEED_MENUS } from "./seed";
 
 export function useMenuLibrary() {
   const [menus, setMenusState] = useState<Menu[]>(SEED_MENUS);
-  const hydrated = useRef(false);
-
-  useEffect(() => {
-    try {
-      const stored = parseMenus(window.localStorage.getItem(MENUS_KEY));
-      if (stored) setMenusState(stored);
-    } catch {
-      // Storage blocked or unavailable — the seed already on screen is fine.
-    }
-    hydrated.current = true;
-  }, []);
-
-  const setMenus = useCallback((next: Menu[]) => {
-    setMenusState(next);
-    // Never write before hydration, or a slow first paint would overwrite the
-    // merchant's saved library with the seed.
-    if (!hydrated.current) return;
-    try {
-      window.localStorage.setItem(MENUS_KEY, serializeMenus(next));
-    } catch {
-      // Quota or private mode. The in-memory library still works this session.
-    }
-  }, []);
-
+  const setMenus = useCallback((next: Menu[]) => setMenusState(next), []);
   return { menus, setMenus };
 }
 ```
@@ -1159,7 +971,6 @@ Create `apps/merchant/src/entities/menu/index.ts`:
 // from the files directly.
 export * from "./menu";
 export * from "./library";
-export * from "./menu-storage";
 export * from "./seed";
 export * from "./use-menu-library";
 ```
@@ -1178,7 +989,7 @@ git commit -m "Seed the menu library and hydrate it from storage"
 
 ---
 
-### Task 5: The library page
+### Task 4: The library page
 
 **Files:**
 - Create: `apps/merchant/src/pages/menu/library/index.tsx`
@@ -1207,7 +1018,6 @@ block, add:
   "menuLib.subtitle": "Create, manage and schedule your menus across all channels.",
   "menuLib.createNew": "Create New Menu",
   "menuLib.importAi": "Import Menu (AI)",
-  "menuLib.importAiSoon": "Coming soon",
   "menuLib.branchBanner": "You create your menu in {branch} branch",
   "menuLib.changeBranch": "Change Branch",
   "menuLib.search": "Search",
@@ -1248,7 +1058,6 @@ In `packages/i18n/src/locales/ar/index.ts`, the same keys:
   "menuLib.subtitle": "أنشئ قوائمك وأدرها وجدولها عبر جميع القنوات.",
   "menuLib.createNew": "إنشاء قائمة جديدة",
   "menuLib.importAi": "استيراد قائمة (ذكاء اصطناعي)",
-  "menuLib.importAiSoon": "قريباً",
   "menuLib.branchBanner": "أنت تنشئ قائمتك في فرع {branch}",
   "menuLib.changeBranch": "تغيير الفرع",
   "menuLib.search": "بحث",
@@ -1443,12 +1252,12 @@ export function MenuLibraryPage() {
           <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{t("menuLib.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2.5">
-          {/* The AI import branch is specced but not built. Showing it disabled
-              is more honest than hiding it — the frame promises it exists. */}
+          {/* The AI branch is deferred, not dead. It navigates to a real page
+              that says so. A disabled button beside the primary action reads as
+              a broken build rather than as a roadmap. */}
           <Button
             variant="secondary"
-            disabled
-            title={t("menuLib.importAiSoon")}
+            onClick={() => navigate("/menu/import")}
             icon={<Sparkles size={16} aria-hidden />}
           >
             {t("menuLib.importAi")}
@@ -1519,8 +1328,7 @@ export function MenuLibraryPage() {
               </Button>
               <Button
                 variant="secondary"
-                disabled
-                title={t("menuLib.importAiSoon")}
+                onClick={() => navigate("/menu/import")}
                 icon={<Sparkles size={16} aria-hidden />}
               >
                 {t("menuLib.importAi")}
@@ -1583,7 +1391,7 @@ git commit -m "Build the menu library page"
 
 ---
 
-### Task 6: Card actions
+### Task 5: Card actions
 
 **Files:**
 - Create: `apps/merchant/src/pages/menu/library/actions-menu.tsx`
@@ -1837,7 +1645,7 @@ git commit -m "Wire the menu card's six actions"
 
 ---
 
-### Task 7: The schedule modal
+### Task 6: The schedule modal
 
 **Files:**
 - Create: `apps/merchant/src/pages/menu/library/schedule-modal.tsx`
@@ -2167,13 +1975,13 @@ git commit -m "Add the Schedule Menu modal"
 
 ---
 
-### Task 8: The Create New Menu chooser
+### Task 7: The Create New Menu chooser
 
 **Files:**
 - Create: `apps/merchant/src/pages/menu/new/index.tsx`
 - Modify: `apps/merchant/src/app/routes/registry.tsx` (add the `menu-new` route)
 - Modify: `packages/i18n/src/locales/en/index.ts`, `packages/i18n/src/locales/ar/index.ts`
-- Copy: the two illustrations into `apps/merchant/public/images/menu/`
+- Create: `apps/merchant/src/shared/lib/menu-assets.ts`
 
 **Interfaces:**
 - Consumes: `SEED_BRANCHES` from `@/entities/menu`
@@ -2184,12 +1992,29 @@ implements. Until then that path has no route and lands on the app's not-found
 handling — acceptable for one plan, and named here so the next plan knows the
 contract.
 
-- [ ] **Step 1: Copy the illustrations**
+- [ ] **Step 1: Reach the illustrations where they already live**
 
-```bash
-mkdir -p apps/merchant/public/images/menu
-cp "apps/assets/Menu/Create Menu.png" apps/merchant/public/images/menu/create-from-scratch.png
-cp "apps/assets/Menu/Upload Menu.png" apps/merchant/public/images/menu/upload-with-ai.png
+The two 3D illustrations stay in `apps/assets/Menu/` and are imported, not
+copied. `shared/lib/storefront-assets.ts` carries a comment explaining why:
+a duplicated set of category images drifted from its original and left
+onboarding step 8 pointing at four photographs that no longer existed. Vite
+hashes and bundles the imported URL just as it would a `public/` file.
+
+Create `apps/merchant/src/shared/lib/menu-assets.ts`:
+
+```ts
+// Image URLs for the Menu module. Same mechanism and same reasoning as
+// storefront-assets.ts: the artwork stays in apps/assets/ and is reached by
+// URL rather than copied into a second location that can drift.
+//
+// Paths are relative to THIS file: four levels up lands on `apps/`.
+
+export function menuAsset(file: string): string {
+  return new URL(`../../../../assets/Menu/${file}`, import.meta.url).href;
+}
+
+export const CREATE_FROM_SCRATCH_ART = menuAsset("Create Menu.png");
+export const UPLOAD_WITH_AI_ART = menuAsset("Upload Menu.png");
 ```
 
 - [ ] **Step 2: Add the i18n keys**
@@ -2249,9 +2074,9 @@ Add to `packages/i18n/src/locales/ar/index.ts`:
 Create `apps/merchant/src/pages/menu/new/index.tsx`:
 
 ```tsx
-// The method chooser. Two cards; the AI one is disabled until its branch is
-// built, which is why its illustration is dimmed and its button inert rather
-// than the card being hidden — the frame promises the capability exists.
+// The method chooser. Two cards, both live. The AI one leads to /menu/import
+// rather than being dimmed or hidden: the frame promises the capability, and a
+// page that explains the wait keeps that promise better than an inert button.
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, Clock, Coins, Info, MapPin, Store } from "lucide-react";
 import { Button } from "@octopus/ui";
@@ -2302,7 +2127,7 @@ export function CreateMenuPage() {
           <span className="absolute end-6 top-6 rounded-full bg-[#7c3aed] px-3 py-1 text-[13px] font-semibold text-white">
             {t("menuNew.recommended")}
           </span>
-          <img src="/images/menu/create-from-scratch.png" alt="" className="mx-auto h-[220px] object-contain" />
+          <img src={CREATE_FROM_SCRATCH_ART} alt="" className="mx-auto h-[220px] object-contain" />
           <h2 className="mt-5 text-[20px] font-semibold text-[var(--octo-text-primary)]">
             {t("menuNew.scratch.title")}
           </h2>
@@ -2320,8 +2145,8 @@ export function CreateMenuPage() {
           </Button>
         </section>
 
-        <section className="rounded-[16px] border-2 border-[#16a34a] bg-[#16a34a]/5 p-6 opacity-70">
-          <img src="/images/menu/upload-with-ai.png" alt="" className="mx-auto h-[220px] object-contain" />
+        <section className="rounded-[16px] border-2 border-[#16a34a] bg-[#16a34a]/5 p-6">
+          <img src={UPLOAD_WITH_AI_ART} alt="" className="mx-auto h-[220px] object-contain" />
           <h2 className="mt-5 text-[20px] font-semibold text-[var(--octo-text-primary)]">
             {t("menuNew.ai.title")}
           </h2>
@@ -2331,7 +2156,10 @@ export function CreateMenuPage() {
             <Point tone="text-[#16a34a]">{t("menuNew.ai.p2")}</Point>
             <Point tone="text-[#16a34a]">{t("menuNew.ai.p3")}</Point>
           </ul>
-          <Button className="mt-5 w-full" disabled title={t("menuLib.importAiSoon")}>
+          <Button
+            className="mt-5 w-full bg-[#16a34a] hover:bg-[#15803d]"
+            onClick={() => navigate("/menu/import")}
+          >
             {t("menuNew.ai.cta")}
           </Button>
         </section>
@@ -2365,14 +2193,108 @@ Expected: no type errors, suite green.
 Open `/menu`, click Create New Menu. Compare against
 `apps/assets/Menu/Menu Design/ADD NEW MENU - For first time or adding.png`:
 the four-fact strip, two cards side by side, the purple Recommended pill, the
-two illustrations, three ticks each, and the switch-method hint. Confirm the AI
-card's button does not respond to clicks.
+two illustrations, three ticks each, and the switch-method hint. Both cards'
+buttons are live; the green one is drawn at full strength, not dimmed.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/merchant/src/pages/menu/new/ apps/merchant/public/images/menu/ apps/merchant/src/app/routes/registry.tsx packages/i18n/src/locales/
+git add apps/merchant/src/pages/menu/new/ apps/merchant/src/shared/lib/menu-assets.ts apps/merchant/src/app/routes/registry.tsx packages/i18n/src/locales/
 git commit -m "Add the Create New Menu method chooser"
+```
+
+---
+
+### Task 8: The AI branch landing
+
+**Files:**
+- Create: `apps/merchant/src/pages/menu/import/index.tsx`
+- Modify: `apps/merchant/src/app/routes/registry.tsx`
+- Modify: `packages/i18n/src/locales/en/index.ts`, `.../ar/index.ts`
+
+**Interfaces:**
+- Consumes: `UPLOAD_WITH_AI_ART` from `@/shared/lib/menu-assets`
+- Produces: `ImportMenuPage`
+
+Three controls now point here — the library header's `Import Menu (AI)`, the
+chooser's green card, and (later) the wizard's method switch. The page exists so
+none of them is a dead button. It is the module's honest edge: it names what the
+branch will do, says it is not built yet, and offers the one route that is —
+building by hand.
+
+Deliberately not a modal or a toast. A merchant who clicked a primary-looking
+action deserves a page that stays put while they read it and a back button that
+works.
+
+- [ ] **Step 1: Add the i18n keys**
+
+Add to `packages/i18n/src/locales/en/index.ts`:
+
+```ts
+  "menuImport.title": "Import Menu with AI",
+  "menuImport.subtitle": "Upload a PDF or photo of your existing menu and let AI turn it into a digital one.",
+  "menuImport.soonTitle": "Not available yet",
+  "menuImport.soonBody": "We are still building this. It will detect your sections, items and prices from the file you upload, keep your branding, and hand you a draft to review before publishing.",
+  "menuImport.buildByHand": "Build the menu by hand instead",
+  "menuImport.backToMenus": "Back to menus",
+```
+
+And the matching Arabic in `.../ar/index.ts`:
+
+```ts
+  "menuImport.title": "استيراد قائمة بالذكاء الاصطناعي",
+  "menuImport.subtitle": "ارفع ملف PDF أو صورة لقائمتك الحالية ودع الذكاء الاصطناعي يحولها إلى قائمة رقمية.",
+  "menuImport.soonTitle": "غير متاح بعد",
+  "menuImport.soonBody": "ما زلنا نبني هذه الميزة. ستتعرف على الأقسام والأصناف والأسعار من الملف الذي ترفعه، وتحافظ على هويتك البصرية، وتسلمك مسودة تراجعها قبل النشر.",
+  "menuImport.buildByHand": "أنشئ القائمة يدوياً بدلاً من ذلك",
+  "menuImport.backToMenus": "العودة إلى القوائم",
+```
+
+- [ ] **Step 2: Run the dictionary test**
+
+Run: `cd apps/merchant && npx vitest run src/shared/i18n/keys.test.ts`
+Expected: PASS — both dictionaries carry the same six keys.
+
+- [ ] **Step 3: Write the page**
+
+Create `apps/merchant/src/pages/menu/import/index.tsx`. It renders the module
+header (title, subtitle), the green illustration, a bordered panel carrying
+`soonTitle` and `soonBody`, and two actions: a primary
+`Build the menu by hand instead` navigating to `/menu/new/scratch`, and a
+secondary `Back to menus` navigating to `/menu`. Page padding and header type
+scale match `pages/menu/index.tsx` so it reads as the same module.
+
+Colours come from `--octo-*` tokens, never literals, so the panel survives dark
+mode. Logical properties only.
+
+- [ ] **Step 4: Add the route**
+
+In `apps/merchant/src/app/routes/registry.tsx`, directly after the `menu-new`
+entry, add:
+
+```tsx
+  { id: "menu-import",  path: "/menu/import",  section: "Menu",         page: "Import Menu",
+    element: lazy(() => import("@/pages/menu/import").then(m => ({ default: m.ImportMenuPage }))) },
+```
+
+- [ ] **Step 5: Verify**
+
+Run: `cd apps/merchant && npx tsc -b --noEmit && npm test`
+Expected: no type errors, suite green.
+
+- [ ] **Step 6: Screenshot and compare**
+
+There is no frame for this page — it is ours, not the designer's. Check it
+against the module instead: open `/menu`, click `Import Menu (AI)`, and confirm
+the page carries the same padding, header scale and card treatment as the
+library behind it. Then open `/menu/new` and confirm the green card reaches the
+same page. Screenshot in both light and dark mode.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/merchant/src/pages/menu/import/ apps/merchant/src/app/routes/registry.tsx packages/i18n/src/locales/
+git commit -m "Give the deferred AI branch a page instead of a dead button"
 ```
 
 ---
@@ -2382,7 +2304,7 @@ git commit -m "Add the Create New Menu method chooser"
 Named so the next plan's author does not go looking:
 
 - **The wizard.** `/menu/new/scratch` and `/menu/:menuId/build/*` have no
-  routes yet. Task 6's `edit` action and Task 8's scratch button both navigate
+  routes yet. Task 5's `edit` action and Task 7's scratch button both navigate
   to paths the wizard plan creates.
 - **The `entities/site-draft/` extraction.** Moved to the wizard plan, where
   the Theme step is its first consumer.
@@ -2392,4 +2314,4 @@ Named so the next plan's author does not go looking:
   siblings, unreachable from the sidebar's Menu entry only once the wizard
   plan's final task removes their `ITEM_PATHS` rows. Until then both the old
   pages and the new library exist; only `/menu` changed hands.
-- **The AI branch.** Disabled in two places, specced but not built.
+- **The AI branch itself.** `/menu/import` exists and explains itself; the three frames behind it (`AI Menu`, `Edit Menu ai`, `Edit Detected items`) are specced but not built.

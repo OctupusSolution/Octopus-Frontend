@@ -49,6 +49,19 @@ const CATEGORY_KEYS = [
   "publicLink.category.breakfast",
 ] as const;
 
+// Parallel to CATEGORY_KEYS — same order, same length — so the mosaic and the
+// four product cards show five genuinely different photographs instead of
+// the widget falling through to one shared default (final review finding
+// F4). Chosen to mirror onboarding's own default (non-T4/T5) category set,
+// which resolves to these same five files.
+const CATEGORY_IMAGES: readonly string[] = [
+  "all.png",
+  "appetizers.png",
+  "drinks.webp",
+  "cake.png",
+  "breakfast.webp",
+];
+
 // Only the block kinds the widget actually draws. Everything else in
 // SECTION_IDS (reservations, reservationsCta, events, testimonials,
 // instagram, waitlist) has no entry and is dropped in `previewModelFromSite`.
@@ -81,8 +94,20 @@ function formatSitePrice(amount: number, locale: string): string {
 // its input is already lowercase and hyphen-safe, which a merchant's free-text
 // business name is not. This lowercases and turns runs of anything else into
 // a single hyphen first, then hands the result to `dnsLabel` for the trim.
+//
+// The slug is capped at MAX_SLUG_LENGTH before that trim (final review finding
+// F1): the Preview step's QR encodes `https://{slug}.octopus.app?preview=test`,
+// whose non-slug characters are a fixed 33 bytes ("https://" [8] +
+// ".octopus.app" [12] + "?preview=test" [13]). `encodeQr` throws above 78
+// bytes total (version-4 byte-mode capacity, see qr-encode.ts), so the slug
+// alone must stay at or under 78 - 33 = 45 bytes — the binding constraint,
+// tighter than the 63-character DNS label limit `sanitizeTag` uses, because
+// that limit governs the label's own legality, not this page's QR budget.
+const MAX_SLUG_LENGTH = 45;
+
 function hostLabelFromName(name: string): string {
-  return dnsLabel(name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, MAX_SLUG_LENGTH);
+  return dnsLabel(slug);
 }
 
 export function previewModelFromSite(
@@ -95,12 +120,18 @@ export function previewModelFromSite(
   const activeTheme = SITE_THEMES.find((entry) => entry.id === theme.id);
   const hero = draft.sectionSettings.hero;
 
+  // `.flatMap` rather than `.map(...)!`: a stored draft can carry a page id
+  // this build's catalog no longer knows (final review finding F2 — the same
+  // failure mode every comparable lookup in this feature already guards
+  // against). Skip the unknown id instead of crashing the whole app on
+  // mount.
   const navItems = draft.pages
     .filter((page) => page.inNav)
-    .map((page) => ({
-      labelKey: PAGE_MODULES.find((module) => module.id === page.id)!.labelKey,
-      visible: !draft.navigation.hidden.includes(page.id),
-    }));
+    .flatMap((page) => {
+      const module = PAGE_MODULES.find((m) => m.id === page.id);
+      if (!module) return [];
+      return [{ labelKey: module.labelKey, visible: !draft.navigation.hidden.includes(page.id) }];
+    });
 
   // Named, not positional: whichever page is first in nav order AND not
   // eye-toggled hidden is "home" for this preview, however the merchant has
@@ -125,8 +156,14 @@ export function previewModelFromSite(
     sections,
     sectionLabelKeys: SECTION_LABEL_KEYS,
     navItems,
+    // "Show in Header" (Navigation step) hides the header's nav strip
+    // entirely — final review finding F5. The builder's pages already cover
+    // Home/About/Contact through real `navItems` entries, so there is no
+    // separate furniture list to gate here.
+    showHeaderNav: draft.navigation.showInHeader,
     activeNavLabelKey,
     categories: CATEGORY_KEYS,
+    categoryImages: CATEGORY_IMAGES,
     cityLabel: "",
     hoursSummary: "",
     samplePrices: PRICE_LADDER.map((p) => formatSitePrice(p, locale)),

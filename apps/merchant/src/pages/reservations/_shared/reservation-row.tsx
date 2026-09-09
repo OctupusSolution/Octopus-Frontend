@@ -19,15 +19,23 @@ export type RowMenu = "none" | "status" | "actions";
 // Fixed grid tracks so Edit/Status/contact icons land at the same x-position
 // on every row (fix round 1). Content-width flex cells drifted per-row once
 // real, varying guest names and party sizes replaced the frame's single
-// repeated mock guest. Guest is the only flexible track — every other cell
-// holds a short, roughly bounded value (a count, an id, an icon label).
+// repeated mock guest.
+//
+// Guest is capped with minmax(160px,240px), not 1fr (fix round 2) — its
+// content (avatar + name/phone) is intrinsically ~150-200px and
+// left-aligned, so letting it soak up all the leftover width at full page
+// width opened a 300-450px void between the phone number and the Party
+// column. Payment carries the flexible track instead: it's the last info
+// column before the Edit/Status/Contact/More action cluster, its pill and
+// deposit lines are already left-aligned, and putting the slack there pins
+// the actions flush right — matching the frame.
 const ROW_GRID_COLUMNS =
-  "grid-cols-[124px_1fr_104px_148px_128px_180px_88px_128px_180px_40px]";
-// Sum of the fixed tracks above, plus a floor for the flexible Guest column,
-// so the row scrolls horizontally on narrow laptop widths instead of
-// squeezing its columns out of alignment. The page wraps the row list in a
-// horizontally-scrolling container sized to this.
-export const ROW_LIST_MIN_WIDTH = "min-w-[1340px]";
+  "grid-cols-[124px_minmax(160px,240px)_104px_148px_128px_minmax(180px,1fr)_88px_128px_180px_40px]";
+// Sum of the fixed tracks plus each minmax()'s floor, so the row scrolls
+// horizontally on narrow laptop widths instead of squeezing its columns out
+// of alignment. The page wraps the row list in a horizontally-scrolling
+// container sized to this.
+export const ROW_LIST_MIN_WIDTH = "min-w-[1280px]";
 
 export interface ReservationRowProps {
   reservation: Reservation;

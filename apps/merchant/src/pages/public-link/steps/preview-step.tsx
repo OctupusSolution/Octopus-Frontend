@@ -141,7 +141,12 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
       <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.preview")}</p>
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.preview.subtitle")}</p>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
+      {/* Before a run the results column has nothing to show, so it isn't
+          reserved at all — two columns (test-mode panel + a properly wide
+          Live Preview) rather than a flexible middle column sitting empty.
+          Once a run finishes, the results table claims a real middle column
+          and the layout grows to three. */}
+      <div className={clsx("grid gap-4", done ? "xl:grid-cols-[300px_minmax(0,1fr)_460px]" : "xl:grid-cols-[320px_520px]")}>
         {/* Start: test-mode status + rehearsal checklist */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="flex flex-col gap-2">
@@ -186,10 +191,12 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
           </Button>
         </div>
 
-        {/* Middle: results, only once a run has completed */}
-        <div className="flex flex-col gap-4">
-          {done && preview.results ? (
-            <>
+        {/* Middle: results — the column itself only exists once a run has
+            completed; before that there is nothing to reserve it for, so the
+            grid template above drops straight to two columns instead of
+            leaving this one flexible-and-empty. */}
+        {done && preview.results ? (
+          <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.preview.simulationResults")}</p>
@@ -248,9 +255,8 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
                   ))}
                 </div>
               </div>
-            </>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         {/* End: device preview and the share QR/link */}
         <div className="flex flex-col gap-3">

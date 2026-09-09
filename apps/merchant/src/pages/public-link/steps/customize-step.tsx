@@ -106,7 +106,7 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
       <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.customize")}</p>
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.customize.subtitle")}</p>
 
-      <div className="grid gap-4 xl:grid-cols-[280px_360px_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[280px_340px_minmax(0,1fr)]">
         {/* Start: the homepage section list */}
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="flex items-center justify-between gap-2">

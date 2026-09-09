@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { reservations, TODAY, type Reservation } from "@/shared/api/mock-reservations";
-import { clock12, deriveKpis, displayState, EMPTY_FILTERS, isPaid, refundPolicy, tableLabel, visibleRows } from "./model";
+import {
+  availableTagPresets,
+  clock12,
+  combinePhone,
+  deriveKpis,
+  displayState,
+  EMPTY_FILTERS,
+  isPaid,
+  phoneDigitsFrom,
+  refundPolicy,
+  tableLabel,
+  TAG_PRESETS,
+  timeSlotOptions,
+  visibleRows,
+} from "./model";
 
 function row(over: Partial<Reservation> = {}): Reservation {
   return {
@@ -126,5 +140,56 @@ describe("refundPolicy", () => {
   });
   it("reports the gap in minutes", () => {
     expect(refundPolicy(r, 12 * 60).minutesToEvent).toBe(420);
+  });
+});
+
+describe("timeSlotOptions", () => {
+  it("builds 48 half-hour slots covering the day", () => {
+    const opts = timeSlotOptions();
+    expect(opts).toHaveLength(48);
+    expect(opts[0]).toMatchObject({ value: 0, label: "12:00 AM" });
+    expect(opts[opts.length - 1]).toMatchObject({ value: 23 * 60 + 30, label: "11:30 PM" });
+  });
+
+  it("folds in an off-grid current value so it's never lost", () => {
+    const opts = timeSlotOptions(13 * 60 + 15);
+    expect(opts).toHaveLength(49);
+    expect(opts.find((o) => o.value === 13 * 60 + 15)).toMatchObject({ label: "1:15 PM" });
+    // stays sorted around the inserted slot
+    const index = opts.findIndex((o) => o.value === 13 * 60 + 15);
+    expect(opts[index - 1].value).toBeLessThan(13 * 60 + 15);
+    expect(opts[index + 1].value).toBeGreaterThan(13 * 60 + 15);
+  });
+
+  it("does not duplicate a current value that already sits on the grid", () => {
+    expect(timeSlotOptions(13 * 60)).toHaveLength(48);
+  });
+});
+
+describe("availableTagPresets", () => {
+  it("returns every preset when none are used", () => {
+    expect(availableTagPresets([])).toEqual([...TAG_PRESETS]);
+  });
+
+  it("excludes tags already attached", () => {
+    expect(availableTagPresets(["Birthday", "VIP"])).toEqual(["Anniversary", "Allergy"]);
+  });
+
+  it("is empty once all four presets are used", () => {
+    expect(availableTagPresets([...TAG_PRESETS])).toEqual([]);
+  });
+});
+
+describe("phone helpers", () => {
+  it("strips the +966 prefix", () => {
+    expect(phoneDigitsFrom("+966510002877")).toBe("510002877");
+  });
+
+  it("leaves a number without the prefix unchanged", () => {
+    expect(phoneDigitsFrom("510002877")).toBe("510002877");
+  });
+
+  it("re-adds the prefix", () => {
+    expect(combinePhone("510002877")).toBe("+966510002877");
   });
 });

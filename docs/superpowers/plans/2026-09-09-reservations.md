@@ -901,7 +901,13 @@ Initials from the first two words, uppercased. Background is a hash of the name 
 
 - [ ] **Step 2: `status-pill.tsx`**
 
-`displayState(reservation)` → a dot + label. One tone map, all eleven values:
+`displayState(reservation)` → a dot + label. One tone map, all eleven values.
+
+> **Corrected after Task 4's review (ruling R7).** The table below as first
+> written had `Confirmed` green and `No-show` violet. Pixel-sampling
+> `Reservations.png` showed the frame draws `Confirmed` gold (≈`#AF9303`),
+> `Completed` green (≈`#009A39`) and `No-show` slate (≈`#58606C`). The frame
+> is the authority; sample it rather than trusting these hexes to the digit.
 
 ```ts
 const TONE: Record<DisplayState, { dot: string; text: string; bg: string }> = {
@@ -924,6 +930,10 @@ Label comes from `reservations.state.*`. Shape: `inline-flex items-center gap-1.
 - [ ] **Step 3: `kpi-cards.tsx`**
 
 Five tinted cards in `grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5`. Each: a `rounded-[10px] h-9 w-9 grid place-items-center` icon tile in a solid brand colour with a white lucide icon, then the number at `text-[26px] font-bold leading-none`, the label at `text-[12px] text-[var(--octo-text-muted)]`, then the percentage line.
+
+Icons: the frame draws card 2 as a chart-with-a-star glyph and uses the *same*
+stopwatch glyph for cards 3 and 5. The column below is a first guess; match the
+frame (ruling R7).
 
 | Card | Card bg | Tile | Icon | Percent line |
 | --- | --- | --- | --- | --- |

@@ -38,6 +38,12 @@ export interface StorefrontPreviewModel {
    *  guarantees the same id sits at the same index in both. */
   sectionLabelKeys: Readonly<Record<string, string>>;
   navItems: readonly PreviewNavItem[];
+  /** Trailing header-nav-only entries with no equivalent page of their own —
+   *  content the footer's Explore column (which lists `navItems` unfiltered,
+   *  as a sitemap) must not also pick up. Optional: a host whose `navItems`
+   *  already contains everything the header should show (the builder, whose
+   *  pages include real About/Contact entries) omits it. */
+  navFurniture?: readonly PreviewNavItem[];
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];
   /** Already translated. Empty string renders nothing. */

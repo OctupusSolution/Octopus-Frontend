@@ -274,10 +274,27 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
           </span>
         )}
 
-        {/* The nav is the merchant's own section list, in their own order:
-            reorder the sections below and this menu follows. The two ends —
-            Home, and the About/Contact pair — are page furniture every
-            storefront has, not sections the merchant can move. */}
+        {/* The nav's middle is entirely the host's own list — reorder the
+            sections below (or the pages, in the builder) and this menu
+            follows. The trailing About/Contact used to be hardcoded here;
+            now each host supplies them, either as real `navItems` entries
+            (the builder, whose pages already include About/Contact) or as
+            `navFurniture` (onboarding, which has no such pages — see that
+            field's doc comment on `StorefrontPreviewModel` for why it isn't
+            just appended to `navItems`). Either way this widget no longer
+            hardcodes a host's content (the same principle as
+            `sectionLabelKeys`).
+            Home stays hardcoded: onboarding's own `navItems` has no "Home"
+            entry at all — its `hero` item is deliberately marked invisible
+            and carries a different label ("Hero Section", for the section
+            editor) — so there is no host-supplied item this span could be
+            replaced with without onboarding losing its Home label entirely.
+            The active/underline treatment below is genuine chrome (every
+            storefront highlights its current page the same way); only the
+            word "Home" is content, and today it still duplicates the
+            builder's own Home page entry in navItems — a residual issue
+            flagged for a follow-up that also touches the model, not fixed
+            here. */}
         {!mobile && (
           <nav className="flex min-w-0 items-center gap-3.5 overflow-x-auto text-[9px] text-[var(--octo-text-primary)]">
             {/* Home is the current page, marked the way SiteHeader marks the
@@ -295,8 +312,11 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
               .map((item, i) => (
                 <span key={i} className="whitespace-nowrap">{t(item.labelKey)}</span>
               ))}
-            <span className="whitespace-nowrap">{t("onboarding.publicLink.previewAbout")}</span>
-            <span className="whitespace-nowrap">{t("onboarding.publicLink.previewContact")}</span>
+            {(model.navFurniture ?? [])
+              .filter((item) => item.visible)
+              .map((item, i) => (
+                <span key={`furniture-${i}`} className="whitespace-nowrap">{t(item.labelKey)}</span>
+              ))}
           </nav>
         )}
 

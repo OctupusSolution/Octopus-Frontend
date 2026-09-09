@@ -3485,6 +3485,8 @@ export const en = {
   "publicLink.navigation.pageOrder": "Page Order",
   "publicLink.navigation.pageOrderHint": "Drag to reorder. Toggle eye icon to show/hide",
   "publicLink.navigation.updatesInstantly": "Changes to navigation update instantly across your Public Link",
+  "publicLink.navigation.webPreviewCaption": "Web Navigation Preview",
+  "publicLink.navigation.mobilePreviewCaption": "Mobile Drawer Preview",
   "publicLink.nav.hidePage": "Hide from navigation",
   "publicLink.nav.showPage": "Show in navigation",
   "publicLink.stepTitle.customize": "Customize Sections",

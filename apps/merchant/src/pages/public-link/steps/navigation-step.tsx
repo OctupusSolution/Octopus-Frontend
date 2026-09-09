@@ -166,12 +166,18 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
         </div>
 
         {/* End: previews */}
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
+                {t("publicLink.navigation.webPreviewCaption")}
+              </p>
               <WebNavPreview draft={draft} />
             </div>
-            <div className="shrink-0">
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
+                {t("publicLink.navigation.mobilePreviewCaption")}
+              </p>
               <MobileDrawerPreview draft={draft} />
             </div>
           </div>

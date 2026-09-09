@@ -38,6 +38,11 @@ export interface StorefrontPreviewModel {
    *  guarantees the same id sits at the same index in both. */
   sectionLabelKeys: Readonly<Record<string, string>>;
   navItems: readonly PreviewNavItem[];
+  /** Whether the header's nav strip renders at all. Optional so a host that
+   *  has no such toggle (onboarding) keeps its current header unconditionally
+   *  — `undefined` behaves as `true`. The builder's "Show in Header" switch
+   *  (Navigation step) is the one control that maps onto this. */
+  showHeaderNav?: boolean;
   /** Header-nav-only entries with no equivalent page of their own — content
    *  the footer's Explore column (which lists `navItems` unfiltered, as a
    *  sitemap) must not also pick up. `leading` renders before `navItems`
@@ -55,6 +60,14 @@ export interface StorefrontPreviewModel {
   activeNavLabelKey?: string;
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];
+  /** `storefrontAsset` filenames, parallel to `categories` — same order, same
+   *  length (never empty, same rule as `categories` itself). Supplied
+   *  explicitly by each adapter rather than guessed by the widget from the
+   *  category key's own string (a widget keyed on one host's dictionary
+   *  contents is exactly the coupling this model exists to remove — see
+   *  Ruling B). The widget indexes into this modulo its length, same as
+   *  `samplePrices`. */
+  categoryImages: readonly string[];
   /** Already translated. Empty string renders nothing. */
   cityLabel: string;
   /** Already summarised, e.g. "Daily 11:00 AM – 12:00 AM". Empty string

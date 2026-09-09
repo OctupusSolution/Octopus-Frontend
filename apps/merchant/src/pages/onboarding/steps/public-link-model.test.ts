@@ -46,4 +46,14 @@ describe("previewModelFromOnboarding", () => {
       bestSeller: "onboarding.publicLink.section.bestSeller",
     });
   });
+
+  // Final review finding F4: `categoryImages` was moved here from the widget
+  // so onboarding's mosaic/product-card photos are unaffected by the
+  // builder's own category keys. One image per category, in the same order.
+  it("supplies one image per category, distinct across the default set", () => {
+    const model = previewModelFromOnboarding(EMPTY_DRAFT, "desktop", t, "en");
+    expect(model.categoryImages).toHaveLength(model.categories.length);
+    expect(model.categoryImages).toEqual(["all.png", "appetizers.png", "drinks.webp", "cake.png", "breakfast.webp"]);
+    expect(new Set(model.categoryImages).size).toBe(model.categoryImages.length);
+  });
 });

@@ -66,4 +66,35 @@ describe("parseDraft normalises the step", () => {
     const low = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, step: 0 } });
     expect(parseDraft(low)?.step).toBe(1);
   });
+
+  // Final review finding F2: a fractional step survived Math.min/Math.max
+  // unchanged, and `SITE_STEPS[3.5 - 1]` is `undefined` — index.tsx then
+  // throws reading `.Component` off it.
+  it("floors a fractional step to a real step index", () => {
+    const raw = JSON.stringify({ version: DRAFT_VERSION, draft: { ...EMPTY_SITE_DRAFT, step: 3.7 } });
+    expect(parseDraft(raw)?.step).toBe(3);
+    expect(Number.isInteger(parseDraft(raw)!.step)).toBe(true);
+  });
+
+});
+
+describe("parseDraft rejects a corrupted typography shape", () => {
+  // Final review finding F2: preview-model.ts reads
+  // `brand.typography.en.titles` / `.ar.titles`; `isRecord(brand.typography)`
+  // alone let `typography: {}` or `typography: { en: 3 }` through.
+  it("discards a draft whose typography.en is not an object", () => {
+    const raw = JSON.stringify({
+      version: DRAFT_VERSION,
+      draft: { ...EMPTY_SITE_DRAFT, brand: { ...EMPTY_SITE_DRAFT.brand, typography: { en: 3, ar: {} } } },
+    });
+    expect(parseDraft(raw)).toBeNull();
+  });
+
+  it("discards a draft whose typography has no ar side at all", () => {
+    const raw = JSON.stringify({
+      version: DRAFT_VERSION,
+      draft: { ...EMPTY_SITE_DRAFT, brand: { ...EMPTY_SITE_DRAFT.brand, typography: {} } },
+    });
+    expect(parseDraft(raw)).toBeNull();
+  });
 });

@@ -87,7 +87,7 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
       <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.theme")}</p>
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.theme.subtitle")}</p>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
             {THEME_FILTERS.map((filter) => {

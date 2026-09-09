@@ -111,7 +111,7 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
       <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.navigation")}</p>
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.navigation.subtitle")}</p>
 
-      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+      <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_540px]">
         {/* Start: Navigation Display + Global Options */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
@@ -180,21 +180,22 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
           <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.navigation.pageOrderHint")}</p>
         </div>
 
-        {/* End: previews */}
-        <div className="flex min-w-0 flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
-                {t("publicLink.navigation.webPreviewCaption")}
-              </p>
-              <WebNavPreview draft={draft} />
-            </div>
-            <div className="flex shrink-0 flex-col gap-1.5">
-              <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
-                {t("publicLink.navigation.mobilePreviewCaption")}
-              </p>
-              <MobileDrawerPreview draft={draft} />
-            </div>
+        {/* End: previews, stacked — the frames show these as two separate
+            labelled previews rather than a row fighting over one column's
+            width, and `WebNavPreview`'s header strip needs its own full
+            width to avoid an inner horizontal scrollbar. */}
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
+              {t("publicLink.navigation.webPreviewCaption")}
+            </p>
+            <WebNavPreview draft={draft} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-[11px] font-medium text-[var(--octo-text-muted)]">
+              {t("publicLink.navigation.mobilePreviewCaption")}
+            </p>
+            <MobileDrawerPreview draft={draft} />
           </div>
           <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[11.5px] text-[#0D6EFD]">
             <Info size={13} className="shrink-0" />

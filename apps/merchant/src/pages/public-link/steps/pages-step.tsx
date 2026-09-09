@@ -102,7 +102,7 @@ export function PagesStep({ draft, dispatch }: StepProps) {
       <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.pages")}</p>
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.pages.subtitle")}</p>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px_380px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px_460px]">
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[500px] border-collapse text-start">

@@ -3714,7 +3714,7 @@ export const en = {
   "publicLink.checklist.waitlist.label": "Waitlist Section",
   "publicLink.checklist.waitlist.note": "Waitlist is enabled, or not offered on your homepage",
   "publicLink.checklist.payments.label": "Payments Ready",
-  "publicLink.checklist.payments.note": "A payment path is configured for ordering",
+  "publicLink.checklist.payments.note": "A payment path is provided automatically for ordering pages",
   "publicLink.checklist.responsive.label": "Responsive Design",
   "publicLink.checklist.responsive.note": "Your site adapts to any screen size",
   "publicLink.checklist.seo.label": "SEO Basics",

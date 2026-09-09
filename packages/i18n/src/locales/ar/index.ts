@@ -3714,7 +3714,7 @@ export const ar = {
   "publicLink.checklist.waitlist.label": "قسم قائمة الانتظار",
   "publicLink.checklist.waitlist.note": "قائمة الانتظار مفعّلة، أو غير معروضة على الصفحة الرئيسية",
   "publicLink.checklist.payments.label": "الدفع جاهز",
-  "publicLink.checklist.payments.note": "تم إعداد طريقة دفع للطلبات",
+  "publicLink.checklist.payments.note": "تُوفَّر طريقة دفع تلقائيًا لصفحات الطلب",
   "publicLink.checklist.responsive.label": "تصميم متجاوب",
   "publicLink.checklist.responsive.note": "يتكيف موقعك مع أي حجم شاشة",
   "publicLink.checklist.seo.label": "أساسيات السيو",

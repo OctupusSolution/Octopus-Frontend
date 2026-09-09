@@ -2,23 +2,27 @@
 // not a fixed row of green ticks. `goLiveReady` gates the footer's "Publish
 // Now" button (see builder-shell.tsx / publish-step.tsx).
 //
-// Two items (`waitlist`, `menu`, `reservations`) read `sections` — the
-// homepage block list from the Customize step — rather than the deeper
-// per-module settings (`sectionSettings.menu.connectedMenuId`,
-// `sectionSettings.reservations.enabled`, ...). A section absent from
-// `sections` altogether (waitlist is deliberately left out of the seeded
-// catalog — see site-draft.ts) has nothing to check and counts as done; a
-// section that IS on the homepage must actually be enabled there. This is
-// what makes a freshly seeded draft already satisfy these three: the seeded
-// catalog ships with menu/reservations enabled and no waitlist block, so
-// there is genuinely nothing left for a merchant to turn on before the page
-// is presentable — the one thing the checklist still makes them do by hand
-// is write their own SEO title and description.
+// Every item checks exactly the thing its label claims. `menu` reads
+// `sectionSettings.menu.connectedMenuId`, `reservations` reads
+// `sectionSettings.reservations.enabled`, `waitlist` reads
+// `sectionSettings.waitlist.enabled` — not the homepage `sections` array
+// (whether the block is *drawn* on the page) and not "absent means done".
+// A row that reads "Menu is connected" must be false when no menu is
+// connected, the same as the custom-domain card is never allowed to show a
+// green SSL/Primary badge over a blank host — a green tick a merchant reads
+// as a fact about their setup has to actually be one. (An earlier version of
+// this file took the more lenient "present-and-enabled-in-sections, or
+// absent" reading so a freshly seeded draft would already satisfy these
+// three; that was resolved the wrong way — see task-21-report.md's fix
+// section — and `EMPTY_SITE_DRAFT` is genuinely not go-live-ready on these
+// axes until a merchant connects a menu and turns reservations/waitlist on.)
 //
 // `payments` and `responsive` have no field of their own in `SiteDraft` at
 // all in this build (there is no payment-gateway or breakpoint config to
 // gate on) — they are mock/always-true rows, same as `analytics`, and exist
-// so the frame's nine-row list matches what a merchant actually sees.
+// so the frame's nine-row list matches what a merchant actually sees. Their
+// notes are worded to say so ("automatically"/"by construction") rather than
+// imply a merchant configured something specific.
 import type { SiteDraft } from "./site-draft";
 
 export interface GoLiveItem {
@@ -26,11 +30,6 @@ export interface GoLiveItem {
   labelKey: string;
   noteKey: string;
   done: (draft: SiteDraft) => boolean;
-}
-
-function sectionLiveOrAbsent(draft: SiteDraft, id: string): boolean {
-  const section = draft.sections.find((entry) => entry.id === id);
-  return section ? section.enabled : true;
 }
 
 export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
@@ -50,19 +49,19 @@ export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
     id: "menu",
     labelKey: "publicLink.checklist.menu.label",
     noteKey: "publicLink.checklist.menu.note",
-    done: (draft) => sectionLiveOrAbsent(draft, "menu"),
+    done: (draft) => draft.sectionSettings.menu.connectedMenuId.trim() !== "",
   },
   {
     id: "reservations",
     labelKey: "publicLink.checklist.reservations.label",
     noteKey: "publicLink.checklist.reservations.note",
-    done: (draft) => sectionLiveOrAbsent(draft, "reservations"),
+    done: (draft) => draft.sectionSettings.reservations.enabled,
   },
   {
     id: "waitlist",
     labelKey: "publicLink.checklist.waitlist.label",
     noteKey: "publicLink.checklist.waitlist.note",
-    done: (draft) => sectionLiveOrAbsent(draft, "waitlist"),
+    done: (draft) => draft.sectionSettings.waitlist.enabled,
   },
   {
     id: "payments",

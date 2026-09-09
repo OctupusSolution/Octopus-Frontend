@@ -144,7 +144,7 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
       open={open}
       onClose={onClose}
       title={t("reservations.cancel.title").replace("{ref}", reservation.ref)}
-      className="max-w-[620px]"
+      className="!max-w-[620px]"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>

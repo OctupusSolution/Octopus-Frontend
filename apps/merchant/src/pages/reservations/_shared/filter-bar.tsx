@@ -74,14 +74,14 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
           type="date"
           value={filters.date}
           onChange={(e) => onChange({ ...filters, day: "date", date: e.target.value })}
-          className="bg-transparent text-[12px] outline-none [color-scheme:light] dark:[color-scheme:dark]"
+          className="bg-transparent text-[12px] outline-none"
         />
       </label>
 
       <Select
         value={filters.status}
         onChange={(e) => onChange({ ...filters, status: e.target.value })}
-        className="!w-auto"
+        className="!w-auto !py-[7px]"
       >
         <option value="">{t("reservations.list.filter.allStatus")}</option>
         {STATUS_OPTIONS.map((status) => (
@@ -94,7 +94,7 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
       <Select
         value={filters.area}
         onChange={(e) => onChange({ ...filters, area: e.target.value })}
-        className="!w-auto"
+        className="!w-auto !py-[7px]"
       >
         <option value="">{t("reservations.list.filter.allAreas")}</option>
         {areas.map((area) => (
@@ -107,7 +107,7 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
       <Select
         value={filters.source}
         onChange={(e) => onChange({ ...filters, source: e.target.value })}
-        className="!w-auto"
+        className="!w-auto !py-[7px]"
       >
         <option value="">{t("reservations.list.filter.allSources")}</option>
         {SOURCE_OPTIONS.map((source) => (

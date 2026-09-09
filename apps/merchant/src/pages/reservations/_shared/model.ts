@@ -73,6 +73,15 @@ export function isPaid(r: Reservation): boolean | null {
   return r.deposit.state === "paid";
 }
 
+// "T-12" -> "Table 12" for display; the raw "T-NN" id stays in the fixture
+// unchanged because Floor Plan and Calendar key off that exact format (fix
+// round 1 — presentational only). Anything that doesn't match the shape
+// (e.g. a private-room name) is returned as-is rather than mangled.
+export function tableLabel(table: string): string {
+  const match = /^T-0*(\d+)$/.exec(table);
+  return match ? `Table ${match[1]}` : table;
+}
+
 export function clock12(startMinutes: number): string {
   const m = ((startMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
   const hours = Math.floor(m / 60);

@@ -173,3 +173,45 @@ export function refundPolicy(r: Reservation, nowMinutes: number): RefundPolicy {
   const tier = minutesToEvent > 360 ? "full" : minutesToEvent > 0 ? "partial" : "none";
   return { minutesToEvent, tier };
 }
+
+/* ============================================================== Task 9 form */
+// Pure helpers for the Add/Edit reservation form (reservation-form-modal.tsx).
+
+export interface TimeOption {
+  value: number;
+  label: string;
+}
+
+// 30-minute slots across the day. When editing a reservation whose stored
+// `startMinutes` doesn't land on the grid (several fixture rows sit on a
+// 15-minute offset, e.g. 13:15), that exact value is folded in too so the
+// select always has a matching option instead of silently showing the
+// browser's default (usually the first slot, midnight).
+export function timeSlotOptions(currentMinutes?: number): TimeOption[] {
+  const slots = new Map<number, string>();
+  for (let m = 0; m < 24 * 60; m += 30) slots.set(m, clock12(m));
+  if (currentMinutes !== undefined && !slots.has(currentMinutes)) {
+    slots.set(currentMinutes, clock12(currentMinutes));
+  }
+  return Array.from(slots.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([value, label]) => ({ value, label }));
+}
+
+export const TAG_PRESETS = ["Birthday", "VIP", "Anniversary", "Allergy"] as const;
+
+/** The preset tag chips not already attached to the draft — the source for
+ *  what "+ Add Tag" appends next, and disables once all four are used. */
+export function availableTagPresets(tags: readonly string[]): string[] {
+  return TAG_PRESETS.filter((preset) => !tags.includes(preset));
+}
+
+// The guest phone field splits a Saudi "+966..." number into a fixed prefix
+// chip plus the digits the guest actually types/edits.
+export function phoneDigitsFrom(phone: string): string {
+  return phone.startsWith("+966") ? phone.slice(4) : phone;
+}
+
+export function combinePhone(digits: string): string {
+  return `+966${digits}`;
+}

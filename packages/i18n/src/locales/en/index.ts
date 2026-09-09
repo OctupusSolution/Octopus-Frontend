@@ -406,7 +406,6 @@ export const en = {
   "reservations.form.linkNotice": "A payment link will be sent to the guest after saving this reservation.",
   "reservations.form.saveAsPending": "Save As Pending",
   "reservations.form.createAndSend": "Create & Send Confirmation",
-  "reservations.form.saveChanges": "Save Changes",
   "reservations.form.cancelReservation": "Cancel Reservation",
   "reservations.detail.title": "Reservation #{ref}",
   "reservations.detail.state.confirmed": "Confirmed",

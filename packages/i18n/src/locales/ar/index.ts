@@ -406,7 +406,6 @@ export const ar = {
   "reservations.form.linkNotice": "سيُرسل رابط الدفع للضيف بعد حفظ هذا الحجز.",
   "reservations.form.saveAsPending": "حفظ كقيد الانتظار",
   "reservations.form.createAndSend": "إنشاء وإرسال التأكيد",
-  "reservations.form.saveChanges": "حفظ التعديلات",
   "reservations.form.cancelReservation": "إلغاء الحجز",
   "reservations.detail.title": "حجز #{ref}",
   "reservations.detail.state.confirmed": "مؤكد",

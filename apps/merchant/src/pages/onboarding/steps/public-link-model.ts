@@ -44,6 +44,17 @@ export function previewModelFromOnboarding(
       labelKey: sectionLabelKey(id),
       visible: id !== "hero",
     })),
+    // The header nav's trailing About/Contact used to be hardcoded in the
+    // widget; now each host supplies them. Onboarding has no real About/
+    // Contact pages the way the builder does, so they go here rather than
+    // into `navItems` — `navItems` also feeds the footer's Explore column
+    // unfiltered, and onboarding's Explore list (the 4 homepage sections)
+    // must stay exactly as it was, not gain two phantom entries for pages
+    // that don't exist in this flow.
+    navFurniture: [
+      { labelKey: "onboarding.publicLink.previewAbout", visible: true },
+      { labelKey: "onboarding.publicLink.previewContact", visible: true },
+    ],
     categories: serviceCategoriesFor(draft.type),
     cityLabel: city ? t(city.labelKey) : "",
     hoursSummary: summarizeHours(brand.hours, t, locale),

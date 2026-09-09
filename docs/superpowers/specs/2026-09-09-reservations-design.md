@@ -105,8 +105,11 @@ already have — the page, the pieces of a row, and the dialogs:
 pages/reservations/
   index.tsx                        list page: state, filtering, wiring
   _shared/
-    types.ts                       unions, displayState, tone maps, formatters
+    model.ts                       pure: displayState, filters, KPIs, refund policy
+    use-dismiss.ts                 outside-click and Escape for the menus
     guest-avatar.tsx               initials avatar
+    guest-card.tsx                 avatar + name + phone, shared by both dialogs
+    meta-row.tsx                   guests · date · time · area - table
     status-pill.tsx                the merged pill
     kpi-cards.tsx                  the five tiles
     filter-bar.tsx                 day chips, date, three selects, More Filters
@@ -180,8 +183,9 @@ State is local to the page — `useState` over the fixture, the same shape as
 2. **Guest photos.** The frames show portrait photos. The repo has no such
    assets and none should be invented. Rows use an initials avatar in the
    sidebar's style.
-3. **Two typos in the frames are fixed**: "Mange all table reservations" →
-   "Manage", and "Paid on MAU20,2026" → "May 20, 2026".
+3. **Three typos in the frames are fixed**: "Mange all table reservations" →
+   "Manage", "Paid on MAU20,2026" → "May 20, 2026", and "Create& Send
+   Confirmation" → "Create & Send Confirmation".
 4. **The modal frames' header button reads "Add To Waitlist"** where the list
    frame reads "Add New Reservation". The list frame is the page being built,
    so the button is "Add New Reservation".

@@ -50,8 +50,9 @@ const SECTIONS: NavSection[] = [
     groups: [
       { id: "orders", label: "Orders", icon: ClipboardList,
         items: ["Live Orders (all channels)", "Order History", "Pre-Orders & Scheduled"] },
-      { id: "reservations", label: "Reservations", icon: CalendarClock,
-        items: ["All Reservations", "Calendar / Timeline", "Private Rooms & Events"] },
+      // No sub-items: Reservations is a single page, so the entry navigates
+      // straight to it rather than opening a dropdown.
+      { id: "reservations", label: "Reservations", icon: CalendarClock },
       { id: "waitlist", label: "Wait list", icon: Clock3, path: "/reservations/waitlist" },
       { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan" },
       { id: "floor-plan-builder", label: "Floor Plan Builder", icon: PencilRuler, placeholder: true },
@@ -129,11 +130,6 @@ const ITEM_PATHS: Record<string, string> = {
   "Live Orders (all channels)": "/orders",
   "Order History": "/orders/history",
   "Pre-Orders & Scheduled": "/orders/preorders",
-  // "/reservations" is a prefix of every other reservations route, but the
-  // longest-match rule below keeps the right sibling lit.
-  "All Reservations": "/reservations",
-  "Calendar / Timeline": "/reservations/calendar",
-  "Private Rooms & Events": "/reservations/events",
   "Categories & Items": "/menu/items",
   "Modifiers": "/menu/modifiers",
   "Combos": "/menu/combos",

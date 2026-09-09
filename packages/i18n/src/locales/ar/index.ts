@@ -450,6 +450,7 @@ export const ar = {
   "reservations.cancel.title": "إلغاء الحجز #{ref}",
   "reservations.cancel.actionType": "نوع الإجراء",
   "reservations.cancel.reason": "السبب",
+  "reservations.cancel.reasonPlaceholder": "اختر السبب",
   "reservations.cancel.note": "ملاحظة",
   "reservations.cancel.noteOption": "(اختياري)",
   "reservations.cancel.notePlaceholder": "اتصل الضيف لتغيير الموعد ليوم آخر.",

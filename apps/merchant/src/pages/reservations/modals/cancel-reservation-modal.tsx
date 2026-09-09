@@ -19,16 +19,23 @@ export interface CancelReservationModalProps {
   open: boolean;
   reservation: Reservation | null;
   onClose: () => void;
-  onConfirm: (reason: string, note: string) => void;
+  onConfirm: (payload: { actionType: ActionType; reason: string; note: string }) => void;
 }
 
 type Tier = RefundPolicy["tier"];
 
-const ACTION_TYPE_OPTIONS = [
+// "Mark as no show" is not a cancellation — ReservationStatus already keeps
+// "No-show" and "Cancelled" distinct (see calendar/index.tsx:901, which sets
+// "No-show" as its own action) — so Task 12's dispatch needs this out of
+// onConfirm as a stable enum, not inferred from the (translated) reason
+// string.
+type ActionType = "guest" | "restaurant" | "no-show";
+
+const ACTION_TYPE_OPTIONS: readonly { value: ActionType; key: string }[] = [
   { value: "guest", key: "reservations.cancel.action.byGuest" },
   { value: "restaurant", key: "reservations.cancel.action.byRestaurant" },
   { value: "no-show", key: "reservations.cancel.action.noShow" },
-] as const;
+];
 
 const REASON_OPTIONS = [
   { value: "changeOfPlans", key: "reservations.cancel.reason.changeOfPlans" },
@@ -97,7 +104,7 @@ function PolicyRow({ label, value }: { label: string; value: ReactNode }) {
 
 export function CancelReservationModal({ open, reservation, onClose, onConfirm }: CancelReservationModalProps) {
   const { t } = useI18n();
-  const [actionType, setActionType] = useState<string>(ACTION_TYPE_OPTIONS[0].value);
+  const [actionType, setActionType] = useState<ActionType>(ACTION_TYPE_OPTIONS[0].value);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
 
@@ -123,11 +130,13 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
 
   function handleConfirm() {
     if (!reason) return;
-    // onConfirm's `reason` is free text (matches how reservation.cancelReason
-    // is stored and displayed elsewhere, e.g. "Guest requested cancellation"
-    // in the mock fixture) — pass the translated label, not the option key.
+    // `reason` is free text (matches how reservation.cancelReason is stored
+    // and displayed elsewhere, e.g. "Guest requested cancellation" in the
+    // mock fixture) — pass the translated label, not the option key.
+    // `actionType` stays the stable enum value so Task 12's dispatch can
+    // branch on it directly instead of parsing a translated string.
     const selected = REASON_OPTIONS.find((option) => option.value === reason);
-    onConfirm(selected ? t(selected.key) : reason, note);
+    onConfirm({ actionType, reason: selected ? t(selected.key) : reason, note });
   }
 
   return (
@@ -153,7 +162,7 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("reservations.cancel.actionType")} required>
-            <Select value={actionType} onChange={(e) => setActionType(e.target.value)}>
+            <Select value={actionType} onChange={(e) => setActionType(e.target.value as ActionType)}>
               {ACTION_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {t(option.key)}
@@ -163,7 +172,7 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
           </Field>
           <Field label={t("reservations.cancel.reason")} required>
             <Select value={reason} onChange={(e) => setReason(e.target.value)}>
-              <option value="" />
+              <option value="">{t("reservations.cancel.reasonPlaceholder")}</option>
               {REASON_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {t(option.key)}

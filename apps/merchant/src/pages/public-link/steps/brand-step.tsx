@@ -168,11 +168,17 @@ export function BrandStep({ draft, dispatch }: StepProps) {
             <p className="text-[11.5px] text-[var(--octo-text-muted)]">{t("publicLink.brand.logoHint")}</p>
           </div>
 
-          {/* Business name */}
+          {/* Business name. `maxLength` is a generous typing cap, not the
+              binding constraint — `hostLabelFromName` (preview-model.ts)
+              separately caps the *slug* built from this name to keep the
+              Preview step's QR code within its byte budget (final review
+              finding F1); this just keeps the field itself from growing
+              without bound. */}
           <Input
             label={t("publicLink.brand.businessName")}
             placeholder={t("publicLink.brand.businessNamePlaceholder")}
             value={brand.businessName}
+            maxLength={80}
             onChange={(e) => dispatch({ type: "patchBrand", patch: { businessName: e.target.value } })}
           />
 

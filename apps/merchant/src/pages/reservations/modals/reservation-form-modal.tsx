@@ -131,7 +131,10 @@ function initDraft(mode: "add" | "edit", reservation: Reservation | null): Draft
       phoneDigits: phoneDigitsFrom(reservation.phone),
       email: reservation.email ?? "",
       notes: reservation.notes ?? "",
-      notifyGuest: false,
+      // The frame draws this filled/checked by default in edit mode — an
+      // edit that changes a confirmed booking's details should default to
+      // telling the guest, not silently skip it.
+      notifyGuest: true,
     };
   }
   return {
@@ -258,7 +261,9 @@ function ChannelPill({ checked, label, onToggle }: { checked: boolean; label: st
           checked ? "border-white/70 bg-white/15" : "border-[var(--octo-border-input)]"
         )}
       >
-        {checked && <Check size={10} strokeWidth={3} className="text-white" />}
+        {/* Unchecked pills still show a faint check glyph in the frame,
+            not an empty box — only the color signals the state. */}
+        <Check size={10} strokeWidth={3} className={checked ? "text-white" : "text-[var(--octo-text-faint)]"} />
       </span>
       {label}
     </label>
@@ -317,6 +322,7 @@ export function ReservationFormModal({
 
   function buildReservation(intent: "pending" | "confirm"): Reservation {
     const guest = `${draft.firstName.trim()} ${draft.lastName.trim()}`.trim();
+    const sendLinkChannels = CHANNELS.filter((channel) => draft.sendLinkWith[channel]);
     const deposit: ReservationDeposit | undefined = draft.depositEnabled
       ? {
           amount: Number(draft.depositAmount) || 0,
@@ -354,6 +360,8 @@ export function ReservationFormModal({
       cancelReason: reservation?.cancelReason,
       notes: draft.notes.trim() || undefined,
       allergyTags: reservation?.allergyTags,
+      sendLinkChannels: sendLinkChannels.length ? sendLinkChannels : undefined,
+      notifyGuestOnChange: mode === "edit" ? draft.notifyGuest : undefined,
     };
   }
 
@@ -456,8 +464,8 @@ export function ReservationFormModal({
         >
           {t("reservations.form.cancelReservation")}
         </Button>
-        <Button variant="primary" disabled={!canConfirm} onClick={() => submit("confirm")}>
-          {t("reservations.form.saveChanges")}
+        <Button variant="primary" icon={<Send size={14} />} disabled={!canConfirm} onClick={() => submit("confirm")}>
+          {t("reservations.form.createAndSend")}
         </Button>
       </>
     );
@@ -637,39 +645,41 @@ export function ReservationFormModal({
               )}
             </div>
 
-            <div>
-              <div className="mb-2 flex items-baseline gap-1.5">
-                <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.tag")}</span>
-                <span className="text-[12px] text-[var(--octo-text-faint)]">{t("reservations.form.optional")}</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={addTag}
-                  disabled={remainingTagPresets.length === 0}
-                  className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-                >
-                  <Plus size={13} />
-                  {t("reservations.form.addTag")}
-                </button>
-                {draft.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)]"
+            {mode === "add" && (
+              <div>
+                <div className="mb-2 flex items-baseline gap-1.5">
+                  <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.tag")}</span>
+                  <span className="text-[12px] text-[var(--octo-text-faint)]">{t("reservations.form.optional")}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={addTag}
+                    disabled={remainingTagPresets.length === 0}
+                    className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                   >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      aria-label={tag}
-                      className="text-[var(--octo-text-muted)] transition-colors hover:text-[var(--octo-text-primary)]"
+                    <Plus size={13} />
+                    {t("reservations.form.addTag")}
+                  </button>
+                  {draft.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)]"
                     >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        aria-label={tag}
+                        className="text-[var(--octo-text-muted)] transition-colors hover:text-[var(--octo-text-primary)]"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {mode === "edit" && (
               <>

@@ -92,6 +92,10 @@ export interface Reservation {
   cancelReason?: string;
   notes?: string;
   allergyTags?: readonly string[];
+  /** Channels the payment link was requested on, from the form's "Send Payment Link with". */
+  sendLinkChannels?: readonly ("WhatsApp" | "SMS" | "Email")[];
+  /** Whether the guest should be told about an edit — the form's "Notify guest about changes". */
+  notifyGuestOnChange?: boolean;
 }
 
 // hour < 10 means "after midnight", stored as the next-day offset (24 + hour).

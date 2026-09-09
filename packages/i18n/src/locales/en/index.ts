@@ -450,6 +450,7 @@ export const en = {
   "reservations.cancel.title": "Cancel Reservation #{ref}",
   "reservations.cancel.actionType": "Action Type",
   "reservations.cancel.reason": "Reason",
+  "reservations.cancel.reasonPlaceholder": "Select a reason",
   "reservations.cancel.note": "Note",
   "reservations.cancel.noteOption": "(Option)",
   "reservations.cancel.notePlaceholder": "Guest called to reschedule for another day.",

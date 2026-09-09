@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { reservations, TODAY, type Reservation } from "@/shared/api/mock-reservations";
 import {
+  addDays,
   availableTagPresets,
   clock12,
   combinePhone,
@@ -8,8 +9,11 @@ import {
   detailState,
   displayState,
   EMPTY_FILTERS,
+  formatTimestamp,
+  freshPaymentLink,
   hoursMinutesParts,
   isPaid,
+  nowTimestampLabel,
   phoneDigitsFrom,
   refundPolicy,
   tableLabel,
@@ -237,6 +241,53 @@ describe("detailState", () => {
     expect(at({ amount: 150, currency: "SAR", type: "Per Guest", state: "paid" })).toBe("cancelled");
     // No deposit at all.
     expect(at(undefined)).toBe("cancelled");
+  });
+});
+
+describe("formatTimestamp / nowTimestampLabel", () => {
+  it("formats a date + minutes into the fixture's own timestamp shape", () => {
+    expect(formatTimestamp("2026-08-08", 14 * 60 + 30)).toBe("Aug 8, 2026 - 2:30 PM");
+  });
+
+  it("pads no leading zero onto the day", () => {
+    expect(formatTimestamp("2026-01-05", 0)).toBe("Jan 5, 2026 - 12:00 AM");
+  });
+
+  it("stamps the module's fixed now (TODAY at 14:30)", () => {
+    expect(nowTimestampLabel()).toBe(`${formatTimestamp(TODAY, 14 * 60 + 30)}`);
+  });
+});
+
+describe("addDays", () => {
+  it("advances the date by the given number of days", () => {
+    expect(addDays("2026-08-08", 1)).toBe("2026-08-09");
+  });
+
+  it("rolls over a month boundary", () => {
+    expect(addDays("2026-08-31", 1)).toBe("2026-09-01");
+  });
+});
+
+describe("freshPaymentLink", () => {
+  it("addresses WhatsApp/phone by default when no channel was recorded", () => {
+    const link = freshPaymentLink(row({ ref: "RSV-9000", phone: "+966510002877" }));
+    expect(link).toMatchObject({
+      url: "https://pay.octopus.app/r/RSV-9000",
+      sentVia: "WhatsApp",
+      sentTo: "+966510002877",
+    });
+    expect(link.sentOn).toBe(nowTimestampLabel());
+    expect(link.expiresOn).toBe(formatTimestamp(addDays(TODAY, 1), 14 * 60 + 30));
+  });
+
+  it("addresses the guest's email when Email was the recorded channel", () => {
+    const link = freshPaymentLink(row({ email: "guest@example.com", sendLinkChannels: ["Email"] }));
+    expect(link).toMatchObject({ sentVia: "Email", sentTo: "guest@example.com" });
+  });
+
+  it("falls back to the phone for Email when no email is on file", () => {
+    const link = freshPaymentLink(row({ sendLinkChannels: ["Email"] }));
+    expect(link.sentTo).toBe(row().phone);
   });
 });
 

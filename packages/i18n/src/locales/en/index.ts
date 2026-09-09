@@ -55,6 +55,7 @@ export const en = {
   "sidebar.liveOrders": "Live Orders (all channels)",
   "sidebar.orderHistory": "Order History",
   "sidebar.preOrders": "Pre-Orders & Scheduled",
+  "sidebar.allReservations": "All Reservations",
   "sidebar.calendarTimeline": "Calendar / Timeline",
   "sidebar.floorPlan": "Floor Plan",
   "sidebar.waitlist": "Waitlist",

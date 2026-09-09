@@ -3329,6 +3329,8 @@ export const ar = {
   "nav.storefront": "المتجر",
   "publicLink.title": "منشئ الرابط العام",
   "publicLink.autosaved": "تم الحفظ تلقائيًا الآن",
+  "publicLink.autosavedMinutesAgo": "تم الحفظ تلقائيًا قبل {n} د",
+  "publicLink.autosavedHoursAgo": "تم الحفظ تلقائيًا قبل {n} س",
   "publicLink.step.theme": "القالب",
   "publicLink.step.brand": "الهوية",
   "publicLink.step.pages": "الصفحات",

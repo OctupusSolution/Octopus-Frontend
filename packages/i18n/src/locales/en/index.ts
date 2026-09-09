@@ -3329,6 +3329,8 @@ export const en = {
   "nav.storefront": "Storefront",
   "publicLink.title": "Public Link Builder",
   "publicLink.autosaved": "Autosaved just now",
+  "publicLink.autosavedMinutesAgo": "Autosaved {n}m ago",
+  "publicLink.autosavedHoursAgo": "Autosaved {n}h ago",
   "publicLink.step.theme": "Theme",
   "publicLink.step.brand": "Brand",
   "publicLink.step.pages": "Pages",

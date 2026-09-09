@@ -70,11 +70,15 @@ function ShareTile({
   action: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-3 text-center">
-      {icon}
+    // `h-full` so every tile fills its grid cell, a fixed-height icon slot so
+    // the labels line up across tiles whose icons differ wildly in size (the QR
+    // is 80px, the rest are 22px glyphs), and `mt-auto` on the action so the
+    // five buttons sit on one line instead of floating up under short copy.
+    <div className="flex h-full flex-col items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-3 text-center">
+      <span className="flex h-[84px] shrink-0 items-center justify-center">{icon}</span>
       <span className="text-[12px] font-medium text-[var(--octo-text-primary)]">{label}</span>
       <span className="text-[10.5px] text-[var(--octo-text-muted)]">{note}</span>
-      {action}
+      <span className="mt-auto w-full pt-2">{action}</span>
     </div>
   );
 }
@@ -276,7 +280,7 @@ export function PublishStep({ draft, dispatch }: StepProps) {
                 href={`https://wa.me/?text=${encodeURIComponent(liveUrl)}`}
                 target="_blank"
                 rel="noreferrer"
-                className={`${LINK_BUTTON} !py-[5px] text-[11.5px]`}
+                className={`${LINK_BUTTON} w-full !py-[5px] text-[11.5px]`}
               >
                 {t("publicLink.share")}
               </a>
@@ -305,7 +309,7 @@ export function PublishStep({ draft, dispatch }: StepProps) {
             action={
               <a
                 href={`mailto:?subject=${encodeURIComponent(model.businessName)}&body=${encodeURIComponent(liveUrl)}`}
-                className={`${LINK_BUTTON} !py-[5px] text-[11.5px]`}
+                className={`${LINK_BUTTON} w-full !py-[5px] text-[11.5px]`}
               >
                 {t("publicLink.send")}
               </a>

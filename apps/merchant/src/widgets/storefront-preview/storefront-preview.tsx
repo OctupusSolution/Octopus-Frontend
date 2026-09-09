@@ -35,27 +35,6 @@ import { storefrontAsset } from "@/shared/lib/storefront-assets";
 import { fontStack, readableOn, styleTokens, type StyleTokens } from "@/shared/lib/brand-tokens";
 import type { StorefrontPreviewModel } from "./model";
 
-// Which storefront photograph belongs to which seeded category.
-//
-// Keyed rather than positional: `serviceCategoriesFor` returns a different
-// list per business type, so pairing tile 3 with photo 3 put a rice platter on
-// the drinks tile the moment the type changed. Every key the seed lists can
-// return has an entry; `categoryImage` falls back for anything added later.
-const CATEGORY_IMAGES: Record<string, string> = {
-  "onboarding.category.signature": "all.png",
-  "onboarding.category.appetizers": "appetizers.png",
-  "onboarding.category.drinks": "drinks.webp",
-  "onboarding.category.desserts": "cake.png",
-  "onboarding.category.breakfast": "breakfast.webp",
-  "onboarding.category.pastries": "side-dishes.png",
-  "onboarding.category.cakes": "cake.png",
-  "onboarding.category.coffee": "drinks.webp",
-};
-
-function categoryImage(key: string): string {
-  return CATEGORY_IMAGES[key] ?? "all.png";
-}
-
 // The five mosaic cells, in the order serviceCategoriesFor fills them. The
 // middle column runs tall through both rows — that is what gives the block its
 // magazine look rather than an even row.
@@ -117,7 +96,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
         </div>
 
         <img
-          src={storefrontAsset(categoryImage(model.categories[index % model.categories.length]))}
+          src={storefrontAsset(model.categoryImages[index % model.categoryImages.length])}
           alt=""
           className="mx-auto mt-1.5 h-[76px] w-auto max-w-full object-contain"
         />
@@ -199,6 +178,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
             >
               {MOSAIC.map((slot, i) => {
                 const key = model.categories[i % model.categories.length];
+                const image = model.categoryImages[i % model.categoryImages.length];
                 return (
                   <div
                     key={`${key}-${i}`}
@@ -221,7 +201,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
                       {t(key)}
                     </span>
                     <img
-                      src={storefrontAsset(categoryImage(key))}
+                      src={storefrontAsset(image)}
                       alt=""
                       loading="lazy"
                       className={clsx("z-10 object-contain", slot.tall ? "mt-1.5 h-full min-h-0 w-full" : "h-full w-1/2")}
@@ -292,7 +272,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
             place in the builder's Page Order must still see Home
             underlined, not whatever now sits first. No match means no
             underline; there is no positional fallback. */}
-        {!mobile && (
+        {!mobile && (model.showHeaderNav ?? true) && (
           <nav className="flex min-w-0 items-center gap-3.5 overflow-x-auto text-[9px] text-[var(--octo-text-primary)]">
             {[...(model.navFurniture?.leading ?? []), ...model.navItems, ...(model.navFurniture?.trailing ?? [])]
               .filter((item) => item.visible)

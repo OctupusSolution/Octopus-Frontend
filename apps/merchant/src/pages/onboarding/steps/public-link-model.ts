@@ -16,6 +16,29 @@ import type { OnboardingDraft } from "../_shared/draft";
 // `45 + index * 5` / `Math.round(price * 1.4)` for `index` 0..3.
 const PRICE_LADDER = [0, 1, 2, 3].map((i) => 45 + i * 5);
 
+// Which storefront photograph belongs to which seeded category. Moved here
+// from the widget (see Task 22 final review, finding F4) — a widget keyed on
+// one host's own dictionary strings is exactly the coupling this model exists
+// to remove. Keyed rather than positional: `serviceCategoriesFor` returns a
+// different list per business type, so pairing tile 3 with photo 3 put a rice
+// platter on the drinks tile the moment the type changed. Every key
+// `serviceCategoriesFor` can return has an entry; the fallback is for
+// anything added there later without a matching photo yet.
+const CATEGORY_IMAGE_BY_KEY: Record<string, string> = {
+  "onboarding.category.signature": "all.png",
+  "onboarding.category.appetizers": "appetizers.png",
+  "onboarding.category.drinks": "drinks.webp",
+  "onboarding.category.desserts": "cake.png",
+  "onboarding.category.breakfast": "breakfast.webp",
+  "onboarding.category.pastries": "side-dishes.png",
+  "onboarding.category.cakes": "cake.png",
+  "onboarding.category.coffee": "drinks.webp",
+};
+
+function categoryImage(key: string): string {
+  return CATEGORY_IMAGE_BY_KEY[key] ?? "all.png";
+}
+
 export function previewModelFromOnboarding(
   draft: OnboardingDraft,
   device: PreviewDevice,
@@ -24,6 +47,7 @@ export function previewModelFromOnboarding(
 ): StorefrontPreviewModel {
   const { brand, publicLink } = draft;
   const city = CITIES.find((c) => c.id === brand.city);
+  const categories = serviceCategoriesFor(draft.type);
 
   return {
     businessName: brand.businessName || t("onboarding.businessName"),
@@ -61,7 +85,8 @@ export function previewModelFromOnboarding(
     // Named, not positional, so the widget marks the same entry active
     // however the merchant reorders `publicLink.sections` elsewhere.
     activeNavLabelKey: "onboarding.publicLink.previewHome",
-    categories: serviceCategoriesFor(draft.type),
+    categories,
+    categoryImages: categories.map(categoryImage),
     cityLabel: city ? t(city.labelKey) : "",
     hoursSummary: summarizeHours(brand.hours, t, locale),
     samplePrices: PRICE_LADDER.map((p) => formatBrandPrice(p, brand.currency, locale)),

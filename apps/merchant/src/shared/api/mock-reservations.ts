@@ -134,9 +134,11 @@ export const reservations: Reservation[] = [
   { id: "res-047", date: "2026-08-08", startMinutes: at(19, 0), durationMinutes: 90, ref: "RSV-1047", guest: "Lama Al-Zahrani", phone: phoneFor(7), email: "lama.alzahrani@example.com", partySize: 4, area: "Main Dining", table: "T-11", branch: "Dammam - Corniche", source: "Instagram", status: "Cancelled",
     deposit: { amount: 150, currency: "SAR", type: "Per Guest", state: "refunded", paidOn: "Aug 4, 2026 - 1:00 PM", method: "mada **** 7789", txnId: "PAY-100234567" },
     cancelledAt: "Aug 7, 2026 - 5:30 PM", cancelReason: "Guest requested cancellation" },
-  { id: "res-048", date: "2026-08-08", startMinutes: at(19, 15), durationMinutes: 60, ref: "RSV-1048", guest: "Turki Al-Anazi", phone: phoneFor(8), email: "turki.alanazi@example.com", partySize: 2, area: "Terrace", table: "T-06", branch: "Riyadh - Olaya", source: "Walk In", status: "Cancelled",
-    deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" },
-    cancelledAt: "Aug 7, 2026 - 8:10 PM" },
+  // Payment cancelled, not the reservation: the guest backed out of paying
+  // the deposit link, but the booking itself is still live and pending —
+  // distinct from res-047 below, whose whole reservation is cancelled.
+  { id: "res-048", date: "2026-08-08", startMinutes: at(19, 15), durationMinutes: 60, ref: "RSV-1048", guest: "Turki Al-Anazi", phone: phoneFor(8), email: "turki.alanazi@example.com", partySize: 2, area: "Terrace", table: "T-06", branch: "Riyadh - Olaya", source: "Walk In", status: "Pending",
+    deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" } },
   { id: "res-049", date: "2026-08-08", startMinutes: at(20, 30), durationMinutes: 90, ref: "RSV-1049", guest: "Hessa Al-Amri", phone: phoneFor(9), email: "hessa.alamri@example.com", partySize: 2, area: "Family Section", table: "T-01", branch: "Dammam - Corniche", source: "Website", status: "Arrived", allergyTags: ["Nuts", "Gluten"],
     deposit: { amount: 120, currency: "SAR", type: "Pre Reservation", state: "paid", paidOn: "Aug 8, 2026 - 8:05 PM", method: "mada **** 3345", txnId: "PAY-155234789" } },
   { id: "res-050", date: "2026-08-08", startMinutes: at(20, 45), durationMinutes: 120, ref: "RSV-1050", guest: "Yousef Al-Harthi", phone: phoneFor(10), email: "yousef.alharthi@example.com", partySize: 5, area: "Private Rooms", table: "T-15", branch: "Khobar - Rakah", source: "Phone", status: "Seated",

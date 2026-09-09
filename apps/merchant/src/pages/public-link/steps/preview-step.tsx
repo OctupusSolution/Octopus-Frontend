@@ -61,7 +61,10 @@ function TesterRow({ tester, t }: { tester: Tester; t: (key: string) => string }
 
 export function PreviewStep({ draft, dispatch }: StepProps) {
   const { t, locale } = useI18n();
-  const [device, setDevice] = useState<PreviewDevice>("mobile");
+  // Desktop, like every other step. Opening this one on `mobile` rendered a
+  // 300px phone inside a much wider column, which read as a broken layout
+  // rather than a deliberate device choice.
+  const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [copied, setCopied] = useState(false);
   const [email, setEmail] = useState("");
   const [canView, setCanView] = useState(true);
@@ -142,11 +145,14 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
       <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.preview.subtitle")}</p>
 
       {/* Before a run the results column has nothing to show, so it isn't
-          reserved at all — two columns (test-mode panel + a properly wide
-          Live Preview) rather than a flexible middle column sitting empty.
-          Once a run finishes, the results table claims a real middle column
-          and the layout grows to three. */}
-      <div className={clsx("grid gap-4", done ? "xl:grid-cols-[300px_minmax(0,1fr)_460px]" : "xl:grid-cols-[320px_520px]")}>
+          reserved at all — two columns (test-mode panel + Live Preview) rather
+          than a flexible middle column sitting empty. Once a run finishes, the
+          results table claims a real middle column and the layout grows to
+          three.
+          Both templates end in `minmax(0,1fr)` on purpose: two FIXED columns
+          left the rest of a 1600px row blank, which is the same dead space
+          this conditional exists to remove — it just moved it to the edge. */}
+      <div className={clsx("grid gap-4", done ? "xl:grid-cols-[300px_460px_minmax(0,1fr)]" : "xl:grid-cols-[320px_minmax(0,1fr)]")}>
         {/* Start: test-mode status + rehearsal checklist */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="flex flex-col gap-2">

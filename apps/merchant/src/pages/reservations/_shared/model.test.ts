@@ -5,6 +5,7 @@ import {
   clock12,
   combinePhone,
   deriveKpis,
+  detailState,
   displayState,
   EMPTY_FILTERS,
   isPaid,
@@ -177,6 +178,35 @@ describe("availableTagPresets", () => {
 
   it("is empty once all four presets are used", () => {
     expect(availableTagPresets([...TAG_PRESETS])).toEqual([]);
+  });
+});
+
+describe("detailState", () => {
+  it("maps the four deposit payment states directly, regardless of reservation status", () => {
+    const at = (state: "link-sent" | "paid" | "failed" | "expired", status: Reservation["status"] = "Pending") =>
+      detailState(row({ status, deposit: { amount: 200, currency: "SAR", type: "Pre Reservation", state } }));
+    expect(at("link-sent")).toBe("link-sent");
+    expect(at("paid", "Arrived")).toBe("paid");
+    expect(at("failed")).toBe("failed");
+    expect(at("expired")).toBe("expired");
+  });
+
+  it("maps a cancelled deposit to payment-cancelled", () => {
+    expect(
+      detailState(row({ status: "Cancelled", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "cancelled" } }))
+    ).toBe("payment-cancelled");
+  });
+
+  it("falls back to confirmed/pending off the reservation's own status when the deposit is quiet", () => {
+    expect(detailState(row({ status: "Confirmed" }))).toBe("confirmed");
+    expect(detailState(row({ status: "Pending" }))).toBe("pending");
+    expect(detailState(row({ status: "Seated" }))).toBe("pending");
+    expect(
+      detailState(row({ status: "Confirmed", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "unpaid" } }))
+    ).toBe("confirmed");
+    expect(
+      detailState(row({ status: "Pending", deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "unpaid" } }))
+    ).toBe("pending");
   });
 });
 

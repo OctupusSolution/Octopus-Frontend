@@ -1,0 +1,605 @@
+// Task 10: the reservation detail dialog. One component covers all eight
+// design frames — the state shown (banner, panel and footer) is *derived*
+// from the reservation, not passed in, via `detailState` in `_shared/model.ts`.
+// The guest card and meta row are built inline here on purpose: Task 11
+// lifts them into `_shared/guest-card.tsx` / `_shared/meta-row.tsx` once the
+// cancel dialog needs the same two pieces, so this file is written clean
+// enough to extract from but isn't pre-split.
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import clsx from "clsx";
+import {
+  AlertCircle,
+  Banknote,
+  Calendar,
+  CheckCircle2,
+  CircleDashed,
+  Clock,
+  Copy,
+  FileDown,
+  Mail,
+  MessageCircle,
+  MoreVertical,
+  Phone,
+  Users,
+  Utensils,
+} from "lucide-react";
+import { Button, Modal } from "@ui/primitives";
+import { useI18n } from "@/app/providers/i18n-provider";
+import type { Reservation } from "@/shared/api/mock-reservations";
+import { GuestAvatar } from "../_shared/guest-avatar";
+import { clock12, detailState, tableLabel, type DetailState } from "../_shared/model";
+import { useDismiss } from "../_shared/use-dismiss";
+
+export interface ReservationDetailModalProps {
+  open: boolean;
+  reservation: Reservation | null;
+  onClose: () => void;
+  onEdit: () => void;
+  onCancel: () => void;
+  onResendLink: () => void;
+  onShareLink: () => void;
+}
+
+const BANNER_CLASS: Record<DetailState, string> = {
+  confirmed: "bg-[#16A34A]/10 text-[#15803D]",
+  pending: "bg-[#F59E0B]/10 text-[#B45309]",
+  "link-sent": "bg-[#7C3AED]/10 text-[#6D28D9]",
+  paid: "bg-[#16A34A]/10 text-[#15803D]",
+  failed: "bg-[#EF4444]/10 text-[#DC2626]",
+  expired: "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
+  "payment-cancelled": "bg-[#EF4444]/10 text-[#DC2626]",
+};
+
+const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
+  confirmed: CheckCircle2,
+  pending: AlertCircle,
+  "link-sent": AlertCircle,
+  paid: CheckCircle2,
+  failed: AlertCircle,
+  expired: AlertCircle,
+  "payment-cancelled": AlertCircle,
+};
+
+const BANNER_LABEL_KEY: Record<DetailState, string> = {
+  confirmed: "reservations.detail.state.confirmed",
+  pending: "reservations.detail.state.pending",
+  "link-sent": "reservations.detail.state.linkSent",
+  paid: "reservations.detail.state.paid",
+  failed: "reservations.detail.state.failed",
+  expired: "reservations.detail.state.expired",
+  "payment-cancelled": "reservations.detail.state.paymentCancelled",
+};
+
+// Same "ISO date -> Aug 8, 2026" formatting reservation-row.tsx uses for a
+// date outside today/tomorrow — duplicated locally rather than shared since
+// this task only touches this one new file plus _shared/model.ts.
+function formatDate(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    numberingSystem: "latn",
+  }).format(new Date(`${date}T00:00:00`));
+}
+
+function DetailRow({
+  icon,
+  label,
+  value,
+  valueClassName,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between text-[12.5px]">
+      <span className="inline-flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
+        {icon}
+        {label}
+      </span>
+      <span className={clsx("font-medium text-[var(--octo-text-primary)]", valueClassName)}>{value}</span>
+    </div>
+  );
+}
+
+function Panel({ children }: { children: ReactNode }) {
+  return <div className="rounded-[9px] border border-[var(--octo-border-card)] p-3.5">{children}</div>;
+}
+
+function PanelHeading({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={clsx("mb-3 flex items-center justify-between border-b border-[var(--octo-divider)] pb-3", className)}>
+      {children}
+    </div>
+  );
+}
+
+// The plain single-line boxes for failed / expired / payment-cancelled — no
+// heading, just a bordered box holding one line of red (or grey) text.
+function MessageBox({ tone, children }: { tone: string; children: ReactNode }) {
+  return (
+    <div className="rounded-[9px] border border-[var(--octo-border-card)] px-3.5 py-3 text-[12.5px] font-medium" style={{ color: tone }}>
+      {children}
+    </div>
+  );
+}
+
+// The "Send Message" popover from the eighth frame — WhatsApp / Call / Email,
+// each a link to the same targets reservation-row.tsx's contact icons use.
+function SendMessagePopover({
+  reservation,
+  onClose,
+  t,
+}: {
+  reservation: Reservation;
+  onClose: () => void;
+  t: (key: string) => string;
+}) {
+  const ref = useDismiss(true, onClose);
+  const digits = reservation.phone.replace(/\D/g, "");
+
+  const items = [
+    { key: "whatsapp", href: `https://wa.me/${digits}`, icon: <MessageCircle size={14} className="text-[#25D366]" />, label: t("reservations.list.row.whatsapp") },
+    { key: "call", href: `tel:${reservation.phone}`, icon: <Phone size={14} className="text-[#0D6EFD]" />, label: t("reservations.list.row.call") },
+    {
+      key: "email",
+      href: reservation.email ? `mailto:${reservation.email}` : undefined,
+      icon: <Mail size={14} className="text-[var(--octo-text-muted)]" />,
+      label: t("reservations.list.row.email"),
+    },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      role="menu"
+      className="absolute top-full start-0 z-20 mt-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+    >
+      {items.map((item) =>
+        item.href ? (
+          <a
+            key={item.key}
+            href={item.href}
+            target={item.href.startsWith("http") ? "_blank" : undefined}
+            rel={item.href.startsWith("http") ? "noreferrer" : undefined}
+            role="menuitem"
+            onClick={onClose}
+            className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            {item.icon}
+            {item.label}
+          </a>
+        ) : (
+          <span
+            key={item.key}
+            role="menuitem"
+            aria-disabled="true"
+            title={t("reservations.list.actions.noBackend")}
+            className="flex w-full cursor-not-allowed items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-faint)]"
+          >
+            {item.icon}
+            {item.label}
+          </span>
+        )
+      )}
+    </div>
+  );
+}
+
+// The small "⋮" menu the confirmed / pending / link-sent / paid footers
+// share — its one item is "Cancel Reservation".
+function MoreMenuButton({ onCancel, t }: { onCancel: () => void; t: (key: string) => string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t("reservations.list.row.more")}
+        onClick={() => setOpen((v) => !v)}
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[var(--octo-track)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+      >
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full start-0 z-20 mb-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onCancel();
+              setOpen(false);
+            }}
+            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[#EF4444] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            {t("reservations.detail.cancelReservation")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ReservationDetailModal({
+  open,
+  reservation,
+  onClose,
+  onEdit,
+  onCancel,
+  onResendLink,
+  onShareLink,
+}: ReservationDetailModalProps) {
+  const { t, locale } = useI18n();
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Reset transient UI state whenever a fresh reservation is opened, so a
+  // second "view" after a first doesn't inherit a stuck popover or label.
+  useEffect(() => {
+    if (open) {
+      setSendMessageOpen(false);
+      setCopied(false);
+    }
+  }, [open, reservation?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeout.current) clearTimeout(copyTimeout.current);
+    };
+  }, []);
+
+  if (!reservation) return null;
+
+  const state = detailState(reservation);
+  const noBackend = t("reservations.list.actions.noBackend");
+
+  async function copyLink() {
+    if (!reservation?.paymentLink) return;
+    try {
+      await navigator.clipboard.writeText(reservation.paymentLink.url);
+      setCopied(true);
+      if (copyTimeout.current) clearTimeout(copyTimeout.current);
+      copyTimeout.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can throw (permissions, insecure context, …) —
+      // swallow it rather than let it blank the dialog. The button simply
+      // doesn't flip to "Copied".
+    }
+  }
+
+  const BannerIcon = BANNER_ICON[state];
+
+  const banner = (
+    <div className={clsx("flex items-center gap-2 rounded-[9px] px-3.5 py-2.5 text-[13px] font-semibold", BANNER_CLASS[state])}>
+      <BannerIcon size={16} className="shrink-0" />
+      {t(BANNER_LABEL_KEY[state])}
+    </div>
+  );
+
+  const guestCard = (
+    <div className="flex items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2.5">
+      <GuestAvatar name={reservation.guest} size={36} />
+      <div>
+        <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{reservation.guest}</p>
+        <p className="inline-flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
+          <MessageCircle size={12} className="text-[#25D366]" />
+          {reservation.phone}
+        </p>
+      </div>
+    </div>
+  );
+
+  const guestsText =
+    reservation.partySize === 1
+      ? t("reservations.list.row.guestOne")
+      : t("reservations.list.row.guests").replace("{n}", String(reservation.partySize));
+
+  const metaRow = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-[var(--octo-text-secondary)]">
+      <span className="inline-flex items-center gap-1.5">
+        <Users size={13} className="shrink-0" />
+        {guestsText}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Calendar size={13} className="shrink-0" />
+        {formatDate(reservation.date, locale)}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Clock size={13} className="shrink-0" />
+        {clock12(reservation.startMinutes)}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        <Utensils size={13} className="shrink-0" />
+        {reservation.area} - {tableLabel(reservation.table)}
+      </span>
+    </div>
+  );
+
+  let panel: ReactNode;
+  switch (state) {
+    case "confirmed":
+      panel = (
+        <Panel>
+          <PanelHeading>
+            <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[#15803D]">
+              <CheckCircle2 size={16} />
+              {t("reservations.detail.confirmedPanel")}
+            </span>
+          </PanelHeading>
+          <div className="space-y-2.5">
+            <DetailRow label={t("reservations.detail.confirmedOn")} value={reservation.confirmedOn ?? "—"} />
+            <DetailRow label={t("reservations.detail.confirmedMethod")} value={reservation.confirmedMethod ?? "—"} />
+          </div>
+        </Panel>
+      );
+      break;
+
+    case "pending": {
+      const deposit = reservation.deposit;
+      panel = (
+        <>
+          <Panel>
+            <PanelHeading>
+              <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
+                {t("reservations.detail.depositInfo")}
+              </span>
+              <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
+                {deposit?.currency ?? "SAR"} {deposit?.amount ?? 0}{" "}
+                <span className="font-normal text-[var(--octo-text-muted)]">{t("reservations.detail.required")}</span>
+              </span>
+            </PanelHeading>
+            <div className="space-y-2.5">
+              <DetailRow
+                icon={<CircleDashed size={14} className="text-[var(--octo-text-muted)]" />}
+                label={t("reservations.detail.status")}
+                value={t("reservations.list.row.unpaid")}
+                valueClassName="!text-[#B45309]"
+              />
+              <DetailRow
+                icon={<Banknote size={14} className="text-[var(--octo-text-muted)]" />}
+                label={t("reservations.detail.depositAmount")}
+                value={`${deposit?.currency ?? "SAR"} ${deposit?.amount ?? 0}`}
+              />
+              <DetailRow
+                icon={<Clock size={14} className="text-[var(--octo-text-muted)]" />}
+                label={t("reservations.detail.dueBy")}
+                value={deposit?.dueBy ?? "—"}
+              />
+            </div>
+          </Panel>
+          <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-[#F59E0B]/10 px-3.5 py-2.5 text-[12px] text-[#B45309]">
+            <AlertCircle size={14} className="shrink-0" />
+            {t("reservations.detail.autoConfirmNote")}
+          </div>
+        </>
+      );
+      break;
+    }
+
+    case "link-sent": {
+      const link = reservation.paymentLink;
+      panel = (
+        <Panel>
+          <PanelHeading>
+            <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.detail.linkPanel")}</span>
+          </PanelHeading>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[#0D6EFD]/20 bg-[#0D6EFD]/[0.06] px-3 py-2.5">
+              <a
+                href={link?.url ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="truncate text-[12.5px] font-semibold text-[#0D6EFD] hover:underline"
+              >
+                {link?.url}
+              </a>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="shrink-0 text-[11.5px] font-medium text-[#0D6EFD] transition-opacity hover:opacity-75"
+                aria-label={t("reservations.detail.copyLink")}
+              >
+                {copied ? t("reservations.detail.copied") : <Copy size={14} />}
+              </button>
+            </div>
+            <div className="space-y-2.5">
+              <DetailRow label={t("reservations.detail.sentVia")} value={link?.sentVia ?? "—"} />
+              <DetailRow label={t("reservations.detail.sentTo")} value={link?.sentTo ?? "—"} />
+              <DetailRow label={t("reservations.detail.sentOn")} value={link?.sentOn ?? "—"} />
+              <DetailRow label={t("reservations.detail.expireOn")} value={link?.expiresOn ?? "—"} />
+            </div>
+          </div>
+        </Panel>
+      );
+      break;
+    }
+
+    case "paid": {
+      const deposit = reservation.deposit;
+      panel = (
+        <Panel>
+          <PanelHeading>
+            <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
+              {t("reservations.detail.paymentSuccessful")}
+            </span>
+          </PanelHeading>
+          <div className="space-y-2.5">
+            <DetailRow label={t("reservations.detail.paidAmount")} value={`${deposit?.currency ?? "SAR"} ${deposit?.amount ?? 0}`} />
+            <DetailRow label={t("reservations.detail.paidOn")} value={deposit?.paidOn ?? "—"} />
+            <DetailRow label={t("reservations.detail.paymentMethod")} value={deposit?.method ?? "—"} />
+            <DetailRow label={t("reservations.detail.transactionId")} value={deposit?.txnId ?? "—"} />
+          </div>
+        </Panel>
+      );
+      break;
+    }
+
+    case "failed":
+      panel = <MessageBox tone="#DC2626">{t("reservations.detail.noAmountCaptured")}</MessageBox>;
+      break;
+
+    case "expired":
+      panel = <MessageBox tone="#DC2626">{t("reservations.detail.linkNoLongerValid")}</MessageBox>;
+      break;
+
+    case "payment-cancelled":
+      panel = <MessageBox tone="#DC2626">{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
+      break;
+  }
+
+  let footer: ReactNode;
+  switch (state) {
+    case "confirmed":
+      footer = (
+        <>
+          <MoreMenuButton onCancel={onCancel} t={t} />
+          <div className="relative">
+            <Button
+              variant="secondary"
+              className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+              onClick={() => setSendMessageOpen((v) => !v)}
+            >
+              {t("reservations.detail.sendMessage")}
+            </Button>
+            {sendMessageOpen && (
+              <SendMessagePopover reservation={reservation} onClose={() => setSendMessageOpen(false)} t={t} />
+            )}
+          </div>
+          <Button variant="primary" className="flex-1 justify-center" onClick={onEdit}>
+            {t("reservations.detail.editReservation")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "pending":
+      footer = (
+        <>
+          <MoreMenuButton onCancel={onCancel} t={t} />
+          <Button
+            variant="secondary"
+            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+            onClick={onEdit}
+          >
+            {t("reservations.detail.editReservation")}
+          </Button>
+          <Button variant="primary" className="flex-1 justify-center" onClick={onShareLink}>
+            {t("reservations.detail.shareLink")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "link-sent":
+      footer = (
+        <>
+          <MoreMenuButton onCancel={onCancel} t={t} />
+          <Button
+            variant="secondary"
+            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+            onClick={onEdit}
+          >
+            {t("reservations.detail.editReservation")}
+          </Button>
+          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+            {t("reservations.detail.resendLink")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "paid":
+      footer = (
+        <>
+          <MoreMenuButton onCancel={onCancel} t={t} />
+          <Button
+            variant="secondary"
+            icon={<FileDown size={14} />}
+            disabled
+            title={noBackend}
+            className="!flex-1 !justify-center !border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+          >
+            {t("reservations.detail.downloadReceipt")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "failed":
+      footer = (
+        <>
+          <Button
+            variant="secondary"
+            className="!border-transparent !bg-[#EF4444]/10 !text-[#DC2626] hover:!bg-[#EF4444]/15"
+            onClick={onCancel}
+          >
+            {t("reservations.detail.cancelReservation")}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled
+            title={noBackend}
+            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+          >
+            {t("reservations.detail.notifyGuest")}
+          </Button>
+          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+            {t("reservations.detail.resendNewLink")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "expired":
+      footer = (
+        <>
+          <Button
+            variant="secondary"
+            disabled
+            title={noBackend}
+            className="!border-transparent !bg-[#0D6EFD]/10 !text-[#0D6EFD] hover:!bg-[#0D6EFD]/15"
+          >
+            {t("reservations.detail.notifyGuest")}
+          </Button>
+          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+            {t("reservations.detail.resendNewLink")}
+          </Button>
+        </>
+      );
+      break;
+
+    case "payment-cancelled":
+      footer = (
+        <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+          {t("reservations.detail.resendNewLink")}
+        </Button>
+      );
+      break;
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("reservations.detail.title").replace("{ref}", reservation.ref)}
+      className="max-w-[620px]"
+      footer={footer}
+    >
+      <div className="space-y-3">
+        {banner}
+        {guestCard}
+        {metaRow}
+        {panel}
+      </div>
+    </Modal>
+  );
+}

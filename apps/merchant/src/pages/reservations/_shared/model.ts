@@ -215,3 +215,24 @@ export function phoneDigitsFrom(phone: string): string {
 export function combinePhone(digits: string): string {
   return `+966${digits}`;
 }
+
+/* ============================================================ Task 10 detail */
+// Pure derivation for the reservation detail dialog (reservation-detail-modal.tsx).
+// Which of the eight frames a given reservation renders as.
+
+export type DetailState =
+  | "confirmed" | "pending" | "link-sent" | "paid" | "failed" | "expired" | "payment-cancelled";
+
+export function detailState(r: Reservation): DetailState {
+  switch (r.deposit?.state) {
+    case "link-sent":
+    case "paid":
+    case "failed":
+    case "expired":
+      return r.deposit.state;
+    case "cancelled":
+      return "payment-cancelled";
+    default:
+      return r.status === "Confirmed" ? "confirmed" : "pending";
+  }
+}

@@ -61,9 +61,15 @@ const RESULT_LABEL_KEY: Record<Tier, string> = {
 // visible border added for the "outline chip" look the frame draws. Every
 // tone reads off the `--octo-tone-*` tokens in index.css (fix round 4,
 // finding 27), not a literal hex, for dark-mode contrast.
+//
+// The border uses the dedicated `-border` token, never `-text` with a `/N`
+// opacity modifier tacked on (re-review fix) — Tailwind 3.4 doesn't support
+// an opacity modifier on an arbitrary var() colour and silently drops the
+// whole declaration, leaving just the bare 1px `border` with no colour set
+// (so it fell back to preflight's grey in both themes).
 const RESULT_CHIP_CLASS: Record<Tier, string> = {
-  full: "border border-[var(--octo-tone-success-text)]/30 bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
-  partial: "border border-[var(--octo-tone-warning-text)]/30 bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
+  full: "border border-[var(--octo-tone-success-border)] bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
+  partial: "border border-[var(--octo-tone-warning-border)] bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
   none: "border border-[var(--octo-border-card)] bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
 };
 
@@ -198,7 +204,11 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
             so the whole preview is hidden rather than showing "Result:
             FULL REFUND" on a branch that refunds nothing. */}
         {actionType !== "no-show" && (
-          <div className="rounded-[9px] bg-[var(--octo-tone-info-bg)] px-3.5 py-3">
+          // bg stays the original, softer 4% wash (re-review fix) — the
+          // shared --octo-tone-info-bg token is 10%, tuned for a status
+          // chip/banner's stronger tint, and was more saturated than this
+          // panel drew before finding 27 touched it.
+          <div className="rounded-[9px] bg-[#0D6EFD]/[0.04] px-3.5 py-3">
             <div className="mb-2.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-tone-info-text)]">
               <Info size={14} />
               {t("reservations.cancel.policyPreview")}

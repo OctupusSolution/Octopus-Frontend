@@ -145,7 +145,13 @@ function initDraft(mode: "add" | "edit", reservation: Reservation | null): Draft
     area: AREA_OPTIONS[0],
     table: "",
     source: "Direct Booking",
-    depositEnabled: false,
+    // Fix round 1, finding 2 — the "reservation details" frame shows this
+    // section expanded (toggle on, notice bar visible) as the tab's
+    // starting state, not a filled-in example the way the frame's demo
+    // guest/date/tags are. Deposit Amount stays blank rather than
+    // mirroring the frame's "200" — that number isn't a rule this app
+    // knows, just whatever the mock happened to show.
+    depositEnabled: true,
     depositAmount: "",
     depositType: "Pre Reservation",
     depositState: "unpaid",
@@ -475,7 +481,7 @@ export function ReservationFormModal({
       open={open}
       onClose={onClose}
       title={t(mode === "add" ? "reservations.form.addTitle" : "reservations.form.editTitle")}
-      className="max-w-[760px]"
+      className="!max-w-[760px]"
       footer={footer}
     >
       <Tabs items={tabItems} value={activeTab} onChange={setActiveTab} />

@@ -579,7 +579,7 @@ export function ReservationDetailModal({
       open={open}
       onClose={onClose}
       title={t("reservations.detail.title").replace("{ref}", reservation.ref)}
-      className="max-w-[620px]"
+      className="!max-w-[620px]"
       footer={footer}
     >
       <div className="space-y-3">

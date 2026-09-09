@@ -149,7 +149,9 @@ export const reservations: Reservation[] = [
   { id: "res-052", date: "2026-08-08", startMinutes: at(21, 30), durationMinutes: 90, ref: "RSV-1052", guest: "Nawaf Al-Qarni", phone: phoneFor(12), email: "nawaf.alqarni@example.com", partySize: 4, area: "Terrace", table: "T-17", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed", tags: ["Birthday", "VIP"] },
 
   // --- Sun 9 Aug ---
-  { id: "res-010", date: "2026-08-09", startMinutes: at(12, 30), durationMinutes: 90, ref: "RSV-1053", guest: "Fahad Al-Rashidi", phone: phoneFor(10), email: "fahad.alrashidi@example.com", partySize: 2, area: "Main Dining", table: "T-05", branch: "Riyadh - Olaya", source: "Website", status: "Confirmed" },
+  // phoneFor(19) — not phoneFor(10), which res-050 above already uses for a
+  // different guest (fix round 4, finding 17).
+  { id: "res-010", date: "2026-08-09", startMinutes: at(12, 30), durationMinutes: 90, ref: "RSV-1053", guest: "Fahad Al-Rashidi", phone: phoneFor(19), email: "fahad.alrashidi@example.com", partySize: 2, area: "Main Dining", table: "T-05", branch: "Riyadh - Olaya", source: "Website", status: "Confirmed" },
 
   // --- Mon 10 Aug ---
   { id: "res-011", date: "2026-08-10", startMinutes: at(13, 0), durationMinutes: 90, ref: "RSV-1054", guest: "Dana Al-Balawi", phone: phoneFor(16), email: "dana.albalawi@example.com", partySize: 4, area: "Terrace", table: "T-16", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed" },
@@ -161,7 +163,10 @@ export const reservations: Reservation[] = [
   { id: "res-013", date: "2026-08-12", startMinutes: at(12, 0), durationMinutes: 90, ref: "RSV-1056", guest: "Omar Al-Ghamdi", phone: phoneFor(6), email: "omar.alghamdi@example.com", partySize: 4, area: "Private Rooms", table: "T-15", branch: "Riyadh - Olaya", source: "Phone", status: "Confirmed" },
 
   // --- Thu 13 Aug ---
-  { id: "res-014", date: "2026-08-13", startMinutes: at(19, 30), durationMinutes: 120, ref: "RSV-1057", guest: "Nawaf Al-Qarni", phone: phoneFor(13), email: "nawaf.alqarni@example.com", partySize: 8, area: "Main Dining", table: "T-28", branch: "Riyadh - Narjis", source: "Website", status: "Confirmed", notes: "Corporate dinner — needs the bill split three ways." },
+  // Same guest as res-052 above — same phone number (fix round 4, finding
+  // 17; this used to be phoneFor(13), a second number for the same Nawaf
+  // Al-Qarni).
+  { id: "res-014", date: "2026-08-13", startMinutes: at(19, 30), durationMinutes: 120, ref: "RSV-1057", guest: "Nawaf Al-Qarni", phone: phoneFor(12), email: "nawaf.alqarni@example.com", partySize: 8, area: "Main Dining", table: "T-28", branch: "Riyadh - Narjis", source: "Website", status: "Confirmed", notes: "Corporate dinner — needs the bill split three ways." },
 
   // --- Fri 14 Aug ---
   { id: "res-015", date: "2026-08-14", startMinutes: at(20, 0), durationMinutes: 150, ref: "RSV-1058", guest: "Abdullah Al-Qahtani", phone: phoneFor(3), email: "abdullah.alqahtani@example.com", partySize: 10, area: "Terrace", table: "T-30", branch: "Khobar - Rakah", source: "Website", status: "Confirmed", notes: "Family gathering, needs two tables joined." },

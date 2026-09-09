@@ -279,7 +279,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
             Home, and the About/Contact pair — are page furniture every
             storefront has, not sections the merchant can move. */}
         {!mobile && (
-          <nav className="flex min-w-0 items-center gap-3.5 overflow-hidden text-[9px] text-[var(--octo-text-primary)]">
+          <nav className="flex min-w-0 items-center gap-3.5 overflow-x-auto text-[9px] text-[var(--octo-text-primary)]">
             {/* Home is the current page, marked the way SiteHeader marks the
                 active route: brand colour, bold, and a rule underneath. */}
             <span className="relative whitespace-nowrap font-semibold" style={{ color: model.primary }}>

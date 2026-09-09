@@ -1,15 +1,13 @@
 // Task 10: the reservation detail dialog. One component covers all eight
 // design frames — the state shown (banner, panel and footer) is *derived*
 // from the reservation, not passed in, via `detailState` in `_shared/model.ts`.
-// The guest card and meta row are built inline here on purpose: Task 11
-// lifts them into `_shared/guest-card.tsx` / `_shared/meta-row.tsx` once the
-// cancel dialog needs the same two pieces, so this file is written clean
-// enough to extract from but isn't pre-split.
+// Task 11 lifted the guest card and meta row out into
+// `_shared/guest-card.tsx` / `_shared/meta-row.tsx` once the cancel dialog
+// needed the same two pieces.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import {
   AlertCircle,
-  Calendar,
   CheckCircle2,
   CircleDashed,
   Clock,
@@ -19,15 +17,14 @@ import {
   MessageCircle,
   MoreVertical,
   Phone,
-  Users,
-  Utensils,
   Vault,
 } from "lucide-react";
 import { Button, Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
-import { GuestAvatar } from "../_shared/guest-avatar";
-import { clock12, detailState, tableLabel, type DetailState } from "../_shared/model";
+import { GuestCard } from "../_shared/guest-card";
+import { MetaRow } from "../_shared/meta-row";
+import { detailState, type DetailState } from "../_shared/model";
 import { useDismiss } from "../_shared/use-dismiss";
 
 export interface ReservationDetailModalProps {
@@ -79,18 +76,6 @@ const BANNER_LABEL_KEY: Record<DetailState, string> = {
   // in the brief's key list either) — reuse the row pill's own label.
   cancelled: "reservations.state.cancelled",
 };
-
-// Same "ISO date -> Aug 8, 2026" formatting reservation-row.tsx uses for a
-// date outside today/tomorrow — duplicated locally rather than shared since
-// this task only touches this one new file plus _shared/model.ts.
-function formatDate(date: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    numberingSystem: "latn",
-  }).format(new Date(`${date}T00:00:00`));
-}
 
 function DetailRow({
   icon,
@@ -260,7 +245,7 @@ export function ReservationDetailModal({
   onResendLink,
   onShareLink,
 }: ReservationDetailModalProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -308,44 +293,8 @@ export function ReservationDetailModal({
     </div>
   );
 
-  const guestCard = (
-    <div className="flex items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2.5">
-      <GuestAvatar name={reservation.guest} size={36} />
-      <div>
-        <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{reservation.guest}</p>
-        <p className="inline-flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
-          <MessageCircle size={12} className="text-[#25D366]" />
-          {reservation.phone}
-        </p>
-      </div>
-    </div>
-  );
-
-  const guestsText =
-    reservation.partySize === 1
-      ? t("reservations.list.row.guestOne")
-      : t("reservations.list.row.guests").replace("{n}", String(reservation.partySize));
-
-  const metaRow = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-[var(--octo-text-secondary)]">
-      <span className="inline-flex items-center gap-1.5">
-        <Users size={13} className="shrink-0" />
-        {guestsText}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Calendar size={13} className="shrink-0" />
-        {formatDate(reservation.date, locale)}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Clock size={13} className="shrink-0" />
-        {clock12(reservation.startMinutes)}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <Utensils size={13} className="shrink-0" />
-        {reservation.area} - {tableLabel(reservation.table)}
-      </span>
-    </div>
-  );
+  const guestCard = <GuestCard reservation={reservation} />;
+  const metaRow = <MetaRow reservation={reservation} />;
 
   let panel: ReactNode;
   switch (state) {

@@ -8,6 +8,7 @@ import {
   detailState,
   displayState,
   EMPTY_FILTERS,
+  hoursMinutesParts,
   isPaid,
   phoneDigitsFrom,
   refundPolicy,
@@ -141,6 +142,21 @@ describe("refundPolicy", () => {
   });
   it("reports the gap in minutes", () => {
     expect(refundPolicy(r, 12 * 60).minutesToEvent).toBe(420);
+  });
+});
+
+describe("hoursMinutesParts", () => {
+  it("splits an exact number of hours", () => {
+    expect(hoursMinutesParts(300)).toEqual({ h: 5, m: 0 });
+  });
+  it("splits hours with a remainder", () => {
+    expect(hoursMinutesParts(625)).toEqual({ h: 10, m: 25 });
+  });
+  it("handles zero", () => {
+    expect(hoursMinutesParts(0)).toEqual({ h: 0, m: 0 });
+  });
+  it("clamps a negative gap (event already started) to zero", () => {
+    expect(hoursMinutesParts(-45)).toEqual({ h: 0, m: 0 });
   });
 });
 

@@ -174,6 +174,20 @@ export function refundPolicy(r: Reservation, nowMinutes: number): RefundPolicy {
   return { minutesToEvent, tier };
 }
 
+/* ========================================================== Task 11 cancel */
+// Pure derivation for the cancel dialog's policy preview
+// (cancel-reservation-modal.tsx).
+
+/** Splits a minute count into whole hours + remainder minutes for the
+ *  "Time to event" row, rendered through `reservations.cancel.hoursMinutes`.
+ *  Clamped at zero — once the tier is "none" the reservation's slot has
+ *  already started and `minutesToEvent` goes negative, which has no sane
+ *  "Xh Ym" reading. */
+export function hoursMinutesParts(minutes: number): { h: number; m: number } {
+  const clamped = Math.max(0, minutes);
+  return { h: Math.floor(clamped / 60), m: clamped % 60 };
+}
+
 /* ============================================================== Task 9 form */
 // Pure helpers for the Add/Edit reservation form (reservation-form-modal.tsx).
 

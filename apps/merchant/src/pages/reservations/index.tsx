@@ -5,7 +5,9 @@ import { reservations, TODAY, type Reservation, type ReservationStatus } from "@
 import { useI18n } from "@/app/providers/i18n-provider";
 
 const STATUS_COLOR: Record<ReservationStatus, string> = {
+  Pending: "#F59E0B",
   Confirmed: "#0D6EFD",
+  Arrived: "#6366F1",
   Seated: "#22C55E",
   Completed: "#a9a9b2",
   "No-show": "#EF4444",

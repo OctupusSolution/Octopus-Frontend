@@ -149,6 +149,7 @@ export const en = {
   "status.available": "Available",
   "status.86d": "86'd",
   "status.confirmed": "Confirmed",
+  "status.arrived": "Arrived",
   "status.seated": "Seated",
   "status.noShow": "No-show",
   "status.waitlisted": "Waitlisted",
@@ -306,8 +307,9 @@ export const en = {
   "reservations.col.status": "Status",
   "reservations.source.phone": "Phone",
   "reservations.source.website": "Website",
-  "reservations.source.walkIn": "Walk-in",
-  "reservations.source.mobileApp": "Mobile App",
+  "reservations.source.walkIn": "Walk In",
+  "reservations.source.directBooking": "Direct Booking",
+  "reservations.source.instagram": "Instagram",
 
   /* ---------------------------------------------------------------------- menu */
   "menu.title": "Menu",
@@ -1300,7 +1302,6 @@ export const en = {
   "customers.feedback.detail.notFound": "Feedback not found.",
 
   /* --- reservations (W2-01) --- */
-  "reservations.source.aggregator": "Aggregator",
   "reservations.waitlistPage.delta.vsLastHour": "vs last hour",
 
   "reservations.calendar.title": "Calendar / Timeline",

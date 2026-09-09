@@ -2,7 +2,11 @@
 // deterministic hash of the name into a fixed six-colour ring — no
 // Math.random — so the same guest always renders the same colour, in this
 // row and everywhere else the avatar shows up.
-const AVATAR_RING = ["#0D6EFD", "#16A34A", "#7C3AED", "#D97706", "#DC2626", "#0891B2"] as const;
+//
+// Every entry clears WCAG AA (4.5:1) for white text at 11px (fix round 1):
+// the green, amber and cyan slots were originally #16A34A/#D97706/#0891B2
+// (~3.2-3.7:1) and have been swapped for darker shades of the same hues.
+const AVATAR_RING = ["#0D6EFD", "#15803D", "#7C3AED", "#B45309", "#DC2626", "#0E7490"] as const;
 
 function hashName(name: string): number {
   let hash = 0;

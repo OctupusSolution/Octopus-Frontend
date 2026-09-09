@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import clsx from "clsx";
-import { CalendarCheck, Clock, Hourglass, Timer, TrendingUp, Users } from "lucide-react";
+import { ChartNoAxesCombined, Hourglass, Timer, Users } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Kpis } from "./model";
 
@@ -31,7 +31,8 @@ export function KpiCards({ kpis }: KpiCardsProps) {
       label: t("reservations.list.kpi.today"),
       percent: (
         <span className="inline-flex items-center gap-1 text-[12px] font-medium">
-          <TrendingUp className="h-3 w-3 text-[#16A34A]" />
+          {/* Frame glyph is bars-plus-trend-line, not a bare arrow (fix round 1). */}
+          <ChartNoAxesCombined className="h-3 w-3 text-[#16A34A]" />
           {/* Placeholder: no yesterday-comparison data exists in the fixture
               yet, so this hardcodes the frame's figure rather than fabricate one. */}
           <span className="text-[#16A34A]">3.46%</span>
@@ -45,7 +46,8 @@ export function KpiCards({ kpis }: KpiCardsProps) {
       key: "confirmed",
       cardBg: "bg-[#16A34A]/[0.06]",
       tile: "#16A34A",
-      icon: CalendarCheck,
+      // Frame draws a chart-with-a-trend glyph here, not a calendar (fix round 1).
+      icon: ChartNoAxesCombined,
       value: kpis.confirmed,
       label: t("reservations.list.kpi.confirmed"),
       percent: <span className="text-[12px] font-medium text-[#16A34A]">{kpis.confirmedPct}%</span>,
@@ -72,7 +74,8 @@ export function KpiCards({ kpis }: KpiCardsProps) {
       key: "noShow",
       cardBg: "bg-[#D97706]/[0.06]",
       tile: "#D97706",
-      icon: Clock,
+      // Frame uses the same stopwatch glyph as Pending, not a plain clock (fix round 1).
+      icon: Timer,
       value: kpis.noShow,
       label: t("reservations.list.kpi.noShow"),
       percent: <span className="text-[12px] font-medium text-[#D97706]">{kpis.noShowPct}%</span>,

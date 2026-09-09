@@ -7,11 +7,14 @@ import { displayState, type DisplayState } from "./model";
 // an eleven-entry colour map.
 export const TONE: Record<DisplayState, { dot: string; text: string; bg: string }> = {
   Pending: { dot: "#F59E0B", text: "text-[#B45309]", bg: "bg-[#F59E0B]/10" },
-  Confirmed: { dot: "#16A34A", text: "text-[#15803D]", bg: "bg-[#16A34A]/10" },
+  // Sampled from the frame: this state is gold/olive, not green (fix round 1).
+  Confirmed: { dot: "#AF9303", text: "text-[#8A7502]", bg: "bg-[#AF9303]/10" },
   Arrived: { dot: "#0D6EFD", text: "text-[#0D6EFD]", bg: "bg-[#0D6EFD]/10" },
   Seated: { dot: "#7C3AED", text: "text-[#6D28D9]", bg: "bg-[#7C3AED]/10" },
-  Completed: { dot: "#16A34A", text: "text-[#15803D]", bg: "bg-[#16A34A]/10" },
-  "No-show": { dot: "#8B5CF6", text: "text-[#7C3AED]", bg: "bg-[#8B5CF6]/10" },
+  // Sampled from the frame: green belongs here, not to Confirmed (fix round 1).
+  Completed: { dot: "#009A39", text: "text-[#00832F]", bg: "bg-[#009A39]/10" },
+  // Sampled from the frame: this state is slate-grey, not violet (fix round 1).
+  "No-show": { dot: "#58606C", text: "text-[#58606C]", bg: "bg-[#58606C]/10" },
   Cancelled: { dot: "#EF4444", text: "text-[#DC2626]", bg: "bg-[#EF4444]/10" },
   "Link Sent": { dot: "#0D6EFD", text: "text-[#0D6EFD]", bg: "bg-[#0D6EFD]/10" },
   Expired: { dot: "#9CA3AF", text: "text-[var(--octo-text-muted)]", bg: "bg-[var(--octo-track)]" },

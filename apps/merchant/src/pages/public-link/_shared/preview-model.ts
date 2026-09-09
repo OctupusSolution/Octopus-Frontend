@@ -102,6 +102,13 @@ export function previewModelFromSite(
       visible: !draft.navigation.hidden.includes(page.id),
     }));
 
+  // Named, not positional: whichever page is first in nav order AND not
+  // eye-toggled hidden is "home" for this preview, however the merchant has
+  // reordered pages. No qualifying page (e.g. every page hidden) means no
+  // entry is drawn as active — never a fallback to the first item regardless
+  // of visibility.
+  const activeNavLabelKey = navItems.find((item) => item.visible)?.labelKey;
+
   const sections = draft.sections
     .filter((section) => section.enabled)
     .map((section) => SECTION_WIDGET_MAP[section.id])
@@ -118,6 +125,7 @@ export function previewModelFromSite(
     sections,
     sectionLabelKeys: SECTION_LABEL_KEYS,
     navItems,
+    activeNavLabelKey,
     categories: CATEGORY_KEYS,
     cityLabel: "",
     hoursSummary: "",

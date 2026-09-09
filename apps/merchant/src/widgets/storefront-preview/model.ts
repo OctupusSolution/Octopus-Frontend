@@ -38,12 +38,21 @@ export interface StorefrontPreviewModel {
    *  guarantees the same id sits at the same index in both. */
   sectionLabelKeys: Readonly<Record<string, string>>;
   navItems: readonly PreviewNavItem[];
-  /** Trailing header-nav-only entries with no equivalent page of their own —
-   *  content the footer's Explore column (which lists `navItems` unfiltered,
-   *  as a sitemap) must not also pick up. Optional: a host whose `navItems`
+  /** Header-nav-only entries with no equivalent page of their own — content
+   *  the footer's Explore column (which lists `navItems` unfiltered, as a
+   *  sitemap) must not also pick up. `leading` renders before `navItems`
+   *  (onboarding's Home, standing in for its hidden `hero` entry), `trailing`
+   *  after (onboarding's About/Contact). Optional: a host whose `navItems`
    *  already contains everything the header should show (the builder, whose
-   *  pages include real About/Contact entries) omits it. */
-  navFurniture?: readonly PreviewNavItem[];
+   *  pages include real Home/About/Contact entries) omits it entirely. */
+  navFurniture?: {
+    leading?: readonly PreviewNavItem[];
+    trailing?: readonly PreviewNavItem[];
+  };
+  /** Which nav entry is drawn as the current page — matched by label key, not by
+   *  position, so it survives a merchant reordering their navigation. Undefined
+   *  means no entry is marked active. */
+  activeNavLabelKey?: string;
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];
   /** Already translated. Empty string renders nothing. */

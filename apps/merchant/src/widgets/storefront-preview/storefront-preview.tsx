@@ -274,49 +274,42 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
           </span>
         )}
 
-        {/* The nav's middle is entirely the host's own list — reorder the
-            sections below (or the pages, in the builder) and this menu
-            follows. The trailing About/Contact used to be hardcoded here;
-            now each host supplies them, either as real `navItems` entries
-            (the builder, whose pages already include About/Contact) or as
-            `navFurniture` (onboarding, which has no such pages — see that
-            field's doc comment on `StorefrontPreviewModel` for why it isn't
-            just appended to `navItems`). Either way this widget no longer
-            hardcodes a host's content (the same principle as
-            `sectionLabelKeys`).
-            Home stays hardcoded: onboarding's own `navItems` has no "Home"
-            entry at all — its `hero` item is deliberately marked invisible
-            and carries a different label ("Hero Section", for the section
-            editor) — so there is no host-supplied item this span could be
-            replaced with without onboarding losing its Home label entirely.
-            The active/underline treatment below is genuine chrome (every
-            storefront highlights its current page the same way); only the
-            word "Home" is content, and today it still duplicates the
-            builder's own Home page entry in navItems — a residual issue
-            flagged for a follow-up that also touches the model, not fixed
-            here. */}
+        {/* The nav is entirely host-supplied — reorder the sections below (or
+            the pages, in the builder) and this menu follows. `navFurniture`
+            covers entries with no page of their own: onboarding's Home
+            (leading — its own `navItems` has no Home entry at all, since its
+            `hero` item is deliberately invisible there and carries a
+            different label, "Hero Section", meant for the section editor)
+            and its About/Contact (trailing, for the same reason). The
+            builder needs neither half — its pages already cover Home, About
+            and Contact through real `navItems` entries — so it omits
+            `navFurniture` entirely. Either way this widget never hardcodes a
+            host's content (the same principle as `sectionLabelKeys`).
+            The active/underline treatment is genuine chrome (every
+            storefront highlights its current page the same way) but is
+            named by the host via `activeNavLabelKey`, matched by label key
+            rather than position — a merchant who drags Home out of first
+            place in the builder's Page Order must still see Home
+            underlined, not whatever now sits first. No match means no
+            underline; there is no positional fallback. */}
         {!mobile && (
           <nav className="flex min-w-0 items-center gap-3.5 overflow-x-auto text-[9px] text-[var(--octo-text-primary)]">
-            {/* Home is the current page, marked the way SiteHeader marks the
-                active route: brand colour, bold, and a rule underneath. */}
-            <span className="relative whitespace-nowrap font-semibold" style={{ color: model.primary }}>
-              {t("onboarding.publicLink.previewHome")}
-              <span
-                className="absolute inset-x-0 -bottom-[11px] h-[2px]"
-                style={{ backgroundColor: model.primary }}
-                aria-hidden
-              />
-            </span>
-            {model.navItems
+            {[...(model.navFurniture?.leading ?? []), ...model.navItems, ...(model.navFurniture?.trailing ?? [])]
               .filter((item) => item.visible)
-              .map((item, i) => (
-                <span key={i} className="whitespace-nowrap">{t(item.labelKey)}</span>
-              ))}
-            {(model.navFurniture ?? [])
-              .filter((item) => item.visible)
-              .map((item, i) => (
-                <span key={`furniture-${i}`} className="whitespace-nowrap">{t(item.labelKey)}</span>
-              ))}
+              .map((item, i) =>
+                item.labelKey === model.activeNavLabelKey ? (
+                  <span key={i} className="relative whitespace-nowrap font-semibold" style={{ color: model.primary }}>
+                    {t(item.labelKey)}
+                    <span
+                      className="absolute inset-x-0 -bottom-[11px] h-[2px]"
+                      style={{ backgroundColor: model.primary }}
+                      aria-hidden
+                    />
+                  </span>
+                ) : (
+                  <span key={i} className="whitespace-nowrap">{t(item.labelKey)}</span>
+                )
+              )}
           </nav>
         )}
 

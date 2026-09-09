@@ -61,21 +61,52 @@
      lifts several steps so it clears WCAG contrast against that tint
      instead of reading near-black. Anything drawing one of these chips
      should reference these vars, not a literal hex, so dark mode never
-     needs patching per-component again. */
+     needs patching per-component again.
+
+     Each tone carries up to three values:
+       -bg     the ~10% tint background, alpha already baked in.
+       -text   the darker, readable ink for text on that tint.
+       -dot    the brighter, more saturated accent for a small solid swatch
+               (a status pill's dot, a calendar block's border) — sampled
+               separately from -text where the frame actually used two
+               different shades of the same hue (fix round 4, re-review:
+               collapsing dot onto -text lost e.g. Pending's dot #F59E0B vs
+               its text #B45309). Only defined where it differs from -text;
+               omitted tones (info, slate) use -text for both.
+       -border a ~20-30% tint for an outline chip's border. Defined only
+               where a component actually draws one — Tailwind 3.4 doesn't
+               support an opacity modifier on an arbitrary var() colour
+               (`border-[var(--x)]/30` compiles to nothing; the alpha has
+               to be baked into the variable itself, same as -bg). Never
+               write `border-[var(--octo-tone-*-text)]/N` — it silently
+               drops the whole declaration. */
   --octo-tone-success-bg: rgb(22 163 74 / 0.1);
   --octo-tone-success-text: #15803d;
+  --octo-tone-success-border: rgb(22 163 74 / 0.3);
   --octo-tone-warning-bg: rgb(245 158 11 / 0.1);
   --octo-tone-warning-text: #b45309;
+  --octo-tone-warning-dot: #f59e0b;
+  --octo-tone-warning-border: rgb(245 158 11 / 0.3);
   --octo-tone-info-bg: rgb(13 110 253 / 0.1);
   --octo-tone-info-text: #0d6efd;
+  --octo-tone-info-border: rgb(13 110 253 / 0.2);
   --octo-tone-danger-bg: rgb(239 68 68 / 0.1);
   --octo-tone-danger-text: #dc2626;
+  --octo-tone-danger-dot: #ef4444;
   --octo-tone-violet-bg: rgb(124 58 237 / 0.1);
   --octo-tone-violet-text: #6d28d9;
+  --octo-tone-violet-dot: #7c3aed;
   --octo-tone-gold-bg: rgb(175 147 3 / 0.1);
   --octo-tone-gold-text: #8a7502;
+  --octo-tone-gold-dot: #af9303;
   --octo-tone-slate-bg: rgb(88 96 108 / 0.1);
   --octo-tone-slate-text: #58606c;
+  /* status-pill.tsx's "Completed" only — a distinct green from -success
+     above (which is Paid/Confirmed/Full-refund's own, already-correct
+     #16A34A/#15803D), sampled separately from the frame. */
+  --octo-tone-completed-bg: rgb(0 154 57 / 0.1);
+  --octo-tone-completed-text: #00832f;
+  --octo-tone-completed-dot: #009a39;
 }
 
 [data-theme="dark"] {
@@ -112,21 +143,34 @@
 
   /* Same ~10% tint backgrounds as light mode (already dark, so they don't
      need to move) — only the text shade lifts, several steps lighter than
-     the light-mode value, to clear contrast against `--octo-card` #1a1f2b. */
+     the light-mode value, to clear contrast against `--octo-card` #1a1f2b.
+     No dark frame exists to sample -dot/-border from, so these reuse the
+     lifted -text shade at a bit more alpha for -border — legible against
+     `--octo-card` without needing their own bespoke values. */
   --octo-tone-success-bg: rgb(22 163 74 / 0.16);
   --octo-tone-success-text: #4ade80;
+  --octo-tone-success-border: rgb(74 222 128 / 0.35);
   --octo-tone-warning-bg: rgb(245 158 11 / 0.16);
   --octo-tone-warning-text: #fbbf24;
+  --octo-tone-warning-dot: #fbbf24;
+  --octo-tone-warning-border: rgb(251 191 36 / 0.35);
   --octo-tone-info-bg: rgb(13 110 253 / 0.18);
   --octo-tone-info-text: #6ea8fe;
+  --octo-tone-info-border: rgb(110 168 254 / 0.3);
   --octo-tone-danger-bg: rgb(239 68 68 / 0.16);
   --octo-tone-danger-text: #f87171;
+  --octo-tone-danger-dot: #f87171;
   --octo-tone-violet-bg: rgb(124 58 237 / 0.18);
   --octo-tone-violet-text: #a78bfa;
+  --octo-tone-violet-dot: #a78bfa;
   --octo-tone-gold-bg: rgb(175 147 3 / 0.16);
   --octo-tone-gold-text: #eab308;
+  --octo-tone-gold-dot: #eab308;
   --octo-tone-slate-bg: rgb(88 96 108 / 0.2);
   --octo-tone-slate-text: #9ca3af;
+  --octo-tone-completed-bg: rgb(0 154 57 / 0.16);
+  --octo-tone-completed-text: #4ade80;
+  --octo-tone-completed-dot: #4ade80;
 }
 
 body {

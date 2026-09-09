@@ -10,21 +10,33 @@ import { displayState, STATE_LABEL_KEY, type DisplayState } from "./model";
 // fix (fix round 4, finding 27) lives in exactly one place — light stays
 // byte-identical to what was sampled from the frames, dark swaps to a
 // lighter text shade automatically via the token.
+// The dot uses each tone's own `-dot` var where the frame sampled it as a
+// distinct (brighter) shade from `-text` (re-review fix: collapsing them
+// onto one value lost e.g. Pending's #F59E0B dot vs its #B45309 text) —
+// falls back to `-text` only for the tones where the frame really did use
+// the same hex for both (info, slate).
 export const TONE: Record<DisplayState, { dot: string; text: string; bg: string }> = {
-  Pending: { dot: "var(--octo-tone-warning-text)", text: "text-[var(--octo-tone-warning-text)]", bg: "bg-[var(--octo-tone-warning-bg)]" },
+  Pending: { dot: "var(--octo-tone-warning-dot)", text: "text-[var(--octo-tone-warning-text)]", bg: "bg-[var(--octo-tone-warning-bg)]" },
   // Sampled from the frame: this state is gold/olive, not green (fix round 1).
-  Confirmed: { dot: "var(--octo-tone-gold-text)", text: "text-[var(--octo-tone-gold-text)]", bg: "bg-[var(--octo-tone-gold-bg)]" },
+  Confirmed: { dot: "var(--octo-tone-gold-dot)", text: "text-[var(--octo-tone-gold-text)]", bg: "bg-[var(--octo-tone-gold-bg)]" },
   Arrived: { dot: "var(--octo-tone-info-text)", text: "text-[var(--octo-tone-info-text)]", bg: "bg-[var(--octo-tone-info-bg)]" },
-  Seated: { dot: "var(--octo-tone-violet-text)", text: "text-[var(--octo-tone-violet-text)]", bg: "bg-[var(--octo-tone-violet-bg)]" },
+  Seated: { dot: "var(--octo-tone-violet-dot)", text: "text-[var(--octo-tone-violet-text)]", bg: "bg-[var(--octo-tone-violet-bg)]" },
   // Sampled from the frame: green belongs here, not to Confirmed (fix round 1).
-  Completed: { dot: "var(--octo-tone-success-text)", text: "text-[var(--octo-tone-success-text)]", bg: "bg-[var(--octo-tone-success-bg)]" },
+  // Its own "completed" tone, not "success" (re-review fix) — the frame's
+  // Completed green (#009A39 dot / #00832F text) is a different shade from
+  // the "success" tone used elsewhere for Paid/Confirmed/Full-refund
+  // (#16A34A / #15803D), which was already correct and stays untouched.
+  Completed: { dot: "var(--octo-tone-completed-dot)", text: "text-[var(--octo-tone-completed-text)]", bg: "bg-[var(--octo-tone-completed-bg)]" },
   // Sampled from the frame: this state is slate-grey, not violet (fix round 1).
   "No-show": { dot: "var(--octo-tone-slate-text)", text: "text-[var(--octo-tone-slate-text)]", bg: "bg-[var(--octo-tone-slate-bg)]" },
-  Cancelled: { dot: "var(--octo-tone-danger-text)", text: "text-[var(--octo-tone-danger-text)]", bg: "bg-[var(--octo-tone-danger-bg)]" },
+  Cancelled: { dot: "var(--octo-tone-danger-dot)", text: "text-[var(--octo-tone-danger-text)]", bg: "bg-[var(--octo-tone-danger-bg)]" },
   "Link Sent": { dot: "var(--octo-tone-info-text)", text: "text-[var(--octo-tone-info-text)]", bg: "bg-[var(--octo-tone-info-bg)]" },
-  Expired: { dot: "var(--octo-text-muted)", text: "text-[var(--octo-text-muted)]", bg: "bg-[var(--octo-track)]" },
-  Failed: { dot: "var(--octo-tone-warning-text)", text: "text-[var(--octo-tone-warning-text)]", bg: "bg-[var(--octo-tone-warning-bg)]" },
-  Refunded: { dot: "var(--octo-tone-danger-text)", text: "text-[var(--octo-tone-danger-text)]", bg: "bg-[var(--octo-tone-danger-bg)]" },
+  // Frame-exact literal, unconditional across themes — this is exactly
+  // what commit c2f45e1 already had; re-review fix restores it (it had
+  // drifted to var(--octo-text-muted), a subtly different grey).
+  Expired: { dot: "#9CA3AF", text: "text-[var(--octo-text-muted)]", bg: "bg-[var(--octo-track)]" },
+  Failed: { dot: "var(--octo-tone-warning-dot)", text: "text-[var(--octo-tone-warning-text)]", bg: "bg-[var(--octo-tone-warning-bg)]" },
+  Refunded: { dot: "var(--octo-tone-danger-dot)", text: "text-[var(--octo-tone-danger-text)]", bg: "bg-[var(--octo-tone-danger-bg)]" },
   // Fix round 4, finding 26 — the guest backed out of paying a deposit
   // link; the reservation itself is still live. Neutral grey, same shape
   // as Expired, since there's no frame for this either.

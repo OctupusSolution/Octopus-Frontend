@@ -400,7 +400,12 @@ export function ReservationDetailModal({
             <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.detail.linkPanel")}</span>
           </PanelHeading>
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[var(--octo-tone-info-text)]/20 bg-[var(--octo-tone-info-bg)] px-3 py-2.5">
+            {/* border reads the dedicated -border token, not -text with a
+                /N opacity modifier (re-review fix) — Tailwind 3.4 drops an
+                opacity modifier on an arbitrary var() colour entirely, so
+                this border was compiling to nothing and falling back to
+                preflight's grey. */}
+            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[var(--octo-tone-info-border)] bg-[var(--octo-tone-info-bg)] px-3 py-2.5">
               <a
                 href={link?.url ?? "#"}
                 target="_blank"

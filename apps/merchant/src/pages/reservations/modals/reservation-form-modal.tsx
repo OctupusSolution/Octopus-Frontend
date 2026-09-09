@@ -777,7 +777,9 @@ export function ReservationFormModal({
       {/* Add only (fix round 4, finding 16) — Edit Reservations.png has no
           equivalent notice; a link only ever goes out once, on creation. */}
       {mode === "add" && draft.depositEnabled && (
-        <div className="mt-4 flex items-center gap-2 rounded-[9px] bg-[var(--octo-tone-info-bg)] px-3 py-2.5 text-[12px] text-[var(--octo-tone-info-text)]">
+        // bg stays the original, softer 6% wash (re-review fix) — see the
+        // matching note on the cancel dialog's Policy Preview box.
+        <div className="mt-4 flex items-center gap-2 rounded-[9px] bg-[#0D6EFD]/[0.06] px-3 py-2.5 text-[12px] text-[var(--octo-tone-info-text)]">
           <Info size={14} className="shrink-0" />
           {t("reservations.form.linkNotice")}
         </div>

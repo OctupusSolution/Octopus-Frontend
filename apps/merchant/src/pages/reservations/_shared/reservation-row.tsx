@@ -21,17 +21,23 @@ export type RowMenu = "none" | "status" | "actions";
 // real, varying guest names and party sizes replaced the frame's single
 // repeated mock guest.
 //
-// Guest is capped with minmax(160px,240px), not 1fr (fix round 2) — its
-// content (avatar + name/phone) is intrinsically ~150-200px and
-// left-aligned, so letting it soak up all the leftover width at full page
-// width opened a 300-450px void between the phone number and the Party
-// column. Payment carries the flexible track instead: it's the last info
-// column before the Edit/Status/Contact/More action cluster, its pill and
-// deposit lines are already left-aligned, and putting the slack there pins
-// the actions flush right — matching the frame.
+// Guest was capped with minmax(160px,240px) in fix round 2, and Payment
+// alone made up the row's only flexible track — but at a 1920px viewport
+// that dumped ~400px of surplus into Payment alone, opening a single
+// lopsided band between the deposit line and the Edit button that the
+// frame (drawn at a narrower content width, everything already snug)
+// never has to reckon with.
+//
+// Fix round 3: every "info" cell (Guest, Seating, Source, Payment) shares
+// the surplus proportionally via minmax(floor, Nfr), so it grows together
+// across four columns instead of piling onto one, and the row reads even
+// at any width. Guest and Payment carry two lines of content (name+phone,
+// pill+deposit) and get double the weight of Seating/Source's one line.
+// Time, Party, Edit, Status, Contact and More stay fixed — they hold a
+// short, bounded value or a control, not prose that benefits from room.
 const ROW_GRID_COLUMNS =
-  "grid-cols-[124px_minmax(160px,240px)_104px_148px_128px_minmax(180px,1fr)_88px_128px_180px_40px]";
-// Sum of the fixed tracks plus each minmax()'s floor, so the row scrolls
+  "grid-cols-[124px_minmax(160px,2fr)_104px_minmax(148px,1fr)_minmax(128px,1fr)_minmax(180px,2fr)_88px_128px_180px_40px]";
+// Sum of the fixed tracks plus every minmax()'s floor, so the row scrolls
 // horizontally on narrow laptop widths instead of squeezing its columns out
 // of alignment. The page wraps the row list in a horizontally-scrolling
 // container sized to this.
@@ -165,8 +171,13 @@ export function ReservationRow({
   return (
     <div
       onClick={onOpen}
+      // No items-center here (fix round 3): grid items default to
+      // align-self: stretch, so every Cell's box — and its border-s
+      // divider — runs the full height of the row, matching the frame's
+      // dividers running edge-to-edge. Each cell centers its own content
+      // internally (see the per-cell "flex items-center" below).
       className={clsx(
-        "grid cursor-pointer items-center rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30",
+        "grid cursor-pointer rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] transition-colors hover:border-[#0D6EFD]/30",
         ROW_GRID_COLUMNS
       )}
     >

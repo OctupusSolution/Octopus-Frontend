@@ -9,15 +9,23 @@ import {
   OFFERS_SECTION_ID,
   addItem,
   addItemToSections,
+  addModifierGroup,
+  addModifierOption,
   blankItem,
   duplicateItem,
   removeItem,
+  removeModifierGroup,
+  removeModifierOption,
   updateItem,
+  updateModifierGroup,
   type Item,
+  type ModifierGroup,
+  type ModifierOption,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useDraft } from "../use-draft";
 import { PreviewRail } from "../preview-rail";
+import { ModifierPreview } from "./modifier-preview";
 import { EntryList, type EntryAction } from "./entry-list";
 import { ItemTabs, type ItemTabId } from "./item-tabs";
 import { AvailabilityCard, NutritionStrip, ScheduleCard } from "./item-extras";
@@ -30,6 +38,7 @@ export function ItemsStep() {
   const [sectionId, setSectionId] = useState(firstItems?.id ?? OFFERS_SECTION_ID);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<ItemTabId>("general");
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [multiFor, setMultiFor] = useState<Item | null>(null);
   const [multiTargets, setMultiTargets] = useState<string[]>([]);
 
@@ -68,6 +77,55 @@ export function ItemsStep() {
     setMultiFor(item);
   }
 
+  // Every modifier edit needs the same three coordinates — section, item,
+  // group — so they are bound once here rather than threaded through the tab.
+  const modifiers = {
+    selectedGroupId: groupId,
+    onSelectGroup: setGroupId,
+    onAddGroup: (g: Pick<ModifierGroup, "name" | "required" | "type">) => {
+      if (!section || !selected) return;
+      const id = `g-${Date.now().toString(36)}`;
+      setDraft(
+        addModifierGroup(draft, section.id, selected.id, {
+          id,
+          name: g.name,
+          type: g.type,
+          customerLabel: g.name,
+          helpText: "",
+          // A required group must take one choice; an optional one may take none.
+          min: g.required ? 1 : 0,
+          max: 1,
+          required: g.required,
+          showAsRadio: g.type === "single",
+          options: [],
+        })
+      );
+      setGroupId(id);
+    },
+    onPatchGroup: (id: string, patch: Partial<ModifierGroup>) => {
+      if (!section || !selected) return;
+      setDraft(updateModifierGroup(draft, section.id, selected.id, id, patch));
+    },
+    onRemoveGroup: (id: string) => {
+      if (!section || !selected) return;
+      setDraft(removeModifierGroup(draft, section.id, selected.id, id));
+      if (groupId === id) setGroupId(null);
+    },
+    onAddOption: (id: string, option: Omit<ModifierOption, "id">) => {
+      if (!section || !selected) return;
+      setDraft(
+        addModifierOption(draft, section.id, selected.id, id, {
+          ...option,
+          id: `o-${Date.now().toString(36)}`,
+        })
+      );
+    },
+    onRemoveOption: (id: string, optionId: string) => {
+      if (!section || !selected) return;
+      setDraft(removeModifierOption(draft, section.id, selected.id, id, optionId));
+    },
+  };
+
   const otherSections = draft.sections.filter(
     (s) => s.id !== sectionId && s.id !== OFFERS_SECTION_ID
   );
@@ -100,6 +158,7 @@ export function ItemsStep() {
             tab={tab}
             onTabChange={setTab}
             onPatch={patchItem}
+            modifiers={modifiers}
           />
         ) : (
           <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
@@ -107,7 +166,11 @@ export function ItemsStep() {
           </section>
         )}
 
-        <PreviewRail menu={draft} />
+        {tab === "modifiers" && selected && !isOffers ? (
+          <ModifierPreview item={selected} />
+        ) : (
+          <PreviewRail menu={draft} />
+        )}
       </div>
 
       {selected && !isOffers && (

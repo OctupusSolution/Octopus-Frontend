@@ -4,13 +4,13 @@
 // swaps the right-hand rail from the live preview to the customer-view
 // modifier preview — the one place in the wizard that rail is not the preview.
 import clsx from "clsx";
-import { EmptyState } from "@ui/primitives";
-import type { Item } from "@/entities/menu";
+import type { Item, ModifierGroup, ModifierOption } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { TabGeneral } from "./tab-general";
 import { TabPricing } from "./tab-pricing";
 import { TabNutrition } from "./tab-nutrition";
 import { TabAllergies } from "./tab-allergies";
+import { TabModifiers } from "./tab-modifiers";
 
 export const ITEM_TABS = ["general", "modifiers", "pricing", "nutrition", "allergies"] as const;
 export type ItemTabId = (typeof ITEM_TABS)[number];
@@ -21,12 +21,22 @@ export function ItemTabs({
   tab,
   onTabChange,
   onPatch,
+  modifiers,
 }: {
   item: Item;
   sectionName: string;
   tab: ItemTabId;
   onTabChange: (tab: ItemTabId) => void;
   onPatch: (patch: Partial<Item>) => void;
+  modifiers: {
+    selectedGroupId: string | null;
+    onSelectGroup: (id: string) => void;
+    onAddGroup: (group: Pick<ModifierGroup, "name" | "required" | "type">) => void;
+    onPatchGroup: (groupId: string, patch: Partial<ModifierGroup>) => void;
+    onRemoveGroup: (groupId: string) => void;
+    onAddOption: (groupId: string, option: Omit<ModifierOption, "id">) => void;
+    onRemoveOption: (groupId: string, optionId: string) => void;
+  };
 }) {
   const { t } = useI18n();
 
@@ -60,7 +70,7 @@ export function ItemTabs({
         {tab === "pricing" && <TabPricing item={item} onPatch={onPatch} />}
         {tab === "nutrition" && <TabNutrition item={item} onPatch={onPatch} />}
         {tab === "allergies" && <TabAllergies item={item} onPatch={onPatch} />}
-        {tab === "modifiers" && <EmptyState title={t("menuWiz.item.tab.modifiers")} />}
+        {tab === "modifiers" && <TabModifiers item={item} {...modifiers} />}
       </div>
     </section>
   );

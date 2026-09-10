@@ -11,14 +11,17 @@ import {
   deleteMenu,
   duplicateMenu,
   filterMenus,
+  setMenuSchedule,
   setMenuStatus,
   useMenuLibrary,
   type LibraryFilters,
   type Menu,
+  type MenuSchedule,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { MenuCard, type CardAction } from "./menu-card";
 import { ActionsMenu } from "./actions-menu";
+import { ScheduleModal } from "./schedule-modal";
 
 export function MenuLibraryPage() {
   const { t, locale } = useI18n();
@@ -33,6 +36,7 @@ export function MenuLibraryPage() {
   const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
   const [actionsFor, setActionsFor] = useState<{ menu: Menu; anchor: DOMRect } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Menu | null>(null);
+  const [scheduleFor, setScheduleFor] = useState<Menu | null>(null);
 
   const visible = useMemo(() => filterMenus(menus, filters), [menus, filters]);
   const branchLabel =
@@ -55,7 +59,7 @@ export function MenuLibraryPage() {
         navigate(`/menu/${menu.id}/build/sections`);
         return;
       case "schedule":
-        // The schedule dialog arrives in the next task.
+        setScheduleFor(menu);
         return;
       case "hold":
         setMenus(setMenuStatus(menus, menu.id, "on-hold", now));
@@ -196,6 +200,22 @@ export function MenuLibraryPage() {
         anchor={actionsFor?.anchor ?? null}
         onClose={() => setActionsFor(null)}
         onPick={runAction}
+      />
+
+      <ScheduleModal
+        menu={scheduleFor}
+        menus={menus}
+        onClose={() => setScheduleFor(null)}
+        onSave={(schedule: MenuSchedule, channels: Menu["channels"]) => {
+          if (scheduleFor) {
+            const now = new Date().toISOString();
+            const rescheduled = setMenuSchedule(menus, scheduleFor.id, schedule, now);
+            setMenus(
+              rescheduled.map((m) => (m.id === scheduleFor.id ? { ...m, channels } : m))
+            );
+          }
+          setScheduleFor(null);
+        }}
       />
 
       <Modal

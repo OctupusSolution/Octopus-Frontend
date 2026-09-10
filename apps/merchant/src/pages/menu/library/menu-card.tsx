@@ -24,6 +24,7 @@ const CHANNEL_TONE: Record<ChannelState, "success" | "warning" | "error" | "info
   expired: "neutral",
   pending: "warning",
   archived: "info",
+  off: "neutral",
 };
 
 export function MenuCard({

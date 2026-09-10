@@ -52,6 +52,11 @@
   --octo-text-secondary: #6b6b74;
   --octo-text-muted: #8b8b93;
   --octo-text-faint: #a9a9b2;
+  /* The console's one accent blue — links, active pills, the primary button.
+     Named rather than repeated as a literal because the Menu module paints it
+     on backgrounds (selected day chips) as well as on text, and the dark theme
+     has to lift it for contrast. */
+  --octo-accent: #0d6efd;
 
   /* Semantic "tone" chips/badges — a status pill, a paid/unpaid chip, a
      policy-preview result chip — every one of them a ~10% tint of the hue
@@ -140,6 +145,7 @@
   --octo-text-secondary: #a7adbb;
   --octo-text-muted: #8b93a3;
   --octo-text-faint: #6b7384;
+  --octo-accent: #4d94ff;
 
   /* Same ~10% tint backgrounds as light mode (already dark, so they don't
      need to move) — only the text shade lifts, several steps lighter than

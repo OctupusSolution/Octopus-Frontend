@@ -20,7 +20,12 @@ export type MenuStatus =
 // shared. Keeping them separate types means the card can show a menu whose
 // POS is live while its public link is still pending.
 export type ChannelState =
-  | "live" | "scheduled" | "on-hold" | "expired" | "pending" | "archived";
+  | "live" | "scheduled" | "on-hold" | "expired" | "pending" | "archived" | "off";
+
+// "off" is the one channel state with no menu-status counterpart: the merchant
+// switched this menu off for this channel in the Schedule dialog, while the
+// menu itself stays active elsewhere. channelStateFor never returns it — only
+// an explicit toggle does.
 
 export type SectionKind = "items" | "offers";
 export type DisplayStyle = "list" | "carousel" | "grid";

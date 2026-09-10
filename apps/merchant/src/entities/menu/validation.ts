@@ -44,6 +44,9 @@ export function validate(menu: Menu): ValidationResult {
 
   return {
     errors: [
+      // Checked on the menu, not per item: the library lists menus by name, so
+      // one without a name is indistinguishable from its neighbours.
+      ...(menu.name.trim() === "" ? [{ id: "menuMissingName", count: 1 }] : []),
       ...count(list, "itemMissingPrice", (item) => item.pricing.price <= 0),
       ...count(list, "taxMissing", (item) => item.pricing.vatRate <= 0),
     ],

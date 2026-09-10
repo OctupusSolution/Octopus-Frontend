@@ -4077,4 +4077,7 @@ export const en = {
   "menuReview.version": "Version",
   "menuReview.publishedBy": "Published by",
   "menuReview.never": "—",
+  "menuWiz.sec.menuName": "Menu Name",
+  "menuWiz.sec.menuNamePlaceholder": "e.g. Breakfast Menu",
+  "menuReview.find.menuMissingName": "Menu has no name:",
 } as const;

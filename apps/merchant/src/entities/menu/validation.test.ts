@@ -108,4 +108,9 @@ describe("validate", () => {
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
+
+  it("raises an error for a menu with no name", () => {
+    const result = validate({ ...healthy(), name: "  " });
+    expect(ids(result.errors)).toContain("menuMissingName");
+  });
 });

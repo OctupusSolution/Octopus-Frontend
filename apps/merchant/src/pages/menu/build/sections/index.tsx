@@ -54,6 +54,21 @@ export function SectionsStep() {
 
   return (
     <>
+      {/* No frame shows where a menu is named, and the library, the schedule
+          dialog and the review step all identify a menu by its name. Step 1
+          is the first screen the merchant reaches, so it asks here. */}
+      <label className="mb-4 block max-w-[520px]">
+        <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
+          {t("menuWiz.sec.menuName")} <span className="text-error">*</span>
+        </span>
+        <input
+          value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+          placeholder={t("menuWiz.sec.menuNamePlaceholder")}
+          className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
+        />
+      </label>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)_minmax(0,1fr)]">
         <SectionList
           sections={draft.sections}

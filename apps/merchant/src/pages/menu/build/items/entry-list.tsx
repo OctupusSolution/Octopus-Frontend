@@ -25,6 +25,8 @@ export function EntryList({
   onSelect,
   onAdd,
   onAction,
+  priceOf,
+  addLabelKey,
 }: {
   sections: Section[];
   sectionId: string;
@@ -34,6 +36,10 @@ export function EntryList({
   onSelect: (id: string) => void;
   onAdd: () => void;
   onAction: (action: EntryAction, item: Item) => void;
+  /** An Offer keeps its price under a different field, so the caller says what
+   *  to show rather than this list reaching into a shape it may not have. */
+  priceOf: (entry: Item) => number;
+  addLabelKey: string;
 }) {
   const { t, dir } = useI18n();
   const [menuFor, setMenuFor] = useState<{ item: Item; anchor: DOMRect } | null>(null);
@@ -57,8 +63,12 @@ export function EntryList({
     };
   }, [menuFor]);
 
-  const actions: EntryAction[] = ["duplicate", "multiSection", "delete"];
+  // An offer cannot be copied into another section — there is only one offers
+  // section — so that action is dropped there rather than shown and ignored.
   const isOffers = sectionId === OFFERS_SECTION_ID;
+  const actions: EntryAction[] = isOffers
+    ? ["duplicate", "delete"]
+    : ["duplicate", "multiSection", "delete"];
 
   return (
     <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
@@ -112,7 +122,7 @@ export function EntryList({
                   {item.name}
                 </span>
                 <span className="block text-[13px] font-semibold text-[var(--octo-accent)]">
-                  SAR {item.pricing.price}
+                  SAR {priceOf(item)}
                 </span>
               </span>
             </button>
@@ -135,7 +145,7 @@ export function EntryList({
         className="mt-3 flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[var(--octo-accent)] bg-[var(--octo-selected)] px-3 py-2.5 text-[14px] font-medium text-[var(--octo-accent)]"
       >
         <Plus size={16} aria-hidden />
-        {t(isOffers ? "menuWiz.item.addNew" : "menuWiz.item.addNew")}
+        {t(addLabelKey)}
       </button>
 
       {menuFor && (

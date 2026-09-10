@@ -15,6 +15,7 @@ import {
   type Menu,
   type ModifierGroup,
   type ModifierOption,
+  type Offer,
   type Section,
   type SectionKind,
 } from "./menu";
@@ -319,4 +320,95 @@ export function modifierTotal(item: Item): number {
     }
   }
   return total;
+}
+
+/* ------------------------------------------------------------------- offers */
+
+/** A slug the public link can address the offer by. Derived from the name at
+ *  creation and then owned by the merchant — regenerating it on every rename
+ *  would break links that are already out in the world. */
+function slugify(name: string): string {
+  return name.trim().replace(/\s+/g, "_");
+}
+
+export function blankOffer(id: string, name: string): Offer {
+  return {
+    id,
+    name,
+    slug: slugify(name),
+    image: null,
+    status: "active",
+    badge: null,
+    showSavingBadge: true,
+    entries: [],
+    // The frame's own default: a combo is a fixed basket unless the merchant
+    // says otherwise.
+    customerCanChange: false,
+    pricing: { role: "fixed", offerPrice: 0, vatRate: 0.15, excludeFromPromotions: false },
+    availability: { from: null, to: null, window: null },
+    channels: {
+      dineIn: true,
+      takeaway: true,
+      delivery: true,
+      kiosk: true,
+      onlineOrdering: false,
+      mobileApp: false,
+    },
+  };
+}
+
+export function addOffer(menu: Menu, offer: Offer): Menu {
+  return mapSection(menu, OFFERS_SECTION_ID, (s) => ({ ...s, entries: [...s.entries, offer] }));
+}
+
+export function updateOffer(menu: Menu, offerId: string, patch: Partial<Offer>): Menu {
+  return mapSection(menu, OFFERS_SECTION_ID, (s) => ({
+    ...s,
+    entries: s.entries.map((e) => (e.id === offerId ? ({ ...e, ...patch } as Offer) : e)),
+  }));
+}
+
+export function removeOffer(menu: Menu, offerId: string): Menu {
+  return mapSection(menu, OFFERS_SECTION_ID, (s) => ({
+    ...s,
+    entries: s.entries.filter((e) => e.id !== offerId),
+  }));
+}
+
+function mapOffer(menu: Menu, offerId: string, fn: (offer: Offer) => Offer): Menu {
+  return mapSection(menu, OFFERS_SECTION_ID, (s) => ({
+    ...s,
+    entries: s.entries.map((e) => (e.id === offerId ? fn(e as Offer) : e)),
+  }));
+}
+
+/** Adds the item to the offer, or changes the quantity of the one already
+ *  there. A quantity of zero removes it, so the stepper's minus button needs no
+ *  special case at its lower bound. */
+export function setOfferEntry(
+  menu: Menu,
+  offerId: string,
+  itemId: string,
+  qty: number,
+  price: number
+): Menu {
+  return mapOffer(menu, offerId, (offer) => {
+    if (qty <= 0) {
+      return { ...offer, entries: offer.entries.filter((e) => e.itemId !== itemId) };
+    }
+    const existing = offer.entries.some((e) => e.itemId === itemId);
+    return {
+      ...offer,
+      entries: existing
+        ? offer.entries.map((e) => (e.itemId === itemId ? { ...e, qty, price } : e))
+        : [...offer.entries, { itemId, qty, price }],
+    };
+  });
+}
+
+export function removeOfferEntry(menu: Menu, offerId: string, itemId: string): Menu {
+  return mapOffer(menu, offerId, (offer) => ({
+    ...offer,
+    entries: offer.entries.filter((e) => e.itemId !== itemId),
+  }));
 }

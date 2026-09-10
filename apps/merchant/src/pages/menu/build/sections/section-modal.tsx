@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { Button, Modal } from "@ui/primitives";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
 import type { Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -29,6 +30,7 @@ export function SectionModal({
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const picker = useFilePicker(setImage);
 
   // Re-seed whenever the dialog opens, so the last edit never leaks into the
   // next one.
@@ -69,12 +71,12 @@ export function SectionModal({
             than pretending to accept a file and dropping it. */}
         <button
           type="button"
-          onClick={() => setImage(image ? null : null)}
-          className="mt-1.5 flex w-full flex-col items-center justify-center gap-2 rounded-[10px] border border-dashed border-[var(--octo-border-input)] px-4 py-8 text-[13.5px] text-[var(--octo-text-secondary)]"
+          onClick={picker.open}
+          className="mt-1.5 flex w-full flex-col items-center justify-center gap-2 overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)] px-4 py-8 text-[13.5px] text-[var(--octo-text-secondary)]"
         >
           {image ? (
             <>
-              <img src={image} alt="" className="h-16 w-16 rounded-[8px] object-cover" />
+              <img src={image} alt="" className="h-20 w-full rounded-[8px] object-cover" />
               {t("menuWiz.sec.modal.change")}
             </>
           ) : (
@@ -84,6 +86,7 @@ export function SectionModal({
             </>
           )}
         </button>
+        {picker.input}
       </div>
 
       <Button

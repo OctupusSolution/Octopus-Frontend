@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { MoreVertical, Plus } from "lucide-react";
 import { Select } from "@ui/primitives";
+import { MediaTile } from "@/shared/ui/media-tile";
 import { OFFERS_SECTION_ID, type Item, type Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -105,18 +106,9 @@ export function EntryList({
               onClick={() => onSelect(item.id)}
               className="flex min-w-0 flex-1 items-center gap-2.5 text-start"
             >
-              {item.image ? (
-                <img src={item.image} alt="" className="h-10 w-10 shrink-0 rounded-[8px] object-cover" />
-              ) : (
-                <span
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[8px] bg-[#0d2b21] text-center font-serif text-[9px] leading-tight text-white/70"
-                  aria-hidden
-                >
-                  ME
-                  <br />
-                  NU
-                </span>
-              )}
+              <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[8px]">
+                <MediaTile src={item.image} rounded="rounded-[8px]" />
+              </span>
               <span className="min-w-0">
                 <span className="block truncate text-[14px] font-medium text-[var(--octo-text-primary)]">
                   {item.name}

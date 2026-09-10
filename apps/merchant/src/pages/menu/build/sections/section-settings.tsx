@@ -9,6 +9,8 @@ import { useState } from "react";
 import clsx from "clsx";
 import { Grid2x2, List, Trash2, GalleryHorizontal } from "lucide-react";
 import { Button, EmptyState } from "@ui/primitives";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
+import { MediaTile } from "@/shared/ui/media-tile";
 import type { DisplayStyle, Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -37,6 +39,7 @@ export function SectionSettings({
 }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>("general");
+  const picker = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
 
   if (!section) {
     return (
@@ -87,19 +90,11 @@ export function SectionSettings({
               {t("menuWiz.sec.image")}
             </p>
             <div className="mt-1.5 flex items-center gap-2.5">
-              {section.image ? (
-                <img src={section.image} alt="" className="h-12 w-12 rounded-[8px] object-cover" />
-              ) : (
-                <span
-                  className="grid h-12 w-12 place-items-center rounded-[8px] bg-[#0d2b21] text-center font-serif text-[10px] leading-tight text-white/70"
-                  aria-hidden
-                >
-                  ME
-                  <br />
-                  NU
-                </span>
-              )}
-              <Button variant="secondary" className="flex-1 justify-center" onClick={onChangeImage}>
+              <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[8px]">
+                <MediaTile src={section.image} rounded="rounded-[8px]" />
+              </span>
+              {picker.input}
+              <Button variant="secondary" className="flex-1 justify-center" onClick={picker.open}>
                 {t("menuWiz.sec.changeImage")}
               </Button>
               <button

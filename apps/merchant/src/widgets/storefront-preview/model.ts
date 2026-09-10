@@ -82,7 +82,15 @@ export interface StorefrontPreviewModel {
    *  does have items, and a preview that ignored them would show the merchant
    *  their section names five times over instead of the food they just typed
    *  in. Omit it and the old behaviour is unchanged. */
-  products?: readonly { name: string; description: string; price: string }[];
+  products?: readonly {
+    name: string;
+    description: string;
+    price: string;
+    /** A data URL the merchant uploaded. Absent means fall back to the cycled
+     *  sample photography, so an item without a picture still draws a card
+     *  rather than a hole. */
+    image?: string | null;
+  }[];
   /** `storefrontAsset` filenames, parallel to `categories` — same order, same
    *  length (never empty, same rule as `categories` itself). Supplied
    *  explicitly by each adapter rather than guessed by the widget from the

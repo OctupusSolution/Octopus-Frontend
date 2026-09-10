@@ -1,6 +1,8 @@
 // The General tab: two columns, as the frame lays them out. Text and media on
 // the start side, image, tags, status and id on the end side.
 import { Copy, Play, Trash2, Upload } from "lucide-react";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
+import { MediaTile } from "@/shared/ui/media-tile";
 import clsx from "clsx";
 import { Button } from "@ui/primitives";
 import type { Item, ItemTag } from "@/entities/menu";
@@ -49,6 +51,8 @@ export function TabGeneral({
   onPatch: (patch: Partial<Item>) => void;
 }) {
   const { t } = useI18n();
+  const image = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
+  const video = useFilePicker((dataUrl) => onPatch({ video: dataUrl }), "video");
 
   function toggleTag(tag: ItemTag) {
     onPatch({
@@ -99,15 +103,28 @@ export function TabGeneral({
               ({t("menuWiz.item.videoOptional")})
             </span>
           </p>
-          <div className="mt-1.5 grid place-items-center rounded-[10px] border border-dashed border-[var(--octo-border-input)] py-8">
+          <button
+            type="button"
+            onClick={video.open}
+            className="relative mt-1.5 grid h-[150px] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]"
+          >
+            {item.video && (
+              <video src={item.video} className="absolute inset-0 h-full w-full object-cover" muted />
+            )}
             <span
-              className="grid h-11 w-11 place-items-center rounded-full bg-[var(--octo-text-primary)] text-[var(--octo-card)]"
+              className="relative grid h-11 w-11 place-items-center rounded-full bg-[var(--octo-text-primary)] text-[var(--octo-card)]"
               aria-hidden
             >
               <Play size={18} />
             </span>
-          </div>
-          <Button variant="secondary" className="mt-2 w-full justify-center" icon={<Upload size={15} />}>
+          </button>
+          {video.input}
+          <Button
+            variant="secondary"
+            className="mt-2 w-full justify-center"
+            icon={<Upload size={15} />}
+            onClick={video.open}
+          >
             {t("menuWiz.item.uploadVideo")}
           </Button>
           <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">
@@ -121,22 +138,16 @@ export function TabGeneral({
           <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
             {t("menuWiz.item.image")} <span className="text-error">*</span>
           </p>
-          <div className="mt-1.5 grid h-[190px] place-items-center rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
-            {item.image ? (
-              <img src={item.image} alt="" className="h-full w-full rounded-[10px] object-cover" />
-            ) : (
-              <span
-                className="grid h-16 w-16 place-items-center rounded-[10px] bg-[#0d2b21] text-center font-serif text-[11px] leading-tight text-white/70"
-                aria-hidden
-              >
-                ME
-                <br />
-                NU
-              </span>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={image.open}
+            className="mt-1.5 block h-[210px] w-full overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]"
+          >
+            <MediaTile src={item.image} />
+          </button>
+          {image.input}
           <div className="mt-2 flex items-center gap-2">
-            <Button variant="secondary" className="flex-1 justify-center">
+            <Button variant="secondary" className="flex-1 justify-center" onClick={image.open}>
               {t("menuWiz.item.changeImage")}
             </Button>
             <button

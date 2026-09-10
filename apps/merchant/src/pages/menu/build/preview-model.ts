@@ -74,6 +74,7 @@ export function toPreviewModel(
       name: item.name,
       description: item.description,
       price: formatPrice(item.pricing.price),
+      image: item.image,
     }));
 
   const offers = menu.sections.find((s) => s.id === OFFERS_SECTION_ID);

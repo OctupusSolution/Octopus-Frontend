@@ -2,5 +2,6 @@
 // from the files directly.
 export * from "./menu";
 export * from "./library";
+export * from "./draft";
 export * from "./seed";
 export * from "./use-menu-library";

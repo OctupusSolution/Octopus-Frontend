@@ -4077,4 +4077,7 @@ export const ar = {
   "menuReview.version": "الإصدار",
   "menuReview.publishedBy": "نُشرت بواسطة",
   "menuReview.never": "—",
+  "menuWiz.sec.menuName": "اسم القائمة",
+  "menuWiz.sec.menuNamePlaceholder": "مثال: قائمة الإفطار",
+  "menuReview.find.menuMissingName": "القائمة بدون اسم:",
 } as const;

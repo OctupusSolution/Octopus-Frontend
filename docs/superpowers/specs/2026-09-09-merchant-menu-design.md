@@ -498,8 +498,12 @@ Recorded, not blocking. Each is resolved when its phase is reached.
    existing ids? Renaming touches Public Link Builder's copy.
 5. **Change Branch.** Present in the wizard header on every frame. Whether it
    re-scopes the draft or only the preview is unstated.
-6. **Offer savings base.** The frame's `SAR 49.5` and `Off 23%` are computed
-   on different bases (see Offers above). Proposal: compare both totals
-   including VAT — `149.5 − 115 = SAR 34.5`, `Off 23%` — which keeps the
-   percentage the frame shows and makes the money figure agree with it. Needs
-   the designer's call, because it changes a number on screen.
+6. **Offer savings base.** ~~Open.~~ **Settled 2026-09-10 by the product
+   owner:** compare both totals including VAT — `149.5 − 115 = SAR 34.5`,
+   `Off 23%`. The frame's `SAR 49.5` measured an inclusive total against an
+   exclusive price and does not agree with its own percentage, so it is not
+   reproduced. `pricing.ts` implements this and `pricing.test.ts` asserts it.
+7. **Where a menu is named.** No frame shows it. **Settled 2026-09-10:** a
+   required Menu Name field at the top of step 1, the first screen the
+   merchant reaches; an unnamed menu is a Review-step error and cannot be
+   published.

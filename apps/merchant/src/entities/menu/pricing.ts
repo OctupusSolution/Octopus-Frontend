@@ -64,8 +64,11 @@ export function offerTotals(offer: Offer): { price: number; vat: number; total: 
  *  23% is (149.5 − 115) / 149.5, two inclusive totals, while 49.5 is
  *  149.5 − 100, an inclusive total against an exclusive price. On the
  *  percentage's own basis the money figure is 34.5, which is what this returns.
- *  See the spec's open question 6 — if the designer rules the other way, the
- *  change is `offerTotals(offer).total` to `offer.pricing.offerPrice` here. */
+ *
+ *  Settled by the product owner on 2026-09-10 (spec open question 6): both
+ *  figures compare what the customer actually pays, VAT included, so the
+ *  amount and the percentage always agree. The frame's SAR 49.5 is not a
+ *  target to match. */
 export function offerSavings(menu: Menu, offer: Offer): { amount: number; percent: number } {
   const parts = individualTotals(menu, offer).total;
   const combo = offerTotals(offer).total;

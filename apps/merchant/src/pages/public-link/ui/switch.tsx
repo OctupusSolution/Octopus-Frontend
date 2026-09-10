@@ -2,7 +2,7 @@
 // not a styled checkbox, so it announces its state and takes a keyboard.
 // `packages/ui/src/primitives/index.ts` is a shared file this plan does not
 // own, so this lives in the page rather than the shared primitives — the same
-// pattern already used by `pages/menu/schedules/index.tsx`.
+// pattern used across the console's settings rows.
 import clsx from "clsx";
 
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {

@@ -9,6 +9,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import type { Menu } from "@/entities/menu";
 import { StorefrontPreview, type PreviewDevice } from "@/widgets/storefront-preview";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { toPreviewModel } from "./preview-model";
 
 export function PreviewRail({
@@ -20,6 +21,7 @@ export function PreviewRail({
   composition?: "landing" | "menu";
 }) {
   const { t } = useI18n();
+  const { activeBusiness } = useTenantConfig();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
 
   const DEVICES: { id: PreviewDevice; icon: typeof Monitor }[] = [
@@ -59,11 +61,15 @@ export function PreviewRail({
         </div>
       </div>
 
-      {/* The widget draws at its own natural width; the rail is narrower than
-          the page it depicts, so it scrolls rather than squashing the layout
-          out of proportion. */}
-      <div className="octo-scroll mt-3 max-h-[560px] overflow-auto rounded-[10px] border border-[var(--octo-border-card)]">
-        <StorefrontPreview model={toPreviewModel(menu, device, composition)} />
+      {/* Tall enough that the landing preview — hero, category mosaic and the
+          product cards — is visible without scrolling, which is the whole point
+          of a live preview: the merchant types an item and sees it. Measured at
+          851px of content, so the cap clears it. The menu composition's full
+          item grid is genuinely longer and still scrolls. */}
+      <div className="octo-scroll mt-3 max-h-[880px] overflow-auto rounded-[10px] border border-[var(--octo-border-card)]">
+        <StorefrontPreview
+          model={toPreviewModel(menu, device, composition, activeBusiness?.businessName ?? "")}
+        />
       </div>
     </section>
   );

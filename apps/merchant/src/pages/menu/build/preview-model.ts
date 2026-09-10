@@ -55,17 +55,26 @@ function formatPrice(value: number): string {
 export function toPreviewModel(
   menu: Menu,
   device: PreviewDevice,
-  composition: "landing" | "menu" = "landing"
+  composition: "landing" | "menu" = "landing",
+  /** The restaurant's name. The hero is the customer's view of the business,
+   *  not of this particular menu — showing the menu's name there told the
+   *  merchant their storefront was called "New Menu". */
+  businessName = ""
 ): StorefrontPreviewModel {
   const sections = visibleSections(menu);
   const labels = sections.length > 0 ? sections.map((s) => s.name) : [PLACEHOLDER_LABEL];
 
-  // Real prices off the draft, in the order the merchant entered them, so the
-  // cards quote the menu rather than a sample. The widget cycles this list, so
-  // supplying fewer than it draws is fine.
-  const prices = sections
+  // The real dishes, in the order the merchant entered them. An item with no
+  // name yet is skipped rather than drawn as a blank card — it is mid-typing,
+  // not a product.
+  const dishes = sections
     .flatMap((section) => section.entries as Item[])
-    .map((item) => formatPrice(item.pricing.price));
+    .filter((item) => item.name.trim() !== "")
+    .map((item) => ({
+      name: item.name,
+      description: item.description,
+      price: formatPrice(item.pricing.price),
+    }));
 
   const offers = menu.sections.find((s) => s.id === OFFERS_SECTION_ID);
   const blocks = [
@@ -76,7 +85,7 @@ export function toPreviewModel(
   ];
 
   return {
-    businessName: menu.name,
+    businessName,
     logoDataUrl: null,
     url: "",
     primary: "#0d6efd",
@@ -95,8 +104,12 @@ export function toPreviewModel(
     categoryImages: CATEGORY_IMAGES.slice(0, Math.max(1, labels.length)),
     cityLabel: "",
     hoursSummary: "",
-    samplePrices: prices.length > 0 ? prices : [formatPrice(0)],
-    sampleWasPrices: prices.length > 0 ? prices : [formatPrice(0)],
+    products: dishes,
+    samplePrices: dishes.length > 0 ? dishes.map((d) => d.price) : [formatPrice(0)],
+    // No struck-through "was" price: this menu has no discount, and printing
+    // the same number twice with a line through one of them is a lie about a
+    // saving that does not exist.
+    sampleWasPrices: [],
     hero: {},
     composition,
     device,

@@ -90,6 +90,11 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
   const footerBg = `color-mix(in srgb, ${model.primary} 7%, var(--octo-card))`;
 
   function productCard(index: number) {
+    // A real dish when the host supplied one, otherwise the category-and-sample
+    // treatment the storefront hosts rely on.
+    const products = model.products;
+    const product =
+      products && products.length > 0 ? products[index % products.length] : null;
     return (
       <article
         key={index}
@@ -115,10 +120,12 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
         />
 
         <p className="mt-2 truncate text-start text-[10px] font-bold text-[var(--octo-text-primary)]">
-          {categoryLabel(model, index, t)}
+          {product ? product.name : categoryLabel(model, index, t)}
         </p>
         <p className="mt-1 line-clamp-2 text-start text-[8px] leading-[1.6] text-[var(--octo-text-muted)]">
-          {t("onboarding.publicLink.previewDish")}
+          {product
+            ? product.description || t("onboarding.publicLink.previewDish")
+            : t("onboarding.publicLink.previewDish")}
         </p>
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
@@ -130,9 +137,11 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
             <ShoppingBag size={10} />
           </span>
           <span className="min-w-0 text-end">
-            {model.samplePrices.length > 0 && (
+            {(product || model.samplePrices.length > 0) && (
               <span className="block truncate text-[10px] font-bold text-[var(--octo-text-primary)]">
-                {model.samplePrices[index % model.samplePrices.length]}
+                {product
+                  ? product.price
+                  : model.samplePrices[index % model.samplePrices.length]}
               </span>
             )}
             {model.sampleWasPrices.length > 0 && (

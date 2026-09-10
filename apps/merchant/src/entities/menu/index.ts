@@ -3,5 +3,6 @@
 export * from "./menu";
 export * from "./library";
 export * from "./draft";
+export * from "./pricing";
 export * from "./seed";
 export * from "./use-menu-library";

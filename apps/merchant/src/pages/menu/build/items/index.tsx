@@ -11,21 +11,28 @@ import {
   addItemToSections,
   addModifierGroup,
   addModifierOption,
+  addOffer,
   blankItem,
+  blankOffer,
   duplicateItem,
   removeItem,
   removeModifierGroup,
   removeModifierOption,
+  removeOfferEntry,
+  setOfferEntry,
   updateItem,
+  updateOffer,
   updateModifierGroup,
   type Item,
   type ModifierGroup,
   type ModifierOption,
+  type Offer,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useDraft } from "../use-draft";
 import { PreviewRail } from "../preview-rail";
 import { ModifierPreview } from "./modifier-preview";
+import { OffersEditor, incompleteTabs, type OfferTabId } from "../offers";
 import { EntryList, type EntryAction } from "./entry-list";
 import { ItemTabs, type ItemTabId } from "./item-tabs";
 import { AvailabilityCard, NutritionStrip, ScheduleCard } from "./item-extras";
@@ -39,6 +46,8 @@ export function ItemsStep() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<ItemTabId>("general");
   const [groupId, setGroupId] = useState<string | null>(null);
+  const [offerId, setOfferId] = useState<string | null>(null);
+  const [offerTab, setOfferTab] = useState<OfferTabId>("info");
   const [multiFor, setMultiFor] = useState<Item | null>(null);
   const [multiTargets, setMultiTargets] = useState<string[]>([]);
 
@@ -47,6 +56,12 @@ export function ItemsStep() {
   const selected = entries.find((e) => e.id === selectedId) ?? entries[0] ?? null;
   const isOffers = sectionId === OFFERS_SECTION_ID;
 
+  const offers = (section?.entries ?? []) as unknown as Offer[];
+  const offer = isOffers ? (offers.find((o) => o.id === offerId) ?? offers[0] ?? null) : null;
+  // The frame's red bar names the tabs still missing something, so Next Step is
+  // gated on the same list the bar prints rather than a separate boolean.
+  const missing = offer ? incompleteTabs(offer) : [];
+
   function patchItem(patch: Partial<Item>) {
     if (!selected || !section) return;
     setDraft(updateItem(draft, section.id, selected.id, patch));
@@ -54,6 +69,13 @@ export function ItemsStep() {
 
   function addNewItem() {
     if (!section) return;
+    if (isOffers) {
+      const id = `of-${Date.now().toString(36)}`;
+      setDraft(addOffer(draft, blankOffer(id, "")));
+      setOfferId(id);
+      setOfferTab("info");
+      return;
+    }
     const id = `i-${Date.now().toString(36)}`;
     setDraft(addItem(draft, section.id, blankItem(id, "")));
     setSelectedId(id);
@@ -141,16 +163,32 @@ export function ItemsStep() {
             setSelectedId(null);
           }}
           entries={entries}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
+          selectedId={isOffers ? (offer?.id ?? null) : (selected?.id ?? null)}
+          onSelect={isOffers ? setOfferId : setSelectedId}
           onAdd={addNewItem}
           onAction={runEntryAction}
+          priceOf={(entry) =>
+            isOffers
+              ? ((entry as unknown as Offer).pricing.offerPrice ?? 0)
+              : entry.pricing.price
+          }
+          addLabelKey={isOffers ? "menuOffer.addNew" : "menuWiz.item.addNew"}
         />
 
         {isOffers ? (
-          <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-            <EmptyState title={section?.name ?? ""} />
-          </section>
+          <OffersEditor
+            menu={draft}
+            offer={offer}
+            tab={offerTab}
+            onTabChange={setOfferTab}
+            onPatch={(patch) => offer && setDraft(updateOffer(draft, offer.id, patch))}
+            onSetEntry={(itemId, qty, price) =>
+              offer && setDraft(setOfferEntry(draft, offer.id, itemId, qty, price))
+            }
+            onRemoveEntry={(itemId) =>
+              offer && setDraft(removeOfferEntry(draft, offer.id, itemId))
+            }
+          />
         ) : selected ? (
           <ItemTabs
             item={selected}
@@ -172,6 +210,12 @@ export function ItemsStep() {
           <PreviewRail menu={draft} />
         )}
       </div>
+
+      {isOffers && offer && missing.length > 0 && (
+        <p className="mt-4 rounded-[10px] border border-[var(--octo-tone-danger-border,var(--octo-border-card))] bg-[var(--octo-tone-danger-bg)] px-3.5 py-2.5 text-[13.5px] text-[var(--octo-tone-danger-text)]">
+          {t("menuOffer.incomplete")}
+        </p>
+      )}
 
       {selected && !isOffers && (
         <>

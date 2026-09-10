@@ -6,7 +6,7 @@
 
 **Architecture:** A new `entities/menu` layer owns the types and the pure operations over a menu collection. The library lives in React state over a seed fixture — the same in-memory posture as every other merchant module; `use-menu-library` is the single seam a real backend later replaces. Three pages consume it: `/menu` (the library), `/menu/new` (the method chooser) and `/menu/import` (the AI branch's landing). No wizard yet — `Create From Scratch` routes to a path the next plan fills in.
 
-**Tech Stack:** React 18, react-router-dom 6, TypeScript 5.5, Vitest 2, Tailwind 3, `@octopus/ui` primitives, `@i18n` flat dictionaries.
+**Tech Stack:** React 18, react-router-dom 6, TypeScript 5.5, Vitest 2, Tailwind 3, `@octopus/ui` primitives (imported as `@ui/primitives`), `@i18n` flat dictionaries.
 
 **Spec:** `docs/superpowers/specs/2026-09-09-merchant-menu-design.md`
 
@@ -1105,7 +1105,7 @@ Create `apps/merchant/src/pages/menu/library/menu-card.tsx`:
 // One menu card in the library grid. Counts and channel chips are derived from
 // the menu, never stored alongside it.
 import { CalendarCheck2, ListTree, MoreVertical, Settings2, UtensilsCrossed } from "lucide-react";
-import { Badge } from "@octopus/ui";
+import { Badge } from "@ui/primitives";
 import { entryCount, sectionCount, type ChannelState, type Menu, type MenuStatus } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -1218,7 +1218,7 @@ Create `apps/merchant/src/pages/menu/library/index.tsx`:
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Info, Search, Sparkles, Plus } from "lucide-react";
-import { Button, Input, Select } from "@octopus/ui";
+import { Button, Input, Select } from "@ui/primitives";
 import {
   DEFAULT_FILTERS,
   SEED_BRANCHES,
@@ -1536,7 +1536,7 @@ import {
 add these imports:
 
 ```tsx
-import { Modal } from "@octopus/ui";
+import { Modal } from "@ui/primitives";
 import { ActionsMenu } from "./actions-menu";
 import type { CardAction } from "./menu-card";
 ```
@@ -1730,7 +1730,7 @@ Create `apps/merchant/src/pages/menu/library/schedule-modal.tsx`:
 // nothing. The channel toggles here set the menu's channel visibility; the
 // menu's own status is not touched — a scheduled menu can still be POS-only.
 import { useEffect, useState } from "react";
-import { Modal, Button, Select, Checkbox } from "@octopus/ui";
+import { Modal, Button, Select, Checkbox } from "@ui/primitives";
 import {
   WEEKDAYS,
   SEED_BRANCHES,
@@ -2079,7 +2079,7 @@ Create `apps/merchant/src/pages/menu/new/index.tsx`:
 // page that explains the wait keeps that promise better than an inert button.
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, Clock, Coins, Info, MapPin, Store } from "lucide-react";
-import { Button } from "@octopus/ui";
+import { Button } from "@ui/primitives";
 import { SEED_BRANCHES } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 

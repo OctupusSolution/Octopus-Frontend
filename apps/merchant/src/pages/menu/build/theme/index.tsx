@@ -22,6 +22,7 @@ import {
   Type,
 } from "lucide-react";
 import { Button, Select } from "@ui/primitives";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { SITE_THEMES, useSiteDraft } from "@/entities/site-draft";
 import type { MenuTheme } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -147,6 +148,11 @@ export function ThemeStep() {
   const { draft, setDraft } = useDraft();
   const { draft: site, dispatch } = useSiteDraft();
 
+  const logo = useFilePicker((dataUrl) => dispatch({ type: "patchBrand", patch: { logoDataUrl: dataUrl } }));
+  const hero = useFilePicker((dataUrl) =>
+    dispatch({ type: "patchSection", section: "hero", patch: { imageDataUrl: dataUrl } })
+  );
+
   const theme = draft.theme;
   function patchTheme(patch: Partial<MenuTheme>) {
     setDraft({ ...draft, theme: { ...theme, ...patch } });
@@ -213,12 +219,21 @@ export function ThemeStep() {
             {t("menuTheme.branding")}
           </h2>
 
-          <div className="mt-2.5 grid h-[110px] place-items-center rounded-[10px] border border-dashed border-[var(--octo-border-input)] bg-[#3a1f14]">
-            <span className="text-[15px] font-semibold text-white">
-              {site.brand.businessName || "—"}
-            </span>
-          </div>
-          <Button variant="secondary" className="mt-2 w-full justify-center">
+          <button
+            type="button"
+            onClick={logo.open}
+            className="mt-2.5 grid h-[110px] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)] bg-[#3a1f14]"
+          >
+            {site.brand.logoDataUrl ? (
+              <img src={site.brand.logoDataUrl} alt="" className="h-full w-full object-contain" />
+            ) : (
+              <span className="text-[15px] font-semibold text-white">
+                {site.brand.businessName || "—"}
+              </span>
+            )}
+          </button>
+          {logo.input}
+          <Button variant="secondary" className="mt-2 w-full justify-center" onClick={logo.open}>
             {t("menuTheme.changeLogo")}
           </Button>
           <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">
@@ -228,21 +243,36 @@ export function ThemeStep() {
           <p className="mt-4 text-[14px] font-semibold text-[var(--octo-text-primary)]">
             {t("menuTheme.heroMedia")}
           </p>
-          <div className="mt-1.5 grid h-[110px] place-items-center rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
+          <button
+            type="button"
+            onClick={hero.open}
+            className="relative mt-1.5 grid h-[110px] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]"
+          >
+            {site.sectionSettings.hero.imageDataUrl && (
+              <img
+                src={site.sectionSettings.hero.imageDataUrl}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
             <span
-              className="grid h-11 w-11 place-items-center rounded-full bg-[var(--octo-text-primary)] text-[var(--octo-card)]"
+              className="relative grid h-11 w-11 place-items-center rounded-full bg-[var(--octo-text-primary)] text-[var(--octo-card)]"
               aria-hidden
             >
               <ImageIcon size={18} />
             </span>
-          </div>
+          </button>
+          {hero.input}
           <div className="mt-2 flex items-center gap-2">
-            <Button variant="secondary" className="flex-1 justify-center">
+            <Button variant="secondary" className="flex-1 justify-center" onClick={hero.open}>
               {t("menuTheme.changeMedia")}
             </Button>
             <button
               type="button"
               aria-label={t("menuTheme.heroMedia")}
+              onClick={() =>
+                dispatch({ type: "patchSection", section: "hero", patch: { imageDataUrl: null } })
+              }
               className="rounded-[9px] border border-[var(--octo-border-card)] p-2 text-error hover:bg-error/10"
             >
               <Trash2 size={16} />

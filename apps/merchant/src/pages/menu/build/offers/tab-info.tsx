@@ -2,6 +2,8 @@
 import clsx from "clsx";
 import { Pencil, Trash2 } from "lucide-react";
 import { Select } from "@ui/primitives";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
+import { MediaTile } from "@/shared/ui/media-tile";
 import type { Offer } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -52,6 +54,7 @@ export function TabInfo({
   onPatch: (patch: Partial<Offer>) => void;
 }) {
   const { t } = useI18n();
+  const picker = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
 
   return (
     <div className="max-w-[720px] space-y-4">
@@ -89,23 +92,14 @@ export function TabInfo({
         <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
           {t("menuOffer.image")} <span className="text-error">*</span>
         </p>
-        <div className="relative mt-1.5 grid h-[220px] place-items-center rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
-          {offer.image ? (
-            <img src={offer.image} alt="" className="h-full w-full rounded-[10px] object-cover" />
-          ) : (
-            <span
-              className="grid h-20 w-20 place-items-center rounded-[10px] bg-[#0d2b21] text-center font-serif text-[12px] leading-tight text-white/70"
-              aria-hidden
-            >
-              ME
-              <br />
-              NU
-            </span>
-          )}
+        <div className="relative mt-1.5 h-[220px] overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
+          <MediaTile src={offer.image} />
+          {picker.input}
           <div className="absolute end-2.5 top-2.5 flex gap-2">
             <button
               type="button"
               aria-label={t("menuOffer.image")}
+              onClick={picker.open}
               className="rounded-[8px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 text-[var(--octo-text-secondary)]"
             >
               <Pencil size={15} />

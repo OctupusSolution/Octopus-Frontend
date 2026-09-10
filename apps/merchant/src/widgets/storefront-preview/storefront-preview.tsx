@@ -114,7 +114,10 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
         </div>
 
         <img
-          src={storefrontAsset(model.categoryImages[index % model.categoryImages.length])}
+          src={
+            product?.image ??
+            storefrontAsset(model.categoryImages[index % model.categoryImages.length])
+          }
           alt=""
           className="mx-auto mt-1.5 h-[76px] w-auto max-w-full object-contain"
         />

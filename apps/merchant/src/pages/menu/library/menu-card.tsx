@@ -31,7 +31,7 @@ export function MenuCard({
   onOpenActions,
 }: {
   menu: Menu;
-  onOpenActions: (menu: Menu) => void;
+  onOpenActions: (menu: Menu, anchor: DOMRect) => void;
 }) {
   const { t, locale } = useI18n();
   const updated = new Date(menu.updatedAt).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", {
@@ -103,7 +103,7 @@ export function MenuCard({
         <button
           type="button"
           aria-label={`${menu.name} actions`}
-          onClick={() => onOpenActions(menu)}
+          onClick={(e) => onOpenActions(menu, e.currentTarget.getBoundingClientRect())}
           className="shrink-0 rounded-[8px] p-1.5 text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
         >
           <MoreVertical size={18} aria-hidden />

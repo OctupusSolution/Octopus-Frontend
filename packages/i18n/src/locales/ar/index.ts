@@ -3896,4 +3896,17 @@ export const ar = {
   "menuImport.soonBody": "ما زلنا نبني هذه الميزة. ستتعرف على الأقسام والأصناف والأسعار من الملف الذي ترفعه، وتحافظ على هويتك البصرية، وتسلمك مسودة تراجعها قبل النشر.",
   "menuImport.buildByHand": "أنشئ القائمة يدوياً بدلاً من ذلك",
   "menuImport.backToMenus": "العودة إلى القوائم",
+
+  /* ------------------------------------------------------------ card actions */
+  "menuLib.action.edit": "تعديل",
+  "menuLib.action.schedule": "جدولة",
+  "menuLib.action.hold": "إيقاف مؤقت",
+  "menuLib.action.resume": "استئناف",
+  "menuLib.action.duplicate": "نسخ",
+  "menuLib.action.archive": "أرشفة",
+  "menuLib.action.delete": "حذف",
+  "menuLib.confirmDelete.title": "حذف هذه القائمة؟",
+  "menuLib.confirmDelete.body": "سيتم حذف {name} وأقسامها وأصنافها. لا يمكن التراجع عن هذا.",
+  "menuLib.confirmDelete.cancel": "إلغاء",
+  "menuLib.confirmDelete.confirm": "حذف القائمة",
 } as const;

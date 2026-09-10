@@ -4,17 +4,21 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CalendarDays, Info, Search, Sparkles, Plus } from "lucide-react";
-import { Button, Input, Select } from "@ui/primitives";
+import { Button, Input, Modal, Select } from "@ui/primitives";
 import {
   DEFAULT_FILTERS,
   SEED_BRANCHES,
+  deleteMenu,
+  duplicateMenu,
   filterMenus,
+  setMenuStatus,
   useMenuLibrary,
   type LibraryFilters,
   type Menu,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { MenuCard } from "./menu-card";
+import { MenuCard, type CardAction } from "./menu-card";
+import { ActionsMenu } from "./actions-menu";
 
 export function MenuLibraryPage() {
   const { t, locale } = useI18n();
@@ -25,8 +29,10 @@ export function MenuLibraryPage() {
     year: "numeric",
   });
   const navigate = useNavigate();
-  const { menus } = useMenuLibrary();
+  const { menus, setMenus } = useMenuLibrary();
   const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
+  const [actionsFor, setActionsFor] = useState<{ menu: Menu; anchor: DOMRect } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Menu | null>(null);
 
   const visible = useMemo(() => filterMenus(menus, filters), [menus, filters]);
   const branchLabel =
@@ -34,6 +40,40 @@ export function MenuLibraryPage() {
 
   function patch(next: Partial<LibraryFilters>) {
     setFilters((current) => ({ ...current, ...next }));
+  }
+
+  // Every kebab choice routes through here rather than each menu item owning
+  // its own handler, so "which menu is this acting on" is answered once.
+  function runAction(action: CardAction) {
+    const menu = actionsFor?.menu ?? null;
+    setActionsFor(null);
+    if (!menu) return;
+
+    const now = new Date().toISOString();
+    switch (action) {
+      case "edit":
+        navigate(`/menu/${menu.id}/build/sections`);
+        return;
+      case "schedule":
+        // The schedule dialog arrives in the next task.
+        return;
+      case "hold":
+        setMenus(setMenuStatus(menus, menu.id, "on-hold", now));
+        return;
+      case "resume":
+        setMenus(setMenuStatus(menus, menu.id, "active", now));
+        return;
+      case "duplicate":
+        setMenus(duplicateMenu(menus, menu.id, `${menu.id}-copy-${Date.now()}`, now));
+        return;
+      case "archive":
+        setMenus(setMenuStatus(menus, menu.id, "archived", now));
+        return;
+      case "delete":
+        // Never deletes straight from the kebab — the confirm owns that.
+        setConfirmDelete(menu);
+        return;
+    }
   }
 
   return (
@@ -142,10 +182,47 @@ export function MenuLibraryPage() {
       ) : (
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((menu: Menu) => (
-            <MenuCard key={menu.id} menu={menu} onOpenActions={() => undefined} />
+            <MenuCard
+              key={menu.id}
+              menu={menu}
+              onOpenActions={(m, anchor) => setActionsFor({ menu: m, anchor })}
+            />
           ))}
         </div>
       )}
+
+      <ActionsMenu
+        menu={actionsFor?.menu ?? null}
+        anchor={actionsFor?.anchor ?? null}
+        onClose={() => setActionsFor(null)}
+        onPick={runAction}
+      />
+
+      <Modal
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        title={t("menuLib.confirmDelete.title")}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmDelete(null)}>
+              {t("menuLib.confirmDelete.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirmDelete) setMenus(deleteMenu(menus, confirmDelete.id));
+                setConfirmDelete(null);
+              }}
+            >
+              {t("menuLib.confirmDelete.confirm")}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[14px] text-[var(--octo-text-secondary)]">
+          {t("menuLib.confirmDelete.body").replace("{name}", confirmDelete?.name ?? "")}
+        </p>
+      </Modal>
     </div>
   );
 }

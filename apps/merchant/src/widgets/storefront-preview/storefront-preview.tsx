@@ -322,7 +322,36 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
         </span>
       </header>
 
-      <div className="pb-5">{model.sections.map(section)}</div>
+      {/* The Theme step is designing the menu page, not the landing page, so
+          it asks for a different body under the same header and footer rather
+          than a second widget that would drift from this one. */}
+      {model.composition === "menu" ? (
+        <div className="pb-5">
+          <div className="flex gap-2 overflow-x-auto px-4 pt-4">
+            {(model.categoryLabels ?? model.categories).map((label, i) => (
+              <span
+                key={`${label}-${i}`}
+                className={clsx(
+                  "shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold",
+                  i === 0 ? "text-white" : "text-[var(--octo-text-secondary)]"
+                )}
+                style={
+                  i === 0
+                    ? { backgroundColor: model.primary, borderColor: model.primary }
+                    : { borderColor: "var(--octo-border-card)" }
+                }
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className={clsx("mt-3 grid gap-2 px-4", mobile ? "grid-cols-2" : "grid-cols-4")}>
+            {Array.from({ length: mobile ? 6 : 12 }, (_, i) => productCard(i))}
+          </div>
+        </div>
+      ) : (
+        <div className="pb-5">{model.sections.map(section)}</div>
+      )}
 
       {/* Only what the model already knows: the name, the sections, the city,
           the hours and the link being shown on this very screen. No invented

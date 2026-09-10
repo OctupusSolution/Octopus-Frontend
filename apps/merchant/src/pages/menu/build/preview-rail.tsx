@@ -11,7 +11,14 @@ import { StorefrontPreview, type PreviewDevice } from "@/widgets/storefront-prev
 import { useI18n } from "@/app/providers/i18n-provider";
 import { toPreviewModel } from "./preview-model";
 
-export function PreviewRail({ menu }: { menu: Menu }) {
+export function PreviewRail({
+  menu,
+  composition = "landing",
+}: {
+  menu: Menu;
+  /** The Theme step is designing the menu page, so it asks for that body. */
+  composition?: "landing" | "menu";
+}) {
   const { t } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
 
@@ -56,7 +63,7 @@ export function PreviewRail({ menu }: { menu: Menu }) {
           the page it depicts, so it scrolls rather than squashing the layout
           out of proportion. */}
       <div className="octo-scroll mt-3 max-h-[560px] overflow-auto rounded-[10px] border border-[var(--octo-border-card)]">
-        <StorefrontPreview model={toPreviewModel(menu, device)} />
+        <StorefrontPreview model={toPreviewModel(menu, device, composition)} />
       </div>
     </section>
   );

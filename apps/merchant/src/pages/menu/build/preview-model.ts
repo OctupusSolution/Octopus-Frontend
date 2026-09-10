@@ -52,7 +52,11 @@ function formatPrice(value: number): string {
   return `SAR ${value}`;
 }
 
-export function toPreviewModel(menu: Menu, device: PreviewDevice): StorefrontPreviewModel {
+export function toPreviewModel(
+  menu: Menu,
+  device: PreviewDevice,
+  composition: "landing" | "menu" = "landing"
+): StorefrontPreviewModel {
   const sections = visibleSections(menu);
   const labels = sections.length > 0 ? sections.map((s) => s.name) : [PLACEHOLDER_LABEL];
 
@@ -94,6 +98,7 @@ export function toPreviewModel(menu: Menu, device: PreviewDevice): StorefrontPre
     samplePrices: prices.length > 0 ? prices : [formatPrice(0)],
     sampleWasPrices: prices.length > 0 ? prices : [formatPrice(0)],
     hero: {},
+    composition,
     device,
   };
 }

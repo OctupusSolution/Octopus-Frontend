@@ -69,6 +69,11 @@ export interface StorefrontPreviewModel {
    *  day someone named a section after a real key. Onboarding and the Public
    *  Link Builder pass nothing here and keep the key path. */
   categoryLabels?: readonly string[];
+  /** Which page this preview depicts. "landing" is the storefront home the two
+   *  original hosts show, and stays the default so neither is affected.
+   *  "menu" is the menu page itself — a category chip strip over a grid of
+   *  every item — which is what the menu builder's Theme step is designing. */
+  composition?: "landing" | "menu";
   /** `storefrontAsset` filenames, parallel to `categories` — same order, same
    *  length (never empty, same rule as `categories` itself). Supplied
    *  explicitly by each adapter rather than guessed by the widget from the

@@ -3896,4 +3896,17 @@ export const en = {
   "menuImport.soonBody": "We are still building this. It will detect your sections, items and prices from the file you upload, keep your branding, and hand you a draft to review before publishing.",
   "menuImport.buildByHand": "Build the menu by hand instead",
   "menuImport.backToMenus": "Back to menus",
+
+  /* ------------------------------------------------------------ card actions */
+  "menuLib.action.edit": "Edit",
+  "menuLib.action.schedule": "Schedule",
+  "menuLib.action.hold": "Hold",
+  "menuLib.action.resume": "Resume",
+  "menuLib.action.duplicate": "Duplicate",
+  "menuLib.action.archive": "Archive",
+  "menuLib.action.delete": "Delete",
+  "menuLib.confirmDelete.title": "Delete this menu?",
+  "menuLib.confirmDelete.body": "{name} and its sections and items are removed. This cannot be undone.",
+  "menuLib.confirmDelete.cancel": "Cancel",
+  "menuLib.confirmDelete.confirm": "Delete menu",
 } as const;

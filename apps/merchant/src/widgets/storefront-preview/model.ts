@@ -60,6 +60,15 @@ export interface StorefrontPreviewModel {
   activeNavLabelKey?: string;
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];
+  /** Literal, already-translated labels for those same tiles. When present the
+   *  widget renders these verbatim and ignores `categories`.
+   *
+   *  The menu builder's sections are strings a merchant typed, not dictionary
+   *  keys. Passing them through `categories` would appear to work only because
+   *  `t()` falls back to returning the key it was handed — and would break the
+   *  day someone named a section after a real key. Onboarding and the Public
+   *  Link Builder pass nothing here and keep the key path. */
+  categoryLabels?: readonly string[];
   /** `storefrontAsset` filenames, parallel to `categories` — same order, same
    *  length (never empty, same rule as `categories` itself). Supplied
    *  explicitly by each adapter rather than guessed by the widget from the

@@ -3990,4 +3990,9 @@ export const ar = {
   "menuWiz.sec.modal.saveChanges": "حفظ تغييرات القسم",
   "menuWiz.sec.deleteTitle": "حذف القسم؟",
   "menuWiz.sec.deleteBody": "حذف {name} يحذف الأصناف الـ{n} التي بداخله. لا يمكن التراجع.",
+  "menuWiz.preview.title": "معاينة حية",
+  "menuWiz.preview.hint": "كيف تظهر لعملائك",
+  "menuWiz.preview.menuHeading": "القائمة",
+  "menuWiz.preview.bestSellers": "الأكثر مبيعاً",
+  "menuWiz.preview.offersHeading": "العروض",
 } as const;

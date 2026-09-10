@@ -38,6 +38,19 @@ import type { StorefrontPreviewModel } from "./model";
 // The five mosaic cells, in the order serviceCategoriesFor fills them. The
 // middle column runs tall through both rows — that is what gives the block its
 // magazine look rather than an even row.
+// One resolver for both places a category name is drawn — the mosaic tiles and
+// the product cards. A host that supplies literal labels gets them verbatim;
+// everyone else keeps the i18n-key path they already had.
+function categoryLabel(
+  model: StorefrontPreviewModel,
+  index: number,
+  t: (key: string) => string
+): string {
+  const labels = model.categoryLabels;
+  if (labels && labels.length > 0) return labels[index % labels.length];
+  return t(model.categories[index % model.categories.length]);
+}
+
 const MOSAIC: readonly { area: string; tall?: boolean }[] = [
   { area: "1 / 1 / 2 / 2" },
   { area: "1 / 2 / 3 / 3", tall: true },
@@ -102,7 +115,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
         />
 
         <p className="mt-2 truncate text-start text-[10px] font-bold text-[var(--octo-text-primary)]">
-          {t(model.categories[index % model.categories.length])}
+          {categoryLabel(model, index, t)}
         </p>
         <p className="mt-1 line-clamp-2 text-start text-[8px] leading-[1.6] text-[var(--octo-text-muted)]">
           {t("onboarding.publicLink.previewDish")}
@@ -177,7 +190,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
               style={mobile ? undefined : { gridTemplateRows: "88px 88px" }}
             >
               {MOSAIC.map((slot, i) => {
-                const key = model.categories[i % model.categories.length];
+                const key = categoryLabel(model, i, t);
                 const image = model.categoryImages[i % model.categoryImages.length];
                 return (
                   <div
@@ -198,7 +211,7 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
                         slot.tall ? "text-center" : "flex flex-1 items-center"
                       )}
                     >
-                      {t(key)}
+                      {key}
                     </span>
                     <img
                       src={storefrontAsset(image)}

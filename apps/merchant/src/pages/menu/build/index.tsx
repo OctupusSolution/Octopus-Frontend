@@ -17,6 +17,7 @@ import { DraftProvider } from "./use-draft";
 import { Stepper, WIZARD_STEPS, type WizardStep } from "./stepper";
 import { WizardHeader } from "./wizard-header";
 import { SectionsStep } from "./sections";
+import { ItemsStep } from "./items";
 
 const TITLES: Record<WizardStep, { title: string; subtitle: string }> = {
   sections: { title: "menuWiz.sections.title", subtitle: "menuWiz.sections.subtitle" },
@@ -93,7 +94,7 @@ export function MenuBuilderPage() {
           <Routes>
             <Route index element={<Navigate to="sections" replace />} />
             <Route path="sections" element={<SectionsStep />} />
-            <Route path="items" element={<StepPlaceholder label={t("menuWiz.step.items")} />} />
+            <Route path="items" element={<ItemsStep />} />
             <Route path="theme" element={<StepPlaceholder label={t("menuWiz.step.theme")} />} />
             <Route path="review" element={<StepPlaceholder label={t("menuWiz.step.review")} />} />
           </Routes>

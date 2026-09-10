@@ -57,8 +57,10 @@ const SECTIONS: NavSection[] = [
       { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan" },
       { id: "floor-plan-builder", label: "Floor Plan Builder", icon: PencilRuler, placeholder: true },
       { id: "public-link", label: "Public Link Builder", icon: Link2, path: "/public-link" },
-      { id: "menu", label: "Menu", icon: UtensilsCrossed,
-        items: ["Categories & Items", "Modifiers", "Combos", "Price Lists & Channels", "Schedules & Ramadan Profile", "Availability (86 board)"] },
+      // No sub-items: a menu is now the root entity and /menu is the library
+      // of them, so the entry navigates straight there rather than opening a
+      // dropdown onto six sibling tables. Same shape as Reservations above.
+      { id: "menu", label: "Menu", icon: UtensilsCrossed },
       { id: "inventory", label: "Inventory", icon: Package,
         items: ["Ingredients & Suppliers", "Recipes & Costing", "Purchase Orders & Receipts", "Stock Counts & Variance", "Waste", "Transfers", "Production"] },
       { id: "delivery-aggregators", label: "Delivery", icon: Truck },
@@ -130,12 +132,6 @@ const ITEM_PATHS: Record<string, string> = {
   "Live Orders (all channels)": "/orders",
   "Order History": "/orders/history",
   "Pre-Orders & Scheduled": "/orders/preorders",
-  "Categories & Items": "/menu/items",
-  "Modifiers": "/menu/modifiers",
-  "Combos": "/menu/combos",
-  "Price Lists & Channels": "/menu/pricing",
-  "Schedules & Ramadan Profile": "/menu/schedules",
-  "Availability (86 board)": "/menu/availability",
   "Employees": "/staff/employees",
   "Schedule": "/staff/schedule",
   "Attendance": "/staff/attendance",

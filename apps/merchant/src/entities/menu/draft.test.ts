@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   OFFERS_SECTION_ID,
   addItem,
+  addOffer,
+  blankOffer,
+  removeOffer,
+  removeOfferEntry,
+  setOfferEntry,
+  updateOffer,
   addItemToSections,
   addModifierGroup,
   addModifierOption,
@@ -19,7 +25,7 @@ import {
   updateModifierGroup,
   updateSection,
 } from "./draft";
-import type { Item, ModifierGroup } from "./menu";
+import type { Item, ModifierGroup, Offer } from "./menu";
 
 const NOW = "2026-09-10T08:00:00.000Z";
 
@@ -194,5 +200,55 @@ describe("modifiers", () => {
       priceType: "add-amount", price: 14, isDefault: true, available: false,
     });
     expect(modifierTotal(firstItem(menu))).toBe(100);
+  });
+});
+
+describe("offers", () => {
+  function withOffer() {
+    const menu = base();
+    return addOffer(menu, blankOffer("of1", "Classic Burger Combo"));
+  }
+
+  function offers(menu: ReturnType<typeof withOffer>): Offer[] {
+    return menu.sections.find((s) => s.id === OFFERS_SECTION_ID)!.entries as Offer[];
+  }
+
+  it("adds an offer to the built-in offers section", () => {
+    expect(offers(withOffer()).map((o) => o.id)).toEqual(["of1"]);
+  });
+
+  it("slugs the name so the offer has a stable public address", () => {
+    expect(blankOffer("of1", "Classic Burger Combo").slug).toBe("Classic_Burger_Combo");
+  });
+
+  it("patches only the named offer", () => {
+    let menu = withOffer();
+    menu = addOffer(menu, blankOffer("of2", "Family Box"));
+    menu = updateOffer(menu, "of2", { badge: "Best Value" });
+    expect(offers(menu)[1].badge).toBe("Best Value");
+    expect(offers(menu)[0].badge).toBeNull();
+  });
+
+  it("removes an offer", () => {
+    expect(offers(removeOffer(withOffer(), "of1"))).toEqual([]);
+  });
+
+  it("adds an entry, then changes its quantity in place", () => {
+    let menu = setOfferEntry(withOffer(), "of1", "i1", 1, 90);
+    expect(offers(menu)[0].entries).toEqual([{ itemId: "i1", qty: 1, price: 90 }]);
+    menu = setOfferEntry(menu, "of1", "i1", 3, 90);
+    expect(offers(menu)[0].entries).toEqual([{ itemId: "i1", qty: 3, price: 90 }]);
+  });
+
+  it("drops an entry when its quantity reaches zero", () => {
+    let menu = setOfferEntry(withOffer(), "of1", "i1", 1, 90);
+    menu = setOfferEntry(menu, "of1", "i1", 0, 90);
+    expect(offers(menu)[0].entries).toEqual([]);
+  });
+
+  it("removes an entry outright", () => {
+    let menu = setOfferEntry(withOffer(), "of1", "i1", 2, 90);
+    menu = removeOfferEntry(menu, "of1", "i1");
+    expect(offers(menu)[0].entries).toEqual([]);
   });
 });

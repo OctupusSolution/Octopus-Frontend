@@ -74,6 +74,15 @@ export interface StorefrontPreviewModel {
    *  "menu" is the menu page itself — a category chip strip over a grid of
    *  every item — which is what the menu builder's Theme step is designing. */
   composition?: "landing" | "menu";
+  /** The actual dishes to draw on the product cards.
+   *
+   *  The two original hosts have no item data — they depict a storefront
+   *  before there is a menu — so their cards title themselves from the
+   *  category and describe themselves from one sample blurb. The menu builder
+   *  does have items, and a preview that ignored them would show the merchant
+   *  their section names five times over instead of the food they just typed
+   *  in. Omit it and the old behaviour is unchanged. */
+  products?: readonly { name: string; description: string; price: string }[];
   /** `storefrontAsset` filenames, parallel to `categories` — same order, same
    *  length (never empty, same rule as `categories` itself). Supplied
    *  explicitly by each adapter rather than guessed by the widget from the

@@ -13,9 +13,13 @@ export interface DraftContextValue {
   /** Replaces the whole draft. Steps compose the pure transforms from
    *  `entities/menu/draft` and hand the result here. */
   setDraft: (next: Menu) => void;
-  /** Writes the draft back into the library. Called by Save Draft, and by
-   *  Publish once step 4 exists. */
-  save: () => void;
+  /** Writes the draft back into the library.
+   *
+   *  Takes the menu to save rather than reading `draft`, because a caller that
+   *  sets state and saves in the same tick would otherwise save the value from
+   *  before its own setDraft — which is exactly how Publish came to write a
+   *  menu still marked pending. Omit the argument to save what is in state. */
+  save: (next?: Menu) => void;
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);

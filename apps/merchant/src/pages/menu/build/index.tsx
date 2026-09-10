@@ -19,12 +19,13 @@ import { WizardHeader } from "./wizard-header";
 import { SectionsStep } from "./sections";
 import { ItemsStep } from "./items";
 import { ThemeStep } from "./theme";
+import { ReviewStep } from "./review";
 
 const TITLES: Record<WizardStep, { title: string; subtitle: string }> = {
   sections: { title: "menuWiz.sections.title", subtitle: "menuWiz.sections.subtitle" },
   items: { title: "menuWiz.items.title", subtitle: "menuWiz.items.subtitle" },
   theme: { title: "menuTheme.title", subtitle: "menuTheme.subtitle" },
-  review: { title: "menuWiz.sections.title", subtitle: "menuWiz.sections.subtitle" },
+  review: { title: "menuReview.title", subtitle: "menuReview.subtitle" },
 };
 
 /** `/menu/new/scratch` — the address the chooser's purple card and the import
@@ -71,11 +72,12 @@ export function MenuBuilderPage() {
     navigate(`/menu/${menuId}/build/${next}`);
   }
 
-  function save() {
+  function save(next?: Menu) {
+    const menu = next ?? draft!;
     setMenus(
-      menus.some((m) => m.id === draft!.id)
-        ? menus.map((m) => (m.id === draft!.id ? draft! : m))
-        : [...menus, draft!]
+      menus.some((m) => m.id === menu.id)
+        ? menus.map((m) => (m.id === menu.id ? menu : m))
+        : [...menus, menu]
     );
   }
 
@@ -97,7 +99,7 @@ export function MenuBuilderPage() {
             <Route path="sections" element={<SectionsStep />} />
             <Route path="items" element={<ItemsStep />} />
             <Route path="theme" element={<ThemeStep />} />
-            <Route path="review" element={<StepPlaceholder label={t("menuWiz.step.review")} />} />
+            <Route path="review" element={<ReviewStep />} />
           </Routes>
         </div>
 
@@ -120,19 +122,5 @@ export function MenuBuilderPage() {
         </footer>
       </div>
     </DraftProvider>
-  );
-}
-
-/** Steps 2-4 land here until their tasks build them. Named rather than blank so
- *  a merchant who clicks Next is told where they are, not shown an empty page. */
-function StepPlaceholder({ label }: { label: string }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-[14px] border border-dashed border-[var(--octo-border-card)] p-10 text-center">
-      <p className="text-[15px] font-medium text-[var(--octo-text-primary)]">{label}</p>
-      <p className="mt-1 text-[13.5px] text-[var(--octo-text-secondary)]">
-        {t("menuImport.soonTitle")}
-      </p>
-    </div>
   );
 }

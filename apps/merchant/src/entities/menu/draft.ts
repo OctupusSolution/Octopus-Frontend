@@ -67,7 +67,10 @@ export function blankItem(id: string, name: string): Item {
 export function blankMenu(id: string, branchId: string, now: string): Menu {
   return {
     id,
-    name: "",
+    // No frame in the set shows where a menu is named, and a blank card in the
+    // library cannot be told from its neighbours — so it starts with something
+    // legible. Renaming needs a control the frames do not yet describe.
+    name: "New Menu",
     cover: null,
     // "pending" rather than "active": nothing has been published, and the
     // library's badge should say so the moment the draft appears there.

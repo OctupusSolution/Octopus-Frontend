@@ -28,11 +28,11 @@ Settled before design; not open questions.
 | Question | Decision |
 |---|---|
 | The six existing pages | Removed. The wizard covers their function. Removal is the last phase, so nothing is deleted before its replacement works |
-| AI import branch | Deferred. `Import Menu (AI)` renders on the library page, visibly disabled, labelled "coming soon". Its three frames are specced later |
+| AI import branch | Deferred, but not dead. `Import Menu (AI)` and the green `Upload Menu & Create With AI` card render exactly as drawn and both navigate to `/menu/import` — a real page carrying the module chrome and a "coming soon" panel. A disabled control in the frame's hero position reads as a broken build; a page that explains itself does not. Its three frames are specced later |
 | Step 3 brand fields | Shared with Public Link Builder, not duplicated. Logo, the four colours, typography and hero read and write one model |
 | Step 3 menu fields | Menu-owned. Card style, category style, navigation style, item-details behaviour, sticky cart, tag visibility live on the menu |
-| Live preview | Reuses `widgets/storefront-preview`. No second renderer |
-| Draft persistence | localStorage, versioned and shape-validated, mirroring `site-draft-storage.ts`. "Save Draft" tells the truth |
+| Live preview | Reuses `widgets/storefront-preview`, extended with a second composition. No second renderer. See Live preview |
+| Draft persistence | In-memory for this stage, matching every other merchant module. See Persistence for what that costs and how the seam is kept |
 | Backend | None. Mock data, same posture as the rest of the merchant app |
 | i18n | EN + AR from the first commit of every phase. Logical CSS properties only |
 | Testing | Models and money maths are unit-tested. Screens are verified by screenshot against the frame |
@@ -89,15 +89,18 @@ This is the same move the Public Link Builder spec made for
 ```
 entities/menu/
   menu.ts                types + the draft reducer
-  menu-storage.ts        versioned localStorage, shape-validated
   use-menu-draft.ts      the hook the wizard steps consume
   pricing.ts             VAT, offer totals, savings — pure functions
   validation.ts          the Review step's errors/warnings/recommendations
   index.ts
 
+shared/api/mock-menus.ts   the seeded library — replaces mock-menu.ts
+shared/lib/menu-assets.ts  menuAsset(), resolving apps/assets/Menu/*
+
 pages/menu/
   index.tsx              the library: cards, filters, actions, schedule modal
   new/index.tsx          Create New Menu — two method cards
+  import/index.tsx       the AI branch's "coming soon" landing
   build/
     index.tsx            wizard shell: stepper, header, footer, step routing
     steps/
@@ -120,21 +123,46 @@ widgets/menu-editor/
 Widgets take resolved props, never a draft. The adapter lives in the widget;
 the mapping lives in `entities/`.
 
+The two method-card illustrations stay where they are, in `apps/assets/Menu/`,
+and are reached through `menuAsset()` — `new URL(..., import.meta.url)`, the
+same mechanism as `storefront-assets.ts`. They are not copied into a merchant
+`public/` folder. That file carries a comment explaining why, written after a
+duplicated set of category images drifted and left onboarding step 8 pointing
+at four photographs that no longer existed; a second copy of these two would be
+the same mistake with a smaller blast radius. Vite hashes and bundles the
+imported URL either way.
+
 ### Routes
 
 ```
 /menu                          library
 /menu/new                      method chooser
+/menu/import                   AI branch, "coming soon"
+/menu/:menuId/build/*          wizard shell — one registry entry
 /menu/:menuId/build/sections   step 1
 /menu/:menuId/build/items      step 2
 /menu/:menuId/build/theme      step 3
 /menu/:menuId/build/review     step 4
 ```
 
-The step is in the URL, not in component state, so refresh and browser-back
-work and "Save Draft" has something stable to save against. Entering the
-wizard from `/menu/new` creates a draft menu and redirects to its
-`/build/sections`.
+The step is in the URL, not in component state, so browser-back walks the
+steps instead of leaving the wizard, and every step is linkable while the
+session lasts. Entering the wizard from `/menu/new` creates a draft menu and
+redirects to its `/build/sections`.
+
+`app/routes/registry.tsx` is a flat route list, so the four steps enter it as
+the single splat entry `/menu/:menuId/build/*`; `build/index.tsx` owns the
+draft and renders a nested `<Routes>` for the four steps beneath it. One
+shell, one draft, four addresses. Because the draft is in memory (see
+Persistence), a step reached by refresh or by a pasted link finds no draft and
+redirects to `/menu` rather than rendering an empty wizard.
+
+Two consequences for `widgets/top-bar`. Its breadcrumb map is keyed on an
+exact `pathname`, so parameterised routes miss it and fall back to
+"Dashboard / Overview" — already visibly wrong today on `/customers/:id` and
+its two siblings. The wizard would add four more. So the lookup gains a
+longest-matching-prefix fallback, which fixes the three existing breadcrumbs
+in the same change.
 
 Removed from `app/routes/registry.tsx`: `/menu/items`, `/menu/modifiers`,
 `/menu/combos`, `/menu/pricing`, `/menu/schedules`, `/menu/availability`.
@@ -336,11 +364,48 @@ library — not a wizard step. The frame's four numbered blocks map one to one.
 
 ### Persistence
 
-`menu-storage.ts` mirrors `site-draft-storage.ts`: a `DRAFT_KEY`, a
-`DRAFT_VERSION`, `serialize`/`parse`, and an `isMenuShape` guard so a
-hand-edited or truncated localStorage value falls back to a fresh draft
-instead of crashing the wizard. localStorage rather than session storage —
-a half-built menu is a business asset, and the merchant expects it tomorrow.
+The library and the draft live in memory for this stage — React state over the
+`mock-menus` fixture, the same posture as Reservations, Orders and every other
+merchant module. `Save Draft` writes the draft back into the library list with
+status `draft`, so it survives leaving the wizard and reopening it; it does not
+survive a reload.
+
+That is a real cost and it is worth naming rather than hiding: a merchant who
+clicks `Save Draft` and then reloads loses the work, and the button's label
+promises more than the stage delivers. It is accepted because the alternative —
+a versioned, shape-guarded localStorage store — is machinery no other module in
+this app has, built against a data shape the backend has not published yet, and
+it would be thrown away at the first real `POST /menus`.
+
+The seam is kept narrow so that trade is reversible in one file: every read and
+write goes through `use-menu-draft`, and nothing else touches the store.
+Swapping its body for localStorage now, or for a TanStack Query mutation later,
+edits no step, no widget and no page.
+
+### Live preview
+
+Every wizard step carries the right-hand `Live Preview — How it appear to your
+customers` rail, and there is already a widget that draws that exact page:
+`widgets/storefront-preview`, which the Public Link Builder and onboarding step 8
+both feed. It renders a real customer storefront from a host-agnostic
+`StorefrontPreviewModel`, honours `brand-tokens`, mirrors under RTL, and makes
+every control inert. Building a second renderer for the same picture would put
+the menu's idea of the storefront on a slow drift away from the storefront.
+
+One thing looked like a blocker and is not. The model takes its category labels
+as i18n keys, and the menu's are merchant-typed strings. But `t()` is
+`dict[key] ?? key` — an unknown key renders as itself, so a literal section name
+passes through unchanged. Rather than lean on that as a happy accident, the
+model gains an explicit `labels` variant beside `categories`, so a caller states
+which it is passing and a section a merchant names "Home" cannot collide with a
+dictionary entry.
+
+What genuinely is missing is a composition. Steps 1 and 2 show the storefront
+landing page, which the widget already draws. Step 3 shows the menu page —
+a category chip strip over a four-across item grid — which it does not. So the
+widget gains a `composition: "landing" | "menu"` prop and a second layout
+beneath it. Its existing two hosts pass nothing and keep the landing page they
+render today.
 
 ## The four steps
 
@@ -395,23 +460,23 @@ Each phase ends with a screenshot compared against its frame, and a review
 checkpoint.
 
 1. `entities/site-draft/` extraction with re-exports; tests move and pass
-2. `entities/menu/` — types, reducer, storage, pricing, validation, with tests
+2. `entities/menu/` — types, reducer, pricing, validation, with tests
 3. Menu library — cards, filters, kebab actions, schedule modal
-4. Create New Menu chooser; `Import Menu (AI)` disabled
-5. Wizard shell and step 1, Sections
+4. Create New Menu chooser, plus `/menu/import` and the two entry points into it
+5. `storefront-preview` gains `labels`; wizard shell and step 1, Sections
 6. Step 2 — item editor: General, Pricing, Nutrition, Allergies
 7. Step 2 — modifier editor, all three states
 8. Step 2 — offer editor, all five tabs
-9. Step 3 — Theme
-10. Step 4 — Review & Publish
-11. Remove the six pages, their routes, their sidebar entries, and `mock-menu.ts`
+9. `storefront-preview` gains the `menu` composition
+10. Step 3 — Theme
+11. Step 4 — Review & Publish
+12. Remove the six pages, their routes, their sidebar entries, and `mock-menu.ts`
 
 ## Verification
 
 - `entities/menu/pricing.ts` — VAT, offer totals, savings, discount percentage
 - `entities/menu/validation.ts` — the three severity buckets and their counts
 - `entities/menu/menu.ts` — reducer transitions, section reorder, cascade delete
-- `entities/menu/menu-storage.ts` — round-trip, version mismatch, corrupt value
 - Every screen screenshotted at its frame's width and compared before it is
   called done
 
@@ -421,7 +486,8 @@ Recorded, not blocking. Each is resolved when its phase is reached.
 
 1. **Dynamic Price.** The third pricing role in `-offers-pricing` has no frame
    showing what it does. Proposal: build Fixed and Discount, render Dynamic
-   selectable but with an inline "coming soon" panel, matching the AI posture.
+   selectable but with an inline "coming soon" panel — the same posture the AI
+   branch takes at `/menu/import`: visible, reachable, and honest about itself.
 2. **Add to Multiple Sections.** The item kebab offers it; no frame shows the
    section picker. Proposal: a modal with the section checklist.
 3. **View More Themes.** Destination unspecified. Proposal: link to Public Link

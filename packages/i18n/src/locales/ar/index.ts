@@ -3938,4 +3938,19 @@ export const ar = {
   "menuLib.day.thu": "خميس",
   "menuLib.day.fri": "جمعة",
   "menuLib.day.sat": "سبت",
+
+  /* ------------------------------------------------------------- menu wizard */
+  "menuWiz.step.sections": "الأقسام",
+  "menuWiz.step.items": "الأصناف",
+  "menuWiz.step.theme": "المظهر",
+  "menuWiz.step.review": "المراجعة والنشر",
+  "menuWiz.sections.title": "إنشاء قائمة جديدة من الصفر",
+  "menuWiz.sections.subtitle": "ابنِ قائمتك خطوة بخطوة، ويمكنك تغيير كل شيء لاحقاً.",
+  "menuWiz.items.title": "إضافة الأصناف وضبطها",
+  "menuWiz.items.subtitle": "ابنِ قائمتك خطوة بخطوة، ويمكنك تغيير كل شيء لاحقاً.",
+  "menuWiz.changeBranch": "تغيير الفرع",
+  "menuWiz.cancel": "إلغاء",
+  "menuWiz.saveDraft": "حفظ كمسودة",
+  "menuWiz.nextStep": "الخطوة التالية",
+  "menuWiz.back": "رجوع",
 } as const;

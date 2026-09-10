@@ -3938,4 +3938,19 @@ export const en = {
   "menuLib.day.thu": "Thu",
   "menuLib.day.fri": "Fri",
   "menuLib.day.sat": "Sat",
+
+  /* ------------------------------------------------------------- menu wizard */
+  "menuWiz.step.sections": "Sections",
+  "menuWiz.step.items": "Items",
+  "menuWiz.step.theme": "Theme",
+  "menuWiz.step.review": "Review& Publish",
+  "menuWiz.sections.title": "Create New Menu from Scratch",
+  "menuWiz.sections.subtitle": "Build your menu step by step, you can always change things later.",
+  "menuWiz.items.title": "Add& Configure Items",
+  "menuWiz.items.subtitle": "Build your menu step by step, you can always change things later.",
+  "menuWiz.changeBranch": "Change Branch",
+  "menuWiz.cancel": "Cancel",
+  "menuWiz.saveDraft": "Save Draft",
+  "menuWiz.nextStep": "Next Step",
+  "menuWiz.back": "Back",
 } as const;

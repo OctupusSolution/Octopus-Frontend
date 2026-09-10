@@ -17,6 +17,7 @@ import {
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useDraft } from "../use-draft";
+import { PreviewRail } from "../preview-rail";
 import { SectionList } from "./section-list";
 import { SectionSettings } from "./section-settings";
 import { SectionModal } from "./section-modal";
@@ -81,9 +82,7 @@ export function SectionsStep() {
           onChangeImage={() => selected && setModal({ mode: "edit", section: selected })}
         />
 
-        {/* Task 4 puts the live preview here. An empty card of the same
-            width keeps the three-column proportions honest until then. */}
-        <div className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]" />
+        <PreviewRail menu={draft} />
       </div>
 
       <SectionModal

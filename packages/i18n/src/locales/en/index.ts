@@ -3990,4 +3990,9 @@ export const en = {
   "menuWiz.sec.modal.saveChanges": "Save Section Changes",
   "menuWiz.sec.deleteTitle": "Delete section?",
   "menuWiz.sec.deleteBody": "Deleting {name} deletes the {n} items in it. This cannot be undone.",
+  "menuWiz.preview.title": "Live Preview",
+  "menuWiz.preview.hint": "How it appear to your customers",
+  "menuWiz.preview.menuHeading": "Menu",
+  "menuWiz.preview.bestSellers": "Best Sellers",
+  "menuWiz.preview.offersHeading": "Offers",
 } as const;

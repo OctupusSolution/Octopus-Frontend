@@ -1,281 +1,485 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown, ChevronLeft, Eye, EyeOff, User, Briefcase, ShieldCheck, KeyRound, Lock } from "lucide-react";
-import { Badge, Button, Input, Select } from "@ui/primitives";
-import type { MemberProfile } from "@/shared/api/mock-staff";
+import { BriefcaseBusiness, ChevronDown, Eye, EyeOff, KeyRound, Lock, LockOpen, ShieldCheck, UserRound } from "lucide-react";
+import clsx from "clsx";
+import {
+  ACCESS_LEVELS,
+  DEPARTMENTS,
+  JOB_TITLES,
+  LANGUAGE_OPTIONS,
+  TWO_FACTOR_METHODS,
+  branches,
+  type Branch,
+  type LoginMethod,
+  type MemberProfile,
+  type ModuleId,
+} from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { buttonClass } from "./_shared/buttons";
+import { ConfirmModal } from "./_shared/confirm-modal";
+import { Field, SelectInput, TextInput } from "./_shared/form";
+import { EMAIL_RE, PHONE_RE, useStaffLabels } from "./_shared/labels";
+import { useStaffStore } from "./_shared/staff-store";
+import { Switch } from "./_shared/switch";
+import { MemberSummaryCard } from "./member-summary-card";
+import { ModulesSelect } from "./modules-select";
 
-function initials(name: string): string {
-  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+export interface MemberDraft {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  dateOfBirth: string;
+  gender: "Male" | "Female";
+  nationality: string;
+  languages: string;
+  jobTitle: string;
+  branch: Branch;
+  department: string;
+  reportsTo: string;
+  hireDate: string;
+  employmentType: "Full time" | "Part time";
+  status: "Active" | "Inactive";
+  assignedRole: string;
+  accessLevel: string;
+  modulesAccess: ModuleId[];
+  loginMethod: LoginMethod;
+  pinCode: string;
+  twoFactorEnabled: boolean;
+  twoFactorMethod: string;
+  allowSystemLogin: boolean;
+  allowAccessOutsideBranch: boolean;
 }
 
-function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2 text-[12.5px]">
-      <span className="text-[var(--octo-text-muted)]">{label}</span>
-      <span className="text-end font-medium text-[var(--octo-text-primary)]">{value}</span>
-    </div>
-  );
+function draftFrom(p: MemberProfile, inactive: boolean): MemberDraft {
+  return {
+    firstName: p.firstName,
+    lastName: p.lastName,
+    phone: p.employee.phone,
+    email: p.email,
+    dateOfBirth: p.dateOfBirth,
+    gender: p.gender,
+    nationality: p.nationality,
+    languages: p.languages,
+    jobTitle: p.jobTitle,
+    branch: p.employee.branch,
+    department: p.department,
+    reportsTo: p.reportsTo,
+    hireDate: p.employee.hireDate,
+    employmentType: p.employmentType,
+    status: inactive ? "Inactive" : "Active",
+    assignedRole: p.assignedRole,
+    accessLevel: p.accessLevel,
+    modulesAccess: [...p.modulesAccess],
+    loginMethod: p.loginMethod,
+    pinCode: p.pinCode,
+    twoFactorEnabled: p.twoFactorEnabled,
+    twoFactorMethod: p.twoFactorMethod,
+    allowSystemLogin: p.allowSystemLogin,
+    allowAccessOutsideBranch: p.allowAccessOutsideBranch,
+  };
 }
 
-function SummaryCard({ profile, deactivated }: { profile: MemberProfile; deactivated: boolean }) {
-  const { t } = useI18n();
-  const e = profile.employee;
-  return (
-    <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-[18px]">
-      <div className="flex items-center gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#eaf2ff] text-[14px] font-bold text-[#0D6EFD]">
-          {initials(e.name)}
-        </div>
-        <div>
-          <h3 className="text-[15px] font-bold text-[var(--octo-text-primary)]">{e.name}</h3>
-          <p className="text-[12px] text-[#0D6EFD]">{profile.jobTitle}</p>
-          <Badge tone={deactivated ? "neutral" : "success"} className="mt-1">
-            {deactivated ? t("staff.grid.menu.deactivate") : t("staff.member.status.active")}
-          </Badge>
-        </div>
-      </div>
+type SectionId = "personal" | "work" | "access" | "login" | "controls";
+type Errors = Partial<Record<keyof MemberDraft, string>>;
 
-      <div className="mt-4 flex flex-col gap-2 border-t border-[var(--octo-divider)] pt-3">
-        <Field label={t("staff.member.field.employeeId")} value={profile.employeeCode} />
-        <Field label={t("staff.member.field.phone")} value={e.phone} />
-        <Field label={t("staff.member.field.branch")} value={e.branch} />
-        <Field label={t("staff.member.field.joined")} value={profile.activeSection.since.split(" - ")[0]} />
-        <Field label={t("staff.member.field.dateOfBirth")} value="31 July 1999" />
-        <Field label={t("staff.member.field.nationality")} value={profile.nationality} />
-        <Field label={t("staff.member.field.language")} value={profile.languages.join(", ")} />
-      </div>
+const FIELD_SECTION: Partial<Record<keyof MemberDraft, SectionId>> = {
+  firstName: "personal",
+  lastName: "personal",
+  phone: "personal",
+  email: "personal",
+  pinCode: "login",
+};
 
-      <div className="mt-3 rounded-[9px] bg-[var(--octo-tone-success-bg)] px-3 py-2.5">
-        <div className="flex items-center justify-between text-[11.5px] font-semibold text-[var(--octo-tone-success-text)]">
-          <span>{t("staff.member.field.activeSections")}</span>
-          <Badge tone="success">{t("staff.member.status.active")}</Badge>
-        </div>
-        <p className="mt-1 text-[12px] text-[var(--octo-text-primary)]">{profile.activeSection.device}</p>
-        <p className="text-[11px] text-[var(--octo-text-muted)]">{profile.activeSection.location}</p>
-        <p className="text-[11px] text-[var(--octo-text-muted)]">{profile.activeSection.since}</p>
-      </div>
-    </div>
-  );
-}
+const LOGIN_METHODS: LoginMethod[] = ["PIN", "Password", "Both"];
 
 function Section({
+  id,
   icon,
   title,
-  expanded,
+  open,
   onToggle,
   children,
 }: {
+  id: SectionId;
   icon: ReactNode;
   title: string;
-  expanded: boolean;
+  open: boolean;
   onToggle: () => void;
   children: ReactNode;
 }) {
+  const bodyId = `member-section-${id}`;
   return (
-    <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between px-[18px] py-[15px] text-start"
-      >
-        <span className="flex items-center gap-2 text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-          {icon} {title}
-        </span>
-        <ChevronDown size={16} className={`text-[var(--octo-text-muted)] transition-transform ${expanded ? "rotate-180" : ""}`} />
-      </button>
-      {expanded && <div className="border-t border-[var(--octo-divider)] px-[18px] py-[15px]">{children}</div>}
-    </div>
+    <section className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
+      <h2>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={onToggle}
+          className="flex w-full items-center justify-between gap-3 rounded-[16px] px-4 py-4 text-start focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40"
+        >
+          <span className="flex items-center gap-2.5 text-[16px] font-semibold text-[var(--octo-text-primary)]">
+            {icon}
+            {title}
+          </span>
+          <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-[var(--octo-text-primary)] transition-transform", open && "rotate-180")} />
+        </button>
+      </h2>
+      {open && (
+        <div id={bodyId} className="px-4 pb-5">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function SwitchRow({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3">
+      <Switch checked={checked} onChange={onChange} label={label} />
+      <span className="text-[14px] text-[var(--octo-text-primary)]">{label}</span>
+    </label>
   );
 }
 
 export function MemberDetails({
   profile,
-  deactivated,
-  onBack,
+  inactive,
+  onSave,
+  onLockChange,
+  notify,
 }: {
   profile: MemberProfile;
-  deactivated: boolean;
-  onBack: () => void;
+  inactive: boolean;
+  onSave: (draft: MemberDraft) => void;
+  onLockChange: (locked: boolean) => void;
+  notify: (text: string, tone?: "success" | "error") => void;
 }) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(["personal", "work"]));
+  const labels = useStaffLabels();
+  const store = useStaffStore();
+  const [baseline, setBaseline] = useState(() => draftFrom(profile, inactive));
+  const [draft, setDraft] = useState(baseline);
+  const [errors, setErrors] = useState<Errors>({});
+  const [openSections, setOpenSections] = useState<Set<SectionId>>(() => new Set(["personal"]));
   const [pinVisible, setPinVisible] = useState(false);
-  const [pinCode, setPinCode] = useState(profile.pinCode);
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(profile.twoFactorEnabled);
-  const [allowSystemLogin, setAllowSystemLogin] = useState(profile.allowSystemLogin);
-  const [allowOutsideBranch, setAllowOutsideBranch] = useState(profile.allowAccessOutsideBranch);
-  const [locked, setLocked] = useState(false);
+  const [lockConfirmOpen, setLockConfirmOpen] = useState(false);
 
-  const toggle = (id: string) => {
-    setExpanded((prev) => {
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+
+  const set = <K extends keyof MemberDraft>(key: K, value: MemberDraft[K]) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
+
+  const toggleSection = (id: SectionId) =>
+    setOpenSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+
+  const save = () => {
+    const next: Errors = {};
+    if (!draft.firstName.trim()) next.firstName = t("staff.validation.required");
+    if (!draft.lastName.trim()) next.lastName = t("staff.validation.required");
+    if (!draft.phone.trim()) next.phone = t("staff.validation.required");
+    else if (!PHONE_RE.test(draft.phone.trim())) next.phone = t("staff.validation.phone");
+    if (draft.email.trim() && !EMAIL_RE.test(draft.email.trim())) next.email = t("staff.validation.email");
+    if (draft.loginMethod !== "Password" && !/^\d{4,6}$/.test(draft.pinCode)) next.pinCode = t("staff.validation.pin");
+
+    if (Object.keys(next).length) {
+      setErrors(next);
+      const sections = Object.keys(next)
+        .map((k) => FIELD_SECTION[k as keyof MemberDraft])
+        .filter((s): s is SectionId => Boolean(s));
+      setOpenSections((prev) => new Set([...prev, ...sections]));
+      notify(t("staff.toast.fixErrors"), "error");
+      return;
+    }
+    onSave(draft);
+    setBaseline(draft);
   };
 
-  const e = profile.employee;
+  const discard = () => {
+    setDraft(baseline);
+    setErrors({});
+  };
+
+  const resetPin = () => {
+    set("pinCode", String(Math.floor(1000 + Math.random() * 9000)));
+    setPinVisible(true);
+    notify(t("staff.toast.pinReset"));
+  };
+
+  const status = profile.locked ? "locked" : inactive ? "inactive" : "active";
+  const managers = store.employees.filter(
+    (e) => e.id !== profile.employee.id && (e.role === "Owner" || e.role === "Branch Manager")
+  );
+  const managerNames = managers.map((m) => m.name);
+  if (draft.reportsTo && !managerNames.includes(draft.reportsTo)) managerNames.unshift(draft.reportsTo);
+  const roleOptions = store.roles.filter((r) => r.active || r.id === draft.assignedRole);
+  const jobTitles: string[] = [...JOB_TITLES];
+  if (!jobTitles.includes(draft.jobTitle)) jobTitles.unshift(draft.jobTitle);
 
   return (
-    <div className="mt-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#0D6EFD] hover:underline"
-      >
-        <ChevronLeft size={14} className="rtl:rotate-180" /> {t("staff.grid.backToStaff")}
-      </button>
+    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[268px_minmax(0,1fr)_268px]">
+      <MemberSummaryCard profile={profile} status={status} showSessions className="lg:sticky lg:top-4" />
 
-      {locked && (
-        <div className="mb-3 rounded-[9px] bg-[#fdecec] px-3 py-2 text-center text-[11.5px] font-medium text-[#dc2626]">
-          {t("staff.member.status.locked")}
-        </div>
-      )}
+      <div className="flex min-w-0 flex-col gap-4">
+        {profile.locked && (
+          <div role="status" className="flex items-center gap-2.5 rounded-[12px] bg-[var(--octo-tone-danger-bg)] px-4 py-3 text-[13px] font-medium text-[var(--octo-tone-danger-text)]">
+            <Lock size={16} aria-hidden className="shrink-0" />
+            {t("staff.member.lockedBanner").replace("{name}", profile.employee.name)}
+          </div>
+        )}
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr_320px]">
-        <SummaryCard profile={profile} deactivated={deactivated} />
+        <Section id="personal" icon={<UserRound size={22} strokeWidth={1.7} />} title={t("staff.member.personalInfo")} open={openSections.has("personal")} onToggle={() => toggleSection("personal")}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label={t("staff.member.field.firstName")} htmlFor="m-first" error={errors.firstName}>
+              <TextInput id="m-first" value={draft.firstName} invalid={!!errors.firstName} onChange={(e) => set("firstName", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.lastName")} htmlFor="m-last" error={errors.lastName}>
+              <TextInput id="m-last" value={draft.lastName} invalid={!!errors.lastName} onChange={(e) => set("lastName", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.phoneNumber")} htmlFor="m-phone" error={errors.phone}>
+              <TextInput id="m-phone" type="tel" dir="ltr" value={draft.phone} invalid={!!errors.phone} onChange={(e) => set("phone", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.email")} htmlFor="m-email" error={errors.email}>
+              <TextInput id="m-email" type="email" dir="ltr" value={draft.email} invalid={!!errors.email} onChange={(e) => set("email", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.dateOfBirth")} htmlFor="m-dob">
+              <TextInput id="m-dob" type="date" value={draft.dateOfBirth} max={draft.hireDate || undefined} onChange={(e) => set("dateOfBirth", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.gender")} htmlFor="m-gender">
+              <SelectInput id="m-gender" value={draft.gender} onChange={(e) => set("gender", e.target.value as MemberDraft["gender"])}>
+                <option value="Male">{t("staff.member.gender.male")}</option>
+                <option value="Female">{t("staff.member.gender.female")}</option>
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.nationality")} htmlFor="m-nationality">
+              <TextInput id="m-nationality" value={labels.data("staff.nationality", draft.nationality)} onChange={(e) => set("nationality", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.language")} htmlFor="m-language">
+              <SelectInput id="m-language" value={draft.languages} onChange={(e) => set("languages", e.target.value)}>
+                {LANGUAGE_OPTIONS.map((l) => (
+                  <option key={l} value={l}>{labels.data("staff.language", l)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+          </div>
+        </Section>
 
-        <div className="flex flex-col gap-3">
-          <Section icon={<User size={15} />} title={t("staff.member.personalInfo")} expanded={expanded.has("personal")} onToggle={() => toggle("personal")}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input label={t("staff.member.field.firstName")} defaultValue={profile.firstName} />
-              <Input label={t("staff.member.field.lastName")} defaultValue={profile.lastName} />
-              <Input label={t("staff.member.field.phoneNumber")} defaultValue={e.phone} />
-              <Input label={t("staff.member.field.email")} defaultValue={`${profile.firstName.toLowerCase()}.${profile.lastName.toLowerCase()}@gmail.com`} />
-              <Input label={t("staff.member.field.dateOfBirth")} defaultValue="31 July 1999" />
-              <Select label={t("staff.member.field.gender")} defaultValue={profile.gender}>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </Select>
-              <Input label={t("staff.member.field.nationality")} defaultValue={profile.nationality} />
-              <Select label={t("staff.member.field.language")} defaultValue={profile.languages.join(", ")}>
-                <option value={profile.languages.join(", ")}>{profile.languages.join(", ")}</option>
-              </Select>
-            </div>
-          </Section>
+        <Section id="work" icon={<BriefcaseBusiness size={22} strokeWidth={1.7} />} title={t("staff.member.workInfo")} open={openSections.has("work")} onToggle={() => toggleSection("work")}>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label={t("staff.member.field.jobTitle")} htmlFor="m-title">
+              <SelectInput id="m-title" value={draft.jobTitle} onChange={(e) => set("jobTitle", e.target.value)}>
+                {jobTitles.map((j) => (
+                  <option key={j} value={j}>{labels.data("staff.jobTitle", j)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.branch")} htmlFor="m-branch">
+              <SelectInput id="m-branch" value={draft.branch} onChange={(e) => set("branch", e.target.value as Branch)}>
+                {branches.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.department")} htmlFor="m-dept">
+              <SelectInput id="m-dept" value={draft.department} onChange={(e) => set("department", e.target.value)}>
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>{labels.data("staff.department", d)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.reportsTo")} htmlFor="m-reports">
+              <SelectInput id="m-reports" value={draft.reportsTo} onChange={(e) => set("reportsTo", e.target.value)}>
+                <option value="">{t("staff.member.field.noManager")}</option>
+                {managerNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.hireDate")} htmlFor="m-hire">
+              <TextInput id="m-hire" type="date" value={draft.hireDate} onChange={(e) => set("hireDate", e.target.value)} />
+            </Field>
+            <Field label={t("staff.member.field.employmentType")} htmlFor="m-type">
+              <SelectInput id="m-type" value={draft.employmentType} onChange={(e) => set("employmentType", e.target.value as MemberDraft["employmentType"])}>
+                <option value="Full time">{t("staff.member.employment.fullTime")}</option>
+                <option value="Part time">{t("staff.member.employment.partTime")}</option>
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.status")} htmlFor="m-status" className="sm:col-span-2">
+              <SelectInput
+                id="m-status"
+                value={draft.status}
+                onChange={(e) => set("status", e.target.value as MemberDraft["status"])}
+                className={draft.status === "Active" ? "text-[var(--octo-tone-success-text)]" : undefined}
+              >
+                <option value="Active">{t("staff.status.active")}</option>
+                <option value="Inactive">{t("staff.status.inactive")}</option>
+              </SelectInput>
+            </Field>
+          </div>
+        </Section>
 
-          <Section icon={<Briefcase size={15} />} title={t("staff.member.workInfo")} expanded={expanded.has("work")} onToggle={() => toggle("work")}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Select label={t("staff.member.field.jobTitle")} defaultValue={profile.jobTitle}>
-                <option value={profile.jobTitle}>{profile.jobTitle}</option>
-              </Select>
-              <Select label={t("staff.member.field.branch")} defaultValue={e.branch}>
-                <option value={e.branch}>{e.branch}</option>
-              </Select>
-              <Select label={t("staff.member.field.department")} defaultValue={profile.department}>
-                <option value={profile.department}>{profile.department}</option>
-              </Select>
-              <Select label={t("staff.member.field.reportsTo")} defaultValue={profile.reportsTo}>
-                <option value={profile.reportsTo}>{profile.reportsTo}</option>
-              </Select>
-              <Input label={t("staff.member.field.hireDate")} defaultValue={e.hireDate} />
-              <Select label={t("staff.member.field.employmentType")} defaultValue={profile.employmentType}>
-                <option value="Full time">Full time</option>
-                <option value="Part time">Part time</option>
-              </Select>
-              <Select label={t("staff.member.field.status")} defaultValue={deactivated ? "Inactive" : "Active"} className="sm:col-span-2">
-                <option value="Active">{t("staff.member.status.active")}</option>
-                <option value="Inactive">{t("staff.grid.menu.deactivate")}</option>
-              </Select>
-            </div>
-          </Section>
+        <Section id="access" icon={<ShieldCheck size={22} strokeWidth={1.7} />} title={t("staff.member.roleAccess")} open={openSections.has("access")} onToggle={() => toggleSection("access")}>
+          <div className="flex flex-col gap-4">
+            <Field label={t("staff.member.field.assignedRole")} htmlFor="m-role">
+              <SelectInput id="m-role" value={draft.assignedRole} onChange={(e) => set("assignedRole", e.target.value)}>
+                {roleOptions.map((r) => (
+                  <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.accessLevel")} htmlFor="m-level">
+              <SelectInput id="m-level" value={draft.accessLevel} onChange={(e) => set("accessLevel", e.target.value)}>
+                {ACCESS_LEVELS.map((a) => (
+                  <option key={a} value={a}>{labels.data("staff.accessLevel", a)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <Field label={t("staff.member.field.modulesAccess")} htmlFor="m-modules">
+              <ModulesSelect id="m-modules" value={draft.modulesAccess} onChange={(next) => set("modulesAccess", next)} />
+            </Field>
+          </div>
+        </Section>
 
-          <Section icon={<ShieldCheck size={15} />} title={t("staff.member.roleAccess")} expanded={expanded.has("access")} onToggle={() => toggle("access")}>
-            <div className="flex flex-col gap-3">
-              <Select label={t("staff.member.field.assignedRole")} defaultValue={profile.jobTitle}>
-                <option value={profile.jobTitle}>{profile.jobTitle}</option>
-              </Select>
-              <Select label={t("staff.member.field.accessLevel")} defaultValue={profile.accessLevel}>
-                <option value={profile.accessLevel}>{profile.accessLevel}</option>
-              </Select>
-              <Select label={t("staff.member.field.modulesAccess")} defaultValue={profile.modulesAccess[0]}>
-                <option value={profile.modulesAccess[0]}>
-                  {profile.modulesAccess.slice(0, 4).join(", ")}
-                  {profile.modulesAccess.length > 4 ? ` +${profile.modulesAccess.length - 4}` : ""}
-                </option>
-              </Select>
-            </div>
-          </Section>
+        <Section id="login" icon={<KeyRound size={22} strokeWidth={1.7} />} title={t("staff.member.loginSecurity")} open={openSections.has("login")} onToggle={() => toggleSection("login")}>
+          <div className="flex flex-col gap-4">
+            <Field label={t("staff.member.field.loginMethod")}>
+              <div role="radiogroup" aria-label={t("staff.member.field.loginMethod")} className="flex flex-wrap gap-2 rounded-[10px] bg-[var(--octo-hover)] p-2">
+                {LOGIN_METHODS.map((method) => {
+                  const active = draft.loginMethod === method;
+                  return (
+                    <button
+                      key={method}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => set("loginMethod", method)}
+                      className={clsx(
+                        "h-9 rounded-[8px] border bg-[var(--octo-card)] px-3.5 text-[14px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                        active ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+                      )}
+                    >
+                      {t(`staff.member.loginMethod.${method.toLowerCase()}`)}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
 
-          <Section icon={<KeyRound size={15} />} title={t("staff.member.loginSecurity")} expanded={expanded.has("login")} onToggle={() => toggle("login")}>
-            <div className="flex flex-col gap-3">
+            {draft.loginMethod !== "Password" && (
               <div>
-                <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{t("staff.member.field.pinCode")}</span>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <Input
+                <Field label={t("staff.member.field.pinCode")} htmlFor="m-pin" error={errors.pinCode} hint={t("staff.member.pinHint")}>
+                  <TextInput
+                    id="m-pin"
                     type={pinVisible ? "text" : "password"}
-                    value={pinCode}
-                    onChange={(ev) => setPinCode(ev.target.value)}
-                    className="flex-1"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    dir="ltr"
+                    maxLength={6}
+                    value={draft.pinCode}
+                    invalid={!!errors.pinCode}
+                    onChange={(e) => set("pinCode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    trailing={
+                      <button
+                        type="button"
+                        onClick={() => setPinVisible((v) => !v)}
+                        aria-label={t(pinVisible ? "staff.member.hidePin" : "staff.member.showPin")}
+                        aria-pressed={pinVisible}
+                        className="grid h-8 w-8 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+                      >
+                        {pinVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    }
                   />
-                  <button
-                    type="button"
-                    onClick={() => setPinVisible((v) => !v)}
-                    aria-label={t("staff.member.field.pinCode")}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]"
-                  >
-                    {pinVisible ? <EyeOff size={15} /> : <Eye size={15} />}
+                </Field>
+                <div className="mt-1 flex justify-end">
+                  <button type="button" onClick={resetPin} className="text-[13px] font-medium text-[#0D6EFD] underline underline-offset-2 hover:no-underline">
+                    {t("staff.member.field.resetPinCode")}
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPinCode(String(1000 + Math.floor(Math.random() * 9000)))}
-                  className="mt-1.5 text-[11.5px] font-medium text-[#0D6EFD] hover:underline"
-                >
-                  {t("staff.member.field.resetPinCode")}
-                </button>
               </div>
+            )}
 
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("staff.member.field.twoFactor")}</span>
-                <input
-                  type="checkbox"
-                  checked={twoFactorEnabled}
-                  onChange={(ev) => setTwoFactorEnabled(ev.target.checked)}
-                  className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--octo-track)] transition-colors checked:bg-[#0D6EFD]"
-                />
-              </label>
-              {twoFactorEnabled && (
-                <Select label={t("staff.member.field.preferred2fa")} defaultValue={profile.twoFactorMethod}>
-                  <option value={profile.twoFactorMethod}>{profile.twoFactorMethod}</option>
-                </Select>
+            {draft.loginMethod !== "PIN" && (
+              <div>
+                <Field label={t("staff.member.field.password")} htmlFor="m-password" hint={t("staff.member.passwordHint")}>
+                  <TextInput id="m-password" type="password" dir="ltr" value="password" readOnly />
+                </Field>
+                <div className="mt-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => notify(t("staff.toast.passwordResetSent").replace("{email}", draft.email || profile.email))}
+                    className="text-[13px] font-medium text-[#0D6EFD] underline underline-offset-2 hover:no-underline"
+                  >
+                    {t("staff.member.field.sendPasswordReset")}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <SwitchRow checked={draft.twoFactorEnabled} onChange={(v) => set("twoFactorEnabled", v)} label={t("staff.member.field.twoFactor")} />
+            <Field label={t("staff.member.field.preferred2fa")} htmlFor="m-2fa">
+              <SelectInput id="m-2fa" value={draft.twoFactorMethod} disabled={!draft.twoFactorEnabled} onChange={(e) => set("twoFactorMethod", e.target.value)}>
+                {TWO_FACTOR_METHODS.map((m) => (
+                  <option key={m} value={m}>{labels.data("staff.twoFactor", m)}</option>
+                ))}
+              </SelectInput>
+            </Field>
+          </div>
+        </Section>
+
+        <Section id="controls" icon={<Lock size={22} strokeWidth={1.7} />} title={t("staff.member.accessControls")} open={openSections.has("controls")} onToggle={() => toggleSection("controls")}>
+          <div className="flex flex-col gap-4">
+            <SwitchRow checked={draft.allowSystemLogin} onChange={(v) => set("allowSystemLogin", v)} label={t("staff.member.field.allowSystemLogin")} />
+            <SwitchRow checked={draft.allowAccessOutsideBranch} onChange={(v) => set("allowAccessOutsideBranch", v)} label={t("staff.member.field.allowAccessOutsideBranch")} />
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[14px] text-[var(--octo-text-primary)]">
+                {t(profile.locked ? "staff.member.field.unlockAccountPrompt" : "staff.member.field.lockAccountPrompt")}
+              </span>
+              {profile.locked ? (
+                <button type="button" onClick={() => onLockChange(false)} className={buttonClass("secondary", "sm")}>
+                  <LockOpen size={16} />
+                  {t("staff.member.field.unlockAccount")}
+                </button>
+              ) : (
+                <button type="button" onClick={() => setLockConfirmOpen(true)} className={buttonClass("danger", "sm")}>
+                  <Lock size={16} />
+                  {t("staff.member.field.lockAccount")}
+                </button>
               )}
             </div>
-          </Section>
+          </div>
+        </Section>
 
-          <Section icon={<Lock size={15} />} title={t("staff.member.accessControls")} expanded={expanded.has("controls")} onToggle={() => toggle("controls")}>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] text-[var(--octo-text-primary)]">{t("staff.member.field.allowSystemLogin")}</span>
-                <input
-                  type="checkbox"
-                  checked={allowSystemLogin}
-                  onChange={(ev) => setAllowSystemLogin(ev.target.checked)}
-                  className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--octo-track)] transition-colors checked:bg-[#0D6EFD]"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] text-[var(--octo-text-primary)]">{t("staff.member.field.allowAccessOutsideBranch")}</span>
-                <input
-                  type="checkbox"
-                  checked={allowOutsideBranch}
-                  onChange={(ev) => setAllowOutsideBranch(ev.target.checked)}
-                  className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--octo-track)] transition-colors checked:bg-[#0D6EFD]"
-                />
-              </label>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[12.5px] text-[var(--octo-text-primary)]">{t("staff.member.field.lockAccountPrompt")}</span>
-                <Button variant="danger" size="sm" onClick={() => setLocked(true)}>
-                  {t("staff.member.field.lockAccount")}
-                </Button>
-              </div>
+        {dirty && (
+          <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3 shadow-[0_12px_32px_rgba(16,24,40,0.14)]">
+            <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">{t("staff.member.unsaved")}</span>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={discard} className={buttonClass("secondary")}>{t("staff.member.discard")}</button>
+              <button type="button" onClick={save} className={buttonClass("primary")}>{t("staff.member.saveChanges")}</button>
             </div>
-          </Section>
-        </div>
-
-        <SummaryCard profile={profile} deactivated={deactivated} />
+          </div>
+        )}
       </div>
+
+      <MemberSummaryCard profile={profile} status={status} showSessions={false} className="hidden xl:sticky xl:top-4 xl:block" />
+
+      <ConfirmModal
+        open={lockConfirmOpen}
+        title={t("staff.member.lockConfirmTitle")}
+        body={t("staff.member.lockConfirmBody").replace("{name}", profile.employee.name)}
+        confirmLabel={t("staff.member.field.lockAccount")}
+        cancelLabel={t("common.cancel")}
+        onClose={() => setLockConfirmOpen(false)}
+        onConfirm={() => onLockChange(true)}
+      />
     </div>
   );
 }

@@ -1,31 +1,69 @@
 import { useState } from "react";
-import { Tabs } from "@ui/primitives";
+import { useSearchParams } from "react-router-dom";
+import { Plus } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { PageTabs } from "./_shared/page-tabs";
+import { StaffStoreProvider } from "./_shared/staff-store";
+import { buttonClass } from "./_shared/buttons";
 import { StaffTab } from "./staff-tab";
 import { RolesPermissionsTab } from "./roles-permissions-tab";
 import { ShiftsTab } from "./shifts-tab";
 
 type TabId = "staff" | "roles" | "shifts";
+const TAB_IDS: readonly TabId[] = ["staff", "roles", "shifts"];
 
 export function StaffPage() {
+  return (
+    <StaffStoreProvider>
+      <StaffPageContent />
+    </StaffStoreProvider>
+  );
+}
+
+function StaffPageContent() {
   const { t } = useI18n();
-  const [tab, setTab] = useState<TabId>("staff");
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab") as TabId | null;
+  const tab: TabId = requested && TAB_IDS.includes(requested) ? requested : "staff";
+  const [addOpen, setAddOpen] = useState(false);
+  const [memberId, setMemberId] = useState<string | null>(null);
+
+  const header: Record<TabId, { title: string; subtitle: string }> = {
+    staff: { title: t("staff.header.title"), subtitle: t("staff.header.subtitle") },
+    roles: { title: t("staff.roles.pageTitle"), subtitle: t("staff.roles.pageSubtitle") },
+    shifts: { title: t("staff.shiftsTab.title"), subtitle: t("staff.shiftsTab.subtitle") },
+  };
+
+  const changeTab = (id: TabId) => {
+    // Re-selecting "Staff" is how a merchant gets from a member profile back
+    // to the team grid — the designs give the profile no back link of its own.
+    if (id === "staff") setMemberId(null);
+    const next = new URLSearchParams(params);
+    if (id === "staff") next.delete("tab");
+    else next.set("tab", id);
+    setParams(next);
+  };
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
-            {t("staff.header.title")}
-          </h1>
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("staff.header.subtitle")}</p>
+    <div className="px-4 pb-10 pt-5 sm:px-[26px]">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[24px]">{header[tab].title}</h1>
+          <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)]">{header[tab].subtitle}</p>
         </div>
+        {tab === "staff" && (
+          <button type="button" onClick={() => setAddOpen(true)} className={buttonClass("primary", "lg")}>
+            <Plus size={20} strokeWidth={2.5} />
+            {t("staff.header.addNewMember")}
+          </button>
+        )}
       </header>
 
-      <Tabs
-        className="mt-4"
+      <PageTabs
+        className="mt-6"
+        ariaLabel={t("staff.tabs.ariaLabel")}
         value={tab}
-        onChange={(id) => setTab(id as TabId)}
+        onChange={changeTab}
         items={[
           { id: "staff", label: t("staff.tabs.staff") },
           { id: "roles", label: t("staff.tabs.rolesPermissions") },
@@ -33,9 +71,13 @@ export function StaffPage() {
         ]}
       />
 
-      {tab === "staff" && <StaffTab />}
-      {tab === "roles" && <RolesPermissionsTab />}
-      {tab === "shifts" && <ShiftsTab />}
+      <div className="mt-6">
+        {tab === "staff" && (
+          <StaffTab addOpen={addOpen} onAddOpenChange={setAddOpen} selectedId={memberId} onSelect={setMemberId} />
+        )}
+        {tab === "roles" && <RolesPermissionsTab />}
+        {tab === "shifts" && <ShiftsTab />}
+      </div>
     </div>
   );
 }

@@ -1,255 +1,182 @@
-import { useEffect, useState } from "react";
-import { CircleCheck, Crown, Plus } from "lucide-react";
-import { Button, Input, Modal, Textarea } from "@ui/primitives";
-import {
-  staffRoleDefs,
-  MODULES,
-  PERMISSION_ACTIONS,
-  defaultPermissionMatrix,
-  type StaffRoleDef,
-  type RoleId,
-  type PermissionAction,
-  type PermissionMatrix,
-} from "@/shared/api/mock-staff";
+import { useState } from "react";
+import { Plus, UserRound } from "lucide-react";
+import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { buttonClass } from "./_shared/buttons";
+import { ConfirmModal } from "./_shared/confirm-modal";
+import { useStaffLabels } from "./_shared/labels";
 import { RowMenu, type RowMenuItem } from "./_shared/row-menu";
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-      className="h-5 w-9 cursor-pointer appearance-none rounded-full bg-[var(--octo-track)] transition-colors checked:bg-[#0D6EFD]"
-    />
-  );
-}
+import { clonePermissions, useStaffStore, type RoleRecord } from "./_shared/staff-store";
+import { StatusPill } from "./_shared/status-pill";
+import { ToastBanner, useToast } from "./_shared/toast";
+import { AssignUsersModal } from "./assign-users-modal";
+import { PermissionMatrix } from "./permission-matrix";
+import { RoleFormModal, type RoleFormState } from "./role-form-modal";
+import { RoleIcon } from "./role-icon";
 
 export function RolesPermissionsTab() {
   const { t } = useI18n();
-  const [roles, setRoles] = useState<StaffRoleDef[]>([...staffRoleDefs]);
-  const [matrix, setMatrix] = useState<PermissionMatrix>(defaultPermissionMatrix);
-  const [selectedRoleId, setSelectedRoleId] = useState<RoleId>(staffRoleDefs[0].id);
-  const [openMenuId, setOpenMenuId] = useState<RoleId | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<StaffRoleDef | null>(null);
-  const [addRoleOpen, setAddRoleOpen] = useState(false);
-  const [newRoleName, setNewRoleName] = useState("");
-  const [newRoleDescription, setNewRoleDescription] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
+  const labels = useStaffLabels();
+  const store = useStaffStore();
+  const { toast, notify } = useToast();
+  const [selectedId, setSelectedId] = useState(store.roles[0]?.id ?? "");
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<RoleFormState>(null);
+  const [assignRoleId, setAssignRoleId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 2200);
-    return () => window.clearTimeout(id);
-  }, [toast]);
+  const selected = store.roles.find((r) => r.id === selectedId) ?? store.roles[0];
+  const deleteTarget = deleteId ? store.roles.find((r) => r.id === deleteId) ?? null : null;
 
-  const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0];
-  const roleMatrix = matrix[selectedRole.id];
-
-  const allOn = MODULES.every((m) => PERMISSION_ACTIONS.every((a) => roleMatrix[m.id][a]));
-
-  const setAction = (moduleId: (typeof MODULES)[number]["id"], action: PermissionAction, value: boolean) => {
-    setMatrix((prev) => ({
-      ...prev,
-      [selectedRole.id]: {
-        ...prev[selectedRole.id],
-        [moduleId]: { ...prev[selectedRole.id][moduleId], [action]: value },
+  const menuItemsFor = (role: RoleRecord): RowMenuItem[] => {
+    const name = labels.roleName(role);
+    return [
+      { key: "edit", label: t("staff.roles.menu.edit"), onSelect: () => setFormState({ mode: "edit", roleId: role.id }) },
+      {
+        key: "duplicate",
+        label: t("staff.roles.menu.duplicate"),
+        onSelect: () => {
+          const id = `role-${Date.now().toString(36)}`;
+          const copyName = t("staff.roles.copyName").replace("{name}", name);
+          store.addRole(
+            { id, name: copyName, description: labels.roleDescription(role), isSystemRole: false, active: true },
+            clonePermissions(store.permissions[role.id])
+          );
+          setSelectedId(id);
+          notify(t("staff.toast.roleDuplicated").replace("{name}", copyName));
+        },
       },
-    }));
-  };
-
-  const setSelectAll = (value: boolean) => {
-    setMatrix((prev) => {
-      const next = { ...prev[selectedRole.id] };
-      for (const m of MODULES) {
-        next[m.id] = Object.fromEntries(PERMISSION_ACTIONS.map((a) => [a, value])) as Record<PermissionAction, boolean>;
-      }
-      return { ...prev, [selectedRole.id]: next };
-    });
-  };
-
-  const menuItemsFor = (role: StaffRoleDef): RowMenuItem[] => [
-    { key: "edit", label: t("staff.roles.menu.edit"), onSelect: () => setSelectedRoleId(role.id) },
-    {
-      key: "duplicate",
-      label: t("staff.roles.menu.duplicate"),
-      onSelect: () => {
-        const copyId = `${role.id}-copy-${roles.length}` as RoleId;
-        setRoles((prev) => [...prev, { ...role, id: copyId, name: `${role.name} (Copy)`, isSystemRole: false }]);
-        setMatrix((prev) => ({ ...prev, [copyId]: prev[role.id] }));
+      { key: "assign", label: t("staff.roles.menu.assignUsers"), onSelect: () => setAssignRoleId(role.id) },
+      {
+        key: "status",
+        label: role.active ? t("staff.roles.menu.deactivate") : t("staff.roles.menu.activate"),
+        tone: role.active ? "warning" : "default",
+        onSelect: () => {
+          store.updateRole(role.id, { active: !role.active });
+          notify(t(role.active ? "staff.toast.roleDeactivated" : "staff.toast.roleActivated").replace("{name}", name));
+        },
       },
-    },
-    { key: "assign-users", label: t("staff.roles.menu.assignUsers"), onSelect: () => setSelectedRoleId(role.id) },
-    { key: "deactivate", label: t("staff.roles.menu.deactivate"), tone: "warning", onSelect: () => {} },
-    { key: "delete", label: t("staff.roles.menu.delete"), tone: "danger", onSelect: () => setDeleteTarget(role) },
-  ];
-
-  const submitAddRole = () => {
-    if (!newRoleName.trim()) return;
-    const id = `custom-${newRoleName.trim().toLowerCase().replace(/\s+/g, "-")}-${roles.length}` as RoleId;
-    const role: StaffRoleDef = {
-      id,
-      name: newRoleName.trim(),
-      description: newRoleDescription.trim() || t("staff.roles.addRoleDescription"),
-      isSystemRole: false,
-      memberCount: 0,
-    };
-    setRoles((prev) => [...prev, role]);
-    setMatrix((prev) => ({
-      ...prev,
-      [id]: Object.fromEntries(
-        MODULES.map((m) => [m.id, Object.fromEntries(PERMISSION_ACTIONS.map((a) => [a, false])) as Record<PermissionAction, boolean>])
-      ) as PermissionMatrix[RoleId],
-    }));
-    setSelectedRoleId(id);
-    setAddRoleOpen(false);
-    setNewRoleName("");
-    setNewRoleDescription("");
-    setToast(t("staff.roles.addRoleToast").replace("{name}", role.name));
+      {
+        key: "delete",
+        label: t("staff.roles.menu.delete"),
+        tone: "danger",
+        onSelect: () => {
+          const count = store.memberCount(role.id);
+          if (count > 0) {
+            notify(t("staff.toast.roleHasMembers").replace("{name}", name).replace("{count}", String(count)), "error");
+            return;
+          }
+          setDeleteId(role.id);
+        },
+      },
+    ];
   };
 
   return (
-    <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
-      <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-[18px]">
-        <h2 className="text-[13.5px] font-bold text-[var(--octo-text-primary)]">{t("staff.roles.heading")}</h2>
-        <p className="mt-1 text-[11.5px] text-[var(--octo-text-muted)]">{t("staff.roles.subheading")}</p>
-        <Button variant="primary" size="sm" icon={<Plus size={14} />} className="mt-3 w-full justify-center" onClick={() => setAddRoleOpen(true)}>
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,366px)_minmax(0,1fr)]">
+      <section aria-labelledby="roles-heading" className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
+        <h2 id="roles-heading" className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("staff.roles.heading")}</h2>
+        <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{t("staff.roles.subheading")}</p>
+        <button type="button" onClick={() => setFormState({ mode: "add" })} className={buttonClass("outline", "lg", "mt-3 w-full")}>
+          <Plus size={20} strokeWidth={2.2} />
           {t("staff.roles.addRole")}
-        </Button>
+        </button>
 
-        <div className="mt-3 flex flex-col gap-2">
-          {roles.map((role) => (
-            <div
-              key={role.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedRoleId(role.id)}
-              onKeyDown={(ev) => { if (ev.key === "Enter") setSelectedRoleId(role.id); }}
-              className={`flex cursor-pointer items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-start transition-colors ${
-                role.id === selectedRole.id
-                  ? "border-[#0D6EFD] bg-[var(--octo-selected)]"
-                  : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
-              }`}
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                {role.isSystemRole ? <Crown size={16} className="shrink-0 text-[#0D6EFD]" /> : <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[var(--octo-track)]" />}
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5 truncate text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-                    {role.name}
-                    {role.isSystemRole && (
-                      <span className="rounded-full bg-[#eaf2ff] px-1.5 py-0.5 text-[9.5px] font-medium text-[#0D6EFD]">{t("staff.roles.systemRole")}</span>
-                    )}
+        <ul className="mt-4 flex flex-col gap-3">
+          {store.roles.map((role) => {
+            const isSelected = role.id === selected?.id;
+            const count = store.memberCount(role.id);
+            return (
+              <li key={role.id}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={() => setSelectedId(role.id)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedId(role.id);
+                    }
+                  }}
+                  className={clsx(
+                    "flex cursor-pointer items-center gap-3 rounded-[10px] border px-3 py-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                    isSelected ? "border-[#0D6EFD] bg-[var(--octo-card)]" : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
+                  )}
+                >
+                  <RoleIcon roleId={role.id} highlighted={role.isSystemRole} className={role.active ? undefined : "opacity-50"} />
+                  <div className={clsx("min-w-0 flex-1", !role.active && "opacity-60")}>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-[15px] font-medium text-[var(--octo-text-primary)]">{labels.roleName(role)}</span>
+                      {role.isSystemRole && (
+                        <span className="shrink-0 rounded-full bg-[var(--octo-selected)] px-2 py-0.5 text-[12px] font-medium text-[#0D6EFD]">
+                          {t("staff.roles.systemRole")}
+                        </span>
+                      )}
+                      {!role.active && <StatusPill tone="neutral" label={t("staff.status.inactive")} />}
+                    </div>
+                    <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{labels.roleDescription(role)}</p>
+                  </div>
+                  <span
+                    className="flex shrink-0 items-center gap-1 text-[13px] text-[var(--octo-text-primary)]"
+                    title={t("staff.roles.memberCount").replace("{count}", String(count))}
+                  >
+                    <UserRound size={17} strokeWidth={1.8} aria-hidden />
+                    <span className="sr-only">{t("staff.roles.memberCount").replace("{count}", String(count))}</span>
+                    <span aria-hidden>{count}</span>
                   </span>
-                  <span className="block truncate text-[11px] text-[var(--octo-text-muted)]">{role.description}</span>
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="text-[11px] text-[var(--octo-text-faint)]">{role.memberCount}</span>
-                {!role.isSystemRole && (
-                  <RowMenu
-                    items={menuItemsFor(role)}
-                    open={openMenuId === role.id}
-                    onOpenChange={(open) => setOpenMenuId(open ? role.id : null)}
-                    ariaLabel={role.name}
-                  />
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
+                  {role.isSystemRole ? (
+                    <span className="w-7 shrink-0" aria-hidden />
+                  ) : (
+                    <RowMenu
+                      items={menuItemsFor(role)}
+                      open={menuId === role.id}
+                      onOpenChange={(open) => setMenuId(open ? role.id : null)}
+                      ariaLabel={t("staff.roles.moreActions").replace("{name}", labels.roleName(role))}
+                    />
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-      <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-[18px]">
-        <h2 className="text-[13.5px] font-bold text-[var(--octo-text-primary)]">{t("staff.permissions.matrixHeading")}</h2>
-        <p className="mt-1 text-[11.5px] text-[var(--octo-text-muted)]">{t("staff.permissions.matrixSubheading")}</p>
+      {selected && <PermissionMatrix role={selected} />}
 
-        <div className="octo-scroll mt-3 overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-[12px]">
-            <thead>
-              <tr className="border-b border-[var(--octo-divider)]">
-                <th className="px-2 py-2 text-start">
-                  <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--octo-text-faint)]">
-                    {t("staff.permissions.column.module")}
-                    <Toggle checked={allOn} onChange={setSelectAll} />
-                    <span>{t("staff.permissions.selectAll")}</span>
-                  </span>
-                </th>
-                {PERMISSION_ACTIONS.map((action) => (
-                  <th key={action} className="px-2 py-2 text-start text-[10.5px] font-semibold uppercase tracking-wide text-[var(--octo-text-faint)]">
-                    {t(`staff.permissions.column.${action}`)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MODULES.map((mod) => (
-                <tr key={mod.id} className="border-b border-[var(--octo-row-border)] last:border-0">
-                  <td className="whitespace-nowrap px-2 py-2.5 font-medium text-[var(--octo-text-primary)]">{mod.label}</td>
-                  {PERMISSION_ACTIONS.map((action) => (
-                    <td key={action} className="px-2 py-2.5">
-                      <Toggle checked={roleMatrix[mod.id][action]} onChange={(v) => setAction(mod.id, action, v)} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <RoleFormModal
+        state={formState}
+        onClose={() => setFormState(null)}
+        onSaved={(roleId, message) => {
+          setSelectedId(roleId);
+          notify(message);
+        }}
+      />
 
-      <Modal
+      <AssignUsersModal
+        roleId={assignRoleId}
+        onClose={() => setAssignRoleId(null)}
+        onSaved={(added, roleName) => notify(t("staff.toast.usersAssigned").replace("{count}", String(added)).replace("{name}", roleName))}
+      />
+
+      <ConfirmModal
         open={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
         title={t("staff.roles.deleteConfirmTitle")}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>{t("common.cancel")}</Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                if (deleteTarget) setRoles((prev) => prev.filter((r) => r.id !== deleteTarget.id));
-                setDeleteTarget(null);
-              }}
-            >
-              {t("staff.roles.menu.delete")}
-            </Button>
-          </>
-        }
-      >
-        <p className="text-[12.5px] text-[var(--octo-text-secondary)]">
-          {t("staff.roles.deleteConfirmBody").replace("{name}", deleteTarget?.name ?? "")}
-        </p>
-      </Modal>
+        body={t("staff.roles.deleteConfirmBody").replace("{name}", deleteTarget ? labels.roleName(deleteTarget) : "")}
+        confirmLabel={t("staff.roles.menu.delete")}
+        cancelLabel={t("common.cancel")}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const name = labels.roleName(deleteTarget);
+          store.removeRole(deleteTarget.id);
+          if (selectedId === deleteTarget.id) setSelectedId(store.roles[0]?.id ?? "");
+          notify(t("staff.toast.roleDeleted").replace("{name}", name));
+        }}
+      />
 
-      <Modal
-        open={addRoleOpen}
-        onClose={() => setAddRoleOpen(false)}
-        title={t("staff.roles.addRoleTitle")}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setAddRoleOpen(false)}>{t("common.cancel")}</Button>
-            <Button variant="primary" size="sm" onClick={submitAddRole}>{t("staff.roles.addRoleSave")}</Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3">
-          <Input label={t("staff.roles.addRoleName")} value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} />
-          <Textarea
-            label={t("staff.roles.addRoleDescription")}
-            value={newRoleDescription}
-            onChange={(e) => setNewRoleDescription(e.target.value)}
-            rows={3}
-          />
-        </div>
-      </Modal>
-
-      {toast && (
-        <div className="fixed bottom-5 end-5 z-50 flex items-center gap-2 rounded-[9px] border border-[#22C55E]/20 bg-[#22C55E]/10 px-4 py-2.5 text-[12.5px] font-medium text-[#16a34a] shadow-lg">
-          <CircleCheck size={14} className="text-[#22C55E]" />
-          {toast}
-        </div>
-      )}
+      <ToastBanner toast={toast} />
     </div>
   );
 }

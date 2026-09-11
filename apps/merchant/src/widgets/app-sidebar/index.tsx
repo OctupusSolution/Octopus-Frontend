@@ -77,8 +77,10 @@ const SECTIONS: NavSection[] = [
       { id: "finance", label: "Finance", icon: Wallet,
         items: ["Tax Invoices (ZATCA)", "Settlements & Reconciliation", "Accounting Sync", "House Accounts"] },
       { id: "payments", label: "Payments", icon: CreditCard, path: "/finance/payments" },
-      { id: "staff", label: "Staff", icon: UserCog,
-        items: ["Employees", "Schedule", "Attendance", "Tips", "Payroll Inputs"] },
+      // No sub-items: Staff is now a single tabbed page (Staff / Roles &
+      // Permissions / Shifts), so the entry navigates straight there rather
+      // than opening a dropdown. Same shape as Reservations and Menu above.
+      { id: "staff", label: "Staff", icon: UserCog },
       { id: "reports", label: "Reports", icon: BarChart3,
         items: ["Sales", "Costs & Margin", "Channels", "Customers", "Compliance", "Scheduled Reports"] },
     ],
@@ -132,11 +134,6 @@ const ITEM_PATHS: Record<string, string> = {
   "Live Orders (all channels)": "/orders",
   "Order History": "/orders/history",
   "Pre-Orders & Scheduled": "/orders/preorders",
-  "Employees": "/staff/employees",
-  "Schedule": "/staff/schedule",
-  "Attendance": "/staff/attendance",
-  "Tips": "/staff/tips",
-  "Payroll Inputs": "/staff/payroll",
   "Customer List & Profiles": "/customers",
   "Segments": "/customers/segments",
   "Feedback & Complaints": "/customers/feedback",
@@ -326,9 +323,19 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
   // prefix of "/customers/feedback"), so a plain startsWith check would
   // light up more than one item at once. Only the single longest matching
   // path — the most specific one — counts as active.
+  // `activePath` carries the query string too, so an item that targets a tab
+  // (e.g. "/staff?tab=shifts") only lights up on that tab; plain paths still
+  // match on the pathname alone.
+  const [activePathname] = activePath.split("?");
   const bestMatchPath = group.items
     .map((item) => ITEM_PATHS[item])
-    .filter((path): path is string => !!path && (activePath === path || activePath.startsWith(path + "/")))
+    .filter(
+      (path): path is string =>
+        !!path &&
+        (path.includes("?")
+          ? activePath === path
+          : activePathname === path || activePathname.startsWith(path + "/"))
+    )
     .sort((a, b) => b.length - a.length)[0];
 
   return (
@@ -582,7 +589,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
           onMouseEnter={() => { if (collapsed && group.items) openFlyout(group); }}
           setRef={(el) => { itemRefs.current[group.id] = el; }}
         />
-        {!collapsed && <GroupItems group={group} open={!!expanded[group.id]} activePath={location.pathname} />}
+        {!collapsed && <GroupItems group={group} open={!!expanded[group.id]} activePath={location.pathname + location.search} />}
       </div>
     );
   }

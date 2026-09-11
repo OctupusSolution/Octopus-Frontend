@@ -158,6 +158,116 @@ export const employeeRows: readonly EmployeeRow[] = employees.map((e) => ({
   attendance: e.attendance,
 }));
 
+/* ------------------------------------------------------------------ Member profile (Staff tab rebuild) */
+
+const ROLE_JOB_TITLE: Record<StaffRole, string> = {
+  Owner: "Owner",
+  "Branch Manager": "Restaurant Manager",
+  Cashier: "Cashier",
+  Waiter: "Waiter",
+  Kitchen: "Kitchen Staff",
+  Driver: "Delivery Driver",
+};
+
+const ROLE_DEPARTMENT: Record<StaffRole, string> = {
+  Owner: "Management",
+  "Branch Manager": "Management",
+  Cashier: "Front of House",
+  Waiter: "Front of House",
+  Kitchen: "Back of House",
+  Driver: "Delivery",
+};
+
+const CONTRACT_TO_EMPLOYMENT_TYPE: Record<ContractType, "Full time" | "Part time"> = {
+  "Full-time": "Full time",
+  "Part-time": "Part time",
+  Seasonal: "Part time",
+};
+
+const ROLE_ACCESS_LEVEL: Record<StaffRole, string> = {
+  Owner: "Full access",
+  "Branch Manager": "Full access",
+  Cashier: "Limited access",
+  Waiter: "Limited access",
+  Kitchen: "Limited access",
+  Driver: "Limited access",
+};
+
+const ROLE_MODULES_ACCESS: Record<StaffRole, readonly string[]> = {
+  Owner: ["Dashboard", "Reservations", "Wait list", "Floor Plan", "Orders", "Payment & Refund", "Menu & POS", "Inventory", "Reports", "Customer CRM", "Staff Management", "Setting & Integrations"],
+  "Branch Manager": ["Dashboard", "Reservations", "Wait list", "Floor Plan", "Orders", "Payment & Refund", "Menu & POS", "Inventory", "Reports", "Customer CRM", "Staff Management", "Setting & Integrations"],
+  Cashier: ["Orders", "Payment & Refund", "Menu & POS"],
+  Waiter: ["Reservations", "Wait list", "Floor Plan", "Orders"],
+  Kitchen: ["Orders", "Menu & POS", "Inventory"],
+  Driver: ["Orders"],
+};
+
+// Deterministic 4-digit PIN and boolean flag from an employee id, so the
+// mock data stays stable across renders without needing a stored seed.
+function hashCode(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+export interface MemberProfile {
+  employee: Employee;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  gender: "Male" | "Female";
+  nationality: string;
+  languages: readonly string[];
+  jobTitle: string;
+  department: string;
+  reportsTo: string;
+  employmentType: "Full time" | "Part time";
+  status: "Active" | "Inactive";
+  accessLevel: string;
+  modulesAccess: readonly string[];
+  loginMethod: "PIN" | "Password" | "Both";
+  pinCode: string;
+  twoFactorEnabled: boolean;
+  twoFactorMethod: string;
+  allowSystemLogin: boolean;
+  allowAccessOutsideBranch: boolean;
+  activeSection: { device: string; location: string; since: string };
+}
+
+export function toMemberProfile(e: Employee): MemberProfile {
+  const hash = hashCode(e.id);
+  const [firstName, ...rest] = e.name.split(" ");
+  const managerForBranch = employees.find((m) => m.role === "Branch Manager" && m.branch === e.branch && m.id !== e.id);
+
+  return {
+    employee: e,
+    employeeCode: e.id,
+    firstName,
+    lastName: rest.join(" ") || "—",
+    gender: hash % 2 === 0 ? "Male" : "Female",
+    nationality: "Saudi Arabia",
+    languages: ["English", "Arabic"],
+    jobTitle: ROLE_JOB_TITLE[e.role],
+    department: ROLE_DEPARTMENT[e.role],
+    reportsTo: e.role === "Owner" ? "—" : (managerForBranch?.name ?? "Owner"),
+    employmentType: CONTRACT_TO_EMPLOYMENT_TYPE[e.contractType],
+    status: "Active",
+    accessLevel: ROLE_ACCESS_LEVEL[e.role],
+    modulesAccess: ROLE_MODULES_ACCESS[e.role],
+    loginMethod: "PIN",
+    pinCode: String(1000 + (hash % 9000)),
+    twoFactorEnabled: e.role === "Owner" || e.role === "Branch Manager",
+    twoFactorMethod: "Authenticator App",
+    allowSystemLogin: true,
+    allowAccessOutsideBranch: e.role === "Owner",
+    activeSection: {
+      device: "iPad Pro",
+      location: `${e.branch}, Saudi Arabia`,
+      since: "May 12, 2026 - 10:30 AM",
+    },
+  };
+}
+
 /* ------------------------------------------------------------------ Leave requests */
 
 export type LeaveType = "Annual" | "Sick" | "Unpaid" | "Emergency";
@@ -624,3 +734,109 @@ function payrollRowsForPeriod(period: PayrollPeriod): PayrollRow[] {
 export const payrollRowsByPeriod: Record<string, readonly PayrollRow[]> = Object.fromEntries(
   payrollPeriods.map((p) => [p.id, payrollRowsForPeriod(p)])
 );
+
+/* ================================================================== ROLES & PERMISSIONS */
+
+export type ModuleId =
+  | "dashboard" | "reservations" | "waitlist" | "floorPlan" | "orders"
+  | "paymentRefund" | "menuPos" | "inventory" | "reports" | "customerCrm"
+  | "staffManagement" | "settingIntegrations";
+
+export const MODULES: readonly { id: ModuleId; label: string }[] = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "reservations", label: "Reservations" },
+  { id: "waitlist", label: "Wait list" },
+  { id: "floorPlan", label: "Floor Plan" },
+  { id: "orders", label: "Orders" },
+  { id: "paymentRefund", label: "Payment & Refund" },
+  { id: "menuPos", label: "Menu & POS" },
+  { id: "inventory", label: "Inventory" },
+  { id: "reports", label: "Reports" },
+  { id: "customerCrm", label: "Customer CRM" },
+  { id: "staffManagement", label: "Staff Management" },
+  { id: "settingIntegrations", label: "Setting & Integrations" },
+];
+
+export type PermissionAction = "view" | "create" | "edit" | "delete" | "approve" | "export" | "setting";
+export const PERMISSION_ACTIONS: readonly PermissionAction[] = ["view", "create", "edit", "delete", "approve", "export", "setting"];
+
+export type RoleId = "owner" | "manager" | "cashier" | "host" | "kitchen" | "barista" | "custom";
+
+export interface StaffRoleDef {
+  id: RoleId;
+  name: string;
+  description: string;
+  isSystemRole: boolean;
+  memberCount: number;
+}
+
+export const staffRoleDefs: readonly StaffRoleDef[] = [
+  { id: "owner", name: "Owner", description: "Full system access", isSystemRole: true, memberCount: 1 },
+  { id: "manager", name: "Manager", description: "Manage operations & staff", isSystemRole: false, memberCount: 2 },
+  { id: "cashier", name: "Cashier", description: "Handle billing & Payment", isSystemRole: false, memberCount: 2 },
+  { id: "host", name: "Host", description: "Manage reservations & seating", isSystemRole: false, memberCount: 2 },
+  { id: "kitchen", name: "Kitchen", description: "View & manage kitchen orders", isSystemRole: false, memberCount: 3 },
+  { id: "barista", name: "Barista", description: "Prepare beverages", isSystemRole: false, memberCount: 2 },
+  { id: "custom", name: "Custom Role", description: "Marketing Access", isSystemRole: false, memberCount: 1 },
+];
+
+type AccessLevel = "full" | "view" | "none";
+
+function permissionsFor(level: AccessLevel): Record<PermissionAction, boolean> {
+  if (level === "full") return { view: true, create: true, edit: true, delete: true, approve: true, export: true, setting: true };
+  if (level === "view") return { view: true, create: false, edit: false, delete: false, approve: false, export: false, setting: false };
+  return { view: false, create: false, edit: false, delete: false, approve: false, export: false, setting: false };
+}
+
+// Per-role, per-module override; any module not listed falls back to the
+// role's `default` level. Mirrors the "Owner = everything on" / narrower
+// roles mockup without hand-writing 7 roles x 12 modules x 7 actions.
+const ROLE_ACCESS: Record<RoleId, { default: AccessLevel; overrides?: Partial<Record<ModuleId, AccessLevel>> }> = {
+  owner: { default: "full" },
+  manager: { default: "full", overrides: { settingIntegrations: "view" } },
+  cashier: {
+    default: "none",
+    overrides: { orders: "full", paymentRefund: "full", menuPos: "view", customerCrm: "view" },
+  },
+  host: {
+    default: "none",
+    overrides: { reservations: "full", waitlist: "full", floorPlan: "full", customerCrm: "view" },
+  },
+  kitchen: {
+    default: "none",
+    overrides: { orders: "full", menuPos: "view", inventory: "view" },
+  },
+  barista: {
+    default: "none",
+    overrides: { orders: "view", menuPos: "view", inventory: "view" },
+  },
+  custom: {
+    default: "none",
+    overrides: { reports: "view", customerCrm: "full" },
+  },
+};
+
+export type PermissionMatrix = Record<RoleId, Record<ModuleId, Record<PermissionAction, boolean>>>;
+
+function buildPermissionMatrix(): PermissionMatrix {
+  const matrix = {} as PermissionMatrix;
+  for (const role of staffRoleDefs) {
+    const access = ROLE_ACCESS[role.id];
+    matrix[role.id] = {} as Record<ModuleId, Record<PermissionAction, boolean>>;
+    for (const mod of MODULES) {
+      const level = access.overrides?.[mod.id] ?? access.default;
+      matrix[role.id][mod.id] = permissionsFor(level);
+    }
+  }
+  return matrix;
+}
+
+export const defaultPermissionMatrix: PermissionMatrix = buildPermissionMatrix();
+
+/* ================================================================== SHIFTS TAB PALETTE */
+
+// Cycled by employee row index in the Shifts tab grid; kept separate from
+// SHIFT_TYPE_COLOR (which colors by shift type, not by employee).
+export const SHIFT_PILL_COLORS: readonly string[] = [
+  "#7C6EF6", "#2E90FA", "#12B76A", "#F79009", "#06AED4", "#EE46BC", "#667085",
+];

@@ -11,6 +11,24 @@ const SORT_ORDER_OPTIONS = ["dateEarliest", "dateLatest", "discount"] as const;
 const CTA_BUTTON_OPTIONS = ["viewAllOffers", "claimNow", "none"] as const;
 const VISIBILITY_OPTIONS = ["visibleHomepage", "hidden"] as const;
 
+/** Module scope, so a keystroke elsewhere never remounts it. Opens on a real
+ *  placeholder rather than a blank row. */
+function OfferSelect({ value, options, onChange }: { value: string; options: readonly string[]; onChange: (id: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <Select value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="" disabled>
+        {t("publicLink.select.placeholder")}
+      </option>
+      {options.map((id) => (
+        <option key={id} value={id}>
+          {t(`publicLink.offers.${id}`)}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 export function OffersInspector({ draft, dispatch }: { draft: SiteDraft; dispatch: (action: SiteAction) => void }) {
   const { t } = useI18n();
   const settings = draft.sectionSettings.offers;
@@ -22,14 +40,7 @@ export function OffersInspector({ draft, dispatch }: { draft: SiteDraft; dispatc
   return (
     <div className="flex flex-col gap-4">
       <FieldRow label={t("publicLink.offers.displayStyle")}>
-        <Select value={settings.displayStyle} onChange={(e) => patch({ displayStyle: e.target.value })}>
-          <option value="" />
-          {DISPLAY_STYLE_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {t(`publicLink.offers.${id}`)}
-            </option>
-          ))}
-        </Select>
+        <OfferSelect value={settings.displayStyle} options={DISPLAY_STYLE_OPTIONS} onChange={(displayStyle) => patch({ displayStyle })} />
       </FieldRow>
 
       <FieldRow label={t("publicLink.offers.filterCategories")}>
@@ -46,36 +57,15 @@ export function OffersInspector({ draft, dispatch }: { draft: SiteDraft; dispatc
       </FieldRow>
 
       <FieldRow label={t("publicLink.offers.sortOrder")}>
-        <Select value={settings.sortOrder} onChange={(e) => patch({ sortOrder: e.target.value })}>
-          <option value="" />
-          {SORT_ORDER_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {t(`publicLink.offers.${id}`)}
-            </option>
-          ))}
-        </Select>
+        <OfferSelect value={settings.sortOrder} options={SORT_ORDER_OPTIONS} onChange={(sortOrder) => patch({ sortOrder })} />
       </FieldRow>
 
       <FieldRow label={t("publicLink.offers.ctaButton")}>
-        <Select value={settings.ctaButton} onChange={(e) => patch({ ctaButton: e.target.value })}>
-          <option value="" />
-          {CTA_BUTTON_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {t(`publicLink.offers.${id}`)}
-            </option>
-          ))}
-        </Select>
+        <OfferSelect value={settings.ctaButton} options={CTA_BUTTON_OPTIONS} onChange={(ctaButton) => patch({ ctaButton })} />
       </FieldRow>
 
       <FieldRow label={t("publicLink.offers.visibility")}>
-        <Select value={settings.visibility} onChange={(e) => patch({ visibility: e.target.value })}>
-          <option value="" />
-          {VISIBILITY_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {t(`publicLink.offers.${id}`)}
-            </option>
-          ))}
-        </Select>
+        <OfferSelect value={settings.visibility} options={VISIBILITY_OPTIONS} onChange={(visibility) => patch({ visibility })} />
       </FieldRow>
     </div>
   );

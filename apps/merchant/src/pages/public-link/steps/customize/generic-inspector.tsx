@@ -40,7 +40,9 @@ export function GenericInspector({ draft, dispatch }: { draft: SiteDraft; dispat
           return (
             <FieldRow key={field.id} label={t(field.labelKey)}>
               <Select value={value} onChange={(e) => applyPatch({ [field.id]: e.target.value })}>
-                <option value="" />
+                <option value="" disabled>
+                  {t("publicLink.select.placeholder")}
+                </option>
                 {field.optionKeys.map((optionKey) => (
                   <option key={optionKey} value={optionKey}>
                     {t(optionKey)}

@@ -108,7 +108,13 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.customize.homepageSections")}</p>
-            <Button size="sm" variant="secondary" icon={<Plus size={13} />} onClick={() => setAddOpen(true)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Plus size={13} />}
+              onClick={() => setAddOpen(true)}
+              className="border-[#0D6EFD] text-[#0D6EFD] hover:bg-[#0D6EFD]/5"
+            >
               {t("publicLink.customize.addSection")}
             </Button>
           </div>

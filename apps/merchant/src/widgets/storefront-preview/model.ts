@@ -18,6 +18,12 @@ export interface PreviewHero {
   primaryCta?: string;
   secondaryCta?: string;
   imageUrl?: string;
+  /** Scrim darkness, 0–80 (percent). Undefined keeps the default gradient. */
+  overlay?: number;
+  /** Where the hero copy sits. Undefined behaves as "center". */
+  align?: "start" | "center";
+  /** Band height. Undefined behaves as "standard". */
+  height?: "compact" | "standard" | "tall";
 }
 
 export interface StorefrontPreviewModel {

@@ -1,13 +1,13 @@
-// The Reservations section's inspector. The frames give it four tabs — Module,
-// Setting, Policies, Notifications — but only draw the first two; Policies and
-// Notifications render the same `EmptyState` treatment hero-inspector.tsx uses
-// for its own undrawn tabs.
+// The Reservations section's inspector: Module and Setting as the frames draw
+// them, plus Policies (cancellation, no-show fee, deposit refund, booking
+// terms) and Notifications (confirmation channels, reminders, staff alerts) —
+// the two tabs the frames name but never draw, built from the same controls.
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Button, EmptyState, Input, Select } from "@ui/primitives";
+import { Button, Input, Select, Textarea } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { ReservationSettings, SiteAction, SiteDraft } from "../../_shared/site-draft";
-import { CheckCard, FieldRow, NumberedHeading, ToggleRow, InspectorTabs } from "./controls";
+import { CheckCard, FieldRow, NumberedHeading, RadioCard, ToggleRow, InspectorTabs } from "./controls";
 
 const TARGET_IDS = ["reservations", "menu", "offers", "waitlist", "contact"] as const;
 
@@ -15,6 +15,9 @@ const BOOKING_WINDOW_OPTIONS = ["30", "60", "90"] as const;
 const CUT_OFF_OPTIONS = ["1", "2", "4"] as const;
 const TABLE_HOLD_OPTIONS = ["10", "15", "30"] as const;
 const DATE_RANGE_OPTIONS = ["7", "14", "30"] as const;
+const CANCELLATION_OPTIONS: readonly ReservationSettings["cancellationWindow"][] = ["none", "2", "12", "24", "48"];
+const REFUND_OPTIONS: readonly ReservationSettings["depositRefund"][] = ["full", "partial", "none"];
+const REMINDER_OPTIONS: readonly ReservationSettings["reminderBefore"][] = ["1", "2", "24"];
 
 const TABS = [
   { id: "module", labelKey: "publicLink.inspector.module" },
@@ -31,10 +34,40 @@ function TargetSelect({ value, onChange }: { value: string; onChange: (id: strin
   const { t } = useI18n();
   return (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{t("publicLink.reservations.primaryActionReservation")}</option>
+      <option value="" disabled>
+        {t("publicLink.select.placeholder")}
+      </option>
       {TARGET_IDS.map((id) => (
         <option key={id} value={id}>
           {t(`publicLink.target.${id}`)}
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+/** A select over option ids whose labels are `${prefix}.${id}`, opening on a
+ *  real placeholder rather than a blank row. */
+function OptionSelect<T extends string>({
+  value,
+  options,
+  labelPrefix,
+  onChange,
+}: {
+  value: string;
+  options: readonly T[];
+  labelPrefix: string;
+  onChange: (id: T) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Select value={value} onChange={(e) => onChange(e.target.value as T)}>
+      <option value="" disabled>
+        {t("publicLink.select.placeholder")}
+      </option>
+      {options.map((id) => (
+        <option key={id} value={id}>
+          {t(`${labelPrefix}.${id}`)}
         </option>
       ))}
     </Select>
@@ -120,14 +153,12 @@ export function ReservationsInspector({ draft, dispatch }: { draft: SiteDraft; d
               />
             </FieldRow>
             <FieldRow label={t("publicLink.reservations.dateRange")}>
-              <Select value={settings.dateRange} onChange={(e) => patch({ dateRange: e.target.value })}>
-                <option value="" />
-                {DATE_RANGE_OPTIONS.map((id) => (
-                  <option key={id} value={id}>
-                    {t(`publicLink.reservations.dateRange.${id}`)}
-                  </option>
-                ))}
-              </Select>
+              <OptionSelect
+                value={settings.dateRange}
+                options={DATE_RANGE_OPTIONS}
+                labelPrefix="publicLink.reservations.dateRange"
+                onChange={(dateRange) => patch({ dateRange })}
+              />
             </FieldRow>
           </div>
         </div>
@@ -136,37 +167,35 @@ export function ReservationsInspector({ draft, dispatch }: { draft: SiteDraft; d
       {tab === "setting" && (
         <div className="flex flex-col gap-4">
           <FieldRow label={t("publicLink.reservations.bookingWindow")}>
-            <Select value={settings.bookingWindow} onChange={(e) => patch({ bookingWindow: e.target.value })}>
-              <option value="" />
-              {BOOKING_WINDOW_OPTIONS.map((id) => (
-                <option key={id} value={id}>
-                  {t(`publicLink.reservations.bookingWindow.${id}`)}
-                </option>
-              ))}
-            </Select>
+            <OptionSelect
+              value={settings.bookingWindow}
+              options={BOOKING_WINDOW_OPTIONS}
+              labelPrefix="publicLink.reservations.bookingWindow"
+              onChange={(bookingWindow) => patch({ bookingWindow })}
+            />
           </FieldRow>
 
           <FieldRow label={t("publicLink.reservations.cutOff")}>
-            <Select value={settings.cutOff} onChange={(e) => patch({ cutOff: e.target.value })}>
-              <option value="" />
-              {CUT_OFF_OPTIONS.map((id) => (
-                <option key={id} value={id}>
-                  {t(`publicLink.reservations.cutOff.${id}`)}
-                </option>
-              ))}
-            </Select>
+            <OptionSelect
+              value={settings.cutOff}
+              options={CUT_OFF_OPTIONS}
+              labelPrefix="publicLink.reservations.cutOff"
+              onChange={(cutOff) => patch({ cutOff })}
+            />
           </FieldRow>
 
           <FieldRow label={t("publicLink.reservations.partySize")}>
             <div className="grid grid-cols-2 gap-3">
               <Input
                 type="number"
+                min={1}
                 label={t("publicLink.reservations.min")}
                 value={settings.minParty}
                 onChange={(e) => patch({ minParty: e.target.value })}
               />
               <Input
                 type="number"
+                min={1}
                 label={t("publicLink.reservations.max")}
                 value={settings.maxParty}
                 onChange={(e) => patch({ maxParty: e.target.value })}
@@ -175,14 +204,12 @@ export function ReservationsInspector({ draft, dispatch }: { draft: SiteDraft; d
           </FieldRow>
 
           <FieldRow label={t("publicLink.reservations.tableHold")}>
-            <Select value={settings.tableHold} onChange={(e) => patch({ tableHold: e.target.value })}>
-              <option value="" />
-              {TABLE_HOLD_OPTIONS.map((id) => (
-                <option key={id} value={id}>
-                  {t(`publicLink.reservations.tableHold.${id}`)}
-                </option>
-              ))}
-            </Select>
+            <OptionSelect
+              value={settings.tableHold}
+              options={TABLE_HOLD_OPTIONS}
+              labelPrefix="publicLink.reservations.tableHold"
+              onChange={(tableHold) => patch({ tableHold })}
+            />
           </FieldRow>
 
           <ToggleRow
@@ -201,8 +228,96 @@ export function ReservationsInspector({ draft, dispatch }: { draft: SiteDraft; d
         </div>
       )}
 
-      {(tab === "policies" || tab === "notifications") && (
-        <EmptyState title={t(tab === "policies" ? "publicLink.inspector.policies" : "publicLink.inspector.notifications")} description={t("publicLink.notBuiltYet")} />
+      {tab === "policies" && (
+        <div className="flex flex-col gap-4">
+          <FieldRow label={t("publicLink.reservations.cancellationWindow")}>
+            <OptionSelect
+              value={settings.cancellationWindow}
+              options={CANCELLATION_OPTIONS}
+              labelPrefix="publicLink.reservations.cancellationWindow"
+              onChange={(cancellationWindow) => patch({ cancellationWindow })}
+            />
+          </FieldRow>
+
+          <div className="flex flex-col gap-2.5 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2.5">
+            <ToggleRow
+              label={t("publicLink.reservations.noShowFee")}
+              note={t("publicLink.reservations.noShowFeeNote")}
+              checked={settings.noShowFee}
+              onChange={() => patch({ noShowFee: !settings.noShowFee })}
+            />
+            {settings.noShowFee && (
+              <Input
+                type="number"
+                min={0}
+                label={t("publicLink.reservations.noShowAmount")}
+                placeholder="0"
+                value={settings.noShowAmount}
+                onChange={(e) => patch({ noShowAmount: e.target.value })}
+              />
+            )}
+          </div>
+
+          <FieldRow label={t("publicLink.reservations.depositRefund")}>
+            <div className="flex flex-col gap-2">
+              {REFUND_OPTIONS.map((id) => (
+                <RadioCard
+                  key={id}
+                  title={t(`publicLink.reservations.depositRefund.${id}`)}
+                  note={t(`publicLink.reservations.depositRefund.${id}Note`)}
+                  selected={settings.depositRefund === id}
+                  onSelect={() => patch({ depositRefund: id })}
+                />
+              ))}
+            </div>
+          </FieldRow>
+
+          <FieldRow label={t("publicLink.reservations.terms")}>
+            <Textarea
+              rows={4}
+              placeholder={t("publicLink.reservations.termsPlaceholder")}
+              value={settings.termsText}
+              onChange={(e) => patch({ termsText: e.target.value })}
+            />
+          </FieldRow>
+        </div>
+      )}
+
+      {tab === "notifications" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2.5">
+            <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.reservations.channels")}</p>
+            <ToggleRow label={t("publicLink.waitlist.whatsapp")} checked={settings.notifyWhatsapp} onChange={() => patch({ notifyWhatsapp: !settings.notifyWhatsapp })} />
+            <ToggleRow label={t("publicLink.waitlist.sms")} checked={settings.notifySms} onChange={() => patch({ notifySms: !settings.notifySms })} />
+            <ToggleRow label={t("publicLink.waitlist.email")} checked={settings.notifyEmail} onChange={() => patch({ notifyEmail: !settings.notifyEmail })} />
+          </div>
+
+          <div className="flex flex-col gap-2.5 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2.5">
+            <ToggleRow
+              label={t("publicLink.reservations.reminder")}
+              note={t("publicLink.reservations.reminderNote")}
+              checked={settings.reminderEnabled}
+              onChange={() => patch({ reminderEnabled: !settings.reminderEnabled })}
+            />
+            {settings.reminderEnabled && (
+              <FieldRow label={t("publicLink.reservations.reminderBefore")}>
+                <OptionSelect
+                  value={settings.reminderBefore}
+                  options={REMINDER_OPTIONS}
+                  labelPrefix="publicLink.reservations.reminderBefore"
+                  onChange={(reminderBefore) => patch({ reminderBefore })}
+                />
+              </FieldRow>
+            )}
+          </div>
+
+          <ToggleRow
+            label={t("publicLink.reservations.notifyStaff")}
+            note={t("publicLink.reservations.notifyStaffNote")}
+            checked={settings.notifyStaff}
+            onChange={() => patch({ notifyStaff: !settings.notifyStaff })}
+          />
+        </div>
       )}
     </div>
   );

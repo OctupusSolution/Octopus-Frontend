@@ -29,7 +29,6 @@
 import type { StorefrontPreviewModel, PreviewDevice } from "@/widgets/storefront-preview";
 import { dnsLabel } from "@/pages/onboarding/steps/public-link-tag";
 import { PAGE_MODULES } from "./page-catalog";
-import { SITE_SECTIONS } from "./section-catalog";
 import { SITE_THEMES } from "./theme-catalog";
 import type { SiteDraft } from "./site-draft";
 
@@ -71,16 +70,16 @@ const SECTION_WIDGET_MAP: Record<string, string> = {
   offers: "offers",
 };
 
-// Explicit id -> heading map, keyed by widget id, sourced from SITE_SECTIONS's
-// own labels — not read positionally off `navItems`. `sections` (drawable
-// blocks) and `navItems` (page modules) are unrelated lists here, so nothing
-// guarantees a shared id lands at the same index in both.
-const SECTION_LABEL_KEYS: Readonly<Record<string, string>> = Object.fromEntries(
-  SITE_SECTIONS.flatMap((section) => {
-    const widgetId = SECTION_WIDGET_MAP[section.id];
-    return widgetId ? [[widgetId, section.labelKey]] : [];
-  })
-);
+// Explicit id -> heading map, keyed by widget id — not read positionally off
+// `navItems`, because `sections` (drawable blocks) and `navItems` (page modules)
+// are unrelated lists here. The headings are the customer-facing page names
+// ("Menu", "Offers"), not the builder's own section labels ("Menu & Order",
+// "Offers Banner"), which describe a section to the merchant and would read
+// oddly as a heading on their storefront.
+const SECTION_LABEL_KEYS: Readonly<Record<string, string>> = {
+  menu: "publicLink.page.menu",
+  offers: "publicLink.page.offers",
+};
 
 function formatSitePrice(amount: number, locale: string): string {
   return new Intl.NumberFormat(locale === "ar" ? "ar" : "en-US", {
@@ -140,8 +139,12 @@ export function previewModelFromSite(
   // of visibility.
   const activeNavLabelKey = navItems.find((item) => item.visible)?.labelKey;
 
+  // The hero's Advanced tab can hide it per device; tablet reads as desktop.
+  const heroVisible = device === "mobile" ? hero.showOnMobile : hero.showOnDesktop;
+
   const sections = draft.sections
     .filter((section) => section.enabled)
+    .filter((section) => section.id !== "hero" || heroVisible)
     .map((section) => SECTION_WIDGET_MAP[section.id])
     .filter((id): id is string => id !== undefined);
 
@@ -180,6 +183,9 @@ export function previewModelFromSite(
       primaryCta: hero.primaryCta || undefined,
       secondaryCta: hero.secondaryCta || undefined,
       imageUrl: hero.imageDataUrl ?? undefined,
+      overlay: hero.overlay,
+      align: hero.textAlign,
+      height: hero.height,
     },
     device,
   };

@@ -307,9 +307,27 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
       case "hero":
         return (
           <section key={id} className="relative isolate overflow-hidden">
-            <img src={heroImage} alt="" className="h-[190px] w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" aria-hidden />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <img
+              src={heroImage}
+              alt=""
+              className={clsx(
+                "w-full object-cover",
+                model.hero.height === "compact" ? "h-[150px]" : model.hero.height === "tall" ? "h-[240px]" : "h-[190px]"
+              )}
+            />
+            {/* A host-set darkness is a flat scrim of that strength; without
+                one, the storefront's own gradient. */}
+            {model.hero.overlay !== undefined ? (
+              <div className="absolute inset-0" style={{ backgroundColor: `rgba(0,0,0,${model.hero.overlay / 100})` }} aria-hidden />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" aria-hidden />
+            )}
+            <div
+              className={clsx(
+                "absolute inset-0 flex flex-col justify-center gap-2 px-6",
+                model.hero.align === "start" ? "items-start ps-8 text-start" : "items-center text-center"
+              )}
+            >
               <p className="max-w-[80%] text-[19px] font-bold leading-[1.4] text-white" style={{ fontFamily: titleFont }}>
                 {heroHeadline}
               </p>

@@ -1,20 +1,23 @@
-// The Hero section's inspector — the first of the five per-section panels
-// Tasks 16-18 build on top of `controls.tsx`. The frames draw its Content tab
-// in full; Style and Advanced are named in the tab strip but never drawn, so
-// those two render an `EmptyState` rather than invented controls.
+// The Hero section's inspector. Content is the tab the frames draw; Style and
+// Advanced hold the settings a hero needs beyond its copy — how dark the scrim
+// is, where the text sits and how tall the band is, which devices show it and
+// the anchor its home link scrolls to. All three drive the live preview.
 import { useRef, useState } from "react";
 import { Upload } from "lucide-react";
-import { Button, EmptyState, Input, Segmented, Select } from "@ui/primitives";
+import { Button, Input, Segmented, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
-import type { HeroBackground, SiteAction, SiteDraft } from "../../_shared/site-draft";
-import { FieldRow, InspectorTabs } from "./controls";
+import type { HeroBackground, HeroSettings, SiteAction, SiteDraft } from "../../_shared/site-draft";
+import { FieldRow, InspectorTabs, ToggleRow } from "./controls";
 
 const BACKGROUND_OPTIONS: readonly { id: HeroBackground; labelKey: string }[] = [
   { id: "image", labelKey: "publicLink.hero.image" },
   { id: "video", labelKey: "publicLink.hero.video" },
   { id: "slider", labelKey: "publicLink.hero.slider" },
 ];
+
+const ALIGN_OPTIONS: readonly HeroSettings["textAlign"][] = ["start", "center"];
+const HEIGHT_OPTIONS: readonly HeroSettings["height"][] = ["compact", "standard", "tall"];
 
 const TARGET_IDS = ["reservations", "menu", "offers", "waitlist", "contact"] as const;
 
@@ -49,8 +52,17 @@ export function HeroInspector({ draft, dispatch }: { draft: SiteDraft; dispatch:
   const fileRef = useRef<HTMLInputElement>(null);
   const hero = draft.sectionSettings.hero;
 
-  function patch(patch: Partial<SiteDraft["sectionSettings"]["hero"]>) {
+  function patch(patch: Partial<HeroSettings>) {
     dispatch({ type: "patchSection", section: "hero", patch });
+  }
+
+  // Deleting the open section must also move the inspector off it — left
+  // selected, the panel (Delete button included) stayed on screen editing a
+  // section that was no longer on the page.
+  function deleteSection() {
+    const remaining = draft.sections.filter((section) => section.id !== "hero");
+    dispatch({ type: "setSections", sections: remaining });
+    if (remaining[0]) dispatch({ type: "selectSection", id: remaining[0].id });
   }
 
   return (
@@ -141,15 +153,82 @@ export function HeroInspector({ draft, dispatch }: { draft: SiteDraft; dispatch:
           <Button
             variant="ghost"
             className="w-full justify-center bg-[#EF4444]/5 text-[#EF4444] hover:bg-[#EF4444]/10"
-            onClick={() => dispatch({ type: "setSections", sections: draft.sections.filter((section) => section.id !== "hero") })}
+            onClick={deleteSection}
           >
             {t("publicLink.customize.deleteSection")}
           </Button>
         </div>
       )}
 
-      {tab !== "content" && (
-        <EmptyState title={t(tab === "style" ? "publicLink.hero.style" : "publicLink.hero.advanced")} description={t("publicLink.notBuiltYet")} />
+      {tab === "style" && (
+        <div className="flex flex-col gap-4">
+          <FieldRow label={t("publicLink.hero.overlay")}>
+            <>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={80}
+                  step={5}
+                  value={hero.overlay}
+                  onChange={(e) => patch({ overlay: Number(e.target.value) })}
+                  aria-label={t("publicLink.hero.overlay")}
+                  className="flex-1 accent-[#0D6EFD]"
+                />
+                <span className="w-10 text-end text-[12px] tabular-nums text-[var(--octo-text-secondary)]">{hero.overlay}%</span>
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.hero.overlayNote")}</p>
+            </>
+          </FieldRow>
+
+          <FieldRow label={t("publicLink.hero.textAlign")}>
+            <Segmented
+              options={ALIGN_OPTIONS.map((id) => ({ id, label: t(`publicLink.hero.align.${id}`) }))}
+              value={hero.textAlign}
+              onChange={(id) => patch({ textAlign: id as HeroSettings["textAlign"] })}
+            />
+          </FieldRow>
+
+          <FieldRow label={t("publicLink.hero.height")}>
+            <Segmented
+              options={HEIGHT_OPTIONS.map((id) => ({ id, label: t(`publicLink.hero.height.${id}`) }))}
+              value={hero.height}
+              onChange={(id) => patch({ height: id as HeroSettings["height"] })}
+            />
+          </FieldRow>
+        </div>
+      )}
+
+      {tab === "advanced" && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2.5 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2.5">
+            <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.hero.visibility")}</p>
+            <ToggleRow
+              label={t("publicLink.hero.showOnDesktop")}
+              checked={hero.showOnDesktop}
+              onChange={() => patch({ showOnDesktop: !hero.showOnDesktop })}
+            />
+            <ToggleRow
+              label={t("publicLink.hero.showOnMobile")}
+              checked={hero.showOnMobile}
+              onChange={() => patch({ showOnMobile: !hero.showOnMobile })}
+            />
+          </div>
+
+          <FieldRow label={t("publicLink.hero.anchorId")}>
+            <>
+              <Input
+                dir="ltr"
+                value={hero.anchorId}
+                // An anchor is part of a URL fragment: lowercase letters,
+                // digits and hyphens only, so what the merchant types is what
+                // actually works in a link.
+                onChange={(e) => patch({ anchorId: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-") })}
+              />
+              <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.hero.anchorNote")}</p>
+            </>
+          </FieldRow>
+        </div>
       )}
     </div>
   );

@@ -151,7 +151,10 @@ export function PagesStep({ draft, dispatch }: StepProps) {
           </p>
         </div>
 
-        <DrawerNavPreview draft={draft} />
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.pages.navigationPreview")}</p>
+          <DrawerNavPreview draft={draft} />
+        </div>
 
         <DeviceFrame model={model} device={device} onDevice={setDevice} paged />
       </div>

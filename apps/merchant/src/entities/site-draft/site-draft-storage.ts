@@ -91,7 +91,55 @@ export function parseDraft(raw: string | null): SiteDraft | null {
     // not, since `NaN ?? 1` is still `NaN`).
     const rawStep = parsed.draft.step;
     const step = Number.isFinite(rawStep) ? Math.floor(Math.min(STEP_COUNT, Math.max(1, rawStep))) : 1;
-    return { ...EMPTY_SITE_DRAFT, ...parsed.draft, step };
+    const stored = parsed.draft;
+    // A draft saved before a field existed (e.g. hero.overlay, a whole
+    // testModeSettings object) is missing it entirely — a shallow spread
+    // leaves such fields `undefined` and the new UI reading them crashes.
+    // Merging one level deeper into each nested slice fills in only the keys
+    // a stored draft actually lacks, without touching keys it does carry —
+    // same "add, never overwrite a present value" rule as the outer merge.
+    return {
+      ...EMPTY_SITE_DRAFT,
+      ...stored,
+      step,
+      brand: {
+        ...EMPTY_SITE_DRAFT.brand,
+        ...stored.brand,
+        colors: { ...EMPTY_SITE_DRAFT.brand.colors, ...stored.brand.colors },
+        typography: {
+          en: { ...EMPTY_SITE_DRAFT.brand.typography.en, ...stored.brand.typography.en },
+          ar: { ...EMPTY_SITE_DRAFT.brand.typography.ar, ...stored.brand.typography.ar },
+        },
+      },
+      navigation: { ...EMPTY_SITE_DRAFT.navigation, ...stored.navigation },
+      sectionSettings: {
+        ...EMPTY_SITE_DRAFT.sectionSettings,
+        ...stored.sectionSettings,
+        hero: { ...EMPTY_SITE_DRAFT.sectionSettings.hero, ...stored.sectionSettings.hero },
+        reservations: {
+          ...EMPTY_SITE_DRAFT.sectionSettings.reservations,
+          ...stored.sectionSettings.reservations,
+        },
+        waitlist: { ...EMPTY_SITE_DRAFT.sectionSettings.waitlist, ...stored.sectionSettings.waitlist },
+        menu: { ...EMPTY_SITE_DRAFT.sectionSettings.menu, ...stored.sectionSettings.menu },
+        offers: { ...EMPTY_SITE_DRAFT.sectionSettings.offers, ...stored.sectionSettings.offers },
+        generic: { ...EMPTY_SITE_DRAFT.sectionSettings.generic, ...stored.sectionSettings.generic },
+      },
+      preview: {
+        ...EMPTY_SITE_DRAFT.preview,
+        ...stored.preview,
+        testModeSettings: {
+          ...EMPTY_SITE_DRAFT.preview.testModeSettings,
+          ...stored.preview.testModeSettings,
+        },
+      },
+      publish: {
+        ...EMPTY_SITE_DRAFT.publish,
+        ...stored.publish,
+        seo: { ...EMPTY_SITE_DRAFT.publish.seo, ...stored.publish.seo },
+        customDomain: { ...EMPTY_SITE_DRAFT.publish.customDomain, ...stored.publish.customDomain },
+      },
+    };
   } catch {
     return null;
   }

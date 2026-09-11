@@ -32,6 +32,14 @@ export interface HeroSettings {
   primaryTarget: string;
   secondaryCta: string;
   secondaryTarget: string;
+  /** Darkness of the scrim over the hero media, 0-80. */
+  overlay: number;
+  textAlign: "start" | "center";
+  height: "compact" | "standard" | "tall";
+  showOnMobile: boolean;
+  showOnDesktop: boolean;
+  /** In-page anchor id the header's home link scrolls to. */
+  anchorId: string;
 }
 
 export interface ReservationSettings {
@@ -48,6 +56,18 @@ export interface ReservationSettings {
   tableHold: string;
   autoConfirm: boolean;
   deposit: boolean;
+  /** Hours' notice a guest must give to cancel free of charge; "none" = anytime. */
+  cancellationWindow: "none" | "2" | "12" | "24" | "48";
+  noShowFee: boolean;
+  noShowAmount: string;
+  depositRefund: "full" | "partial" | "none";
+  termsText: string;
+  notifyWhatsapp: boolean;
+  notifySms: boolean;
+  notifyEmail: boolean;
+  reminderEnabled: boolean;
+  reminderBefore: "1" | "2" | "24";
+  notifyStaff: boolean;
 }
 
 export interface WaitlistSettings {
@@ -66,6 +86,13 @@ export interface WaitlistSettings {
   notifySms: boolean;
   notifyEmail: boolean;
   autoRemove: string;
+  maxWaitMinutes: "30" | "60" | "90";
+  requirePhone: boolean;
+  allowSelfCancel: boolean;
+  policyNote: string;
+  notifyReady: boolean;
+  reminderEnabled: boolean;
+  notifyStaff: boolean;
 }
 
 export interface MenuSettings {
@@ -148,11 +175,14 @@ export interface SiteDraft {
     completed: number;
     results: readonly SimResult[] | null;
     testers: readonly Tester[];
+    testModeSettings: { expiresInDays: "1" | "7" | "30"; requirePassword: boolean; password: string };
   };
   publish: {
     seo: { title: string; description: string; socialImageDataUrl: string | null };
     customDomain: { host: string; connected: boolean; ssl: boolean };
     published: boolean;
+    /** Timestamp of the last successful publish; null until the first one. */
+    publishedAt: number | null;
   };
   savedAt: number | null;
 }
@@ -175,7 +205,10 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
   brand: {
     businessName: "",
     logoDataUrl: null,
-    colors: { primary: "#08589D", light: "#08589D", accent: "#08589D", dark: "#08589D" },
+    // The four swatches the menu Theme frame draws: brand blue, a near-white
+    // tint of it, a light blue and a navy. Four identical blues gave the
+    // preview nothing to tell a surface from an accent.
+    colors: { primary: "#08589D", light: "#EEF4FF", accent: "#5B9BD5", dark: "#0B2545" },
     typography: {
       en: { titles: "inter", body: "inter" },
       ar: { titles: "inter", body: "inter" },
@@ -195,7 +228,8 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
     activeIndicator: true,
     showIcons: true,
     sameTab: true,
-    hidden: [],
+    // Frame shows Events and Loyalty already toggled off in the nav.
+    hidden: ["events", "loyalty"],
   },
   sections: SEEDED_SECTION_IDS.map((id) => ({ id, enabled: id !== "events" })),
   selectedSection: "hero",
@@ -206,44 +240,68 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
       heading: "",
       subheading: "",
       primaryCta: "",
-      primaryTarget: "",
+      primaryTarget: "reservations",
       secondaryCta: "",
-      secondaryTarget: "",
+      secondaryTarget: "menu",
+      overlay: 45,
+      textAlign: "center",
+      height: "standard",
+      showOnMobile: true,
+      showOnDesktop: true,
+      anchorId: "home",
     },
     reservations: {
-      enabled: false,
+      enabled: true,
       homepageDisplay: "widget",
-      primaryAction: "",
-      availabilityPreview: false,
+      primaryAction: "reservations",
+      availabilityPreview: true,
       nextAvailableLabel: "",
-      dateRange: "",
-      bookingWindow: "",
-      cutOff: "",
+      dateRange: "7",
+      bookingWindow: "30",
+      cutOff: "2",
       minParty: "",
       maxParty: "",
-      tableHold: "",
+      tableHold: "15",
       autoConfirm: true,
       deposit: false,
+      cancellationWindow: "24",
+      noShowFee: false,
+      noShowAmount: "",
+      depositRefund: "full",
+      termsText: "",
+      notifyWhatsapp: true,
+      notifySms: false,
+      notifyEmail: true,
+      reminderEnabled: true,
+      reminderBefore: "2",
+      notifyStaff: true,
     },
     waitlist: {
-      enabled: false,
+      enabled: true,
       homepageDisplay: "widget",
-      primaryAction: "",
-      availabilityPreview: false,
+      primaryAction: "waitlist",
+      availabilityPreview: true,
       nextAvailableLabel: "",
-      format: "",
+      format: "30min",
       queueMethod: "fifo",
       minParty: "",
       maxParty: "",
       showWaitTime: true,
-      updateInterval: "",
+      updateInterval: "5",
       notifyWhatsapp: true,
       notifySms: true,
       notifyEmail: true,
-      autoRemove: "",
+      autoRemove: "10",
+      maxWaitMinutes: "60",
+      requirePhone: true,
+      allowSelfCancel: true,
+      policyNote: "",
+      notifyReady: true,
+      reminderEnabled: true,
+      notifyStaff: true,
     },
     menu: {
-      connectedMenuId: "",
+      connectedMenuId: "menu-ocean-table-main",
       homepageDisplay: ["highlighted"],
       primaryAction: "menuPage",
       orderingMode: "ordering",
@@ -251,14 +309,14 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
       orderAhead: true,
       prepTime: "",
       serviceAreas: "",
-      taxDisplay: "",
+      taxDisplay: "inclusive",
     },
     offers: {
-      displayStyle: "",
-      filterCategories: false,
-      sortOrder: "",
-      ctaButton: "",
-      visibility: "",
+      displayStyle: "cardList",
+      filterCategories: true,
+      sortOrder: "dateEarliest",
+      ctaButton: "viewAllOffers",
+      visibility: "visibleHomepage",
     },
     generic: {},
   },
@@ -268,11 +326,13 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
     completed: 0,
     results: null,
     testers: [],
+    testModeSettings: { expiresInDays: "7", requirePassword: false, password: "" },
   },
   publish: {
     seo: { title: "", description: "", socialImageDataUrl: null },
     customDomain: { host: "", connected: false, ssl: false },
     published: false,
+    publishedAt: null,
   },
   savedAt: null,
 };
@@ -299,6 +359,11 @@ export type SiteAction =
   | { type: "patchSection"; section: "offers"; patch: Partial<OffersSettings> }
   | { type: "patchGeneric"; id: string; patch: GenericSettings }
   | { type: "patchPreview"; patch: Partial<SiteDraft["preview"]> }
+  // patchPreview's Partial<preview> requires the whole testModeSettings object
+  // when that key is present at all, so a caller changing just one field
+  // (e.g. toggling requirePassword) would have to spread the nested object by
+  // hand every time. A dedicated action merges one level deeper instead.
+  | { type: "patchTestMode"; patch: Partial<SiteDraft["preview"]["testModeSettings"]> }
   | { type: "patchPublish"; patch: Partial<SiteDraft["publish"]> };
 
 function clampStep(step: number): number {
@@ -391,6 +456,14 @@ export function siteDraftReducer(state: SiteDraft, action: SiteAction): SiteDraf
       };
     case "patchPreview":
       return { ...state, preview: { ...state.preview, ...action.patch } };
+    case "patchTestMode":
+      return {
+        ...state,
+        preview: {
+          ...state.preview,
+          testModeSettings: { ...state.preview.testModeSettings, ...action.patch },
+        },
+      };
     case "patchPublish":
       return { ...state, publish: { ...state.publish, ...action.patch } };
   }

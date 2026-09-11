@@ -92,7 +92,7 @@ export function TabInfo({
         <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
           {t("menuOffer.image")} <span className="text-error">*</span>
         </p>
-        <div className="relative mt-1.5 h-[220px] overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
+        <div className="relative mt-1.5 h-[480px] overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
           <MediaTile src={offer.image} />
           {picker.input}
           <div className="absolute end-2.5 top-2.5 flex gap-2">

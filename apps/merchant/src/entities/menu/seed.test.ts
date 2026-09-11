@@ -39,6 +39,14 @@ describe("SEED_MENUS", () => {
     }
   });
 
+  it("keeps the built-in offers section last, under its fixed id", () => {
+    for (const menu of SEED_MENUS) {
+      const last = menu.sections[menu.sections.length - 1];
+      expect(last.kind, menu.name).toBe("offers");
+      expect(last.id, menu.name).toBe("offers");
+    }
+  });
+
   it("uses unique ids", () => {
     expect(new Set(SEED_MENUS.map((m) => m.id)).size).toBe(SEED_MENUS.length);
   });

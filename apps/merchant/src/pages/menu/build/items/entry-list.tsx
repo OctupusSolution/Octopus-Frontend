@@ -71,6 +71,11 @@ export function EntryList({
     ? ["duplicate", "delete"]
     : ["duplicate", "multiSection", "delete"];
 
+  function actionLabel(action: EntryAction): string {
+    if (isOffers) return t(action === "duplicate" ? "menuOffer.duplicate" : "menuOffer.delete");
+    return t(`menuWiz.item.action.${action}`);
+  }
+
   return (
     <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
       <label className="block">
@@ -109,11 +114,13 @@ export function EntryList({
               <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[8px]">
                 <MediaTile src={item.image} rounded="rounded-[8px]" />
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-medium text-[var(--octo-text-primary)]">
                   {item.name}
                 </span>
-                <span className="block text-[13px] font-semibold text-[var(--octo-accent)]">
+                {/* The name may truncate; the price never does — it is the
+                    one thing a merchant scans this list for. */}
+                <span className="block whitespace-nowrap text-[13px] font-semibold text-[var(--octo-accent)]">
                   SAR {priceOf(item)}
                 </span>
               </span>
@@ -134,9 +141,9 @@ export function EntryList({
       <button
         type="button"
         onClick={onAdd}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[var(--octo-accent)] bg-[var(--octo-selected)] px-3 py-2.5 text-[14px] font-medium text-[var(--octo-accent)]"
+        className="mt-3 flex w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--octo-accent)] bg-[var(--octo-card)] px-3 py-2.5 text-[15px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-selected)]"
       >
-        <Plus size={16} aria-hidden />
+        <Plus size={18} aria-hidden />
         {t(addLabelKey)}
       </button>
 
@@ -156,7 +163,7 @@ export function EntryList({
             ),
             width: MENU_WIDTH,
           }}
-          className="fixed z-50 overflow-hidden rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] shadow-lg"
+          className="fixed z-50 space-y-1.5 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2 shadow-lg"
         >
           {actions.map((action) => (
             <button
@@ -169,13 +176,13 @@ export function EntryList({
                 onAction(action, item);
               }}
               className={clsx(
-                "block w-full border-b border-[var(--octo-border-card)] px-4 py-3 text-start text-[14px] last:border-b-0 hover:bg-[var(--octo-hover)]",
+                "block w-full rounded-[8px] px-3 py-2.5 text-start text-[15px]",
                 action === "delete"
-                  ? "text-error hover:bg-error/10"
-                  : "text-[var(--octo-text-primary)]"
+                  ? "bg-error/10 text-error hover:bg-error/20"
+                  : "bg-[var(--octo-hover)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-selected)]"
               )}
             >
-              {t(`menuWiz.item.action.${action}`)}
+              {actionLabel(action)}
             </button>
           ))}
         </div>

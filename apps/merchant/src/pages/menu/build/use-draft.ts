@@ -5,7 +5,7 @@
 // step, panel or dialog is edited. The spec's Persistence section records why
 // the draft is in memory for this stage and what that costs.
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, type MutableRefObject } from "react";
 import type { Menu } from "@/entities/menu";
 
 export interface DraftContextValue {
@@ -20,6 +20,12 @@ export interface DraftContextValue {
    *  before its own setDraft — which is exactly how Publish came to write a
    *  menu still marked pending. Omit the argument to save what is in state. */
   save: (next?: Menu) => void;
+  /** What the footer's "Save & Add another item" does. The items step owns
+   *  "add an item" and points this at it while it is mounted. */
+  addAnother: MutableRefObject<(() => void) | null>;
+  /** Lets a step hold the footer's Next Step back — the offer editor does
+   *  while its red bar lists missing details. Reset on every step change. */
+  setNextBlocked: (blocked: boolean) => void;
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);

@@ -42,22 +42,24 @@ export function ItemTabs({
 
   return (
     <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <h2 className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
-        {t("menuWiz.item.infoTitle")}
+      {/* The frames title the card after the Allergies tab when it is open,
+          and "Item Information" for every other tab. */}
+      <h2 className="text-[20px] font-semibold text-[var(--octo-text-primary)]">
+        {t(tab === "allergies" ? "menuWiz.item.tab.allergies" : "menuWiz.item.infoTitle")}
       </h2>
-      <p className="mt-1 text-[15px] font-medium text-[var(--octo-text-primary)]">{sectionName}</p>
+      <p className="mt-1 text-[16px] font-medium text-[var(--octo-text-primary)]">{sectionName}</p>
 
-      <div className="mt-3 flex flex-wrap gap-5 border-b border-[var(--octo-border-card)]">
+      <div className="mt-3 flex flex-wrap justify-between gap-x-5 gap-y-1 border-b border-[var(--octo-border-card)]">
         {ITEM_TABS.map((id) => (
           <button
             key={id}
             type="button"
             onClick={() => onTabChange(id)}
             className={clsx(
-              "-mb-px border-b-2 pb-2 text-[14px]",
+              "-mb-px border-b-2 px-1 pb-2 text-[16px]",
               tab === id
                 ? "border-[var(--octo-accent)] font-medium text-[var(--octo-accent)]"
-                : "border-transparent text-[var(--octo-text-secondary)]"
+                : "border-transparent text-[var(--octo-text-primary)]"
             )}
           >
             {t(`menuWiz.item.tab.${id}`)}

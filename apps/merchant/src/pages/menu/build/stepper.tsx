@@ -34,7 +34,8 @@ export function Stepper({
     <ol className="mt-5 flex items-start">
       {WIZARD_STEPS.map((step, index) => {
         const n = index + 1;
-        const done = n <= current;
+        const done = n < current;
+        const isCurrent = n === current;
         const reachable = n <= furthest;
         const isLast = index === WIZARD_STEPS.length - 1;
 
@@ -47,17 +48,21 @@ export function Stepper({
                   onClick={() => onJump(n)}
                   aria-current={n === current ? "step" : undefined}
                   className={clsx(
-                    "grid h-[26px] w-[26px] place-items-center rounded-full text-[13px] font-semibold transition-colors",
-                    done
-                      ? "bg-[var(--octo-accent)] text-white"
-                      : "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"
+                    "grid h-[30px] w-[30px] place-items-center rounded-full text-[14px] font-semibold transition-colors",
+                    // The frames ring the step you are on and fill the ones
+                    // behind you, so "here" and "done" never look alike.
+                    isCurrent
+                      ? "border-2 border-[var(--octo-accent)] bg-[var(--octo-card)] text-[var(--octo-accent)]"
+                      : done
+                        ? "bg-[var(--octo-accent)] text-white"
+                        : "border border-[var(--octo-border-card)] bg-[var(--octo-card)] text-[var(--octo-text-muted)]"
                   )}
                 >
                   {n}
                 </button>
               ) : (
                 <span
-                  className="grid h-[26px] w-[26px] place-items-center rounded-full bg-[var(--octo-track)] text-[13px] font-semibold text-[var(--octo-text-muted)]"
+                  className="grid h-[30px] w-[30px] place-items-center rounded-full border border-[var(--octo-border-card)] bg-[var(--octo-card)] text-[14px] font-semibold text-[var(--octo-text-muted)]"
                   aria-disabled
                 >
                   {n}
@@ -65,8 +70,8 @@ export function Stepper({
               )}
               <span
                 className={clsx(
-                  "whitespace-nowrap text-[13px]",
-                  done
+                  "whitespace-nowrap text-[14px]",
+                  done || isCurrent
                     ? "font-medium text-[var(--octo-accent)]"
                     : "text-[var(--octo-text-muted)]"
                 )}
@@ -76,13 +81,13 @@ export function Stepper({
             </div>
 
             {!isLast && (
-              // The connector fills only where the merchant has already been,
-              // which is what tells them at a glance how much is left.
+              // The frames fill the connector leaving the current step too — the
+              // line points at where you are heading — and leave the rest grey.
               <span
                 aria-hidden
                 className={clsx(
-                  "mt-[13px] h-[2px] flex-1",
-                  n < current ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-border-card)]"
+                  "mt-[15px] h-[2px] flex-1",
+                  n <= current ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-border-card)]"
                 )}
               />
             )}

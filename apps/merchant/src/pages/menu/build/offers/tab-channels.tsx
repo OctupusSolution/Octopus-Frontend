@@ -22,10 +22,11 @@ export function TabChannels({
   const { t } = useI18n();
 
   return (
-    <div className="max-w-[720px] space-y-2.5">
+    <div className="max-w-[720px]">
       {CHANNELS.map((channel) => (
-        <label key={channel} className="flex items-center gap-2.5 text-[14px]">
+        <label key={channel} className="flex h-[50px] items-center gap-3 text-[16px]">
           <Checkbox
+            className="[&_input]:h-6 [&_input]:w-6 [&>span]:h-6 [&>span]:w-6"
             checked={offer.channels[channel]}
             onChange={() =>
               onPatch({
@@ -37,7 +38,7 @@ export function TabChannels({
             className={
               offer.channels[channel]
                 ? "font-medium text-[var(--octo-accent)]"
-                : "text-[var(--octo-text-primary)]"
+                : "font-medium text-[var(--octo-text-primary)]"
             }
           >
             {t(`menuOffer.channel.${channel}`)}

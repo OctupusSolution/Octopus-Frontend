@@ -103,10 +103,21 @@ describe("validate", () => {
 
   it("ignores the offers section when counting item findings", () => {
     // A menu with no items at all still has its built-in offers section, and
-    // an empty offers section is not eight things wrong with the menu.
+    // an empty offers section is not eight things wrong with the menu — the
+    // only error is that there is nothing to order.
     const result = validate(blankMenu("m2", "b1", NOW));
-    expect(result.errors).toEqual([]);
+    expect(result.errors).toEqual([{ id: "menuEmpty", count: 1 }]);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("blocks publishing a menu with no items", () => {
+    let menu = blankMenu("m3", "b1", NOW);
+    menu = addSection(menu, blankSection("s1", "items", "Breakfast", null));
+    expect(ids(validate(menu).errors)).toContain("menuEmpty");
+  });
+
+  it("does not raise menuEmpty once any item exists", () => {
+    expect(ids(validate(healthy()).errors)).not.toContain("menuEmpty");
   });
 
   it("raises an error for a menu with no name", () => {

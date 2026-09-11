@@ -23,7 +23,9 @@ export const DEFAULT_FILTERS: LibraryFilters = {
   area: "all",
   channel: "all",
   sort: "recent",
-  includeArchived: false,
+  // The frame's library shows its archived menu, as the last card. Hiding it
+  // by default made Archive look like Delete: the card simply vanished.
+  includeArchived: true,
 };
 
 const STATUS_ORDER: readonly MenuStatus[] = [
@@ -42,6 +44,10 @@ export function filterMenus(menus: readonly Menu[], filters: LibraryFilters): Me
   });
 
   return [...kept].sort((a, b) => {
+    // Archived menus sink below every live one whatever the sort — they are
+    // kept for reference, not competing for attention.
+    const archived = Number(a.status === "archived") - Number(b.status === "archived");
+    if (archived !== 0) return archived;
     switch (filters.sort) {
       case "name":
         return a.name.localeCompare(b.name);
@@ -118,6 +124,27 @@ export function setMenuSchedule(
   return menus.map((menu) =>
     menu.id === id ? { ...menu, schedule, updatedAt: now } : menu,
   );
+}
+
+/** The window each named availability type stands for. */
+export const SCHEDULE_PRESETS: Record<Exclude<MenuSchedule["type"], "custom">, { start: string; end: string }> = {
+  "all-day": { start: "00:00", end: "23:59" },
+  breakfast: { start: "06:00", end: "11:30" },
+  lunch: { start: "12:00", end: "16:00" },
+  dinner: { start: "18:00", end: "23:30" },
+};
+
+/** Picking a named type sets its window; "custom" keeps whatever was there. */
+export function applyScheduleType(schedule: MenuSchedule, type: MenuSchedule["type"]): MenuSchedule {
+  return type === "custom" ? { ...schedule, type } : { ...schedule, type, ...SCHEDULE_PRESETS[type] };
+}
+
+/** Editing a time by hand means the window is no longer the named one. */
+export function setScheduleTime(schedule: MenuSchedule, field: "start" | "end", value: string): MenuSchedule {
+  const next = { ...schedule, [field]: value };
+  const preset = schedule.type === "custom" ? null : SCHEDULE_PRESETS[schedule.type];
+  const stillPreset = preset && preset.start === next.start && preset.end === next.end;
+  return stillPreset ? next : { ...next, type: "custom" };
 }
 
 /** A menu cannot fall back to itself, and an archived menu cannot serve. */

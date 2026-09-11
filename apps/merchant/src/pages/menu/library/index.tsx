@@ -3,7 +3,7 @@
 // is threaded through now so the card's contract does not change later.
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, Info, Search, Sparkles, Plus } from "lucide-react";
+import { CalendarDays, FolderDown, Info, Search, Sparkles, Plus } from "lucide-react";
 import { Button, Input, Modal, Select } from "@ui/primitives";
 import {
   DEFAULT_FILTERS,
@@ -84,10 +84,10 @@ export function MenuLibraryPage() {
     <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold text-[var(--octo-text-primary)]">{t("menuLib.title")}</h1>
-          <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{t("menuLib.subtitle")}</p>
+          <h1 className="text-[26px] font-bold text-[var(--octo-text-primary)]">{t("menuLib.title")}</h1>
+          <p className="mt-1 text-[15px] text-[var(--octo-text-secondary)]">{t("menuLib.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Today's date, as the frame shows it on every screen in this
               module. Read-only: it dates what the merchant is looking at, it
               does not filter it. */}
@@ -95,17 +95,21 @@ export function MenuLibraryPage() {
             <CalendarDays size={15} className="text-[var(--octo-text-muted)]" aria-hidden />
             {today}
           </span>
-          {/* The AI branch is deferred, not dead. It navigates to a real page
-              that says so. A disabled button beside the primary action reads as
-              a broken build rather than as a roadmap. */}
           <Button
             variant="secondary"
             onClick={() => navigate("/menu/import")}
-            icon={<Sparkles size={16} aria-hidden />}
+            icon={<FolderDown size={18} aria-hidden />}
+            // The primitive has no merge step, so the variant's grey border and
+            // text would win on stylesheet order without the important flag.
+            className="h-11 !border-[var(--octo-accent)] px-4 text-[15px] font-semibold !text-[var(--octo-accent)]"
           >
             {t("menuLib.importAi")}
           </Button>
-          <Button onClick={() => navigate("/menu/new")} icon={<Plus size={16} aria-hidden />}>
+          <Button
+            onClick={() => navigate("/menu/new")}
+            icon={<Plus size={18} aria-hidden />}
+            className="h-11 px-4 text-[15px] font-semibold"
+          >
             {t("menuLib.createNew")}
           </Button>
         </div>
@@ -116,7 +120,11 @@ export function MenuLibraryPage() {
           <Info size={16} aria-hidden />
           {t("menuLib.branchBanner").replace("{branch}", branchLabel)}
         </p>
-        <button type="button" className="text-[14px] font-semibold text-[var(--octo-accent)] underline">
+        <button
+          type="button"
+          onClick={() => navigate("/settings/branches")}
+          className="text-[14px] font-semibold text-[var(--octo-accent)] underline"
+        >
           {t("menuLib.changeBranch")}
         </button>
       </div>

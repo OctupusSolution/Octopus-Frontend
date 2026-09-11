@@ -37,6 +37,7 @@ export function OffersEditor({
   onPatch,
   onSetEntry,
   onRemoveEntry,
+  onReplaceEntry,
 }: {
   menu: Menu;
   offer: Offer | null;
@@ -45,6 +46,7 @@ export function OffersEditor({
   onPatch: (patch: Partial<Offer>) => void;
   onSetEntry: (itemId: string, qty: number, price: number) => void;
   onRemoveEntry: (itemId: string) => void;
+  onReplaceEntry: (fromItemId: string, toItemId: string, qty: number, price: number) => void;
 }) {
   const { t } = useI18n();
 
@@ -89,6 +91,7 @@ export function OffersEditor({
             offer={offer}
             onSetEntry={onSetEntry}
             onRemoveEntry={onRemoveEntry}
+            onReplaceEntry={onReplaceEntry}
             onPatch={onPatch}
           />
         )}

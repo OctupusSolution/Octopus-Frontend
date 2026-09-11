@@ -2,11 +2,9 @@
 // side, the live preview (in a `DeviceFrame`) on the end side. Selecting a
 // card or a filter both patch `draft.theme`, so either survives a refresh.
 //
-// The frames show a small desktop/mobile toggle baked into each card. Six
-// independent device toggles competing with the one beside the preview would
-// be a worse screen than the frame implies, so that per-card control is
-// rendered decorative (aria-hidden) — the real toggle lives in the
-// `DeviceFrame`.
+// Each card carries the frames' desktop/mobile pair: pressing one selects that
+// theme and switches the live preview to that device, so the card's pair and
+// the preview's own switcher can never disagree about what is on screen.
 import { useState } from "react";
 import clsx from "clsx";
 import { Info, Monitor, Smartphone } from "lucide-react";
@@ -18,7 +16,24 @@ import { SITE_THEMES, THEME_FILTERS, type SiteTheme } from "../_shared/theme-cat
 import { DeviceFrame } from "../ui/device-frame";
 import type { StepProps } from "../_shared/steps";
 
-function ThemeCard({ theme, active, onSelect }: { theme: SiteTheme; active: boolean; onSelect: () => void }) {
+const CARD_DEVICES = [
+  { id: "desktop", Icon: Monitor },
+  { id: "mobile", Icon: Smartphone },
+] as const;
+
+function ThemeCard({
+  theme,
+  active,
+  previewDevice,
+  onSelect,
+  onPreviewDevice,
+}: {
+  theme: SiteTheme;
+  active: boolean;
+  previewDevice: PreviewDevice;
+  onSelect: () => void;
+  onPreviewDevice: (device: PreviewDevice) => void;
+}) {
   const { t } = useI18n();
   // `themeThumb` only ships one real asset today (the "elegant" style) — the
   // frames themselves show all six cards sharing that same storefront
@@ -29,45 +44,71 @@ function ThemeCard({ theme, active, onSelect }: { theme: SiteTheme; active: bool
   // it would be regressing to the wrong answer.
   const thumb = themeThumb(theme.styleId) ?? themeThumb("elegant");
 
+  // A div, not a button: the card holds three real buttons (the device pair and
+  // Use This), and a button nested in a button is invalid and swallows clicks.
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
       className={clsx(
-        "flex flex-col overflow-hidden rounded-xl border text-start transition-all",
+        "flex flex-col overflow-hidden rounded-xl border bg-[var(--octo-card)] transition-all",
         active ? "border-[#0D6EFD] ring-1 ring-[#0D6EFD]/20" : "border-[var(--octo-border-card)]"
       )}
     >
-      <div className="relative">
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-label={t(theme.nameKey)}
+        className="relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40"
+      >
         <img src={thumb ?? undefined} alt="" className="h-28 w-full object-cover" />
-
         {theme.recommended && (
           <span className="absolute start-2 top-2 rounded-full bg-[#0D6EFD] px-2 py-0.5 text-[10px] font-medium text-white">
             {t("publicLink.theme.recommended")}
           </span>
         )}
+      </button>
 
-        {/* Decorative: the real device toggle is the DeviceFrame beside the
-            grid, not a per-card control. */}
-        <span aria-hidden className="absolute end-2 top-2 flex items-center gap-1 rounded-full bg-black/40 p-1">
-          <Monitor size={11} className="text-white" />
-          <Smartphone size={11} className="text-white" />
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1 px-[18px] py-[15px]">
+      <div className="flex flex-1 flex-col gap-1 px-3.5 pb-3.5 pt-3">
         <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t(theme.nameKey)}</p>
-        <p className="text-[12.5px] text-[var(--octo-text-muted)]">{t(theme.descKey)}</p>
-        <span
-          className={clsx(
-            "mt-2 self-start rounded-[9px] px-3 py-[7px] text-[12px] font-medium transition-colors",
-            active ? "bg-[#0D6EFD] text-white" : "border border-[#0D6EFD] text-[#0D6EFD]"
-          )}
-        >
-          {t("publicLink.theme.use")}
-        </span>
+        <p className="text-[12px] text-[var(--octo-text-muted)]">{t(theme.descKey)}</p>
+
+        <div className="mt-auto flex items-center gap-2 pt-2">
+          <div className="flex shrink-0 overflow-hidden rounded-[9px] border border-[var(--octo-border-input)]">
+            {CARD_DEVICES.map(({ id, Icon }) => {
+              const on = active && previewDevice === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-label={`${t(theme.nameKey)} — ${t(`publicLink.device.${id}`)}`}
+                  aria-pressed={on}
+                  onClick={() => {
+                    onSelect();
+                    onPreviewDevice(id);
+                  }}
+                  className={clsx(
+                    "grid h-8 w-8 place-items-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40",
+                    on ? "bg-[#0D6EFD]/10 text-[#0D6EFD]" : "text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]",
+                    id === "mobile" && "border-s border-[var(--octo-border-input)]"
+                  )}
+                >
+                  <Icon size={14} />
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={onSelect}
+            className={clsx(
+              "h-8 flex-1 rounded-[9px] px-3 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+              active ? "bg-[#0D6EFD] text-white" : "border border-[#0D6EFD] text-[#0D6EFD] hover:bg-[#0D6EFD]/5"
+            )}
+          >
+            {t("publicLink.theme.use")}
+          </button>
+        </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -86,7 +127,7 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2">
             {THEME_FILTERS.map((filter) => {
               const active = activeFilter === filter.id;
               return (
@@ -111,15 +152,12 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
                 key={theme.id}
                 theme={theme}
                 active={draft.theme.id === theme.id}
+                previewDevice={device}
                 onSelect={() => dispatch({ type: "patchTheme", patch: { id: theme.id } })}
+                onPreviewDevice={setDevice}
               />
             ))}
           </div>
-
-          <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[11.5px] text-[#0D6EFD]">
-            <Info size={13} className="shrink-0" />
-            {t("publicLink.theme.keepsContent")}
-          </p>
         </div>
 
         <DeviceFrame
@@ -131,6 +169,12 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
           paged
         />
       </div>
+
+      {/* Full width under both columns, as the frame places it. */}
+      <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[12px] text-[#0D6EFD]">
+        <Info size={14} className="shrink-0" />
+        {t("publicLink.theme.keepsContent")}
+      </p>
     </div>
   );
 }

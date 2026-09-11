@@ -58,6 +58,15 @@ export interface StorefrontPreviewModel {
    *  position, so it survives a merchant reordering their navigation. Undefined
    *  means no entry is marked active. */
   activeNavLabelKey?: string;
+  /** The header stays pinned while the preview scrolls. Undefined behaves as
+   *  false. */
+  stickyHeader?: boolean;
+  /** Whether the active nav entry is drawn highlighted. Undefined behaves as
+   *  true, so a host with no such toggle keeps its underline. */
+  activeIndicator?: boolean;
+  /** Each header link carries an external-link glyph — the visible cue that it
+   *  opens a new tab. Undefined behaves as false. */
+  navOpensNewTab?: boolean;
   /** i18n keys for the category mosaic tiles. */
   categories: readonly string[];
   /** Literal, already-translated labels for those same tiles. When present the

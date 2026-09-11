@@ -41,6 +41,26 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
+/** A nested translation scope pinned to one locale — for previews that show the
+ *  merchant's site in a language other than the app's. Unlike `I18nProvider` it
+ *  never writes the document's lang/dir or storage; the caller sets `dir` on
+ *  its own container. */
+export function I18nScope({ locale, children }: { locale: Locale; children: ReactNode }) {
+  const parent = useContext(I18nContext);
+  const setLocale = parent?.setLocale;
+  const value = useMemo<I18nContextValue>(() => {
+    const dict = dictionaries[locale];
+    return {
+      locale,
+      setLocale: setLocale ?? (() => {}),
+      t: (key: string) => dict[key] ?? key,
+      dir: getDirection(locale),
+    };
+  }, [locale, setLocale]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
 export function useI18n(): I18nContextValue {
   const ctx = useContext(I18nContext);
   if (!ctx) throw new Error("useI18n must be used within I18nProvider");

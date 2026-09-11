@@ -91,7 +91,7 @@ export function RolesPermissionsTab() {
               onClick={() => setSelectedRoleId(role.id)}
               className={`flex items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-start transition-colors ${
                 role.id === selectedRole.id
-                  ? "border-[#0D6EFD] bg-[#eaf2ff]"
+                  ? "border-[#0D6EFD] bg-[var(--octo-selected)]"
                   : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
               }`}
             >

@@ -1,16 +1,19 @@
-// The section row's kebab: Edit / Archived / Delete.
+// The section row's kebab: Edit / Archived (or Restore) / Delete.
 //
 // Same anchored-popover shape as the library card's actions menu, and anchored
 // for the same reason — a centred sheet over a list of six near-identical rows
 // loses which row you were on. The built-in offers section offers no Delete.
 import { useEffect, useRef } from "react";
+import clsx from "clsx";
 import { OFFERS_SECTION_ID, type Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
-export type SectionAction = "edit" | "archive" | "delete";
+export type SectionAction = "edit" | "archive" | "restore" | "delete";
 
 const MENU_WIDTH = 200;
-const ROW_HEIGHT = 46;
+const ROW_HEIGHT = 44;
+const ROW_GAP = 6;
+const PADDING = 8;
 const GAP = 6;
 const VIEWPORT_MARGIN = 8;
 
@@ -50,10 +53,14 @@ export function SectionRowMenu({
 
   if (!section || !anchor) return null;
 
-  const actions: SectionAction[] =
-    section.id === OFFERS_SECTION_ID ? ["edit", "archive"] : ["edit", "archive", "delete"];
+  // An archived row swaps Archived for Restore; archiving it twice means nothing.
+  const actions: SectionAction[] = [
+    "edit",
+    section.visibility === "archived" ? "restore" : "archive",
+    ...(section.id === OFFERS_SECTION_ID ? [] : (["delete"] as const)),
+  ];
 
-  const height = actions.length * ROW_HEIGHT;
+  const height = actions.length * ROW_HEIGHT + (actions.length - 1) * ROW_GAP + PADDING * 2;
   const below = anchor.bottom + GAP;
   const flip = below + height > window.innerHeight - VIEWPORT_MARGIN;
   const top = flip ? Math.max(VIEWPORT_MARGIN, anchor.top - GAP - height) : below;
@@ -70,7 +77,7 @@ export function SectionRowMenu({
       role="menu"
       aria-label={section.name}
       style={{ top, left, width: MENU_WIDTH }}
-      className="fixed z-50 overflow-hidden rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] shadow-lg"
+      className="fixed z-50 flex flex-col gap-1.5 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2 shadow-lg"
     >
       {actions.map((action) => (
         <button
@@ -78,11 +85,12 @@ export function SectionRowMenu({
           type="button"
           role="menuitem"
           onClick={() => onPick(action)}
-          className={`block w-full border-b border-[var(--octo-border-card)] px-4 py-3 text-start text-[14px] last:border-b-0 hover:bg-[var(--octo-hover)] ${
+          className={clsx(
+            "block h-11 w-full rounded-[8px] px-3 text-start text-[15px]",
             action === "delete"
-              ? "text-error hover:bg-error/10"
-              : "text-[var(--octo-text-primary)]"
-          }`}
+              ? "bg-error/10 text-error hover:bg-error/15"
+              : "bg-[var(--octo-selected)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+          )}
         >
           {t(`menuWiz.sec.action.${action}`)}
         </button>

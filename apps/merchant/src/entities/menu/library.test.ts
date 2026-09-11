@@ -7,6 +7,8 @@ import {
   filterMenus,
   setMenuSchedule,
   setMenuStatus,
+  applyScheduleType,
+  setScheduleTime,
 } from "./library";
 import { WEEKDAYS, type Menu, type MenuStatus } from "./menu";
 
@@ -55,24 +57,29 @@ const LIBRARY: Menu[] = [
 ];
 
 describe("filterMenus", () => {
-  it("hides archived menus by default", () => {
+  it("shows archived menus by default, as the frame's last card", () => {
     const ids = filterMenus(LIBRARY, DEFAULT_FILTERS).map((m) => m.id);
+    expect(ids[ids.length - 1]).toBe("d");
+  });
+
+  it("hides archived menus when asked", () => {
+    const ids = filterMenus(LIBRARY, { ...DEFAULT_FILTERS, includeArchived: false }).map((m) => m.id);
     expect(ids).not.toContain("d");
   });
 
-  it("shows archived menus when asked", () => {
-    const ids = filterMenus(LIBRARY, { ...DEFAULT_FILTERS, includeArchived: true }).map((m) => m.id);
-    expect(ids).toContain("d");
+  it("sorts most recently updated first, archived last, by default", () => {
+    const ids = filterMenus(LIBRARY, DEFAULT_FILTERS).map((m) => m.id);
+    expect(ids).toEqual(["b", "a", "e", "c", "d"]);
   });
 
-  it("sorts most recently updated first by default", () => {
-    const ids = filterMenus(LIBRARY, DEFAULT_FILTERS).map((m) => m.id);
-    expect(ids).toEqual(["b", "a", "e", "c"]);
+  it("keeps archived last under every sort", () => {
+    const names = filterMenus(LIBRARY, { ...DEFAULT_FILTERS, sort: "name" }).map((m) => m.name);
+    expect(names[names.length - 1]).toBe("Adha Eid Menu");
   });
 
   it("sorts by name when asked", () => {
     const names = filterMenus(LIBRARY, { ...DEFAULT_FILTERS, sort: "name" }).map((m) => m.name);
-    expect(names).toEqual(["All Day Menu", "Breakfast Menu", "Ramadan Menu", "Riyadh Lunch"]);
+    expect(names).toEqual(["All Day Menu", "Breakfast Menu", "Ramadan Menu", "Riyadh Lunch", "Adha Eid Menu"]);
   });
 
   it("matches the search query case-insensitively", () => {
@@ -165,6 +172,30 @@ describe("setMenuSchedule", () => {
     expect(menu.schedule.type).toBe("lunch");
     expect(menu.schedule.start).toBe("10:00");
     expect(menu.updatedAt).toBe(NOW);
+  });
+});
+
+describe("applyScheduleType", () => {
+  it("sets the named type's window", () => {
+    const next = applyScheduleType(LIBRARY[0].schedule, "lunch");
+    expect(next).toMatchObject({ type: "lunch", start: "12:00", end: "16:00" });
+  });
+
+  it("keeps the current window when switching to custom", () => {
+    const lunch = applyScheduleType(LIBRARY[0].schedule, "lunch");
+    expect(applyScheduleType(lunch, "custom")).toMatchObject({ type: "custom", start: "12:00", end: "16:00" });
+  });
+});
+
+describe("setScheduleTime", () => {
+  it("turns a named window custom once a time is edited", () => {
+    const lunch = applyScheduleType(LIBRARY[0].schedule, "lunch");
+    expect(setScheduleTime(lunch, "end", "17:00")).toMatchObject({ type: "custom", end: "17:00" });
+  });
+
+  it("stays named when the edit lands back on the preset", () => {
+    const lunch = applyScheduleType(LIBRARY[0].schedule, "lunch");
+    expect(setScheduleTime(lunch, "start", "12:00").type).toBe("lunch");
   });
 });
 

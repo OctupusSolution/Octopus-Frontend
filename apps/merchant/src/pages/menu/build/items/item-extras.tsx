@@ -11,6 +11,17 @@ import { useI18n } from "@/app/providers/i18n-provider";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
 
+/** "HH:00" stays the stored value; the label is 12-hour as the frame draws it
+ *  ("10:00 AM"). Latin digits in Arabic too, matching the rest of the console. */
+function hourLabel(value: string, rtl: boolean): string {
+  const hour = Number(value.slice(0, 2));
+  return new Intl.DateTimeFormat(rtl ? "ar-u-nu-latn" : "en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(2000, 0, 1, hour));
+}
+
 function Switch({
   checked,
   onChange,
@@ -96,7 +107,8 @@ export function ScheduleCard({
   item: Item;
   onPatch: (patch: Partial<Item>) => void;
 }) {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
+  const rtl = dir === "rtl";
   // Narrow on the schedule itself rather than on a boolean: a separate flag
   // does not tell the compiler which arm of the union it came from.
   const sched = item.schedule;
@@ -161,7 +173,7 @@ export function ScheduleCard({
             onChange={(e) => setCustom({ start: e.target.value })}
           >
             {HOURS.map((h) => (
-              <option key={h} value={h}>{h}</option>
+              <option key={h} value={h}>{hourLabel(h, rtl)}</option>
             ))}
           </Select>
         </label>
@@ -176,7 +188,7 @@ export function ScheduleCard({
             onChange={(e) => setCustom({ end: e.target.value })}
           >
             {HOURS.map((h) => (
-              <option key={h} value={h}>{h}</option>
+              <option key={h} value={h}>{hourLabel(h, rtl)}</option>
             ))}
           </Select>
         </label>
@@ -196,10 +208,12 @@ export function ScheduleCard({
                 setCustom({ days: on ? days.filter((d: Weekday) => d !== day) : [...days, day] })
               }
               className={clsx(
-                "rounded-full px-3 py-1 text-[13px] disabled:opacity-60",
+                // Unselected days keep the chip's shape in a pale accent tint,
+                // so the row reads as one control rather than two kinds of pill.
+                "rounded-full border px-2.5 py-0.5 text-[14px] disabled:opacity-60",
                 on
-                  ? "bg-[var(--octo-accent)] text-white"
-                  : "border border-[var(--octo-border-card)] text-[var(--octo-text-secondary)]"
+                  ? "border-[var(--octo-accent)] bg-[var(--octo-accent)] text-white"
+                  : "border-[var(--octo-accent)] bg-[var(--octo-selected)] text-[var(--octo-accent)]"
               )}
             >
               {t(`menuLib.day.${day}`)}

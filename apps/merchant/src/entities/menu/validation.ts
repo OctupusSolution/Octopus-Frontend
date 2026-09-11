@@ -47,6 +47,10 @@ export function validate(menu: Menu): ValidationResult {
       // Checked on the menu, not per item: the library lists menus by name, so
       // one without a name is indistinguishable from its neighbours.
       ...(menu.name.trim() === "" ? [{ id: "menuMissingName", count: 1 }] : []),
+      // A menu with nothing to order would publish as a blank page on every
+      // channel. Offers do not count — they bundle items, so they cannot
+      // exist meaningfully without them.
+      ...(list.length === 0 ? [{ id: "menuEmpty", count: 1 }] : []),
       ...count(list, "itemMissingPrice", (item) => item.pricing.price <= 0),
       ...count(list, "taxMissing", (item) => item.pricing.vatRate <= 0),
     ],

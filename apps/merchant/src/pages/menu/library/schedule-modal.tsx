@@ -1,21 +1,45 @@
-// The four numbered blocks of the frame's Schedule Menu modal. Edits are held
+// The four numbered blocks of the frame's Schedule Menu modal (the numbers
+// live in the i18n strings). Edits are held
 // locally and only committed on Save, so closing without saving changes
 // nothing. The channel toggles here set the menu's channel visibility; the
 // menu's own status is not touched — a scheduled menu can still be POS-only.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Globe, MonitorSmartphone, QrCode, X } from "lucide-react";
 import { Modal, Button, Select, Checkbox } from "@ui/primitives";
 import {
   WEEKDAYS,
   SEED_BRANCHES,
+  applyScheduleType,
   channelStateFor,
   fallbackCandidates,
+  setScheduleTime,
   type Menu,
   type MenuSchedule,
   type Weekday,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { MenuCover, STATUS_TONE } from "./menu-card";
+import { Badge } from "@ui/primitives";
 
 const TYPES: MenuSchedule["type"][] = ["all-day", "breakfast", "lunch", "dinner", "custom"];
+
+const CHANNEL_ICON: Record<"pos" | "publicLink" | "tableQr", ReactNode> = {
+  pos: <MonitorSmartphone size={22} aria-hidden />,
+  publicLink: <Globe size={22} aria-hidden />,
+  tableQr: <QrCode size={22} aria-hidden />,
+};
+
+const FIELD =
+  "mt-1.5 w-full rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2.5 text-[15px] text-[var(--octo-text-primary)]";
+
+function Block({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-[var(--octo-border-card)] pt-4">
+      <h3 className="text-[17px] font-medium text-[var(--octo-text-primary)]">{title}</h3>
+      {children}
+    </section>
+  );
+}
 
 export function ScheduleModal({
   menu,
@@ -35,7 +59,7 @@ export function ScheduleModal({
   // Re-seed whenever a different menu opens the modal, so yesterday's edits
   // never leak into today's menu.
   useEffect(() => {
-    setDraft(menu ? { ...menu.schedule, days: [...menu.schedule.days] } : null);
+    setDraft(menu ? { ...menu.schedule, days: [...menu.schedule.days], branchIds: [...menu.schedule.branchIds] } : null);
     setChannels(menu ? { ...menu.channels } : null);
   }, [menu]);
 
@@ -53,34 +77,49 @@ export function ScheduleModal({
     });
   }
 
+  const unpicked = SEED_BRANCHES.filter((b) => !draft.branchIds.includes(b.id));
+
   return (
     <Modal
       open
       onClose={onClose}
-      title={t("menuLib.sched.title")}
+      className="max-h-[92vh] max-w-[740px] overflow-y-auto sm:p-7"
+      title={<span className="text-[24px] font-bold">{t("menuLib.sched.title")}</span>}
       footer={
-        <Button className="w-full" onClick={() => onSave(draft, channels)}>
+        <Button className="h-12 w-full justify-center text-[17px] font-semibold" onClick={() => onSave(draft, channels)}>
           {t("menuLib.sched.save")}
         </Button>
       }
     >
       <div className="space-y-5">
-        <section>
-          <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuLib.sched.availability")}
-          </h3>
-          <p className="mt-1 text-[13px] text-[var(--octo-text-secondary)]">
-            {t("menuLib.sched.chooseType")}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
+        {/* Which menu is being scheduled — the modal is opened from one of
+            nine look-alike cards, so it names its subject before anything. */}
+        <div className="flex items-center gap-3">
+          <MenuCover className="h-11 w-11 text-[9px]" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[17px] font-semibold text-[var(--octo-text-primary)]">{menu.name}</p>
+            <p className="text-[13px] text-[var(--octo-text-secondary)]">
+              {t(`menuLib.scheduleType.${menu.schedule.type}`)}
+            </p>
+          </div>
+          <Badge tone={STATUS_TONE[menu.status]}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+            {t(`menuLib.status.${menu.status}`)}
+          </Badge>
+        </div>
+
+        <Block title={t("menuLib.sched.availability")}>
+          <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{t("menuLib.sched.chooseType")}</p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
             {TYPES.map((type) => (
               <button
                 key={type}
                 type="button"
-                onClick={() => patch({ type })}
-                className={`rounded-[8px] border px-3 py-1.5 text-[14px] ${
+                aria-pressed={draft.type === type}
+                onClick={() => setDraft(applyScheduleType(draft, type))}
+                className={`rounded-[10px] border px-3 py-2.5 text-[15px] ${
                   draft.type === type
-                    ? "border-[var(--octo-accent)] text-[var(--octo-accent)]"
+                    ? "border-[var(--octo-accent)] bg-[var(--octo-selected)] text-[var(--octo-accent)]"
                     : "border-[var(--octo-border-card)] text-[var(--octo-text-primary)]"
                 }`}
               >
@@ -88,36 +127,24 @@ export function ScheduleModal({
               </button>
             ))}
           </div>
-        </section>
+        </Block>
 
-        <section>
-          <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuLib.sched.window")}
-          </h3>
+        <Block title={t("menuLib.sched.window")}>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            <label className="text-[13px] text-[var(--octo-text-secondary)]">
-              {t("menuLib.sched.startTime")}
-              <input
-                type="time"
-                value={draft.start}
-                onChange={(e) => patch({ start: e.target.value })}
-                className="mt-1 w-full rounded-[9px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2 text-[14px] text-[var(--octo-text-primary)]"
-              />
-            </label>
-            <label className="text-[13px] text-[var(--octo-text-secondary)]">
-              {t("menuLib.sched.endTime")}
-              <input
-                type="time"
-                value={draft.end}
-                onChange={(e) => patch({ end: e.target.value })}
-                className="mt-1 w-full rounded-[9px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2 text-[14px] text-[var(--octo-text-primary)]"
-              />
-            </label>
+            {(["start", "end"] as const).map((field) => (
+              <label key={field} className="text-[14px] text-[var(--octo-text-secondary)]">
+                {t(field === "start" ? "menuLib.sched.startTime" : "menuLib.sched.endTime")}
+                <input
+                  type="time"
+                  value={draft[field]}
+                  onChange={(e) => setDraft(setScheduleTime(draft, field, e.target.value))}
+                  className={FIELD}
+                />
+              </label>
+            ))}
           </div>
 
-          <p className="mt-3 text-[13px] text-[var(--octo-text-secondary)]">
-            {t("menuLib.sched.applyTo")}
-          </p>
+          <p className="mt-3 text-[14px] text-[var(--octo-text-secondary)]">{t("menuLib.sched.applyTo")}</p>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {WEEKDAYS.map((day) => (
               <button
@@ -125,7 +152,7 @@ export function ScheduleModal({
                 type="button"
                 aria-pressed={draft.days.includes(day)}
                 onClick={() => toggleDay(day)}
-                className={`rounded-full px-3 py-1 text-[13px] ${
+                className={`rounded-full px-3.5 py-1.5 text-[14px] ${
                   draft.days.includes(day)
                     ? "bg-[var(--octo-accent)] text-white"
                     : "border border-[var(--octo-border-card)] text-[var(--octo-text-secondary)]"
@@ -136,47 +163,68 @@ export function ScheduleModal({
             ))}
           </div>
 
-          <label className="mt-3 block text-[13px] text-[var(--octo-text-secondary)]">
-            {t("menuLib.sched.timezone")}
-            <Select
-              className="mt-1"
-              value={draft.timezone}
-              onChange={(e) => patch({ timezone: e.target.value })}
-            >
-              <option value="Asia/Riyadh">(GMT+ 03:00) Asia/Riyadh</option>
-            </Select>
-          </label>
+          <div className="mt-3 space-y-3">
+            <label className="block text-[14px] text-[var(--octo-text-secondary)]">
+              {t("menuLib.sched.timezone")}
+              <Select className="mt-1.5" value={draft.timezone} onChange={(e) => patch({ timezone: e.target.value })}>
+                <option value="Asia/Riyadh">(GMT+ 03:00) Asia/Riyadh</option>
+              </Select>
+            </label>
 
-          <label className="mt-3 block text-[13px] text-[var(--octo-text-secondary)]">
-            {t("menuLib.sched.branches")}
-            <Select
-              className="mt-1"
-              value={draft.branchIds[0] ?? ""}
-              onChange={(e) => patch({ branchIds: [e.target.value] })}
-            >
-              {SEED_BRANCHES.map((branch) => (
-                <option key={branch.id} value={branch.id}>{branch.label}</option>
-              ))}
-            </Select>
-          </label>
-        </section>
+            {/* Several branches can share one menu, so this is a chip set:
+                chosen branches as removable chips, the rest in a picker. The
+                last chip cannot be removed — a menu must serve somewhere. */}
+            <div className="text-[14px] text-[var(--octo-text-secondary)]">
+              {t("menuLib.sched.branches")}
+              <div className="mt-1.5 flex min-h-[44px] flex-wrap items-center gap-1.5 rounded-[10px] border border-[var(--octo-border-card)] p-1.5">
+                {draft.branchIds.map((id) => (
+                  <span
+                    key={id}
+                    className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--octo-accent)] bg-[var(--octo-selected)] px-2 py-1 text-[13px] text-[var(--octo-accent)]"
+                  >
+                    {SEED_BRANCHES.find((b) => b.id === id)?.label ?? id}
+                    {draft.branchIds.length > 1 && (
+                      <button
+                        type="button"
+                        aria-label={`${t("menuLib.sched.removeBranch")} ${SEED_BRANCHES.find((b) => b.id === id)?.label ?? id}`}
+                        onClick={() => patch({ branchIds: draft.branchIds.filter((b) => b !== id) })}
+                        className="rounded-full"
+                      >
+                        <X size={13} aria-hidden />
+                      </button>
+                    )}
+                  </span>
+                ))}
+                {unpicked.length > 0 && (
+                  <select
+                    aria-label={t("menuLib.sched.addBranch")}
+                    value=""
+                    onChange={(e) => e.target.value && patch({ branchIds: [...draft.branchIds, e.target.value] })}
+                    className="min-w-0 flex-1 bg-transparent px-1 py-1 text-[13px] text-[var(--octo-text-secondary)] outline-none"
+                  >
+                    <option value="">+ {t("menuLib.sched.addBranch")}</option>
+                    {unpicked.map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.label}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+          </div>
+        </Block>
 
-        <section>
-          <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuLib.sched.channels")}
-          </h3>
+        <Block title={t("menuLib.sched.channels")}>
           <div className="mt-2 divide-y divide-[var(--octo-border-card)]">
             {(["pos", "publicLink", "tableQr"] as const).map((channel) => {
               const on = channels[channel] !== "off";
               return (
-                <div key={channel} className="flex items-start justify-between gap-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
+                <div key={channel} className="flex items-center justify-between gap-3 py-3">
+                  <span className="text-[var(--octo-text-secondary)]">{CHANNEL_ICON[channel]}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-[var(--octo-text-primary)]">
                       {t(`menuLib.channel.${channel}`)}
                     </p>
-                    <p className="text-[13px] text-[var(--octo-text-secondary)]">
-                      {t(`menuLib.sched.${channel}Hint`)}
-                    </p>
+                    <p className="text-[13px] text-[var(--octo-text-secondary)]">{t(`menuLib.sched.${channel}Hint`)}</p>
                   </div>
                   {/* Switching a channel off is not the same as holding the
                       menu: the menu stays active everywhere else, so the
@@ -188,12 +236,10 @@ export function ScheduleModal({
                     aria-label={t(`menuLib.channel.${channel}`)}
                     onClick={() =>
                       setChannels((prev) =>
-                        prev
-                          ? { ...prev, [channel]: on ? "off" : channelStateFor(menu.status) }
-                          : prev
+                        prev ? { ...prev, [channel]: on ? "off" : channelStateFor(menu.status) } : prev
                       )
                     }
-                    className={`mt-0.5 h-[22px] w-[40px] shrink-0 rounded-full p-[2px] transition-colors ${
+                    className={`h-[22px] w-[40px] shrink-0 rounded-full p-[2px] transition-colors ${
                       on ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-switch-off)]"
                     }`}
                   >
@@ -207,17 +253,13 @@ export function ScheduleModal({
               );
             })}
           </div>
-        </section>
+        </Block>
 
-        <section>
-          <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuLib.sched.additional")}
-          </h3>
-          <label className="mt-2 block text-[13px] text-[var(--octo-text-secondary)]">
-            {t("menuLib.sched.fallback")}{" "}
-            <span className="text-[var(--octo-text-secondary)]">({t("menuLib.sched.fallbackHint")})</span>
+        <Block title={t("menuLib.sched.additional")}>
+          <label className="mt-2 block text-[14px] text-[var(--octo-text-secondary)]">
+            {t("menuLib.sched.fallback")} <span>({t("menuLib.sched.fallbackHint")})</span>
             <Select
-              className="mt-1"
+              className="mt-1.5"
               value={draft.fallbackMenuId ?? ""}
               onChange={(e) => patch({ fallbackMenuId: e.target.value || null })}
             >
@@ -235,7 +277,7 @@ export function ScheduleModal({
             onChange={(e) => patch({ allowPreorderOutsideSchedule: e.target.checked })}
             label={t("menuLib.sched.preorder")}
           />
-        </section>
+        </Block>
       </div>
     </Modal>
   );

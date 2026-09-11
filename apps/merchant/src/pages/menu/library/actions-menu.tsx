@@ -10,8 +10,8 @@ import type { Menu } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { CardAction } from "./menu-card";
 
-const MENU_WIDTH = 220;
-const ROW_HEIGHT = 46;
+const MENU_WIDTH = 180;
+const ROW_HEIGHT = 48;
 const GAP = 6;
 const VIEWPORT_MARGIN = 8;
 
@@ -65,7 +65,7 @@ export function ActionsMenu({
 
   // Flip above the button when there is not enough room below it, so the last
   // row is never the one cut off by the viewport.
-  const height = actions.length * ROW_HEIGHT;
+  const height = actions.length * ROW_HEIGHT + 8;
   const below = anchor.bottom + GAP;
   const flip = below + height > window.innerHeight - VIEWPORT_MARGIN;
   const top = flip ? Math.max(VIEWPORT_MARGIN, anchor.top - GAP - height) : below;
@@ -83,16 +83,20 @@ export function ActionsMenu({
       role="menu"
       aria-label={menu.name}
       style={{ top, left, width: MENU_WIDTH }}
-      className="fixed z-50 overflow-hidden rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] shadow-lg"
+      className="fixed z-50 space-y-2 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2 shadow-lg"
     >
+      {/* Each choice is its own soft tile, as the frame draws them — no
+          dividers, and Delete on a red wash so it never reads as a sibling. */}
       {actions.map((action) => (
         <button
           key={action}
           type="button"
           role="menuitem"
           onClick={() => onPick(action)}
-          className={`block w-full border-b border-[var(--octo-border-card)] px-4 py-3 text-start text-[14px] last:border-b-0 hover:bg-[var(--octo-hover)] ${
-            action === "delete" ? "text-error hover:bg-error/10" : "text-[var(--octo-text-primary)]"
+          className={`block h-10 w-full rounded-[8px] px-3 text-start text-[14px] ${
+            action === "delete"
+              ? "bg-error/10 text-error hover:bg-error/20"
+              : "bg-[var(--octo-hover)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-selected)]"
           }`}
         >
           {t(`menuLib.action.${action}`)}

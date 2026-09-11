@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  OFFERS_SECTION_ID,
+  addOffer,
   addItem,
   addSection,
   blankItem,
@@ -7,7 +9,7 @@ import {
   blankSection,
   updateItem,
 } from "./draft";
-import { individualTotals, offerLines, offerSavings, offerTotals } from "./pricing";
+import { discountedPrice, individualTotals, offerLines, syncDiscountPrice, offerSavings, offerTotals } from "./pricing";
 import type { Offer } from "./menu";
 
 const NOW = "2026-09-10T08:00:00.000Z";
@@ -41,7 +43,10 @@ const OFFER: Offer = {
     { itemId: "i3", qty: 1, price: 20 },
   ],
   customerCanChange: false,
-  pricing: { role: "fixed", offerPrice: 100, vatRate: 0.15, excludeFromPromotions: false },
+  pricing: {
+    role: "fixed", offerPrice: 100, vatRate: 0.15,
+    excludeFromPromotions: false, discount: null,
+  },
   availability: { from: null, to: null, window: null },
   channels: {
     dineIn: true, takeaway: true, delivery: true,
@@ -76,6 +81,50 @@ describe("individualTotals", () => {
   it("multiplies by quantity", () => {
     const offer = { ...OFFER, entries: [{ itemId: "i2", qty: 3, price: 20 }] };
     expect(individualTotals(menuWithParts(), offer).subTotal).toBe(60);
+  });
+});
+
+describe("discountedPrice", () => {
+  it("takes a percentage off the VAT-exclusive subtotal", () => {
+    expect(discountedPrice(130, { type: "percent", value: 10 })).toBe(117);
+  });
+
+  it("takes a fixed amount off, to two decimals", () => {
+    expect(discountedPrice(130, { type: "amount", value: 30.55 })).toBe(99.45);
+  });
+
+  it("never goes below zero", () => {
+    expect(discountedPrice(130, { type: "amount", value: 500 })).toBe(0);
+    expect(discountedPrice(130, { type: "percent", value: 150 })).toBe(0);
+  });
+
+  it("is the subtotal when there is no discount", () => {
+    expect(discountedPrice(130, null)).toBe(130);
+  });
+});
+
+describe("syncDiscountPrice", () => {
+  function withOffer(offer: Offer) {
+    return addOffer(menuWithParts(), offer);
+  }
+  function stored(menu: ReturnType<typeof withOffer>): Offer {
+    return menu.sections.find((s) => s.id === OFFERS_SECTION_ID)!.entries[0] as Offer;
+  }
+
+  it("writes the derived price back under the discount role", () => {
+    const menu = syncDiscountPrice(
+      withOffer({ ...OFFER, pricing: { ...OFFER.pricing, role: "discount", discount: { type: "amount", value: 30 } } }),
+      "of1"
+    );
+    expect(stored(menu).pricing.offerPrice).toBe(100);
+  });
+
+  it("leaves a fixed price the merchant typed alone", () => {
+    const menu = syncDiscountPrice(
+      withOffer({ ...OFFER, pricing: { ...OFFER.pricing, offerPrice: 77, discount: { type: "amount", value: 30 } } }),
+      "of1"
+    );
+    expect(stored(menu).pricing.offerPrice).toBe(77);
   });
 });
 

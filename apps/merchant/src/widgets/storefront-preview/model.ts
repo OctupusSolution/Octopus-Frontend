@@ -111,4 +111,43 @@ export interface StorefrontPreviewModel {
   sampleWasPrices: readonly string[];
   hero: PreviewHero;
   device: PreviewDevice;
+
+  /* ------------------------------------------------------------------
+   * Menu-page theming. Every field below is optional and only the menu
+   * builder's Theme step sets them; onboarding and the Public Link Builder
+   * omit them all and draw exactly what they drew before.
+   * ------------------------------------------------------------------ */
+
+  /** Body typeface (a FONTS id); `font` stays the title face. */
+  bodyFont?: string;
+  /** Parallel to `categoryLabels`: an image the merchant uploaded for that
+   *  tile, used verbatim (data URLs included). `null` falls back to the stock
+   *  `categoryImages` photograph. `storefrontAsset()` prefixes a path, which
+   *  would turn a data URL into a broken link — hence a separate list. */
+  categoryImageUrls?: readonly (string | null)[];
+  /** Parallel to `categoryLabels`: the section's own accent colour, or null. */
+  categoryColors?: readonly (string | null)[];
+  /** How the category strip draws on the menu page. */
+  categoryStyle?: "icon-text" | "text-only" | "icons-only" | "image-text";
+  /** How each dish card is laid out on the menu page. */
+  cardStyle?: "classic" | "clean-minimal" | "image-top" | "image-left";
+  /** How the customer moves between categories. */
+  navStyle?: "top-bar" | "side-drawer" | "bottom-bar" | "pill-scroll";
+  /** The menu page's body, one group per merchant section, in order: its
+   *  heading, accent colour, display style, and which `products` (by index)
+   *  it holds. Absent means the old flat grid of cards. */
+  menuGroups?: readonly {
+    label: string;
+    color: string | null;
+    layout: "list" | "carousel" | "grid";
+    products: readonly number[];
+  }[];
+  /** Draw each product's `tags` as badges. */
+  showItemTags?: boolean;
+  /** Draw a sticky add-to-cart bar across the bottom of the menu page. */
+  stickyAddToCart?: boolean;
+  /** Real offers for the offers block: name and already formatted price. */
+  offers?: readonly { name: string; price: string; image?: string | null }[];
+  /** Already-translated tag labels per product, parallel to `products`. */
+  productTags?: readonly (readonly string[])[];
 }

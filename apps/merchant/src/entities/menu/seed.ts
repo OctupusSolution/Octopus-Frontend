@@ -14,6 +14,7 @@ import {
   type MenuStatus,
   type Section,
 } from "./menu";
+import { OFFERS_SECTION_ID } from "./draft";
 
 export const SEED_BRANCHES: readonly { id: string; label: string }[] = [
   { id: "jeddah-corniche", label: "Jeddah - Corniche" },
@@ -21,9 +22,13 @@ export const SEED_BRANCHES: readonly { id: string; label: string }[] = [
   { id: "dammam-corniche", label: "Dammam - Corniche" },
 ];
 
+// Offers comes last and keeps the id "offers": every menu's built-in offers
+// section is found by that id and must stay at the end (see draft.ts). Seeding
+// it mid-list under a generated id made it draggable, deletable and invisible
+// to the offers editor.
 const SECTION_NAMES = [
-  "Breakfast", "Starters", "Mains", "Desserts", "Drinks", "Offers",
-  "Grills", "Salads", "Sandwiches", "Pasta", "Burgers", "Sides",
+  "Breakfast", "Starters", "Mains", "Desserts", "Drinks",
+  "Grills", "Salads", "Sandwiches", "Pasta", "Burgers", "Sides", "Offers",
 ] as const;
 
 function seedItem(sectionId: string, index: number): Item {
@@ -49,7 +54,7 @@ function seedItem(sectionId: string, index: number): Item {
 // Twelve sections, ten items each — the 12 and 120 the cards show.
 function seedSections(menuId: string): Section[] {
   return SECTION_NAMES.map((name, index) => {
-    const id = `${menuId}-s${index}`;
+    const id = name === "Offers" ? OFFERS_SECTION_ID : `${menuId}-s${index}`;
     return {
       id,
       kind: name === "Offers" ? "offers" : "items",
@@ -65,12 +70,12 @@ function seedSections(menuId: string): Section[] {
 }
 
 // The Offers section carries no seeded entries, so its ten are made up
-// elsewhere: give the eleventh and twelfth sections an extra ten between them
-// to keep the visible total at 120.
+// elsewhere: the last item section takes an extra ten to keep the visible
+// total at 120.
 function balanced(sections: Section[]): Section[] {
-  const offers = sections.find((s) => s.kind === "offers");
-  if (!offers) return sections;
-  const donor = sections[sections.length - 1];
+  const items = sections.filter((s) => s.kind !== "offers");
+  if (items.length === sections.length) return sections;
+  const donor = items[items.length - 1];
   return sections.map((section) =>
     section.id === donor.id
       ? { ...section, entries: [...section.entries, ...Array.from({ length: 10 }, (_, i) => seedItem(donor.id, 10 + i))] }
@@ -94,7 +99,7 @@ function seedMenu(
     branchId,
     sections: balanced(seedSections(id)),
     theme: {
-      presetId: "elegant",
+      presetId: "ocean",
       navStyle: "top-bar",
       categoryStyle: "icon-text",
       cardStyle: "classic",

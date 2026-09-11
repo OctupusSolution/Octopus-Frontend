@@ -1,14 +1,40 @@
 // The Allergies tab: which allergens this dish carries, plus free text for the
 // things a checkbox cannot say ("fried in the same oil as shellfish").
-import { Plus } from "lucide-react";
-import { Checkbox } from "@ui/primitives";
+import { useState } from "react";
+import { Check, Plus } from "lucide-react";
+import { Button, Modal } from "@ui/primitives";
 import type { Item } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 
-// The three the frame shows, offered by default. `Add Allergens` appends the
-// rest of this list; anything already on the item is rendered whether or not
-// it appears here, so an allergen set elsewhere is never silently dropped.
-const KNOWN = ["gluten", "eggs", "dairy"] as const;
+// The three the frame shows are listed by default; `Add Allergens` offers the
+// rest. Anything already on the item is rendered whether or not it appears
+// here, so an allergen set elsewhere is never silently dropped.
+const DEFAULT_ROWS = ["gluten", "eggs", "dairy"] as const;
+const KNOWN = [
+  ...DEFAULT_ROWS,
+  "nuts", "peanuts", "soy", "fish", "shellfish", "sesame", "mustard", "celery",
+] as const;
+
+/** A 22px checkbox — the primitive's 16px box reads as a speck beside the
+ *  frame's 16px labels. The native input stays in place for a11y. */
+function BigCheck({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <span className="relative inline-grid h-[22px] w-[22px] shrink-0 place-items-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="peer absolute inset-0 cursor-pointer appearance-none rounded-[4px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] checked:border-[var(--octo-accent)] checked:bg-[var(--octo-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--octo-accent)]"
+      />
+      <Check
+        size={15}
+        strokeWidth={3}
+        aria-hidden
+        className="pointer-events-none relative hidden text-white peer-checked:block"
+      />
+    </span>
+  );
+}
 
 export function TabAllergies({
   item,
@@ -19,43 +45,64 @@ export function TabAllergies({
 }) {
   const { t } = useI18n();
   const selected = item.allergies.allergens;
-  const rows = Array.from(new Set<string>([...KNOWN, ...selected]));
+  // Rows the merchant pulled in from the picker but has not ticked yet stay
+  // listed for this visit, so unticking one does not make it vanish mid-click.
+  const [extraRows, setExtraRows] = useState<string[]>([]);
+  const rows = Array.from(new Set<string>([...DEFAULT_ROWS, ...extraRows, ...selected]));
+  const available = KNOWN.filter((id) => !rows.includes(id));
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  function label(id: string) {
+    const key = `menuWiz.item.allergen.${id}`;
+    const text = t(key);
+    // Unknown ids (set by an import, say) have no key; show the raw id.
+    return text === key ? id : text;
+  }
 
   function toggle(id: string) {
     onPatch({
       allergies: {
         ...item.allergies,
-        allergens: selected.includes(id)
-          ? selected.filter((a) => a !== id)
-          : [...selected, id],
+        allergens: selected.includes(id) ? selected.filter((a) => a !== id) : [...selected, id],
       },
     });
   }
 
+  function addPicked() {
+    const fresh = picked.filter((id) => !selected.includes(id));
+    if (fresh.length) {
+      onPatch({ allergies: { ...item.allergies, allergens: [...selected, ...fresh] } });
+      setExtraRows((rows) => [...rows, ...fresh]);
+    }
+    setPicked([]);
+    setPickerOpen(false);
+  }
+
   return (
-    <div className="max-w-[680px] space-y-2.5">
+    <div className="space-y-3">
       {rows.map((id) => (
         <label
           key={id}
-          className="flex items-center gap-2.5 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-3"
+          className="flex cursor-pointer items-center gap-3 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-3"
         >
-          <Checkbox checked={selected.includes(id)} onChange={() => toggle(id)} />
-          <span className="text-[14px] font-medium text-[var(--octo-accent)]">
-            {t(`menuWiz.item.allergen.${id}`)}
-          </span>
+          <BigCheck checked={selected.includes(id)} onChange={() => toggle(id)} />
+          <span className="text-[16px] font-medium text-[var(--octo-accent)]">{label(id)}</span>
         </label>
       ))}
 
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed border-[var(--octo-accent)] bg-[var(--octo-selected)] px-3 py-2.5 text-[14px] font-medium text-[var(--octo-accent)]"
+        onClick={() => setPickerOpen(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--octo-accent)] bg-[var(--octo-card)] px-3 py-3 text-[16px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
       >
-        <Plus size={16} aria-hidden />
+        <Plus size={20} aria-hidden />
         {t("menuWiz.item.addAllergens")}
       </button>
 
       <label className="block pt-1">
-        <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
+        <span className="text-[16px] font-medium text-[var(--octo-text-primary)]">
           {t("menuWiz.item.allergenNote")}
         </span>
         <textarea
@@ -65,6 +112,60 @@ export function TabAllergies({
           className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
         />
       </label>
+
+      <Modal
+        open={pickerOpen}
+        onClose={() => {
+          setPicked([]);
+          setPickerOpen(false);
+        }}
+        title={
+          <span className="text-[20px] font-bold text-[var(--octo-text-primary)]">
+            {t("menuWiz.item.addAllergens")}
+          </span>
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setPicked([]);
+                setPickerOpen(false);
+              }}
+            >
+              {t("menuWiz.cancel")}
+            </Button>
+            <Button disabled={picked.length === 0} onClick={addPicked}>
+              {t("menuWiz.item.allergenAdd")}
+            </Button>
+          </div>
+        }
+      >
+        {available.length === 0 ? (
+          <p className="text-[14px] text-[var(--octo-text-secondary)]">
+            {t("menuWiz.item.allergenAll")}
+          </p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {available.map((id) => (
+              <label
+                key={id}
+                className="flex cursor-pointer items-center gap-3 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-2.5"
+              >
+                <BigCheck
+                  checked={picked.includes(id)}
+                  onChange={() =>
+                    setPicked((list) =>
+                      list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+                    )
+                  }
+                />
+                <span className="text-[15px] text-[var(--octo-text-primary)]">{label(id)}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

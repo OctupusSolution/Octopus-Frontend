@@ -6,6 +6,7 @@
 // fixture — an offer whose parts change has to re-quote itself.
 
 import type { Item, Menu, Offer } from "./menu";
+import { OFFERS_SECTION_ID, updateOffer } from "./draft";
 
 export interface OfferLine {
   name: string;
@@ -49,6 +50,36 @@ export function individualTotals(
   );
   const vat = subTotal * offer.pricing.vatRate;
   return { subTotal: round(subTotal), vat: round(vat), total: round(subTotal + vat) };
+}
+
+/** The offer price the "Set a Discount" role derives: the VAT-exclusive
+ *  individual subtotal less the discount, never below zero. Exclusive because
+ *  offerPrice itself is exclusive — VAT is added on top of it in offerTotals. */
+export function discountedPrice(
+  subTotal: number,
+  discount: Offer["pricing"]["discount"]
+): number {
+  if (!discount || discount.value <= 0) return round(subTotal);
+  const off =
+    discount.type === "percent"
+      ? subTotal * (Math.min(discount.value, 100) / 100)
+      : discount.value;
+  return round(Math.max(0, subTotal - off));
+}
+
+/** Re-derives the offer price of a "Set a Discount" offer after any edit to
+ *  it. offerPrice stays a stored field — the Next Step gate, the entry list
+ *  and the storefront all read it — so under that role it has to be written
+ *  back whenever the lines or the discount change, not only computed on the
+ *  pricing tab. Any other role is left alone: there the merchant typed it. */
+export function syncDiscountPrice(menu: Menu, offerId: string): Menu {
+  const offer = menu.sections
+    .find((s) => s.id === OFFERS_SECTION_ID)
+    ?.entries.find((e) => e.id === offerId) as Offer | undefined;
+  if (!offer || offer.pricing.role !== "discount") return menu;
+  const offerPrice = discountedPrice(individualTotals(menu, offer).subTotal, offer.pricing.discount);
+  if (offerPrice === offer.pricing.offerPrice) return menu;
+  return updateOffer(menu, offerId, { pricing: { ...offer.pricing, offerPrice } });
 }
 
 export function offerTotals(offer: Offer): { price: number; vat: number; total: number } {

@@ -22,8 +22,16 @@ import {
   removeModifierOption,
   removeSection,
   updateItem,
+  duplicateOffer,
+  moveModifierGroup,
+  moveModifierOption,
+  updateModifierOption,
   updateModifierGroup,
   updateSection,
+  archiveSection,
+  restoreSection,
+  toggleSectionVisibility,
+  neighbourSectionId,
 } from "./draft";
 import type { Item, ModifierGroup, Offer } from "./menu";
 
@@ -86,6 +94,31 @@ describe("sections", () => {
   it("leaves the order alone when an index is out of range", () => {
     const menu = moveSection(withBreakfast(), 5, 0);
     expect(menu.sections.map((s) => s.id)).toEqual(["s1", OFFERS_SECTION_ID]);
+  });
+
+  it("toggles visible and hidden, but never touches an archived section", () => {
+    let menu = toggleSectionVisibility(withBreakfast(), "s1");
+    expect(menu.sections[0].visibility).toBe("hidden");
+    menu = toggleSectionVisibility(menu, "s1");
+    expect(menu.sections[0].visibility).toBe("visible");
+    menu = toggleSectionVisibility(archiveSection(menu, "s1"), "s1");
+    expect(menu.sections[0].visibility).toBe("archived");
+  });
+
+  it("restores an archived section to visible and ignores others", () => {
+    const hidden = updateSection(withBreakfast(), "s1", { visibility: "hidden" });
+    expect(restoreSection(hidden, "s1").sections[0].visibility).toBe("hidden");
+    const archived = archiveSection(hidden, "s1");
+    expect(restoreSection(archived, "s1").sections[0].visibility).toBe("visible");
+  });
+
+  it("picks the next section after a removal, else the previous, else null", () => {
+    let menu = withBreakfast();
+    menu = addSection(menu, blankSection("s2", "items", "Mains", null));
+    expect(neighbourSectionId(menu, "s1")).toBe("s2");
+    expect(neighbourSectionId(menu, OFFERS_SECTION_ID)).toBe("s2");
+    expect(neighbourSectionId(base(), OFFERS_SECTION_ID)).toBeNull();
+    expect(neighbourSectionId(menu, "missing")).toBeNull();
   });
 });
 
@@ -194,6 +227,70 @@ describe("modifiers", () => {
     expect(modifierTotal(firstItem(menu))).toBe(113);
   });
 
+  it("applies a chosen fixed price as the base before any surcharge, whatever the group order", () => {
+    const surcharge: ModifierGroup = {
+      ...size, id: "gA", type: "multi",
+      options: [{ id: "a1", name: "Bacon", subLabel: "", priceType: "add-amount", price: 5, isDefault: true, available: true }],
+    };
+    const fixed: ModifierGroup = {
+      ...size, id: "gF",
+      options: [{ id: "f1", name: "Family", subLabel: "", priceType: "fixed", price: 150, isDefault: true, available: true }],
+    };
+    let menu = updateItem(withGroup(), "s1", "i1", { modifierGroups: [surcharge, fixed] });
+    expect(modifierTotal(firstItem(menu))).toBe(155);
+    menu = updateItem(menu, "s1", "i1", { modifierGroups: [fixed, surcharge] });
+    expect(modifierTotal(firstItem(menu))).toBe(155);
+  });
+
+  function withThreeOptions() {
+    let menu = withGroup();
+    for (const id of ["o1", "o2", "o3"]) {
+      menu = addModifierOption(menu, "s1", "i1", "g1", {
+        id, name: id, subLabel: "", priceType: "no-change", price: 0,
+        isDefault: id === "o1", available: true,
+      });
+    }
+    return menu;
+  }
+
+  it("keeps a single-choice group to one default when a defaulted option is added", () => {
+    const menu = addModifierOption(withThreeOptions(), "s1", "i1", "g1", {
+      id: "o4", name: "o4", subLabel: "", priceType: "no-change", price: 0,
+      isDefault: true, available: true,
+    });
+    expect(firstItem(menu).modifierGroups[0].options.filter((o) => o.isDefault).map((o) => o.id))
+      .toEqual(["o4"]);
+  });
+
+  it("moves the default when another single-choice option is made default", () => {
+    const menu = updateModifierOption(withThreeOptions(), "s1", "i1", "g1", "o3", { isDefault: true });
+    expect(firstItem(menu).modifierGroups[0].options.map((o) => o.isDefault)).toEqual([false, false, true]);
+  });
+
+  it("lets a default be unticked, leaving none", () => {
+    const menu = updateModifierOption(withThreeOptions(), "s1", "i1", "g1", "o1", { isDefault: false });
+    expect(firstItem(menu).modifierGroups[0].options.some((o) => o.isDefault)).toBe(false);
+  });
+
+  it("allows several defaults in a multi-choice group", () => {
+    let menu = updateModifierGroup(withThreeOptions(), "s1", "i1", "g1", { type: "multi" });
+    menu = updateModifierOption(menu, "s1", "i1", "g1", "o2", { isDefault: true });
+    expect(firstItem(menu).modifierGroups[0].options.map((o) => o.isDefault)).toEqual([true, true, false]);
+  });
+
+  it("reorders options, and ignores an out-of-range move", () => {
+    let menu = moveModifierOption(withThreeOptions(), "s1", "i1", "g1", 2, 0);
+    expect(firstItem(menu).modifierGroups[0].options.map((o) => o.id)).toEqual(["o3", "o1", "o2"]);
+    menu = moveModifierOption(menu, "s1", "i1", "g1", 0, 9);
+    expect(firstItem(menu).modifierGroups[0].options.map((o) => o.id)).toEqual(["o3", "o1", "o2"]);
+  });
+
+  it("reorders groups", () => {
+    let menu = addModifierGroup(withGroup(), "s1", "i1", { ...size, id: "g2", name: "Cheese" });
+    menu = moveModifierGroup(menu, "s1", "i1", 1, 0);
+    expect(firstItem(menu).modifierGroups.map((g) => g.id)).toEqual(["g2", "g1"]);
+  });
+
   it("ignores an unavailable option even when it is defaulted", () => {
     const menu = addModifierOption(withGroup(), "s1", "i1", "g1", {
       id: "o1", name: "Large", subLabel: "",
@@ -231,6 +328,18 @@ describe("offers", () => {
 
   it("removes an offer", () => {
     expect(offers(removeOffer(withOffer(), "of1"))).toEqual([]);
+  });
+
+  it("starts with no discount", () => {
+    expect(blankOffer("of1", "Combo").pricing.discount).toBeNull();
+  });
+
+  it("duplicates an offer right after the original, named and slugged as a copy", () => {
+    let menu = addOffer(withOffer(), blankOffer("of2", "Family Box"));
+    menu = duplicateOffer(menu, "of1", "of1-copy");
+    expect(offers(menu).map((o) => o.id)).toEqual(["of1", "of1-copy", "of2"]);
+    expect(offers(menu)[1].name).toBe("Classic Burger Combo (Copy)");
+    expect(offers(menu)[1].slug).toBe("Classic_Burger_Combo_(Copy)");
   });
 
   it("adds an entry, then changes its quantity in place", () => {

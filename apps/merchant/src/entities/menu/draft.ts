@@ -78,7 +78,7 @@ export function blankMenu(id: string, branchId: string, now: string): Menu {
     branchId,
     sections: [blankSection(OFFERS_SECTION_ID, "offers", "Offers", null)],
     theme: {
-      presetId: "elegant",
+      presetId: "ocean",
       navStyle: "top-bar",
       categoryStyle: "icon-text",
       cardStyle: "classic",
@@ -133,6 +133,35 @@ export function moveSection(menu: Menu, from: number, to: number): Menu {
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
   return { ...menu, sections: next };
+}
+
+/** The eye toggle. Archived sections are left alone — only Restore may bring
+ *  one back, so a stray click cannot republish something parked on purpose. */
+export function toggleSectionVisibility(menu: Menu, sectionId: string): Menu {
+  return mapSection(menu, sectionId, (s) =>
+    s.visibility === "archived"
+      ? s
+      : { ...s, visibility: s.visibility === "visible" ? "hidden" : "visible" }
+  );
+}
+
+export function archiveSection(menu: Menu, sectionId: string): Menu {
+  return updateSection(menu, sectionId, { visibility: "archived" });
+}
+
+/** Restores to visible: archiving is what hid it, so undoing it shows it. */
+export function restoreSection(menu: Menu, sectionId: string): Menu {
+  return mapSection(menu, sectionId, (s) =>
+    s.visibility === "archived" ? { ...s, visibility: "visible" } : s
+  );
+}
+
+/** Which section to select once `sectionId` is gone: the one after it, else
+ *  the one before, else null. Asked of the menu *before* removal. */
+export function neighbourSectionId(menu: Menu, sectionId: string): string | null {
+  const at = menu.sections.findIndex((s) => s.id === sectionId);
+  if (at === -1) return null;
+  return menu.sections[at + 1]?.id ?? menu.sections[at - 1]?.id ?? null;
 }
 
 /* -------------------------------------------------------------------- items */
@@ -265,6 +294,40 @@ export function removeModifierGroup(
   }));
 }
 
+/** A single-choice group can only arrive pre-selected on one option, so making
+ *  one the default takes it off the others. Done here rather than in the form
+ *  so the inline Default radio, the option dialog and any future import all
+ *  get the same rule. */
+function withSoleDefault(group: ModifierGroup, defaultId: string): ModifierGroup {
+  if (group.type !== "single") return group;
+  return {
+    ...group,
+    options: group.options.map((o) => (o.id === defaultId ? o : { ...o, isDefault: false })),
+  };
+}
+
+function moveInList<T>(list: T[], from: number, to: number): T[] | null {
+  const last = list.length - 1;
+  if (from < 0 || to < 0 || from > last || to > last || from === to) return null;
+  const next = [...list];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+export function moveModifierGroup(
+  menu: Menu,
+  sectionId: string,
+  itemId: string,
+  from: number,
+  to: number
+): Menu {
+  return mapItem(menu, sectionId, itemId, (item) => {
+    const next = moveInList(item.modifierGroups, from, to);
+    return next ? { ...item, modifierGroups: next } : item;
+  });
+}
+
 export function addModifierOption(
   menu: Menu,
   sectionId: string,
@@ -272,10 +335,10 @@ export function addModifierOption(
   groupId: string,
   option: ModifierOption
 ): Menu {
-  return mapGroup(menu, sectionId, itemId, groupId, (g) => ({
-    ...g,
-    options: [...g.options, option],
-  }));
+  return mapGroup(menu, sectionId, itemId, groupId, (g) => {
+    const next = { ...g, options: [...g.options, option] };
+    return option.isDefault ? withSoleDefault(next, option.id) : next;
+  });
 }
 
 export function updateModifierOption(
@@ -286,10 +349,27 @@ export function updateModifierOption(
   optionId: string,
   patch: Partial<ModifierOption>
 ): Menu {
-  return mapGroup(menu, sectionId, itemId, groupId, (g) => ({
-    ...g,
-    options: g.options.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
-  }));
+  return mapGroup(menu, sectionId, itemId, groupId, (g) => {
+    const next = {
+      ...g,
+      options: g.options.map((o) => (o.id === optionId ? { ...o, ...patch } : o)),
+    };
+    return patch.isDefault ? withSoleDefault(next, optionId) : next;
+  });
+}
+
+export function moveModifierOption(
+  menu: Menu,
+  sectionId: string,
+  itemId: string,
+  groupId: string,
+  from: number,
+  to: number
+): Menu {
+  return mapGroup(menu, sectionId, itemId, groupId, (g) => {
+    const next = moveInList(g.options, from, to);
+    return next ? { ...g, options: next } : g;
+  });
 }
 
 export function removeModifierOption(
@@ -310,19 +390,24 @@ export function removeModifierOption(
  *  frame's SAR 113 is 100 + Medium 8 + American 2 + Cheddar 3.
  *
  *  An option that is defaulted but unavailable contributes nothing: the
- *  customer cannot have it, so quoting them for it would be a lie. */
+ *  customer cannot have it, so quoting them for it would be a lie.
+ *
+ *  Two passes, so the answer does not depend on group order: a chosen "fixed"
+ *  price replaces the base first (the last one wins if several are chosen),
+ *  then every "add-amount" surcharge goes on top of whichever base that left.
+ *  "no-change" adds nothing at all. */
 export function modifierTotal(item: Item): number {
+  const chosen = item.modifierGroups.flatMap((g) =>
+    g.options.filter((o) => o.isDefault && o.available)
+  );
   let total = item.pricing.price;
-  for (const group of item.modifierGroups) {
-    for (const option of group.options) {
-      if (!option.isDefault || !option.available) continue;
-      if (option.priceType === "add-amount") total += option.price;
-      // "fixed" replaces the base rather than adding to it; "no-change" adds
-      // nothing at all.
-      if (option.priceType === "fixed") total = option.price;
-    }
+  for (const option of chosen) {
+    if (option.priceType === "fixed") total = option.price;
   }
-  return total;
+  for (const option of chosen) {
+    if (option.priceType === "add-amount") total += option.price;
+  }
+  return Number(total.toFixed(2));
 }
 
 /* ------------------------------------------------------------------- offers */
@@ -347,7 +432,13 @@ export function blankOffer(id: string, name: string): Offer {
     // The frame's own default: a combo is a fixed basket unless the merchant
     // says otherwise.
     customerCanChange: false,
-    pricing: { role: "fixed", offerPrice: 0, vatRate: 0.15, excludeFromPromotions: false },
+    pricing: {
+      role: "fixed",
+      offerPrice: 0,
+      vatRate: 0.15,
+      excludeFromPromotions: false,
+      discount: null,
+    },
     availability: { from: null, to: null, window: null },
     channels: {
       dineIn: true,
@@ -376,6 +467,21 @@ export function removeOffer(menu: Menu, offerId: string): Menu {
     ...s,
     entries: s.entries.filter((e) => e.id !== offerId),
   }));
+}
+
+/** The offer kebab's "Duplicate Offer". The copy is named "<name> (Copy)" and
+ *  slugged from that name, so two offers never share a public address. */
+export function duplicateOffer(menu: Menu, offerId: string, newId: string): Menu {
+  return mapSection(menu, OFFERS_SECTION_ID, (s) => {
+    const at = s.entries.findIndex((e) => e.id === offerId);
+    if (at === -1) return s;
+    const source = s.entries[at] as Offer;
+    const name = `${source.name} (Copy)`;
+    const copy: Offer = { ...source, id: newId, name, slug: slugify(name) };
+    const entries = [...s.entries];
+    entries.splice(at + 1, 0, copy);
+    return { ...s, entries };
+  });
 }
 
 function mapOffer(menu: Menu, offerId: string, fn: (offer: Offer) => Offer): Menu {

@@ -30,8 +30,14 @@ export type ChannelState =
 export type SectionKind = "items" | "offers";
 export type DisplayStyle = "list" | "carousel" | "grid";
 
-export type ItemTag =
+/** The four tags the frame offers as presets. */
+export type KnownItemTag =
   | "chef-recommended" | "top-selling" | "most-ordered" | "healthy-choice";
+
+/** A preset or a merchant-typed label. `string & {}` keeps the presets in
+ *  autocomplete instead of collapsing the union to plain `string`. */
+// eslint-disable-next-line @typescript-eslint/ban-types
+export type ItemTag = KnownItemTag | (string & {});
 
 export interface ModifierOption {
   id: string;
@@ -101,13 +107,23 @@ export interface Offer {
   pricing: {
     role: "fixed" | "discount" | "dynamic";
     offerPrice: number;
+    /** Only meaningful under the "discount" role, where offerPrice is derived
+     *  from it rather than typed. Kept when the role changes so switching back
+     *  does not lose what the merchant entered. */
+    discount: { type: "percent" | "amount"; value: number } | null;
     vatRate: number;
     excludeFromPromotions: boolean;
   };
   availability: {
     from: string | null;
     to: string | null;
-    window: { days: [Weekday, Weekday]; start: string; end: string } | null;
+    // Each part starts unchosen: the frame shows placeholders when the window
+    // is first ticked, and a pre-filled Sun–Sat 10–12 would be saved unread.
+    window: {
+      days: [Weekday | null, Weekday | null];
+      start: string | null;
+      end: string | null;
+    } | null;
   };
   channels: {
     dineIn: boolean;
@@ -127,7 +143,9 @@ export interface Section {
   name: string;
   image: string | null;
   description: string;
-  visibility: "visible" | "hidden";
+  /** "archived" is stronger than "hidden": the row is parked out of the way,
+   *  its eye toggle is locked, and only Restore brings it back. */
+  visibility: "visible" | "hidden" | "archived";
   displayStyle: DisplayStyle;
   color: string | null;
   entries: (Item | Offer)[];

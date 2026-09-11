@@ -33,6 +33,18 @@ function formatDatePill(date: string, locale: string): string {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+// Clicking an invisible date input only focuses it in Chrome; the picker
+// opens only from its own indicator. Open it explicitly so a click anywhere
+// on the pill works. showPicker() throws without user activation or inside a
+// cross-origin frame, and older browsers lack it — fall back to plain focus.
+export function openDatePicker(input: HTMLInputElement) {
+  try {
+    input.showPicker();
+  } catch {
+    input.focus();
+  }
+}
+
 export interface FilterBarProps {
   filters: ListFilters;
   onChange: (next: ListFilters) => void;
@@ -71,6 +83,7 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
           type="date"
           value={filters.date}
           onChange={(e) => onChange({ ...filters, day: "date", date: e.target.value })}
+          onClick={(e) => openDatePicker(e.currentTarget)}
           className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
         />
       </label>

@@ -16,14 +16,13 @@ interface CardSpec {
 
 export interface KpiCardsProps {
   kpis: Kpis;
-  /** "Today" / "Tomorrow" / a formatted date — whatever the list's day
-   *  filter is currently showing (fix round 4, finding 12). Card 1 used to
-   *  hardcode "Today's Reservations" even while `kpis` itself was already
-   *  correctly scoped to the picked day. */
-  dayLabel: string;
+  /** Card 1's label. "Today's Reservations" on the default Today view, as
+   *  the frame reads; "Reservations: {day}" once another day is picked, so
+   *  the label still says which day the numbers belong to. */
+  totalLabel: string;
 }
 
-export function KpiCards({ kpis, dayLabel }: KpiCardsProps) {
+export function KpiCards({ kpis, totalLabel }: KpiCardsProps) {
   const { t } = useI18n();
 
   const cards: CardSpec[] = [
@@ -33,7 +32,7 @@ export function KpiCards({ kpis, dayLabel }: KpiCardsProps) {
       tile: "#0D6EFD",
       icon: Users,
       value: kpis.total,
-      label: t("reservations.list.kpi.forDay").replace("{day}", dayLabel),
+      label: totalLabel,
       percent: (
         <span className="inline-flex items-center gap-1 text-[12px] font-medium">
           {/* Frame glyph is bars-plus-trend-line, not a bare arrow (fix round 1). */}

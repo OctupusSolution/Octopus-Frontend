@@ -35,13 +35,18 @@ export type RowMenu = "none" | "status" | "actions";
 // pill+deposit) and get double the weight of Seating/Source's one line.
 // Time, Party, Edit, Status, Contact and More stay fixed — they hold a
 // short, bounded value or a control, not prose that benefits from room.
+//
+// Audit fix: the floor used to total 1280px, but at a 1440px viewport only
+// ~1125px is left beside the sidebar, so Call, Email and the kebab were cut
+// off and the actions menu opened half off-screen. Tracks are tightened so
+// the floor totals 1104px and the whole row fits a standard laptop width.
 const ROW_GRID_COLUMNS =
-  "grid-cols-[124px_minmax(160px,2fr)_104px_minmax(148px,1fr)_minmax(128px,1fr)_minmax(180px,2fr)_88px_128px_180px_40px]";
+  "grid-cols-[104px_minmax(150px,2fr)_94px_minmax(116px,1fr)_minmax(110px,1fr)_minmax(150px,2fr)_80px_104px_156px_40px]";
 // Sum of the fixed tracks plus every minmax()'s floor, so the row scrolls
 // horizontally on narrow laptop widths instead of squeezing its columns out
 // of alignment. The page wraps the row list in a horizontally-scrolling
 // container sized to this.
-export const ROW_LIST_MIN_WIDTH = "min-w-[1280px]";
+export const ROW_LIST_MIN_WIDTH = "min-w-[1104px]";
 
 export interface ReservationRowProps {
   reservation: Reservation;
@@ -51,6 +56,9 @@ export interface ReservationRowProps {
   onEdit: () => void;
   onStatus: (status: ReservationStatus) => void;
   onDuplicate: () => void;
+  onAddNote: () => void;
+  onSendReminder: () => void;
+  onExportCalendar: () => void;
   onSharePaymentLink: () => void;
   onCancel: () => void;
 }
@@ -130,6 +138,9 @@ export function ReservationRow({
   onEdit,
   onStatus,
   onDuplicate,
+  onAddNote,
+  onSendReminder,
+  onExportCalendar,
   onSharePaymentLink,
   onCancel,
 }: ReservationRowProps) {
@@ -194,7 +205,7 @@ export function ReservationRow({
       {/* 1. Time — dir="ltr" (fix round 4, finding 18): a bare "7:00 PM" in
           an RTL container reverses to "PM 7:00", the AM/PM token bidi-swapped
           in front of the digits. */}
-      <Cell divider={false}>
+      <Cell divider={false} className="!px-2.5">
         <p className="text-[15px] font-bold text-[#0D6EFD]" dir="ltr">{clock12(reservation.startMinutes)}</p>
         <p className="text-[11.5px] text-[var(--octo-text-muted)]">{dayText}</p>
         <p className="text-[11px] text-[var(--octo-text-faint)]">
@@ -213,9 +224,9 @@ export function ReservationRow({
       </Cell>
 
       {/* 3. Party */}
-      <Cell className="flex items-center gap-1.5">
+      <Cell className="flex items-center gap-1.5 !px-2.5">
         <Users size={14} className="shrink-0 text-[var(--octo-text-muted)]" />
-        <span className="text-[12px] text-[var(--octo-text-secondary)]">{guestsLabel}</span>
+        <span className="whitespace-nowrap text-[12px] text-[var(--octo-text-secondary)]">{guestsLabel}</span>
       </Cell>
 
       {/* 4. Seating */}
@@ -274,11 +285,11 @@ export function ReservationRow({
       </Cell>
 
       {/* 7. Edit */}
-      <Cell onClick={stopBubble} className="flex items-center">
+      <Cell onClick={stopBubble} className="flex items-center !px-2">
         <button
           type="button"
           onClick={onEdit}
-          className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[#0D6EFD] transition-colors hover:bg-[var(--octo-hover)]"
+          className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2.5 py-[7px] text-[12px] font-medium text-[#0D6EFD] transition-colors hover:bg-[var(--octo-hover)]"
         >
           <SquarePen size={13} />
           {t("reservations.list.row.edit")}
@@ -286,7 +297,7 @@ export function ReservationRow({
       </Cell>
 
       {/* 8. Status */}
-      <Cell onClick={stopBubble} className="flex items-center">
+      <Cell onClick={stopBubble} className="flex items-center !px-2">
         <StatusMenu
           value={reservation.status}
           onSelect={onStatus}
@@ -296,7 +307,7 @@ export function ReservationRow({
       </Cell>
 
       {/* 9. Contact */}
-      <Cell onClick={stopBubble} className="flex items-center gap-3">
+      <Cell onClick={stopBubble} className="flex items-center justify-center gap-2.5 !px-2">
         <ContactLink
           href={`https://wa.me/${digits}`}
           tone="#25D366"
@@ -319,9 +330,12 @@ export function ReservationRow({
       </Cell>
 
       {/* 10. More actions */}
-      <Cell onClick={stopBubble} className="flex items-center">
+      <Cell onClick={stopBubble} className="flex items-center justify-center !px-1">
         <RowActionsMenu
           onDuplicate={onDuplicate}
+          onAddNote={onAddNote}
+          onSendReminder={onSendReminder}
+          onExportCalendar={onExportCalendar}
           onSharePaymentLink={onSharePaymentLink}
           onCancel={onCancel}
           // Enabled whenever there's a deposit to share a link for (fix

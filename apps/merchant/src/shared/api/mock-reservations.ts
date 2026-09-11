@@ -146,7 +146,10 @@ export const reservations: Reservation[] = [
   // Deliberately no `email` — same reason as res-046 above.
   { id: "res-051", date: "2026-08-08", startMinutes: at(21, 0), durationMinutes: 60, ref: "RSV-1051", guest: "Amal Al-Enezi", phone: phoneFor(11), partySize: 3, area: "Main Dining", table: "T-09", branch: "Riyadh - Olaya", source: "Direct Booking", status: "No-show",
     deposit: { amount: 100, currency: "SAR", type: "Pre Reservation", state: "unpaid" } },
-  { id: "res-052", date: "2026-08-08", startMinutes: at(21, 30), durationMinutes: 90, ref: "RSV-1052", guest: "Nawaf Al-Qarni", phone: phoneFor(12), email: "nawaf.alqarni@example.com", partySize: 4, area: "Terrace", table: "T-17", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed", tags: ["Birthday", "VIP"] },
+  { id: "res-052", date: "2026-08-08", startMinutes: at(21, 30), durationMinutes: 90, ref: "RSV-1052", guest: "Nawaf Al-Qarni", phone: phoneFor(12), email: "nawaf.alqarni@example.com", partySize: 4, area: "Terrace", table: "T-17", branch: "Jeddah - Corniche", source: "Website", status: "Confirmed", tags: ["Birthday", "VIP"],
+    // No deposit, so this was confirmed by staff rather than automatically;
+    // without these the confirmed panel rendered two bare "—" values.
+    confirmedOn: "Aug 7, 2026 - 4:12 PM", confirmedMethod: "Manual (Staff)" },
 
   // --- Sun 9 Aug ---
   // phoneFor(19) — not phoneFor(10), which res-050 above already uses for a

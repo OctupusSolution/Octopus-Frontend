@@ -155,7 +155,13 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
       className="!max-w-[620px]"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          {/* Grey filled, as the frame draws it — not the white outline of
+              the shared "secondary" variant. */}
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            className="!border-transparent !bg-[var(--octo-track)] !text-[var(--octo-text-secondary)] hover:!bg-[var(--octo-hover)]"
+          >
             {t("common.cancel")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" disabled={!reason} onClick={handleConfirm}>

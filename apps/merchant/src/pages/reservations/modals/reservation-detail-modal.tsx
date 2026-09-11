@@ -26,6 +26,8 @@ import { GuestCard } from "../_shared/guest-card";
 import { MetaRow } from "../_shared/meta-row";
 import { channelLabel, DEPOSIT_STATE_LABEL_KEY, detailState, STATE_LABEL_KEY, type DetailState } from "../_shared/model";
 import { useDismiss } from "../_shared/use-dismiss";
+import { downloadFile, openExternal } from "../_shared/download";
+import { buildReceiptHtml, paymentIssueMessage, whatsappHref } from "../_shared/guest-actions";
 
 export interface ReservationDetailModalProps {
   open: boolean;
@@ -176,7 +178,7 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
       {open && (
         <div
           role="menu"
-          className="absolute top-full start-0 z-20 mt-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+          className="absolute top-full start-0 z-20 mt-1.5 w-48 space-y-1 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
         >
           {items.map((item) =>
             item.href ? (
@@ -187,7 +189,7 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
                 rel={item.href.startsWith("http") ? "noreferrer" : undefined}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                className="flex w-full items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2 text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
               >
                 {item.icon}
                 {item.label}
@@ -201,7 +203,7 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
                 key={item.key}
                 role="menuitem"
                 aria-disabled="true"
-                className="flex w-full cursor-not-allowed items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-faint)]"
+                className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2 text-[12.5px] font-medium text-[var(--octo-text-faint)]"
               >
                 {item.icon}
                 {item.label}
@@ -263,7 +265,7 @@ export function ReservationDetailModal({
   onResendLink,
   onShareLink,
 }: ReservationDetailModalProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [copied, setCopied] = useState(false);
   const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -286,7 +288,19 @@ export function ReservationDetailModal({
   if (!reservation) return null;
 
   const state = detailState(reservation);
-  const noBackend = t("reservations.list.actions.noBackend");
+
+  // Both used to be disabled as "needs a backend", but neither does: the
+  // receipt is generated from data already on the reservation, and the
+  // guest is reached over WhatsApp with the message already typed.
+  function downloadReceipt() {
+    if (!reservation) return;
+    downloadFile("receipt-" + reservation.ref + ".html", buildReceiptHtml(t, reservation, locale), "text/html;charset=utf-8");
+  }
+
+  function notifyGuest() {
+    if (!reservation) return;
+    openExternal(whatsappHref(reservation.phone, paymentIssueMessage(t, reservation)));
+  }
 
   async function copyLink() {
     if (!reservation?.paymentLink) return;
@@ -574,8 +588,7 @@ export function ReservationDetailModal({
           <Button
             variant="secondary"
             icon={<FileDown size={14} />}
-            disabled
-            title={noBackend}
+            onClick={downloadReceipt}
             className={clsx("!flex-1 !justify-center", tintedBlue)}
           >
             {t("reservations.detail.downloadReceipt")}
@@ -590,7 +603,7 @@ export function ReservationDetailModal({
           <Button variant="secondary" className={tintedRed} onClick={onCancel}>
             {t("reservations.detail.cancelReservation")}
           </Button>
-          <Button variant="secondary" disabled title={noBackend} className={tintedBlue}>
+          <Button variant="secondary" onClick={notifyGuest} className={tintedBlue}>
             {t("reservations.detail.notifyGuest")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
@@ -603,7 +616,7 @@ export function ReservationDetailModal({
     case "expired":
       footer = (
         <>
-          <Button variant="secondary" disabled title={noBackend} className={tintedBlue}>
+          <Button variant="secondary" onClick={notifyGuest} className={tintedBlue}>
             {t("reservations.detail.notifyGuest")}
           </Button>
           <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>

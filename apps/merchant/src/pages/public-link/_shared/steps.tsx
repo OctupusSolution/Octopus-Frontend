@@ -16,12 +16,24 @@ export interface StepProps {
   dispatch: (action: SiteAction) => void;
 }
 
-export const SITE_STEPS: readonly { id: string; labelKey: string; Component: ComponentType<StepProps> }[] = [
-  { id: "theme", labelKey: "publicLink.step.theme", Component: ThemeStep },
-  { id: "brand", labelKey: "publicLink.step.brand", Component: BrandStep },
-  { id: "pages", labelKey: "publicLink.step.pages", Component: PagesStep },
-  { id: "navigation", labelKey: "publicLink.step.navigation", Component: NavigationStep },
-  { id: "customize", labelKey: "publicLink.step.customize", Component: CustomizeStep },
-  { id: "preview", labelKey: "publicLink.step.preview", Component: PreviewStep },
-  { id: "publish", labelKey: "publicLink.step.publish", Component: PublishStep },
+export interface SiteStep {
+  id: string;
+  labelKey: string;
+  /** The step's real heading, shown by the shell (not the step body) beside
+   *  the rail — e.g. "Choose Your Theme", "Customize Sections". */
+  titleKey: string;
+  /** Muted copy under `titleKey`. Publish has none in the frame, so it's the
+   *  one step that omits this. */
+  subtitleKey?: string;
+  Component: ComponentType<StepProps>;
+}
+
+export const SITE_STEPS: readonly SiteStep[] = [
+  { id: "theme", labelKey: "publicLink.step.theme", titleKey: "publicLink.stepTitle.theme", subtitleKey: "publicLink.theme.subtitle", Component: ThemeStep },
+  { id: "brand", labelKey: "publicLink.step.brand", titleKey: "publicLink.stepTitle.brand", subtitleKey: "publicLink.brand.subtitle", Component: BrandStep },
+  { id: "pages", labelKey: "publicLink.step.pages", titleKey: "publicLink.stepTitle.pages", subtitleKey: "publicLink.pages.subtitle", Component: PagesStep },
+  { id: "navigation", labelKey: "publicLink.step.navigation", titleKey: "publicLink.stepTitle.navigation", subtitleKey: "publicLink.navigation.subtitle", Component: NavigationStep },
+  { id: "customize", labelKey: "publicLink.step.customize", titleKey: "publicLink.stepTitle.customize", subtitleKey: "publicLink.customize.subtitle", Component: CustomizeStep },
+  { id: "preview", labelKey: "publicLink.step.preview", titleKey: "publicLink.stepTitle.preview", subtitleKey: "publicLink.preview.subtitle", Component: PreviewStep },
+  { id: "publish", labelKey: "publicLink.step.publish", titleKey: "publicLink.stepTitle.publish", Component: PublishStep },
 ];

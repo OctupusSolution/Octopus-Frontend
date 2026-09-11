@@ -99,13 +99,22 @@ export function PagesStep({ draft, dispatch }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.pages")}</p>
-      <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.pages.subtitle")}</p>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_240px_460px]">
-        <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+      {/* Three columns only from 1400px. At 1280px the sidebar leaves ~980px,
+          and 210px + 400px of previews squeezed the five-column table below
+          what it needs, clipping "Show on Home" and "Customize". Between xl
+          and 1400px the table takes the full row and the two previews share
+          the row beneath it. */}
+      <div className="grid gap-4 xl:grid-cols-[210px_minmax(0,1fr)] min-[1400px]:grid-cols-[minmax(0,1fr)_210px_400px]">
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px] xl:col-span-2 min-[1400px]:col-span-1">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px] border-collapse text-start">
+            <table className="w-full min-w-[420px] table-fixed border-collapse text-start">
+              <colgroup>
+                <col className="w-8" />
+                <col />
+                <col className="w-[76px]" />
+                <col className="w-[76px]" />
+                <col className="w-[84px]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-[var(--octo-border-card)]">
                   <th scope="col" className="w-8 py-2">
@@ -114,13 +123,13 @@ export function PagesStep({ draft, dispatch }: StepProps) {
                   <th scope="col" className={clsx(HEADER_CELL, "text-start")}>
                     {t("publicLink.pages.pageModule")}
                   </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-center")}>
+                  <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
                     {t("publicLink.pages.showInNav")}
                   </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-center")}>
+                  <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
                     {t("publicLink.pages.showOnHome")}
                   </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-end")}>
+                  <th scope="col" className={clsx(HEADER_CELL, "text-end leading-tight")}>
                     {t("publicLink.pages.customize")}
                   </th>
                 </tr>

@@ -141,9 +141,6 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.preview")}</p>
-      <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.preview.subtitle")}</p>
-
       {/* Before a run the results column has nothing to show, so it isn't
           reserved at all — two columns (test-mode panel + Live Preview) rather
           than a flexible middle column sitting empty. Once a run finishes, the

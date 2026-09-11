@@ -108,9 +108,6 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.navigation")}</p>
-      <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.navigation.subtitle")}</p>
-
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_540px]">
         {/* Start: Navigation Display + Global Options */}
         <div className="flex flex-col gap-4">

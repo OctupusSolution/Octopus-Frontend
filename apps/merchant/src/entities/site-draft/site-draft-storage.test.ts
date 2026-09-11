@@ -78,6 +78,44 @@ describe("parseDraft normalises the step", () => {
 
 });
 
+describe("parseDraft deep-merges new fields into an older stored draft", () => {
+  it("fills in fields added after the draft was saved, while keeping the stored values it does carry", () => {
+    // Simulates a draft saved before hero.overlay, reservations.cancellationWindow,
+    // preview.testModeSettings and publish.publishedAt existed: those keys are
+    // simply absent, not present-with-a-value, on the stored slices.
+    const { overlay: _overlay, ...heroWithoutOverlay } = EMPTY_SITE_DRAFT.sectionSettings.hero;
+    const { cancellationWindow: _cancellationWindow, ...reservationsWithoutWindow } =
+      EMPTY_SITE_DRAFT.sectionSettings.reservations;
+    const { testModeSettings: _testModeSettings, ...previewWithoutTestMode } = EMPTY_SITE_DRAFT.preview;
+    const { publishedAt: _publishedAt, ...publishWithoutPublishedAt } = EMPTY_SITE_DRAFT.publish;
+
+    const stored = {
+      ...EMPTY_SITE_DRAFT,
+      sectionSettings: {
+        ...EMPTY_SITE_DRAFT.sectionSettings,
+        hero: { ...heroWithoutOverlay, heading: "Custom heading" },
+        reservations: { ...reservationsWithoutWindow, cutOff: "4" },
+      },
+      preview: previewWithoutTestMode,
+      publish: publishWithoutPublishedAt,
+    };
+    const raw = JSON.stringify({ version: DRAFT_VERSION, draft: stored });
+
+    const parsed = parseDraft(raw);
+    expect(parsed).not.toBeNull();
+    // Defaults fill the missing fields in.
+    expect(parsed!.sectionSettings.hero.overlay).toBe(EMPTY_SITE_DRAFT.sectionSettings.hero.overlay);
+    expect(parsed!.sectionSettings.reservations.cancellationWindow).toBe(
+      EMPTY_SITE_DRAFT.sectionSettings.reservations.cancellationWindow,
+    );
+    expect(parsed!.preview.testModeSettings).toEqual(EMPTY_SITE_DRAFT.preview.testModeSettings);
+    expect(parsed!.publish.publishedAt).toBeNull();
+    // The draft's own values on those same slices survive the merge.
+    expect(parsed!.sectionSettings.hero.heading).toBe("Custom heading");
+    expect(parsed!.sectionSettings.reservations.cutOff).toBe("4");
+  });
+});
+
 describe("parseDraft rejects a corrupted typography shape", () => {
   // Final review finding F2: preview-model.ts reads
   // `brand.typography.en.titles` / `.ar.titles`; `isRecord(brand.typography)`

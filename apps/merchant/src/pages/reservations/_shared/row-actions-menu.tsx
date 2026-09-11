@@ -5,6 +5,12 @@ import { useDismiss } from "./use-dismiss";
 
 export interface RowActionsMenuProps {
   onDuplicate: () => void;
+  /** Opens the edit form straight onto its Notes tab. */
+  onAddNote: () => void;
+  /** Opens WhatsApp with a pre-written reminder addressed to the guest. */
+  onSendReminder: () => void;
+  /** Downloads the booking as an .ics file for any calendar app. */
+  onExportCalendar: () => void;
   onSharePaymentLink: () => void;
   onCancel: () => void;
   canShareLink: boolean;
@@ -12,8 +18,15 @@ export interface RowActionsMenuProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const ITEM = "flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] transition-colors";
+const ITEM_ENABLED = "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
+const ITEM_DISABLED = "text-[var(--octo-text-faint)] disabled:cursor-not-allowed";
+
 export function RowActionsMenu({
   onDuplicate,
+  onAddNote,
+  onSendReminder,
+  onExportCalendar,
   onSharePaymentLink,
   onCancel,
   canShareLink,
@@ -22,12 +35,16 @@ export function RowActionsMenu({
 }: RowActionsMenuProps) {
   const { t } = useI18n();
   const ref = useDismiss(open, () => onOpenChange(false));
-  const noBackend = t("reservations.list.actions.noBackend");
-  // Fix round 4, finding 8 — disabled here means "no deposit on this
-  // reservation to share a link for", not "needs a backend" (this action
-  // works fine once canShareLink is true); the two reasons need different
-  // copy.
+  // Disabled Share Payment Link means "no deposit on this reservation to
+  // share a link for" — a different reason from View Logs, which has no
+  // history data behind it at all — so the two titles differ.
   const noDeposit = t("reservations.list.actions.noDepositToShare");
+
+  // Every enabled item runs its action and then closes the menu.
+  const run = (action: () => void) => () => {
+    action();
+    onOpenChange(false);
+  };
 
   return (
     <div ref={ref} className="relative">
@@ -47,51 +64,27 @@ export function RowActionsMenu({
           role="menu"
           className="absolute end-0 z-20 mt-1 w-52 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              onDuplicate();
-              onOpenChange(false);
-            }}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
+          <button type="button" role="menuitem" onClick={run(onDuplicate)} className={clsx(ITEM, ITEM_ENABLED)}>
             {t("reservations.list.actions.duplicate")}
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled
-            title={noBackend}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[var(--octo-text-faint)] disabled:cursor-not-allowed"
-          >
+          <button type="button" role="menuitem" onClick={run(onAddNote)} className={clsx(ITEM, ITEM_ENABLED)}>
             {t("reservations.list.actions.addNote")}
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled
-            title={noBackend}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[var(--octo-text-faint)] disabled:cursor-not-allowed"
-          >
+          <button type="button" role="menuitem" onClick={run(onSendReminder)} className={clsx(ITEM, ITEM_ENABLED)}>
             {t("reservations.list.actions.sendReminder")}
           </button>
+          {/* No activity history is recorded anywhere yet, so there is
+              nothing honest to show — rendered, disabled, and titled. */}
           <button
             type="button"
             role="menuitem"
             disabled
-            title={noBackend}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[var(--octo-text-faint)] disabled:cursor-not-allowed"
+            title={t("reservations.list.actions.noBackend")}
+            className={clsx(ITEM, ITEM_DISABLED)}
           >
             {t("reservations.list.actions.viewLogs")}
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            disabled
-            title={noBackend}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[var(--octo-text-faint)] disabled:cursor-not-allowed"
-          >
+          <button type="button" role="menuitem" onClick={run(onExportCalendar)} className={clsx(ITEM, ITEM_ENABLED)}>
             {t("reservations.list.actions.exportCalendar")}
           </button>
           <button
@@ -99,27 +92,15 @@ export function RowActionsMenu({
             role="menuitem"
             disabled={!canShareLink}
             title={canShareLink ? undefined : noDeposit}
-            onClick={() => {
-              if (!canShareLink) return;
-              onSharePaymentLink();
-              onOpenChange(false);
-            }}
-            className={clsx(
-              "flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] transition-colors",
-              canShareLink
-                ? "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-                : "text-[var(--octo-text-faint)] disabled:cursor-not-allowed"
-            )}
+            onClick={canShareLink ? run(onSharePaymentLink) : undefined}
+            className={clsx(ITEM, canShareLink ? ITEM_ENABLED : ITEM_DISABLED)}
           >
             {t("reservations.list.actions.sharePaymentLink")}
           </button>
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              onCancel();
-              onOpenChange(false);
-            }}
+            onClick={run(onCancel)}
             className="mt-1 flex w-full items-center rounded-[9px] border-t border-[var(--octo-divider)] px-2.5 pb-1.5 pt-2 text-start text-[12px] text-[#EF4444] transition-colors hover:bg-[var(--octo-hover)]"
           >
             {t("reservations.list.actions.cancel")}

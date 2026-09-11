@@ -32,6 +32,8 @@ import { ReservationRow, ROW_LIST_MIN_WIDTH, type RowMenu } from "./_shared/rese
 import { ReservationFormModal } from "./modals/reservation-form-modal";
 import { ReservationDetailModal } from "./modals/reservation-detail-modal";
 import { CancelReservationModal } from "./modals/cancel-reservation-modal";
+import { buildIcs, reminderMessage, whatsappHref } from "./_shared/guest-actions";
+import { downloadFile, openExternal } from "./_shared/download";
 
 const SORT_OPTIONS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "time-asc", labelKey: "reservations.list.sort.timeEarliest" },
@@ -47,7 +49,9 @@ type OpenMenu = { id: string; menu: "status" | "actions" } | null;
 // The three dialogs this page can show. Exactly one of the three id/mode
 // fields below is non-null at a time — every "open X" transition clears the
 // other two, rather than each dialog tracking its own independent flag.
-type FormState = { mode: "add" } | { mode: "edit"; id: string } | null;
+// `tab` lets the row menu's "Add Note" open the edit form straight onto Notes.
+type FormTab = "details" | "guest" | "notes";
+type FormState = { mode: "add" } | { mode: "edit"; id: string; tab?: FormTab } | null;
 
 export function ReservationsPage() {
   const { t, locale } = useI18n();
@@ -82,10 +86,10 @@ export function ReservationsPage() {
     setFormState({ mode: "add" });
   }
 
-  function openEdit(id: string) {
+  function openEdit(id: string, tab?: FormTab) {
     setDetailId(null);
     setCancelId(null);
-    setFormState({ mode: "edit", id });
+    setFormState({ mode: "edit", id, tab });
   }
 
   function openDetail(id: string) {
@@ -158,17 +162,29 @@ export function ReservationsPage() {
     setRows((prev) => applyShareLink(prev, id));
   }
 
+  // Row menu actions that reach outside the app. Neither needs a server:
+  // WhatsApp opens with the reminder already typed, and the calendar entry
+  // downloads as an .ics file any calendar app imports.
+  function sendReminder(r: Reservation) {
+    openExternal(whatsappHref(r.phone, reminderMessage(t, r, locale)));
+  }
+
+  function exportToCalendar(r: Reservation) {
+    downloadFile("reservation-" + r.ref + ".ics", buildIcs(t, r), "text/calendar;charset=utf-8");
+  }
+
   const allCountText = t("reservations.list.allCount").replace("{n}", String(visible.length));
 
-  // The KPI card's own day label (fix round 4, finding 12) — it used to
-  // hardcode "Today's Reservations" even while `visible`/`kpis` (below) was
-  // already correctly scoped to whatever day filter was picked.
-  const kpiDayLabel =
+  // KPI card 1's label. The frame reads "Today's Reservations"; once
+  // another day is picked it names that day instead, since the numbers are
+  // scoped to whatever day filter is active.
+  const kpiTotalLabel =
     filters.day === "today"
-      ? t("reservations.list.filter.today")
-      : filters.day === "tomorrow"
-        ? t("reservations.list.filter.tomorrow")
-        : formatDisplayDate(filters.date, locale);
+      ? t("reservations.list.kpi.today")
+      : t("reservations.list.kpi.forDay").replace(
+          "{day}",
+          filters.day === "tomorrow" ? t("reservations.list.filter.tomorrow") : formatDisplayDate(filters.date, locale)
+        );
 
   return (
     <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
@@ -192,7 +208,7 @@ export function ReservationsPage() {
       </header>
 
       <div className="mt-4">
-        <KpiCards kpis={kpis} dayLabel={kpiDayLabel} />
+        <KpiCards kpis={kpis} totalLabel={kpiTotalLabel} />
       </div>
 
       <div className="mt-4">
@@ -230,9 +246,12 @@ export function ReservationsPage() {
           <EmptyState title={t("reservations.list.empty")} />
         ) : (
           // Rows are a fixed-column grid (see reservation-row.tsx) so they
-          // scan as a table; this scrolls horizontally on narrow laptop
-          // widths instead of squeezing the columns out of alignment.
-          <div className="overflow-x-auto">
+          // scan as a table. Below ~1420px the grid's floor no longer fits
+          // beside the sidebar, so the list scrolls horizontally instead of
+          // squeezing columns out of alignment. Wider than that there is no
+          // scroll container at all: overflow-x:auto forces overflow-y to
+          // auto too, which clipped the row menus that open downward.
+          <div className="max-[1419px]:overflow-x-auto">
             <div className={clsx("flex flex-col gap-2.5", ROW_LIST_MIN_WIDTH)}>
               {visible.map((reservation) => (
                 <ReservationRow
@@ -244,6 +263,9 @@ export function ReservationsPage() {
                   onEdit={() => openEdit(reservation.id)}
                   onStatus={(status) => handleStatus(reservation.id, status)}
                   onDuplicate={() => handleDuplicate(reservation.id)}
+                  onAddNote={() => openEdit(reservation.id, "notes")}
+                  onSendReminder={() => sendReminder(reservation)}
+                  onExportCalendar={() => exportToCalendar(reservation)}
                   onSharePaymentLink={() => shareOrResendLink(reservation.id)}
                   onCancel={() => requestCancel(reservation.id)}
                 />
@@ -262,6 +284,10 @@ export function ReservationsPage() {
         onRequestCancel={() => {
           if (formState?.mode === "edit") requestCancel(formState.id);
         }}
+        onViewPayment={() => {
+          if (formState?.mode === "edit") openDetail(formState.id);
+        }}
+        initialTab={formState?.mode === "edit" ? (formState.tab ?? "details") : "details"}
       />
 
       <ReservationDetailModal

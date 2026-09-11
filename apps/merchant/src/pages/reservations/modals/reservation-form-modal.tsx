@@ -24,13 +24,16 @@ import {
   combinePhone,
   DEPOSIT_STATE_LABEL_KEY,
   durationMinuteOptions,
+  formatDisplayDate,
   guestsText,
   hoursMinutesParts,
   NOW_MINUTES,
   phoneDigitsFrom,
   SOURCE_LABEL_KEY,
+  tableLabel,
   timeSlotOptions,
 } from "../_shared/model";
+import { openDatePicker } from "../_shared/filter-bar";
 
 export interface ReservationFormModalProps {
   open: boolean;
@@ -41,6 +44,10 @@ export interface ReservationFormModalProps {
   onSubmit: (draft: Reservation, intent: "pending" | "confirm") => void;
   /** Edit mode's red "Cancel Reservation" footer button. */
   onRequestCancel: () => void;
+  /** Edit mode's "View Payment" — opens the reservation's payment details. */
+  onViewPayment?: () => void;
+  /** Which tab to open on — the row's "Add Note" opens straight onto Notes. */
+  initialTab?: "details" | "guest" | "notes";
 }
 
 const SOURCE_OPTIONS: readonly ReservationSource[] = [
@@ -277,6 +284,24 @@ function ChannelPill({ checked, label, onToggle }: { checked: boolean; label: st
   );
 }
 
+// Every frame draws the footer's Cancel as a grey filled button, not the
+// white outline of the shared "secondary" variant.
+const GREY_CANCEL =
+  "!border-transparent !bg-[var(--octo-track)] !text-[var(--octo-text-secondary)] hover:!bg-[var(--octo-hover)]";
+
+// Flag emoji don't render on Windows — Chrome shows the regional-indicator
+// letters "SA" instead — so draw the round green flag the frame shows.
+function SaudiFlag() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0" aria-hidden="true">
+      <circle cx="10" cy="10" r="10" fill="#006C35" />
+      <path d="M5.5 8h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M6.8 10.2h6.4" stroke="#fff" strokeWidth="1" strokeLinecap="round" />
+      <path d="M5.2 13.2h9.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function ReservationFormModal({
   open,
   mode,
@@ -284,9 +309,11 @@ export function ReservationFormModal({
   onClose,
   onSubmit,
   onRequestCancel,
+  onViewPayment,
+  initialTab = "details",
 }: ReservationFormModalProps) {
-  const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState("details");
+  const { t, locale } = useI18n();
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [draft, setDraft] = useState<DraftState>(() => initDraft(mode, reservation));
 
   // One draft object holds every field regardless of which tab is showing —
@@ -297,10 +324,10 @@ export function ReservationFormModal({
   useEffect(() => {
     if (open) {
       setDraft(initDraft(mode, reservation));
-      setActiveTab("details");
+      setActiveTab(initialTab);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, mode, reservation?.id]);
+  }, [open, mode, reservation?.id, initialTab]);
 
   const timeOptions = useMemo(() => timeSlotOptions(draft.time), [draft.time]);
   const durationOptions = useMemo(() => durationMinuteOptions(draft.durationMinutes), [draft.durationMinutes]);
@@ -457,7 +484,7 @@ export function ReservationFormModal({
   const footer =
     mode === "add" ? (
       <>
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} className={GREY_CANCEL}>
           {t("common.cancel")}
         </Button>
         <Button
@@ -474,7 +501,7 @@ export function ReservationFormModal({
       </>
     ) : (
       <>
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} className={GREY_CANCEL}>
           {t("common.cancel")}
         </Button>
         <Button
@@ -505,7 +532,21 @@ export function ReservationFormModal({
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label={t("reservations.form.date")} required>
-                <Input type="date" value={draft.date} onChange={(e) => update("date", e.target.value)} />
+                {/* The frame shows a formatted date with a calendar icon, not the
+                    browser's own "08/08/2026". Same approach as the filter
+                    bar's date pill: formatted text, real input laid on top. */}
+                <label className="relative flex cursor-pointer items-center justify-between rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
+                  <span dir="ltr">{draft.date ? formatDisplayDate(draft.date, locale) : "—"}</span>
+                  <Calendar size={15} className="shrink-0 text-[var(--octo-text-muted)]" />
+                  <input
+                    type="date"
+                    aria-label={t("reservations.form.date")}
+                    value={draft.date}
+                    onChange={(e) => update("date", e.target.value)}
+                    onClick={(e) => openDatePicker(e.currentTarget)}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
               </Field>
               <Field label={t("reservations.form.time")} required>
                 <Select value={String(draft.time)} onChange={(e) => update("time", Number(e.target.value))}>
@@ -557,7 +598,7 @@ export function ReservationFormModal({
                   <option value="">{t("reservations.form.tableAny")}</option>
                   {tableOptions.map((table) => (
                     <option key={table} value={table}>
-                      {table}
+                      {tableLabel(table)}
                     </option>
                   ))}
                 </Select>
@@ -658,8 +699,9 @@ export function ReservationFormModal({
                       <Button
                         variant="secondary"
                         size="sm"
-                        disabled
-                        title={t("reservations.list.actions.noBackend")}
+                        disabled={!onViewPayment}
+                        title={onViewPayment ? undefined : t("reservations.list.actions.noBackend")}
+                        onClick={onViewPayment}
                       >
                         {t("reservations.form.viewPayment")}
                       </Button>
@@ -748,7 +790,7 @@ export function ReservationFormModal({
             <Field label={t("reservations.form.phone")} required>
               <div className="flex items-stretch rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
                 <span className="flex items-center gap-1.5 border-e border-[var(--octo-border-input)] px-3 text-[12.5px] text-[var(--octo-text-primary)]">
-                  <span aria-hidden="true">🇸🇦</span>
+                  <SaudiFlag />
                   +966
                 </span>
                 <input

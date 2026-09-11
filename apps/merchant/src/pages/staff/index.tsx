@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
-import { Button, Tabs } from "@ui/primitives";
+import { Tabs } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { StaffTab } from "./staff-tab";
 import { RolesPermissionsTab } from "./roles-permissions-tab";
@@ -21,11 +20,6 @@ export function StaffPage() {
           </h1>
           <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("staff.header.subtitle")}</p>
         </div>
-        {tab === "staff" && (
-          <Button variant="primary" icon={<Plus size={15} />}>
-            {t("staff.header.addNewMember")}
-          </Button>
-        )}
       </header>
 
       <Tabs

@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Crown, Plus } from "lucide-react";
-import { Button, Modal } from "@ui/primitives";
+import { useEffect, useState } from "react";
+import { CircleCheck, Crown, Plus } from "lucide-react";
+import { Button, Input, Modal, Textarea } from "@ui/primitives";
 import {
   staffRoleDefs,
   MODULES,
@@ -32,6 +32,16 @@ export function RolesPermissionsTab() {
   const [selectedRoleId, setSelectedRoleId] = useState<RoleId>(staffRoleDefs[0].id);
   const [openMenuId, setOpenMenuId] = useState<RoleId | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffRoleDef | null>(null);
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDescription, setNewRoleDescription] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0];
   const roleMatrix = matrix[selectedRole.id];
@@ -74,12 +84,36 @@ export function RolesPermissionsTab() {
     { key: "delete", label: t("staff.roles.menu.delete"), tone: "danger", onSelect: () => setDeleteTarget(role) },
   ];
 
+  const submitAddRole = () => {
+    if (!newRoleName.trim()) return;
+    const id = `custom-${newRoleName.trim().toLowerCase().replace(/\s+/g, "-")}-${roles.length}` as RoleId;
+    const role: StaffRoleDef = {
+      id,
+      name: newRoleName.trim(),
+      description: newRoleDescription.trim() || t("staff.roles.addRoleDescription"),
+      isSystemRole: false,
+      memberCount: 0,
+    };
+    setRoles((prev) => [...prev, role]);
+    setMatrix((prev) => ({
+      ...prev,
+      [id]: Object.fromEntries(
+        MODULES.map((m) => [m.id, Object.fromEntries(PERMISSION_ACTIONS.map((a) => [a, false])) as Record<PermissionAction, boolean>])
+      ) as PermissionMatrix[RoleId],
+    }));
+    setSelectedRoleId(id);
+    setAddRoleOpen(false);
+    setNewRoleName("");
+    setNewRoleDescription("");
+    setToast(t("staff.roles.addRoleToast").replace("{name}", role.name));
+  };
+
   return (
     <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
       <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-[18px]">
         <h2 className="text-[13.5px] font-bold text-[var(--octo-text-primary)]">{t("staff.roles.heading")}</h2>
         <p className="mt-1 text-[11.5px] text-[var(--octo-text-muted)]">{t("staff.roles.subheading")}</p>
-        <Button variant="primary" size="sm" icon={<Plus size={14} />} className="mt-3 w-full justify-center">
+        <Button variant="primary" size="sm" icon={<Plus size={14} />} className="mt-3 w-full justify-center" onClick={() => setAddRoleOpen(true)}>
           {t("staff.roles.addRole")}
         </Button>
 
@@ -187,6 +221,35 @@ export function RolesPermissionsTab() {
           {t("staff.roles.deleteConfirmBody").replace("{name}", deleteTarget?.name ?? "")}
         </p>
       </Modal>
+
+      <Modal
+        open={addRoleOpen}
+        onClose={() => setAddRoleOpen(false)}
+        title={t("staff.roles.addRoleTitle")}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setAddRoleOpen(false)}>{t("common.cancel")}</Button>
+            <Button variant="primary" size="sm" onClick={submitAddRole}>{t("staff.roles.addRoleSave")}</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <Input label={t("staff.roles.addRoleName")} value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} />
+          <Textarea
+            label={t("staff.roles.addRoleDescription")}
+            value={newRoleDescription}
+            onChange={(e) => setNewRoleDescription(e.target.value)}
+            rows={3}
+          />
+        </div>
+      </Modal>
+
+      {toast && (
+        <div className="fixed bottom-5 end-5 z-50 flex items-center gap-2 rounded-[9px] border border-[#22C55E]/20 bg-[#22C55E]/10 px-4 py-2.5 text-[12.5px] font-medium text-[#16a34a] shadow-lg">
+          <CircleCheck size={14} className="text-[#22C55E]" />
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

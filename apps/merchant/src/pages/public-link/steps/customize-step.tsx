@@ -103,9 +103,6 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.customize")}</p>
-      <p className="-mt-2 text-[12px] text-[var(--octo-text-muted)]">{t("publicLink.customize.subtitle")}</p>
-
       <div className="grid gap-4 xl:grid-cols-[280px_340px_minmax(0,1fr)]">
         {/* Start: the homepage section list */}
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
@@ -131,17 +128,21 @@ export function CustomizeStep({ draft, dispatch }: StepProps) {
           </p>
         </div>
 
-        {/* Middle: the selected section's inspector */}
+        {/* Middle: the selected section's inspector. The frame gives this
+            one title line: "Selected Section" when the section has its own
+            tabbed inspector (hero, reservations, waitlist), or "Setting for
+            Selected Section" for the generic/menu/offers panels that have
+            none. */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
-              {t("publicLink.customize.selectedSection")}
-            </p>
-            <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-              {selectedMeta ? t(selectedMeta.labelKey) : draft.selectedSection}
-            </p>
-            <p className="text-[11.5px] text-[var(--octo-text-muted)]">{t("publicLink.customize.settingForSelected")}</p>
-          </div>
+          <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
+            {t(
+              selectedMeta?.inspector === "hero" ||
+                selectedMeta?.inspector === "reservations" ||
+                selectedMeta?.inspector === "waitlist"
+                ? "publicLink.customize.selectedSection"
+                : "publicLink.customize.settingForSelected"
+            )}
+          </p>
           {renderInspector()}
         </div>
 

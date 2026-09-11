@@ -51,22 +51,24 @@ export function DeviceFrame({ model, device, onDevice, devices = DEFAULT_DEVICES
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{title ?? t("publicLink.livePreview")}</p>
         <div className="flex items-center gap-2">
-          <Segmented
-            options={devices.map((id) => {
-              const Icon = DEVICE_ICON[id];
-              return {
-                id,
-                label: (
-                  <>
-                    <Icon size={14} />
-                    <span className="sr-only">{t(DEVICE_LABEL_KEY[id])}</span>
-                  </>
-                ),
-              };
-            })}
-            value={device}
-            onChange={(id) => onDevice(id as PreviewDevice)}
-          />
+          {devices.length > 1 && (
+            <Segmented
+              options={devices.map((id) => {
+                const Icon = DEVICE_ICON[id];
+                return {
+                  id,
+                  label: (
+                    <>
+                      <Icon size={14} />
+                      <span className="sr-only">{t(DEVICE_LABEL_KEY[id])}</span>
+                    </>
+                  ),
+                };
+              })}
+              value={device}
+              onChange={(id) => onDevice(id as PreviewDevice)}
+            />
+          )}
           {actions}
         </div>
       </div>

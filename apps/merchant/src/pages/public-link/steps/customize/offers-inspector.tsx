@@ -21,8 +21,6 @@ export function OffersInspector({ draft, dispatch }: { draft: SiteDraft; dispatc
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.customize.settingForSelected")}</p>
-
       <FieldRow label={t("publicLink.offers.displayStyle")}>
         <Select value={settings.displayStyle} onChange={(e) => patch({ displayStyle: e.target.value })}>
           <option value="" />

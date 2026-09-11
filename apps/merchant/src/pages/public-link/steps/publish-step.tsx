@@ -130,10 +130,11 @@ export function PublishStep({ draft, dispatch }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.stepTitle.publish")}</p>
-        {draft.publish.published && <Badge tone="success">{t("publicLink.published")}</Badge>}
-      </div>
+      {draft.publish.published && (
+        <div>
+          <Badge tone="success">{t("publicLink.published")}</Badge>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-3">
         {/* Go-live checklist */}

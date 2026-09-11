@@ -45,8 +45,8 @@ function SummaryCard({ profile, deactivated }: { profile: MemberProfile; deactiv
         <Field label={t("staff.member.field.language")} value={profile.languages.join(", ")} />
       </div>
 
-      <div className="mt-3 rounded-[9px] bg-[#ecfdf3] px-3 py-2.5">
-        <div className="flex items-center justify-between text-[11.5px] font-semibold text-[#16a34a]">
+      <div className="mt-3 rounded-[9px] bg-[var(--octo-tone-success-bg)] px-3 py-2.5">
+        <div className="flex items-center justify-between text-[11.5px] font-semibold text-[var(--octo-tone-success-text)]">
           <span>{t("staff.member.field.activeSections")}</span>
           <Badge tone="success">{t("staff.member.status.active")}</Badge>
         </div>

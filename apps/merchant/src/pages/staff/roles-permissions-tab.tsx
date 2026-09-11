@@ -85,11 +85,13 @@ export function RolesPermissionsTab() {
 
         <div className="mt-3 flex flex-col gap-2">
           {roles.map((role) => (
-            <button
+            <div
               key={role.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedRoleId(role.id)}
-              className={`flex items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-start transition-colors ${
+              onKeyDown={(ev) => { if (ev.key === "Enter") setSelectedRoleId(role.id); }}
+              className={`flex cursor-pointer items-center justify-between gap-2 rounded-[10px] border px-3 py-2.5 text-start transition-colors ${
                 role.id === selectedRole.id
                   ? "border-[#0D6EFD] bg-[var(--octo-selected)]"
                   : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
@@ -118,7 +120,7 @@ export function RolesPermissionsTab() {
                   />
                 )}
               </span>
-            </button>
+            </div>
           ))}
         </div>
       </div>

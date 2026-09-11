@@ -89,8 +89,8 @@ describe("previewModelFromSite", () => {
     };
     const model = previewModelFromSite(draft, "desktop", t, "en");
     expect(model.sections).toEqual(["offers", "menu"]);
-    expect(model.sectionLabelKeys.offers).toBe("publicLink.section.offers");
-    expect(model.sectionLabelKeys.menu).toBe("publicLink.section.menu");
+    expect(model.sectionLabelKeys.offers).toBe("publicLink.page.offers");
+    expect(model.sectionLabelKeys.menu).toBe("publicLink.page.menu");
     // Not any page module's label (e.g. "home", which sits first in navItems).
     expect(model.sectionLabelKeys.offers).not.toBe(model.navItems[0]?.labelKey);
   });

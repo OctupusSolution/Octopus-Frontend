@@ -5,7 +5,7 @@
 // never a button, and the purely decorative chrome is aria-hidden; the
 // pages-enabled count beneath `DrawerNavPreview` is the one piece of real
 // information, so it alone stays outside the aria-hidden block.
-import type { LucideIcon } from "lucide-react";
+import { ExternalLink, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PAGE_MODULES, type PageModule } from "../_shared/page-catalog";
 import type { SiteDraft } from "../_shared/site-draft";
@@ -128,6 +128,7 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
 
   const modules = modulesInRenderedNav(draft);
   const showIcons = draft.navigation.showIcons;
+  const primary = draft.brand.colors.primary;
 
   return (
     <div
@@ -139,12 +140,25 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
         <span className="text-[10.5px] font-semibold text-[var(--octo-text-primary)]">OCTOPUS</span>
       </div>
       <ul className="flex flex-col gap-1.5">
-        {modules.map((module) => {
+        {modules.map((module, index) => {
           const Icon: LucideIcon = module.icon;
+          // The first visible page is the one a customer lands on, so it
+          // carries the Active Page Indicator; "Open Links in Same Tab" off
+          // shows the same new-tab glyph the web header does.
+          const active = index === 0 && draft.navigation.activeIndicator;
           return (
-            <li key={module.id} className="flex items-center gap-1.5 text-[10.5px] text-[var(--octo-text-secondary)]">
-              {showIcons && <Icon size={11} className="text-[var(--octo-text-faint)]" />}
-              {t(module.labelKey)}
+            <li
+              key={module.id}
+              className="flex items-center gap-1.5 rounded-[6px] px-1 py-0.5 text-[10.5px]"
+              style={
+                active
+                  ? { color: primary, fontWeight: 600, backgroundColor: `color-mix(in srgb, ${primary} 10%, transparent)` }
+                  : { color: "var(--octo-text-secondary)" }
+              }
+            >
+              {showIcons && <Icon size={11} className={active ? undefined : "text-[var(--octo-text-faint)]"} />}
+              <span className="min-w-0 flex-1 truncate">{t(module.labelKey)}</span>
+              {!draft.navigation.sameTab && <ExternalLink size={8} className="shrink-0 opacity-60" />}
             </li>
           );
         })}

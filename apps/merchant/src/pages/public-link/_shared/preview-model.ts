@@ -162,6 +162,12 @@ export function previewModelFromSite(
     // separate furniture list to gate here.
     showHeaderNav: draft.navigation.showInHeader,
     activeNavLabelKey,
+    // The Navigation step's three global options, each drawn by the widget:
+    // a pinned header, the active-page underline, and a new-tab glyph on
+    // every link when "Open Links in Same Tab" is off.
+    stickyHeader: draft.navigation.stickyHeader,
+    activeIndicator: draft.navigation.activeIndicator,
+    navOpensNewTab: !draft.navigation.sameTab,
     categories: CATEGORY_KEYS,
     categoryImages: CATEGORY_IMAGES,
     cityLabel: "",

@@ -35,6 +35,7 @@
 import {
   ChevronDown,
   ClipboardList,
+  ExternalLink,
   Globe,
   Heart,
   House,
@@ -681,7 +682,12 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
       // chrome around it stays in the app's own face.
       style={{ fontFamily: bodyFont }}
     >
-      <header className="flex items-center justify-between gap-4 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-2.5">
+      <header
+        className={clsx(
+          "flex items-center justify-between gap-4 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-2.5",
+          model.stickyHeader && "sticky top-0 z-30"
+        )}
+      >
         <span className="flex shrink-0 items-center gap-2">
           {navStyle === "side-drawer" && (
             <MenuIcon size={14} className="text-[var(--octo-text-primary)]" aria-hidden />
@@ -708,10 +714,14 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
           <nav className="flex min-w-0 items-center gap-3.5 overflow-x-auto text-[9px] text-[var(--octo-text-primary)]">
             {[...(model.navFurniture?.leading ?? []), ...model.navItems, ...(model.navFurniture?.trailing ?? [])]
               .filter((item) => item.visible)
-              .map((item, i) =>
-                item.labelKey === model.activeNavLabelKey ? (
+              .map((item, i) => {
+                const external = model.navOpensNewTab ? (
+                  <ExternalLink size={7} className="ms-0.5 inline-block opacity-60" aria-hidden />
+                ) : null;
+                return item.labelKey === model.activeNavLabelKey && (model.activeIndicator ?? true) ? (
                   <span key={i} className="relative whitespace-nowrap font-semibold" style={{ color: model.primary }}>
                     {t(item.labelKey)}
+                    {external}
                     <span
                       className="absolute inset-x-0 -bottom-[11px] h-[2px]"
                       style={{ backgroundColor: model.primary }}
@@ -719,9 +729,12 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
                     />
                   </span>
                 ) : (
-                  <span key={i} className="whitespace-nowrap">{t(item.labelKey)}</span>
-                )
-              )}
+                  <span key={i} className="whitespace-nowrap">
+                    {t(item.labelKey)}
+                    {external}
+                  </span>
+                );
+              })}
           </nav>
         )}
 
@@ -759,13 +772,24 @@ export function StorefrontPreview({ model }: { model: StorefrontPreviewModel }) 
           )}
         </>
       ) : (
-        <div className="pb-5">{model.sections.map(section)}</div>
+        // Each drawn block is tagged `data-preview-slide` so a host that pages
+        // through the preview (the builder's dots and arrows) can find them.
+        <div className="pb-5">
+          {model.sections.map((id) => {
+            const node = section(id);
+            return node ? (
+              <div key={id} data-preview-slide>
+                {node}
+              </div>
+            ) : null;
+          })}
+        </div>
       )}
 
       {/* Only what the model already knows: the name, the sections, the city,
           the hours and the link being shown on this very screen. No invented
           phone numbers or social accounts. */}
-      <footer className="px-4 py-4" style={{ backgroundColor: footerBg }}>
+      <footer data-preview-slide className="px-4 py-4" style={{ backgroundColor: footerBg }}>
         <div className={clsx("grid gap-4", mobile ? "grid-cols-2" : "grid-cols-4")}>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

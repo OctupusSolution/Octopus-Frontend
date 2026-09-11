@@ -122,7 +122,14 @@ export function ThemeStep({ draft, dispatch }: StepProps) {
           </p>
         </div>
 
-        <DeviceFrame model={model} device={device} onDevice={setDevice} />
+        <DeviceFrame
+          model={model}
+          device={device}
+          onDevice={setDevice}
+          devices={["desktop", "mobile"]}
+          subtitle={t("publicLink.preview.subtitleTheme")}
+          paged
+        />
       </div>
     </div>
   );

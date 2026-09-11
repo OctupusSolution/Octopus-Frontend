@@ -153,7 +153,7 @@ export function PagesStep({ draft, dispatch }: StepProps) {
 
         <DrawerNavPreview draft={draft} />
 
-        <DeviceFrame model={model} device={device} onDevice={setDevice} />
+        <DeviceFrame model={model} device={device} onDevice={setDevice} paged />
       </div>
     </div>
   );

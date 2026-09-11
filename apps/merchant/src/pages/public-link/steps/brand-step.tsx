@@ -285,6 +285,8 @@ export function BrandStep({ draft, dispatch }: StepProps) {
           model={model}
           device={device}
           onDevice={setDevice}
+          paged
+          modelFor={(previewT, previewLocale) => previewModelFromSite(draft, device, previewT, previewLocale)}
           actions={
             <Button
               variant="ghost"

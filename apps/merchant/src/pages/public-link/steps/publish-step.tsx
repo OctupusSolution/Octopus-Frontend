@@ -23,11 +23,14 @@ import {
 } from "lucide-react";
 import { Badge, Button, Input, Modal, Textarea } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { StorefrontPreview } from "@/widgets/storefront-preview";
+import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
 import { GO_LIVE_ITEMS } from "../_shared/checklist";
 import { previewModelFromSite } from "../_shared/preview-model";
+import { DeviceFrame } from "../ui/device-frame";
 import { QrCode } from "../ui/qr-code";
+import { SitePreviewModal } from "../ui/site-preview-modal";
+import type { SiteAction } from "../_shared/site-draft";
 import type { StepProps } from "../_shared/steps";
 
 const COPY_RESET_MS = 2000;
@@ -39,7 +42,19 @@ const LINK_BUTTON =
 /** Module scope, not nested inside `PublishStep`: a component redefined on
  *  every render would remount every row, which is exactly the kind of churn
  *  that drops focus mid-interaction elsewhere on a long page like this one. */
-function ChecklistItemRow({ label, note, done }: { label: string; note: string; done: boolean }) {
+function ChecklistItemRow({
+  label,
+  note,
+  done,
+  fixLabel,
+  onFix,
+}: {
+  label: string;
+  note: string;
+  done: boolean;
+  fixLabel: string;
+  onFix?: () => void;
+}) {
   return (
     <div className="flex items-start gap-2.5">
       {done ? (
@@ -47,12 +62,43 @@ function ChecklistItemRow({ label, note, done }: { label: string; note: string; 
       ) : (
         <Circle size={17} className="mt-0.5 shrink-0 text-[var(--octo-text-faint)]" />
       )}
-      <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-[12.5px] font-medium text-[var(--octo-text-primary)]">{label}</span>
         <span className="truncate text-[11px] text-[var(--octo-text-muted)]">{note}</span>
       </div>
+      {!done && onFix && (
+        <button
+          type="button"
+          onClick={onFix}
+          className="shrink-0 rounded-[7px] px-2 py-0.5 text-[11.5px] font-semibold text-[#0D6EFD] hover:bg-[#0D6EFD]/10"
+        >
+          {fixLabel}
+        </button>
+      )}
     </div>
   );
+}
+
+/** Where each incomplete checklist row sends the merchant. Rows with no
+ *  setting of their own (payments, responsive, analytics) have no entry. */
+function fixActionFor(id: string, dispatch: (action: SiteAction) => void, focusSeo: () => void): (() => void) | undefined {
+  switch (id) {
+    case "pages":
+      return () => dispatch({ type: "goTo", step: 3 });
+    case "navigation":
+      return () => dispatch({ type: "goTo", step: 4 });
+    case "menu":
+    case "reservations":
+    case "waitlist":
+      return () => {
+        dispatch({ type: "selectSection", id });
+        dispatch({ type: "goTo", step: 5 });
+      };
+    case "seo":
+      return focusSeo;
+    default:
+      return undefined;
+  }
 }
 
 /** One of the five share tiles: an icon, a label, an optional note, and
@@ -92,8 +138,21 @@ export function PublishStep({ draft, dispatch }: StepProps) {
   const [copiedSocial, setCopiedSocial] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [siteView, setSiteView] = useState<PreviewDevice | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const qrRef = useRef<HTMLDivElement>(null);
   const socialImageRef = useRef<HTMLInputElement>(null);
+  const seoTitleRef = useRef<HTMLInputElement>(null);
+  const seoCardRef = useRef<HTMLDivElement>(null);
+
+  /** SEO Basics needs both a title and a description, so Fix lands on
+   *  whichever of the two is still empty. */
+  function focusSeo() {
+    const fields = Array.from(seoCardRef.current?.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input:not([type=file]), textarea") ?? []);
+    const target = fields.find((field) => field.value.trim() === "") ?? seoTitleRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    target?.focus({ preventScroll: true });
+  }
 
   const { seo, customDomain } = draft.publish;
   const hostSet = customDomain.host.trim() !== "";
@@ -131,8 +190,27 @@ export function PublishStep({ draft, dispatch }: StepProps) {
   return (
     <div className="flex flex-col gap-4">
       {draft.publish.published && (
-        <div>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#22C55E]/30 bg-[#22C55E]/5 px-[18px] py-3">
           <Badge tone="success">{t("publicLink.published")}</Badge>
+          {draft.publish.publishedAt !== null && (
+            <span className="text-[12px] text-[var(--octo-text-secondary)]">
+              {t("publicLink.publishedOn").replace(
+                "{date}",
+                new Date(draft.publish.publishedAt).toLocaleString(locale === "ar" ? "ar-SA" : "en-US", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })
+              )}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => dispatch({ type: "patchPublish", patch: { published: false, publishedAt: null } })}
+            className="ms-auto !text-[#DC2626] hover:bg-[#DC2626]/10"
+          >
+            {t("publicLink.unpublish")}
+          </Button>
         </div>
       )}
 
@@ -143,7 +221,14 @@ export function PublishStep({ draft, dispatch }: StepProps) {
           <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.checklistNote")}</p>
           <div className="flex flex-col gap-3">
             {GO_LIVE_ITEMS.map((item) => (
-              <ChecklistItemRow key={item.id} label={t(item.labelKey)} note={t(item.noteKey)} done={item.done(draft)} />
+              <ChecklistItemRow
+                key={item.id}
+                label={t(item.labelKey)}
+                note={t(item.noteKey)}
+                done={item.done(draft)}
+                fixLabel={t("publicLink.fix")}
+                onFix={fixActionFor(item.id, dispatch, focusSeo)}
+              />
             ))}
           </div>
         </div>
@@ -172,21 +257,25 @@ export function PublishStep({ draft, dispatch }: StepProps) {
               >
                 {copiedLive ? t("publicLink.preview.copied") : t("publicLink.copyLink")}
               </Button>
-              <a href={liveUrl} target="_blank" rel="noreferrer" className={LINK_BUTTON}>
+              <button type="button" onClick={() => setSiteView("desktop")} className={LINK_BUTTON}>
                 <ExternalLink size={13} />
                 {t("publicLink.openWebsite")}
-              </a>
-              <a href={`${liveUrl}?view=customer`} target="_blank" rel="noreferrer" className={LINK_BUTTON}>
+              </button>
+              <button type="button" onClick={() => setSiteView("mobile")} className={LINK_BUTTON}>
                 <Globe size={13} />
                 {t("publicLink.visitAsCustomer")}
-              </a>
+              </button>
             </div>
           </div>
 
           <div className={CARD}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.customDomain")}</p>
-              <span className="text-[10.5px] text-[var(--octo-text-faint)]">{t("publicLink.optional")}</span>
+              {hostSet ? (
+                <Badge tone="success">{t("publicLink.domainConnected")}</Badge>
+              ) : (
+                <span className="text-[10.5px] text-[var(--octo-text-faint)]">{t("publicLink.optional")}</span>
+              )}
             </div>
             <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.customDomainNote")}</p>
             <div className="flex items-center gap-2">
@@ -208,10 +297,11 @@ export function PublishStep({ draft, dispatch }: StepProps) {
         </div>
 
         {/* SEO & social */}
-        <div className={CARD}>
+        <div ref={seoCardRef} className={CARD}>
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.seoSocial")}</p>
           <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.seoNote")}</p>
           <Input
+            ref={seoTitleRef}
             label={t("publicLink.siteTitle")}
             value={seo.title}
             onChange={(e) => dispatch({ type: "patchPublish", patch: { seo: { ...seo, title: e.target.value } } })}
@@ -329,7 +419,22 @@ export function PublishStep({ draft, dispatch }: StepProps) {
         </div>
       </div>
 
-      <StorefrontPreview model={model} />
+      <DeviceFrame
+        model={previewModelFromSite(draft, previewDevice, t, locale)}
+        device={previewDevice}
+        onDevice={setPreviewDevice}
+        devices={["desktop", "mobile"]}
+        title={t("publicLink.livePreview")}
+        paged
+        modelFor={(scopedT, scopedLocale) => previewModelFromSite(draft, previewDevice, scopedT, scopedLocale as typeof locale)}
+      />
+
+      <SitePreviewModal
+        open={siteView !== null}
+        onClose={() => setSiteView(null)}
+        draft={draft}
+        initialDevice={siteView ?? "desktop"}
+      />
 
       <Modal
         open={embedOpen}

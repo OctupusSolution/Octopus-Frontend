@@ -6,7 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Copy, QrCode as QrCodeIcon, Settings2 } from "lucide-react";
 import clsx from "clsx";
-import { Badge, Button, Input } from "@ui/primitives";
+import { Badge, Button, Input, Modal, Select } from "@ui/primitives";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { previewModelFromSite } from "../_shared/preview-model";
@@ -59,8 +60,105 @@ function TesterRow({ tester, t }: { tester: Tester; t: (key: string) => string }
   );
 }
 
+const EXPIRY_OPTIONS = ["1", "7", "30"] as const;
+
+/** Where "Test Mode Settings" leads: how long the private preview link lives
+ *  and whether it asks for a password. Edits a local copy so Cancel really
+ *  discards them. */
+function TestModeSettingsModal({
+  open,
+  onClose,
+  settings,
+  dispatch,
+}: {
+  open: boolean;
+  onClose: () => void;
+  settings: StepProps["draft"]["preview"]["testModeSettings"];
+  dispatch: (action: SiteAction) => void;
+}) {
+  const { t } = useI18n();
+  const [local, setLocal] = useState(settings);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) setLocal(settings);
+  }, [open, settings]);
+
+  function save() {
+    if (local.requirePassword && local.password.trim().length < 4) {
+      passwordRef.current?.focus();
+      return;
+    }
+    dispatch({ type: "patchTestMode", patch: local });
+    onClose();
+  }
+
+  const passwordInvalid = local.requirePassword && local.password.trim().length < 4;
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t("publicLink.preview.settings.title")}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={save}>{t("common.save")}</Button>
+        </div>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[12px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.preview.settings.expires")}</span>
+          <Select
+            value={local.expiresInDays}
+            onChange={(e) => setLocal({ ...local, expiresInDays: e.target.value as (typeof EXPIRY_OPTIONS)[number] })}
+          >
+            {EXPIRY_OPTIONS.map((days) => (
+              <option key={days} value={days}>
+                {t(`publicLink.preview.settings.expires.${days}`)}
+              </option>
+            ))}
+          </Select>
+          <span className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.preview.settings.expiresNote")}</span>
+        </label>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.preview.settings.requirePassword")}</span>
+            <span className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.preview.settings.requirePasswordNote")}</span>
+          </div>
+          <Switch
+            checked={local.requirePassword}
+            onChange={() => setLocal({ ...local, requirePassword: !local.requirePassword })}
+            label={t("publicLink.preview.settings.requirePassword")}
+          />
+        </div>
+        {local.requirePassword && (
+          <div className="flex flex-col gap-1">
+            <Input
+              ref={passwordRef}
+              type="password"
+              label={t("publicLink.preview.settings.password")}
+              placeholder={t("publicLink.preview.settings.passwordPlaceholder")}
+              value={local.password}
+              onChange={(e) => setLocal({ ...local, password: e.target.value })}
+            />
+            {passwordInvalid && (
+              <span className="text-[11px] text-[#DC2626]">{t("publicLink.preview.settings.passwordShort")}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export function PreviewStep({ draft, dispatch }: StepProps) {
   const { t, locale } = useI18n();
+  const { user } = useAuth();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Desktop, like every other step. Opening this one on `mobile` rendered a
   // 300px phone inside a much wider column, which read as a broken layout
   // rather than a deliberate device choice.
@@ -171,10 +269,14 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
               size="sm"
               variant="secondary"
               icon={<Settings2 size={13} />}
-              onClick={() => dispatch({ type: "patchPreview", patch: { testMode: !preview.testMode } })}
+              onClick={() => setSettingsOpen(true)}
             >
               {t("publicLink.preview.testModeSetting")}
             </Button>
+            <p className="text-[11px] text-[var(--octo-text-muted)]">
+              {t(`publicLink.preview.settings.expires.${preview.testModeSettings.expiresInDays}`)}
+              {preview.testModeSettings.requirePassword ? ` · ${t("publicLink.preview.settings.passwordOn")}` : ""}
+            </p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -309,12 +411,22 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
         </div>
 
         <div className="flex flex-col gap-2">
-          <TesterRow tester={{ email: t("publicLink.preview.owner"), roleKey: "publicLink.preview.owner", canView: true, tested: true }} t={t} />
+          <TesterRow
+            tester={{ email: user?.email ?? t("publicLink.preview.owner"), roleKey: "publicLink.preview.owner", canView: true, tested: true }}
+            t={t}
+          />
           {preview.testers.map((tester, index) => (
             <TesterRow key={`${tester.email}-${index}`} tester={tester} t={t} />
           ))}
         </div>
       </div>
+
+      <TestModeSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={preview.testModeSettings}
+        dispatch={dispatch}
+      />
     </div>
   );
 }

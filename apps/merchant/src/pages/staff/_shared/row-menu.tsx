@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { MoreVertical } from "lucide-react";
 import clsx from "clsx";
 import { useDismiss } from "./use-dismiss";
@@ -9,11 +10,16 @@ export interface RowMenuItem {
   tone?: "default" | "warning" | "danger";
 }
 
+// Menu items are tinted pills, per the Staff designs: neutral actions sit on the
+// selection tint, Deactivate on the warning tint, Delete on the danger tint.
 const TONE_CLASSES: Record<NonNullable<RowMenuItem["tone"]>, string> = {
-  default: "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]",
-  warning: "text-[#B54708] hover:bg-[#FFFAEB]",
-  danger: "text-[#EF4444] hover:bg-[#FEF2F2]",
+  default: "bg-[var(--octo-selected)] text-[var(--octo-text-primary)]",
+  warning: "bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
+  danger: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
 };
+
+const GAP = 4;
+const ESTIMATED_ITEM_HEIGHT = 42;
 
 export function RowMenu({
   items,
@@ -27,10 +33,40 @@ export function RowMenu({
   ariaLabel: string;
 }) {
   const ref = useDismiss(open, () => onOpenChange(false));
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({});
+
+  // The menu is `position: fixed` so it escapes the scrolling schedule table
+  // and card grids that would otherwise clip it; it flips above the trigger
+  // when there's no room below.
+  useLayoutEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const rtl = document.documentElement.dir === "rtl";
+    const height = items.length * ESTIMATED_ITEM_HEIGHT + 16;
+    const below = rect.bottom + GAP + height <= window.innerHeight;
+    setStyle({
+      position: "fixed",
+      ...(below ? { top: rect.bottom + GAP } : { bottom: window.innerHeight - rect.top + GAP }),
+      ...(rtl ? { left: rect.left } : { right: window.innerWidth - rect.right }),
+    });
+  }, [open, items.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = () => onOpenChange(false);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open, onOpenChange]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
@@ -39,15 +75,21 @@ export function RowMenu({
           e.stopPropagation();
           onOpenChange(!open);
         }}
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-[7px] text-[var(--octo-text-muted)] transition-colors hover:bg-[var(--octo-hover)]"
+        onKeyDown={(e) => e.stopPropagation()}
+        className={clsx(
+          "grid h-7 w-7 place-items-center rounded-[7px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+          open && "bg-[var(--octo-hover)]"
+        )}
       >
-        <MoreVertical size={15} />
+        <MoreVertical size={16} />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute end-0 z-20 mt-1 w-48 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+          style={style}
+          onClick={(e) => e.stopPropagation()}
+          className="z-50 flex min-w-[176px] flex-col gap-1.5 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2 shadow-[0_12px_32px_rgba(16,24,40,0.16)]"
         >
           {items.map((item) => (
             <button
@@ -56,11 +98,11 @@ export function RowMenu({
               role="menuitem"
               onClick={(e) => {
                 e.stopPropagation();
-                item.onSelect();
                 onOpenChange(false);
+                item.onSelect();
               }}
               className={clsx(
-                "flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] transition-colors",
+                "flex w-full items-center whitespace-nowrap rounded-[8px] px-3 py-2 text-start text-[14px] font-medium transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
                 TONE_CLASSES[item.tone ?? "default"]
               )}
             >

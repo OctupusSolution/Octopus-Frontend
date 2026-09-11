@@ -1,9 +1,7 @@
-// Mock data for the Staff module (Employees, Schedule, Attendance, Tips,
-// Payroll Inputs). Stands in for @octopus/api-client — same rule as
-// mock-dashboard.ts. Shapes mirror what real endpoints would return so
-// swapping these for TanStack Query hooks later is a drop-in change.
-
-import type { KpiCard } from "./mock-dashboard";
+// Mock data for the Staff module (Staff / Roles & Permissions / Shifts).
+// Stands in for @octopus/api-client — same rule as mock-dashboard.ts. Shapes
+// mirror what real endpoints would return so swapping these for TanStack
+// Query hooks later is a drop-in change.
 
 export const TODAY = "2026-08-09";
 
@@ -21,47 +19,6 @@ export const staffRoles: readonly StaffRole[] = ["Owner", "Branch Manager", "Cas
 
 export type ShiftStatus = "On Shift" | "Off Duty" | "On Leave" | "Absent";
 export type ContractType = "Full-time" | "Part-time" | "Seasonal";
-
-/* ------------------------------------------------------------------ KPIs */
-
-export const staffStats: readonly KpiCard[] = [
-  {
-    id: "total-employees",
-    label: "TOTAL EMPLOYEES",
-    value: "142",
-    delta: "+3.1%",
-    deltaNote: "vs last month",
-    color: "#a78bfa",
-    sparkline: [120, 122, 121, 125, 124, 128, 127, 131, 130, 134, 133, 137, 136, 140, 139, 142],
-  },
-  {
-    id: "on-shift-now",
-    label: "ON SHIFT NOW",
-    value: "38",
-    delta: "+5.6%",
-    deltaNote: "vs same time yesterday",
-    color: "#60a5fa",
-    sparkline: [28, 30, 29, 32, 31, 34, 33, 36, 35, 37, 36, 38, 37, 39, 38, 38],
-  },
-  {
-    id: "hours-this-week",
-    label: "HOURS THIS WEEK",
-    value: "2,847",
-    delta: "+2.4%",
-    deltaNote: "vs last week",
-    color: "#a3e635",
-    sparkline: [2600, 2620, 2610, 2650, 2640, 2680, 2670, 2710, 2700, 2740, 2730, 2780, 2770, 2820, 2810, 2847],
-  },
-  {
-    id: "pending-leave",
-    label: "PENDING LEAVE REQUESTS",
-    value: "7",
-    delta: "+2",
-    deltaNote: "since yesterday",
-    color: "#fb923c",
-    sparkline: [3, 4, 3, 5, 4, 6, 5, 6, 5, 6, 5, 7, 6, 7, 6, 7],
-  },
-] as const;
 
 /* ------------------------------------------------------------------ Employees */
 
@@ -136,28 +93,6 @@ export const employees: readonly Employee[] = [
 
 export const employeeById = new Map(employees.map((e) => [e.id, e]));
 
-// Backwards-compatible narrow view used by the original single-table page.
-export interface EmployeeRow {
-  id: string;
-  name: string;
-  role: StaffRole;
-  branch: string;
-  status: ShiftStatus;
-  shift: string;
-  hoursThisWeek: number;
-  attendance: number;
-}
-export const employeeRows: readonly EmployeeRow[] = employees.map((e) => ({
-  id: e.id,
-  name: e.name,
-  role: e.role,
-  branch: e.branch,
-  status: e.status,
-  shift: e.todayShift,
-  hoursThisWeek: e.hoursThisWeek,
-  attendance: e.attendance,
-}));
-
 /* ------------------------------------------------------------------ Member profile (Staff tab rebuild) */
 
 const ROLE_JOB_TITLE: Record<StaffRole, string> = {
@@ -193,13 +128,27 @@ const ROLE_ACCESS_LEVEL: Record<StaffRole, string> = {
   Driver: "Limited access",
 };
 
-const ROLE_MODULES_ACCESS: Record<StaffRole, readonly string[]> = {
-  Owner: ["Dashboard", "Reservations", "Wait list", "Floor Plan", "Orders", "Payment & Refund", "Menu & POS", "Inventory", "Reports", "Customer CRM", "Staff Management", "Setting & Integrations"],
-  "Branch Manager": ["Dashboard", "Reservations", "Wait list", "Floor Plan", "Orders", "Payment & Refund", "Menu & POS", "Inventory", "Reports", "Customer CRM", "Staff Management", "Setting & Integrations"],
-  Cashier: ["Orders", "Payment & Refund", "Menu & POS"],
-  Waiter: ["Reservations", "Wait list", "Floor Plan", "Orders"],
-  Kitchen: ["Orders", "Menu & POS", "Inventory"],
-  Driver: ["Orders"],
+const ALL_MODULE_IDS: readonly ModuleId[] = [
+  "dashboard", "reservations", "waitlist", "floorPlan", "orders", "paymentRefund",
+  "menuPos", "inventory", "reports", "customerCrm", "staffManagement", "settingIntegrations",
+];
+
+const ROLE_MODULES_ACCESS: Record<StaffRole, readonly ModuleId[]> = {
+  Owner: ALL_MODULE_IDS,
+  "Branch Manager": ALL_MODULE_IDS,
+  Cashier: ["orders", "paymentRefund", "menuPos"],
+  Waiter: ["reservations", "waitlist", "floorPlan", "orders"],
+  Kitchen: ["orders", "menuPos", "inventory"],
+  Driver: ["orders"],
+};
+
+const ROLE_ASSIGNED_ROLE: Record<StaffRole, RoleId> = {
+  Owner: "owner",
+  "Branch Manager": "manager",
+  Cashier: "cashier",
+  Waiter: "host",
+  Kitchen: "kitchen",
+  Driver: "custom",
 };
 
 // Deterministic 4-digit PIN and boolean flag from an employee id, so the
@@ -210,48 +159,69 @@ function hashCode(id: string): number {
   return h;
 }
 
+export const JOB_TITLES = ["Owner", "Restaurant Manager", "Cashier", "Waiter", "Kitchen Staff", "Delivery Driver"] as const;
+export const DEPARTMENTS = ["Management", "Front of House", "Back of House", "Delivery"] as const;
+export const ACCESS_LEVELS = ["Full access", "Limited access", "View only"] as const;
+export const LANGUAGE_OPTIONS = ["English, Arabic", "Arabic", "English"] as const;
+export const TWO_FACTOR_METHODS = ["Authenticator App", "SMS", "Email"] as const;
+export type LoginMethod = "PIN" | "Password" | "Both";
+
 export interface MemberProfile {
   employee: Employee;
   employeeCode: string;
   firstName: string;
   lastName: string;
+  email: string;
+  dateOfBirth: string; // ISO
   gender: "Male" | "Female";
   nationality: string;
-  languages: readonly string[];
+  languages: string;
   jobTitle: string;
   department: string;
   reportsTo: string;
   employmentType: "Full time" | "Part time";
-  status: "Active" | "Inactive";
+  assignedRole: string;
   accessLevel: string;
-  modulesAccess: readonly string[];
-  loginMethod: "PIN" | "Password" | "Both";
+  modulesAccess: readonly ModuleId[];
+  loginMethod: LoginMethod;
   pinCode: string;
   twoFactorEnabled: boolean;
   twoFactorMethod: string;
   allowSystemLogin: boolean;
   allowAccessOutsideBranch: boolean;
+  locked: boolean;
+  lastAccess: string; // ISO date-time
   activeSection: { device: string; location: string; since: string };
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
 }
 
 export function toMemberProfile(e: Employee): MemberProfile {
   const hash = hashCode(e.id);
   const [firstName, ...rest] = e.name.split(" ");
+  const lastName = rest.join(" ");
   const managerForBranch = employees.find((m) => m.role === "Branch Manager" && m.branch === e.branch && m.id !== e.id);
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const lastAccessDay = 9 - (hash % 5);
+  const lastAccess = `2026-08-${pad(lastAccessDay)}T${pad(8 + (hash % 10))}:${pad((hash % 4) * 15)}`;
 
   return {
     employee: e,
     employeeCode: e.id,
     firstName,
-    lastName: rest.join(" ") || "—",
+    lastName,
+    email: `${slug(firstName)}.${slug(lastName) || "staff"}@gmail.com`,
+    dateOfBirth: `${1984 + (hash % 16)}-${pad(1 + (hash % 12))}-${pad(1 + (hash % 28))}`,
     gender: hash % 2 === 0 ? "Male" : "Female",
     nationality: "Saudi Arabia",
-    languages: ["English", "Arabic"],
+    languages: "English, Arabic",
     jobTitle: ROLE_JOB_TITLE[e.role],
     department: ROLE_DEPARTMENT[e.role],
-    reportsTo: e.role === "Owner" ? "—" : (managerForBranch?.name ?? "Owner"),
+    reportsTo: e.role === "Owner" ? "" : (managerForBranch?.name ?? "Abdulrahman Al-Faisal"),
     employmentType: CONTRACT_TO_EMPLOYMENT_TYPE[e.contractType],
-    status: "Active",
+    assignedRole: ROLE_ASSIGNED_ROLE[e.role],
     accessLevel: ROLE_ACCESS_LEVEL[e.role],
     modulesAccess: ROLE_MODULES_ACCESS[e.role],
     loginMethod: "PIN",
@@ -260,10 +230,12 @@ export function toMemberProfile(e: Employee): MemberProfile {
     twoFactorMethod: "Authenticator App",
     allowSystemLogin: true,
     allowAccessOutsideBranch: e.role === "Owner",
+    locked: false,
+    lastAccess,
     activeSection: {
-      device: "iPad Pro",
-      location: `${e.branch}, Saudi Arabia`,
-      since: "May 12, 2026 - 10:30 AM",
+      device: hash % 3 === 0 ? "POS Terminal" : "iPad Pro",
+      location: e.branch,
+      since: lastAccess,
     },
   };
 }
@@ -335,14 +307,14 @@ function addDays(d: Date, n: number): Date {
   return next;
 }
 // Sunday-start week (the schedule grid runs Sun -> Sat per spec).
-export function getWeekStart(d: Date): Date {
+function getWeekStart(d: Date): Date {
   const date = new Date(d);
   date.setDate(date.getDate() - date.getDay());
   date.setHours(0, 0, 0, 0);
   return date;
 }
 
-export const scheduleStaff: readonly Employee[] = employees.filter((e) => e.role !== "Owner");
+const scheduleStaff: readonly Employee[] = employees.filter((e) => e.role !== "Owner");
 
 const CURRENT_WEEK_START = getWeekStart(fromISO(TODAY));
 // weekOffset: -1 last week, 0 current week, +1/+2 next two weeks
@@ -391,350 +363,6 @@ function generateScheduleShifts(): ScheduleShift[] {
 
 export const scheduleShifts: readonly ScheduleShift[] = generateScheduleShifts();
 
-export const REQUIRED_MIN_STAFF_PER_DAY = 6;
-export const MAX_WEEKLY_HOURS = 48;
-
-/* ================================================================== ATTENDANCE */
-
-export type AttendanceStatus = "Present" | "Late" | "Absent" | "On Leave" | "Holiday";
-
-export interface PunchEntry {
-  time: string; // HH:mm
-  type: "Clock In" | "Clock Out" | "Break Start" | "Break End";
-  device: string;
-}
-
-export interface AttendanceRecord {
-  id: string;
-  employeeId: string;
-  date: string; // ISO
-  scheduledStart: string;
-  scheduledEnd: string;
-  scheduledHours: number;
-  clockIn: string | null;
-  clockOut: string | null;
-  lateMinutes: number;
-  breakMinutes: number;
-  workedHours: number;
-  variance: number;
-  status: AttendanceStatus;
-  punches: readonly PunchEntry[];
-}
-
-export const attendanceStats: readonly KpiCard[] = [
-  {
-    id: "present-today",
-    label: "PRESENT TODAY",
-    value: "38",
-    delta: "+1.2%",
-    deltaNote: "vs yesterday",
-    color: "#a78bfa",
-    sparkline: [32, 34, 33, 35, 34, 36, 35, 37, 36, 38, 37, 39, 38, 39, 38, 38],
-  },
-  {
-    id: "late-arrivals",
-    label: "LATE ARRIVALS",
-    value: "6",
-    delta: "+1",
-    deltaNote: "since yesterday",
-    color: "#fb923c",
-    sparkline: [3, 4, 3, 5, 4, 5, 4, 6, 5, 6, 5, 6, 5, 6, 5, 6],
-  },
-  {
-    id: "absent-today",
-    label: "ABSENT",
-    value: "3",
-    delta: "-1",
-    deltaNote: "vs yesterday",
-    color: "#f87171",
-    sparkline: [5, 4, 5, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 3],
-  },
-  {
-    id: "avg-hours-day",
-    label: "AVG HOURS/DAY",
-    value: "7.8",
-    delta: "+0.2",
-    deltaNote: "vs last week",
-    color: "#60a5fa",
-    sparkline: [7.2, 7.3, 7.1, 7.4, 7.3, 7.5, 7.4, 7.6, 7.5, 7.7, 7.6, 7.8, 7.7, 7.9, 7.8, 7.8],
-  },
-] as const;
-
-const DEVICES = ["POS Terminal 1", "POS Terminal 2", "Mobile App", "Biometric Reader"] as const;
-
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
-function minutesToTime(m: number): string {
-  return `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
-}
-
-function generateAttendance(): AttendanceRecord[] {
-  const out: AttendanceRecord[] = [];
-  const attendanceStaff = employees.filter((e) => e.role !== "Owner");
-  const anchor = fromISO(TODAY);
-  let n = 0;
-  for (let dayBack = 0; dayBack < 10; dayBack++) {
-    const date = toISO(addDays(anchor, -dayBack));
-    attendanceStaff.forEach((emp, i) => {
-      // Skip roughly half the employee/day combinations to land ~55 rows.
-      if ((i + dayBack) % 2 !== 0) return;
-      const scheduled = SHIFT_ROLE_TYPES[emp.role][(i + dayBack) % SHIFT_ROLE_TYPES[emp.role].length];
-      const time = SHIFT_TYPE_TIME[scheduled];
-      const scheduledStartMin = timeToMinutes(time.start);
-      const scheduledEndMin = timeToMinutes(time.end) + (time.end < time.start ? 24 * 60 : 0);
-      const scheduledHours = (scheduledEndMin - scheduledStartMin) / 60;
-
-      n++;
-      const cycle = n % 14;
-      let status: AttendanceStatus = "Present";
-      let lateMinutes = 0;
-      if (cycle === 3 || cycle === 7) status = "Late";
-      else if (cycle === 11) status = "Absent";
-      else if (cycle === 5 && dayBack > 6) status = "On Leave";
-
-      const id = `ATT-${emp.id}-${date}`;
-      if (status === "Absent") {
-        out.push({
-          id, employeeId: emp.id, date, scheduledStart: time.start, scheduledEnd: time.end,
-          scheduledHours, clockIn: null, clockOut: null, lateMinutes: 0, breakMinutes: 0,
-          workedHours: 0, variance: -scheduledHours, status, punches: [],
-        });
-        return;
-      }
-      if (status === "On Leave") {
-        out.push({
-          id, employeeId: emp.id, date, scheduledStart: time.start, scheduledEnd: time.end,
-          scheduledHours, clockIn: null, clockOut: null, lateMinutes: 0, breakMinutes: 0,
-          workedHours: 0, variance: 0, status, punches: [],
-        });
-        return;
-      }
-      if (status === "Late") lateMinutes = 8 + ((i * 3) % 22);
-      const clockInMin = scheduledStartMin + lateMinutes;
-      const breakMinutes = 30;
-      const clockOutMin = scheduledEndMin - ((i + dayBack) % 3 === 0 ? 6 : 0);
-      const workedHours = Math.round(((clockOutMin - clockInMin - breakMinutes) / 60) * 10) / 10;
-      const variance = Math.round((workedHours - scheduledHours) * 10) / 10;
-      const device = DEVICES[(i + dayBack) % DEVICES.length];
-
-      out.push({
-        id, employeeId: emp.id, date,
-        scheduledStart: time.start, scheduledEnd: time.end, scheduledHours,
-        clockIn: minutesToTime(clockInMin), clockOut: minutesToTime(clockOutMin),
-        lateMinutes, breakMinutes, workedHours, variance, status,
-        punches: [
-          { time: minutesToTime(clockInMin), type: "Clock In", device },
-          { time: minutesToTime(clockInMin + 180), type: "Break Start", device },
-          { time: minutesToTime(clockInMin + 180 + breakMinutes), type: "Break End", device },
-          { time: minutesToTime(clockOutMin), type: "Clock Out", device },
-        ],
-      });
-    });
-  }
-  return out;
-}
-
-export const attendanceRecords: readonly AttendanceRecord[] = generateAttendance();
-
-export const correctionReasons = [
-  "System error",
-  "Device malfunction",
-  "Manual override",
-  "Forgot to clock out",
-  "Network outage",
-] as const;
-
-/* ================================================================== TIPS */
-
-export type TipPoolMethod = "Individual" | "Pooled by branch" | "Pooled by shift";
-export type TipPoolRole = "Waiters" | "Kitchen" | "Runners" | "Hosts";
-export type TipStatus = "Pending" | "Distributed" | "Paid Out";
-
-export const tipsStats: readonly KpiCard[] = [
-  {
-    id: "tips-period",
-    label: "TIPS THIS PERIOD",
-    value: "SAR 42.8K",
-    delta: "+6.4%",
-    deltaNote: "vs last week",
-    color: "#a78bfa",
-    sparkline: [30, 32, 31, 34, 33, 36, 35, 38, 37, 40, 39, 41, 40, 42, 41, 42.8],
-  },
-  {
-    id: "avg-tip-pct",
-    label: "AVG TIP",
-    value: "8.4%",
-    delta: "+0.3pp",
-    deltaNote: "of check",
-    color: "#60a5fa",
-    sparkline: [7.8, 7.9, 7.8, 8.0, 8.1, 8.0, 8.2, 8.1, 8.3, 8.2, 8.3, 8.2, 8.4, 8.3, 8.4, 8.4],
-  },
-  {
-    id: "cash-card-split",
-    label: "CASH VS CARD SPLIT",
-    value: "32% / 68%",
-    delta: "-1.1pp",
-    deltaNote: "cash share vs last week",
-    color: "#a3e635",
-    sparkline: [36, 35, 35, 34, 34, 33, 33, 33, 32, 32, 33, 32, 32, 32, 33, 32],
-  },
-  {
-    id: "pending-distribution",
-    label: "PENDING DISTRIBUTION",
-    value: "SAR 6.2K",
-    delta: "+SAR 800",
-    deltaNote: "since yesterday",
-    color: "#fb923c",
-    sparkline: [3.2, 3.6, 3.4, 4.0, 3.8, 4.4, 4.2, 4.8, 4.6, 5.2, 5.0, 5.6, 5.4, 6.0, 5.8, 6.2],
-  },
-] as const;
-
-export interface TipSplitRule {
-  role: TipPoolRole;
-  percent: number;
-}
-export const defaultTipSplitRules: readonly TipSplitRule[] = [
-  { role: "Waiters", percent: 55 },
-  { role: "Kitchen", percent: 25 },
-  { role: "Runners", percent: 12 },
-  { role: "Hosts", percent: 8 },
-];
-
-export interface TipRecord {
-  id: string;
-  employeeId: string;
-  poolRole: TipPoolRole;
-  hours: number;
-  poolSharePercent: number;
-  cardTips: number;
-  cashTips: number;
-  status: TipStatus;
-}
-
-const TIP_EMPLOYEES: { id: string; poolRole: TipPoolRole; hours: number; card: number; cash: number; status: TipStatus }[] = [
-  { id: "EMP-013", poolRole: "Waiters", hours: 42, card: 980, cash: 420, status: "Distributed" },
-  { id: "EMP-014", poolRole: "Waiters", hours: 38, card: 860, cash: 360, status: "Distributed" },
-  { id: "EMP-015", poolRole: "Waiters", hours: 40, card: 910, cash: 400, status: "Distributed" },
-  { id: "EMP-016", poolRole: "Waiters", hours: 36, card: 780, cash: 340, status: "Pending" },
-  { id: "EMP-017", poolRole: "Waiters", hours: 34, card: 720, cash: 300, status: "Pending" },
-  { id: "EMP-018", poolRole: "Waiters", hours: 28, card: 560, cash: 260, status: "Pending" },
-  { id: "EMP-019", poolRole: "Waiters", hours: 33, card: 700, cash: 310, status: "Pending" },
-  { id: "EMP-020", poolRole: "Waiters", hours: 20, card: 400, cash: 180, status: "Paid Out" },
-  { id: "EMP-021", poolRole: "Kitchen", hours: 34, card: 320, cash: 140, status: "Distributed" },
-  { id: "EMP-022", poolRole: "Kitchen", hours: 41, card: 390, cash: 165, status: "Distributed" },
-  { id: "EMP-023", poolRole: "Kitchen", hours: 40, card: 380, cash: 160, status: "Pending" },
-  { id: "EMP-024", poolRole: "Kitchen", hours: 42, card: 400, cash: 170, status: "Pending" },
-  { id: "EMP-025", poolRole: "Kitchen", hours: 36, card: 340, cash: 150, status: "Paid Out" },
-  { id: "EMP-027", poolRole: "Runners", hours: 40, card: 260, cash: 110, status: "Pending" },
-];
-
-const TIP_TOTAL_HOURS = TIP_EMPLOYEES.reduce((s, r) => s + r.hours, 0);
-
-export const tipRecords: readonly TipRecord[] = TIP_EMPLOYEES.map((r) => ({
-  id: `TIP-${r.id}`,
-  employeeId: r.id,
-  poolRole: r.poolRole,
-  hours: r.hours,
-  poolSharePercent: Math.round((r.hours / TIP_TOTAL_HOURS) * 1000) / 10,
-  cardTips: r.card,
-  cashTips: r.cash,
-  status: r.status,
-}));
-
-/* ================================================================== PAYROLL */
-
-export type PayrollStatus = "Draft" | "Approved" | "Exported" | "Locked";
-
-export interface PayrollPeriod {
-  id: string;
-  label: string; // "August 2026"
-  hijriLabel: string; // "Safar 1448"
-  status: PayrollStatus;
-  totalInputs: number;
-}
-
-export const payrollPeriods: readonly PayrollPeriod[] = [
-  { id: "2026-08", label: "August 2026", hijriLabel: "Safar 1448", status: "Draft", totalInputs: 1_240_000 },
-  { id: "2026-07", label: "July 2026", hijriLabel: "Muharram 1448", status: "Approved", totalInputs: 1_198_500 },
-  { id: "2026-06", label: "June 2026", hijriLabel: "Dhu al-Hijjah 1447", status: "Exported", totalInputs: 1_176_200 },
-  { id: "2026-05", label: "May 2026", hijriLabel: "Dhu al-Qadah 1447", status: "Locked", totalInputs: 1_142_900 },
-];
-
-export interface PayrollAuditEntry {
-  date: string;
-  field: string;
-  oldValue: string;
-  newValue: string;
-  editedBy: string;
-}
-
-export interface PayrollRow {
-  id: string;
-  employeeId: string;
-  periodId: string;
-  baseSalary: number;
-  overtimeHours: number;
-  overtimePay: number;
-  tips: number;
-  deductions: number;
-  allowances: number;
-  gosi: number;
-  netInput: number;
-  status: PayrollStatus;
-  auditTrail: readonly PayrollAuditEntry[];
-}
-
-const PAYROLL_STAFF = employees.filter((e) => e.role !== "Owner");
-const OT_HOURLY_MULTIPLIER = 1.5;
-
-function payrollRowsForPeriod(period: PayrollPeriod): PayrollRow[] {
-  return PAYROLL_STAFF.map((emp, i) => {
-    const base = Math.round((emp.salaryBandMin + emp.salaryBandMax) / 2);
-    const hourlyRate = base / 240; // 30 days * 8h reference
-    const overtimeHours = (i + period.id.length) % 5 === 0 ? 6 : (i % 3 === 0 ? 3 : 0);
-    const overtimePay = Math.round(overtimeHours * hourlyRate * OT_HOURLY_MULTIPLIER);
-    const tipRecord = period.id === "2026-08" ? tipRecords.find((t) => t.employeeId === emp.id) : undefined;
-    const tips = tipRecord ? tipRecord.cardTips + tipRecord.cashTips : 0;
-    const deductions = i % 6 === 0 ? 150 : 0;
-    const allowances = emp.role === "Driver" ? 400 : emp.role === "Branch Manager" ? 500 : 200;
-    const gosi = Math.round(base * 0.1075);
-    const netInput = base + overtimePay + tips - deductions - allowances - gosi;
-
-    const auditTrail: PayrollAuditEntry[] =
-      period.status === "Draft" && i % 5 === 0
-        ? [
-            { date: "2026-08-02", field: "Overtime Hours", oldValue: "0", newValue: String(overtimeHours), editedBy: "Amal Al-Subai'i" },
-            { date: "2026-08-04", field: "Deductions", oldValue: "0", newValue: String(deductions), editedBy: "Faisal Al-Otaibi" },
-            { date: "2026-08-06", field: "Allowances", oldValue: "0", newValue: String(allowances), editedBy: "Amal Al-Subai'i" },
-          ]
-        : [];
-
-    const status: PayrollStatus = period.status === "Draft" && i % 7 === 0 ? "Approved" : period.status;
-
-    return {
-      id: `PR-${emp.id}-${period.id}`,
-      employeeId: emp.id,
-      periodId: period.id,
-      baseSalary: base,
-      overtimeHours,
-      overtimePay,
-      tips,
-      deductions,
-      allowances,
-      gosi,
-      netInput,
-      status,
-      auditTrail,
-    };
-  });
-}
-
-export const payrollRowsByPeriod: Record<string, readonly PayrollRow[]> = Object.fromEntries(
-  payrollPeriods.map((p) => [p.id, payrollRowsForPeriod(p)])
-);
-
 /* ================================================================== ROLES & PERMISSIONS */
 
 export type ModuleId =
@@ -756,6 +384,23 @@ export const MODULES: readonly { id: ModuleId; label: string }[] = [
   { id: "staffManagement", label: "Staff Management" },
   { id: "settingIntegrations", label: "Setting & Integrations" },
 ];
+
+// The finer-grained screens behind each module row. A module's toggle in the
+// matrix is ON only while every one of its features is ON for that action.
+export const MODULE_FEATURES: Record<ModuleId, readonly string[]> = {
+  dashboard: ["overview", "salesWidgets"],
+  reservations: ["bookings", "calendar", "deposits"],
+  waitlist: ["queue", "notifications"],
+  floorPlan: ["tables", "sections"],
+  orders: ["liveOrders", "orderHistory", "refunds"],
+  paymentRefund: ["payments", "refunds", "settlements"],
+  menuPos: ["menuItems", "pricing", "posTerminal"],
+  inventory: ["stock", "purchaseOrders", "transfers"],
+  reports: ["salesReports", "staffReports"],
+  customerCrm: ["profiles", "segments", "loyalty"],
+  staffManagement: ["team", "roles", "shifts"],
+  settingIntegrations: ["businessSettings", "integrations", "devices"],
+};
 
 export type PermissionAction = "view" | "create" | "edit" | "delete" | "approve" | "export" | "setting";
 export const PERMISSION_ACTIONS: readonly PermissionAction[] = ["view", "create", "edit", "delete", "approve", "export", "setting"];

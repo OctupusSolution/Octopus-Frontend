@@ -8,6 +8,7 @@ import { ArrowRight, CheckCircle2, HelpCircle } from "lucide-react";
 import { Button } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { StepRail } from "@/pages/onboarding/_shared/step-rail";
+import { HelpModal } from "../ui/help-modal";
 import { SITE_STEPS } from "./steps";
 import type { SiteAction, SiteDraft } from "./site-draft";
 
@@ -26,6 +27,9 @@ export interface BuilderShellProps {
   /** Shown beside the primary button while it's disabled, naming the reason
    *  rather than leaving a merchant to guess why "Publish Now" won't press. */
   primaryHint?: string;
+  /** Overrides the primary button's label — the Publish step reads "Publish
+   *  Changes" once the site is already live. */
+  primaryLabel?: string;
 }
 
 const LABEL_KEYS = SITE_STEPS.map((s) => s.labelKey);
@@ -54,6 +58,7 @@ export function BuilderShell({
   primaryDisabled,
   onPrimaryClick,
   primaryHint,
+  primaryLabel,
 }: BuilderShellProps) {
   const { t } = useI18n();
   const current = SITE_STEPS[draft.step - 1];
@@ -62,6 +67,7 @@ export function BuilderShell({
   // The same self-dismissing note pattern `onboarding/_shared/wizard.tsx`
   // uses for "Save As Draft" — there is no shared toast in this app.
   const [note, setNote] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     if (!note) return;
     const id = window.setTimeout(() => setNote(null), 3200);
@@ -135,7 +141,12 @@ export function BuilderShell({
               chips in the frame (`ghost` + an explicit fill), matched to the
               same ~40px height as Next Step. */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex-1 lg:[grid-template-columns:235fr_505fr_570fr]">
-            <Button variant="ghost" icon={<HelpCircle size={14} />} className="h-10 w-full justify-center bg-[var(--octo-hover)]">
+            <Button
+              variant="ghost"
+              icon={<HelpCircle size={14} />}
+              onClick={() => setHelpOpen(true)}
+              className="h-10 w-full justify-center bg-[var(--octo-hover)]"
+            >
               {t("publicLink.help")}
             </Button>
             <Button variant="ghost" onClick={handleSaveDraft} className="h-10 w-full justify-center bg-[var(--octo-hover)]">
@@ -148,12 +159,14 @@ export function BuilderShell({
               onClick={onPrimaryClick ?? (() => dispatch({ type: "next" }))}
               className="h-10 w-full justify-center"
             >
-              {t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
+              {primaryLabel ?? t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
               <ArrowRight size={14} className="rtl:rotate-180" />
             </Button>
           </div>
         </div>
       </div>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} stepId={current.id} titleKey={current.titleKey} />
     </div>
   );
 }

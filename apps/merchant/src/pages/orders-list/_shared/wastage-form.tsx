@@ -71,7 +71,7 @@ export function WastageForm({
               <span className="w-4 text-center text-[12.5px]">{selected[item.name] || 1}</span>
               <button
                 type="button"
-                onClick={() => setQty(item.name, (selected[item.name] || 1) + 1)}
+                onClick={() => setQty(item.name, selected[item.name] > 0 ? selected[item.name] + 1 : 1)}
                 className="grid h-6 w-6 place-items-center rounded-full text-white"
                 style={{ backgroundColor: accent }}
               >

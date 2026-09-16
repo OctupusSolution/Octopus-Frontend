@@ -12,6 +12,7 @@ import { OrderFilterPills } from "./_shared/filter-pills";
 import { SourceFilterPopover } from "./_shared/source-filter-popover";
 import { OrderCard, OrderTableRow } from "./_shared/order-row";
 import { ordersToCsv } from "./_shared/csv-export";
+import { OrderDetailsModal } from "./_shared/order-details-modal";
 import type { OrderAction } from "./_shared/theme";
 import type { OrderRecord, OrderSource, OrderState } from "./_shared/types";
 
@@ -65,7 +66,8 @@ export function OrdersListPage() {
   }
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
+    <>
+      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
@@ -174,6 +176,16 @@ export function OrdersListPage() {
           </>
         )}
       </section>
-    </div>
+      </div>
+
+      <OrderDetailsModal
+        order={detailsOrder}
+        onClose={() => setDetailsOrder(null)}
+        onAction={(action, order) => {
+          setDetailsOrder(null);
+          setPendingAction({ action, order });
+        }}
+      />
+    </>
   );
 }

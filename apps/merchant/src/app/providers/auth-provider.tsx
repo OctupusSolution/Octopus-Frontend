@@ -1,10 +1,18 @@
-// Session state for the merchant console. MOCK AUTH — the backend does not
-// exist yet, so a sign-in just writes a fake session to localStorage and the
-// route guard keys off its presence. Swap this for a real /auth/session call
-// when the API is published (see architecture PDF, Section 9).
+// Session state for the merchant console, backed by the real Identity module
+// (POST /v1/auth/login, /v1/accounts/register, ...) via @octopus/api-client.
 //
-// Never store a password here — this is a prototype gate, not security.
+// Two gaps this still papers over (see FRONTEND_INTEGRATION_GAPS.md 1.1/1.2):
+// there is no GET /v1/accounts/me, so `name`/`role` are not something the
+// backend returns after login — `name` is derived from the email locally
+// (same heuristic the old mock used) and `role` stays a fixed client-side
+// literal until a real roles system exists (see gap 4.1, which blocks that
+// anyway). There is also no logout/revoke endpoint, so `signOut` only drops
+// the local token — the refresh token stays valid server-side until it
+// expires on its own.
+//
+// Never store a password here — only the tokens the backend issued.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { login as apiLogin, type TokenResponse } from "@octopus/api-client";
 
 const STORAGE_KEY = "octopus.session";
 
@@ -13,17 +21,25 @@ export interface SessionUser {
   name: string;
   role: string;
   signedInAt: string;
-  /** Whether a password was set at signup — never the password itself, just the flag. */
+  /** Whether a password was set — always true for a real account (the
+   *  backend requires one at registration); kept only because the
+   *  needsPassword gate below still reads it. */
   passwordSet: boolean;
+  accessToken: string;
+  refreshToken: string;
 }
 
 interface AuthContextValue {
   isAuthenticated: boolean;
   user: SessionUser | null;
-  /** `passwordSet` defaults to true (email/social sign-in already implies credentials); the onboarding account step passes it explicitly. */
-  signIn: (email: string, passwordSet?: boolean) => void;
+  /** Calls the real /auth/login endpoint. Throws ApiError on failure (bad
+   *  credentials, unverified email, network) — callers show that message. */
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  /** For the two paths that already hold a token from another real call
+   *  (post-registration verify+auto-login, social sign-in once that's wired)
+   *  rather than calling /auth/login again. */
+  signInWithTokens: (email: string, tokens: TokenResponse) => void;
   signOut: () => void;
-  /** True once signed in without a password — the shell blocks on this until `setPasswordSet` runs. */
   needsPassword: boolean;
   setPasswordSet: () => void;
 }
@@ -49,6 +65,18 @@ function displayNameFromEmail(email: string): string {
     .join(" ");
 }
 
+function sessionFromTokens(email: string, tokens: TokenResponse): SessionUser {
+  return {
+    email,
+    name: displayNameFromEmail(email),
+    role: "owner",
+    signedInAt: new Date().toISOString(),
+    passwordSet: true,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(readSession);
 
@@ -63,22 +91,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthContextValue = {
     isAuthenticated: user !== null,
     user,
-    signIn: (email: string, passwordSet = true) =>
-      setUser({
-        email,
-        name: displayNameFromEmail(email),
-        role: "owner",
-        signedInAt: new Date().toISOString(),
-        passwordSet,
-      }),
+    signInWithPassword: async (email: string, password: string) => {
+      const tokens = await apiLogin({ email: email.trim(), password });
+      setUser(sessionFromTokens(email.trim(), tokens));
+    },
+    signInWithTokens: (email: string, tokens: TokenResponse) => {
+      setUser(sessionFromTokens(email, tokens));
+    },
+    // No revoke endpoint exists yet (gap 1.2) — this only forgets the token
+    // locally, it does not invalidate it server-side.
     signOut: () => setUser(null),
-    needsPassword: user !== null && !user.passwordSet,
+    needsPassword: false,
     setPasswordSet: () => setUser((prev) => (prev ? { ...prev, passwordSet: true } : prev)),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);

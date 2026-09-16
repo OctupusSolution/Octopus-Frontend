@@ -37,7 +37,7 @@ SP="C:/Users/Mohamed/AppData/Local/Temp/claude/e--Octupus-octopus-frontend/d354f
 MSYS_NO_PATHCONV=1 node "$SP/shot.mjs" /menu/m-allday/build/sections shot-name en 1600 1150
 ```
 
-`MSYS_NO_PATHCONV=1` is required — Git Bash rewrites a leading `/route` into a Windows path. `CLICK_SELECTOR` clicks one selector, or several separated by `|`, before capturing, so popovers and dialogs can be shot open. The dev server usually already runs on **5180**; check before starting one.
+`MSYS_NO_PATHCONV=1` is required — Git Bash rewrites a leading `/route` into a Windows path. `CLICK_SELECTOR` clicks one selector, or several separated by `|`, before capturing, so popovers and dialogs can be shot open. The dev server usually already runs on **4180**; check before starting one.
 
 ---
 

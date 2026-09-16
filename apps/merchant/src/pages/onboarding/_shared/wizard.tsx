@@ -7,8 +7,7 @@
 // passes no `chrome` at all. Which steps run and what happens on finish are
 // entirely the host's decision — this component only knows how to walk
 // whatever list it is given, over whatever draft config it is given.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import clsx from "clsx";
 import { Button } from "@ui/primitives";
 import { defaultModulesFor, questionsFor, withDependencies } from "@/shared/catalog";
@@ -51,7 +50,7 @@ export function Wizard({
   containerClassName,
   finishLabelKey = "onboarding.payment.goToDashboard",
 }: WizardProps) {
-  const { t, dir } = useI18n();
+  const { t } = useI18n();
   const { draft, dispatch, clear, keep, restored } = useOnboardingDraft(draftConfig);
 
   // A local, self-dismissing note, the same shape the settings pages use —
@@ -127,70 +126,118 @@ export function Wizard({
 
   const canContinue = current.canContinue(draft);
   const isLast = index === steps.length - 1;
-  const BackArrow = dir === "rtl" ? ArrowRight : ArrowLeft;
-  const NextArrow = dir === "rtl" ? ArrowLeft : ArrowRight;
 
+  // The frames give the footer two wide buttons that split the content width —
+  // Back on the left at roughly two fifths, the primary action filling the
+  // rest — rather than a pair of small right-aligned buttons. On the first
+  // step, where there is nothing to go back to, the primary action takes the
+  // whole row.
   const actions = (
-    <>
+    <div className="grid w-full gap-3" style={{ gridTemplateColumns: index > 0 ? "minmax(0,2fr) minmax(0,3fr)" : "minmax(0,1fr)" }}>
       {index > 0 && (
-        <Button variant="secondary" onClick={() => dispatch({ type: "back" })} icon={<BackArrow size={14} />}>
+        <Button
+          variant="secondary"
+          onClick={() => dispatch({ type: "back" })}
+          className="justify-center !py-3 !text-[13.5px] !font-semibold"
+        >
           {t("onboarding.back")}
         </Button>
       )}
       {current.showSaveDraft && (
-        <Button variant="secondary" onClick={handleSaveDraft}>
+        <Button variant="secondary" className="justify-center !py-3" onClick={handleSaveDraft}>
           {t("onboarding.publicLink.saveDraft")}
         </Button>
       )}
       {isLast ? (
-        <Button variant="primary" disabled={!canContinue} onClick={handleFinish}>
+        <Button
+          variant="primary"
+          disabled={!canContinue}
+          onClick={handleFinish}
+          className="justify-center !py-3 !text-[13.5px] !font-semibold"
+        >
           {t(finishLabelKey)}
         </Button>
       ) : (
-        <Button variant="primary" disabled={!canContinue} onClick={() => dispatch({ type: "next" })}>
+        <Button
+          variant="primary"
+          disabled={!canContinue}
+          onClick={() => dispatch({ type: "next" })}
+          className="justify-center !py-3 !text-[13.5px] !font-semibold"
+        >
           {t("onboarding.next")}
-          <NextArrow size={14} />
         </Button>
       )}
+    </div>
+  );
+
+  // The heading block and the step body. `cardHeader` steps wrap both in one
+  // white panel; everything else sits straight on the page background.
+  const heading = current.titleKey && (
+    <>
+      <span className="block text-[12px] font-medium text-[var(--octo-text-muted)]">
+        {t("onboarding.step").replace("{n}", String(index + 1)).replace("{total}", String(steps.length))}
+      </span>
+      <h1 className="mt-2 text-[30px] font-bold leading-[1.1] tracking-tight text-[var(--octo-text-primary)] sm:text-[38px]">
+        {t(current.titleKey)}
+      </h1>
+      {current.subtitleKey && (
+        <p className="mt-3 max-w-[640px] text-[14px] leading-relaxed text-[var(--octo-text-muted)]">
+          {t(current.subtitleKey)}
+        </p>
+      )}
+    </>
+  );
+
+  const body = (
+    <>
+      {heading}
+      <div className={clsx(current.titleKey && "mt-8")}>
+        <current.Component draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} />
+      </div>
     </>
   );
 
   return (
     <StepsProvider steps={steps}>
-      <div className={clsx("flex flex-col", containerClassName)}>
+      {/* Light-only: the Setup frames are drawn light and nothing in them has a
+          dark counterpart. Re-declaring the light palette here beats the dark
+          one on <html> for this subtree alone, so a merchant who runs the
+          console dark keeps that choice everywhere else. */}
+      <div
+        data-theme="light"
+        // The frames sit the wizard on a near-white ground, not the console's
+        // #e9eaec page grey — the cards inside it are the light greys, and on
+        // #e9eaec they would read as lighter than the page rather than
+        // darker. Overriding the token (rather than a class) keeps the sticky
+        // footer and the price bar on the same ground for free.
+        style={{ "--octo-page-bg": "#f7f8fa" } as CSSProperties}
+        className={clsx("flex flex-col", containerClassName)}
+      >
         {chrome}
 
-        <main className="mx-auto w-full max-w-[1180px] flex-1 px-5 py-8">
-          <StepRail step={index + 1} labelKeys={labelKeys} />
-
-          {current.titleKey && (
-            <>
-              <span className="mt-8 block text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[#0D6EFD]">
-                {t("onboarding.step").replace("{n}", String(index + 1)).replace("{total}", String(steps.length))}
-              </span>
-              <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)] sm:text-[28px]">
-                {t(current.titleKey)}
-              </h1>
-              {current.subtitleKey && (
-                <p className="mt-2 text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
-              )}
-            </>
+        <main className="mx-auto w-full max-w-[1248px] flex-1 px-6 py-8">
+          {!current.hideRail && (
+            <div className="mb-10">
+              <StepRail step={index + 1} labelKeys={labelKeys} />
+            </div>
           )}
 
-          <div className="mt-6">
-            <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} /> : undefined}>
-              <current.Component draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} />
-            </StepShell>
-          </div>
+          <StepShell aside={current.Aside ? <current.Aside draft={draft} dispatch={dispatch} onFinish={handleFinish} finishLabelKey={finishLabelKey} /> : undefined}>
+            {current.cardHeader ? (
+              <section className="rounded-[20px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-7 sm:p-8">{body}</section>
+            ) : (
+              body
+            )}
+          </StepShell>
         </main>
 
-        {current.showPriceBar ? (
+        {current.hideFooter ? null : current.showPriceBar ? (
           <PriceBar draft={draft} action={actions} />
         ) : (
-          <div className="sticky bottom-0 border-t border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 backdrop-blur">
-            <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-end gap-2 px-5 py-3.5">
+          <div className="sticky bottom-0 bg-[var(--octo-page-bg)]/95 backdrop-blur">
+            <div className="mx-auto flex max-w-[1248px] flex-col gap-2 px-6 py-4">
               {note && (
-                <p role="status" className="me-auto text-[11.5px] text-[var(--octo-text-muted)]">
+                <p role="status" className="text-[11.5px] text-[var(--octo-text-muted)]">
                   {note}
                 </p>
               )}

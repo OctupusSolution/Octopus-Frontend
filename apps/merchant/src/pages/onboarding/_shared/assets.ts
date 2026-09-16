@@ -49,3 +49,4 @@ export function getStartedAsset(file: string): string {
 
 // Moved to shared/lib/storefront-assets.ts — see the note there.
 export * from "@/shared/lib/storefront-assets";
+

@@ -1,7 +1,6 @@
 // "Create another business" — the same onboarding flow signup uses, minus the
 // Get Started hero (a merchant who is already signed in doesn't need the
-// pitch) and, on Payment, the Create Account modal (they already have an
-// account). Runs inside the app shell, with the existing back-link and page
+// pitch). Runs inside the app shell, with the existing back-link and page
 // title standing in for the header the standalone signup flow renders.
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
@@ -16,10 +15,9 @@ const DRAFT_CONFIG: OnboardingDraftConfig = {
   draftKey: "octopus.addBusiness.draft",
   keptKey: "octopus.addBusiness.draft.kept",
   stepCount: ADD_BUSINESS_STEPS.length,
-  // The merchant creating a second business already has an account — the
-  // Payment step's Create Account modal opens only when `!accountCreated`,
-  // so starting a fresh draft with this already true keeps it from ever
-  // appearing on this flow.
+  // The merchant already has an account. Nothing in the flow asks for one any
+  // more (signup happens before the wizard on both hosts), so this only keeps
+  // the draft honest about a merchant who is plainly signed in.
   patch: { accountCreated: true },
 };
 

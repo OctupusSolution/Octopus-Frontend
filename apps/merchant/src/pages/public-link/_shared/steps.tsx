@@ -3,6 +3,7 @@
 // below without ever touching this shape.
 import type { ComponentType } from "react";
 import type { SiteAction, SiteDraft } from "./site-draft";
+import type { PublicLinkSync } from "@/entities/site-draft";
 import { ThemeStep } from "../steps/theme-step";
 import { BrandStep } from "../steps/brand-step";
 import { PagesStep } from "../steps/pages-step";
@@ -14,6 +15,10 @@ import { PublishStep } from "../steps/publish-step";
 export interface StepProps {
   draft: SiteDraft;
   dispatch: (action: SiteAction) => void;
+  /** Only Brand and Publish read this — the backend-connected subset of the
+   *  builder (slug, brand colours, publish state). See
+   *  entities/site-draft/public-link-sync.ts. */
+  publicLinkSync: PublicLinkSync;
 }
 
 export interface SiteStep {

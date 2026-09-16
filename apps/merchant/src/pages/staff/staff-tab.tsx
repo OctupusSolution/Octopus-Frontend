@@ -70,6 +70,8 @@ export function StaffTab({
   };
 
   const saveMember = (id: string, draft: MemberDraft) => {
+    const before = store.profileOf(id);
+    const wasInactive = store.isInactive(id);
     const name = `${draft.firstName.trim()} ${draft.lastName.trim()}`.trim();
     store.updateEmployee(id, {
       name,
@@ -98,6 +100,37 @@ export function StaffTab({
       allowAccessOutsideBranch: draft.allowAccessOutsideBranch,
     });
     store.setInactive(id, draft.status === "Inactive");
+    if (before) {
+      const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+      const accessChanged =
+        before.accessLevel !== draft.accessLevel ||
+        !same(before.modulesAccess, draft.modulesAccess) ||
+        before.loginMethod !== draft.loginMethod ||
+        before.twoFactorEnabled !== draft.twoFactorEnabled ||
+        before.twoFactorMethod !== draft.twoFactorMethod ||
+        before.allowSystemLogin !== draft.allowSystemLogin ||
+        before.allowAccessOutsideBranch !== draft.allowAccessOutsideBranch;
+      const profileChanged =
+        before.firstName !== draft.firstName.trim() ||
+        before.lastName !== draft.lastName.trim() ||
+        before.employee.phone !== draft.phone.trim() ||
+        before.email !== draft.email.trim() ||
+        before.dateOfBirth !== draft.dateOfBirth ||
+        before.gender !== draft.gender ||
+        before.nationality !== draft.nationality.trim() ||
+        before.languages !== draft.languages ||
+        before.jobTitle !== draft.jobTitle ||
+        before.employee.branch !== draft.branch ||
+        before.department !== draft.department ||
+        before.reportsTo !== draft.reportsTo ||
+        before.employee.hireDate !== draft.hireDate ||
+        before.employmentType !== draft.employmentType;
+      if (profileChanged) store.logAudit(id, "profileUpdated");
+      if (accessChanged) store.logAudit(id, "accessUpdated");
+      if (before.pinCode !== draft.pinCode) store.logAudit(id, "pinReset");
+      if (before.assignedRole !== draft.assignedRole) store.logAudit(id, "roleUpdated");
+      if (wasInactive !== (draft.status === "Inactive")) store.logAudit(id, wasInactive ? "activated" : "deactivated");
+    }
     notify(t("staff.toast.memberUpdated").replace("{name}", name));
   };
 
@@ -112,6 +145,7 @@ export function StaffTab({
         tone: inactive ? "default" : "warning",
         onSelect: () => {
           store.setInactive(id, !inactive);
+          store.logAudit(id, inactive ? "activated" : "deactivated");
           notify(t(inactive ? "staff.toast.memberActivated" : "staff.toast.memberDeactivated").replace("{name}", name));
         },
       },
@@ -129,6 +163,7 @@ export function StaffTab({
           onSave={(draft) => saveMember(selected.employee.id, draft)}
           onLockChange={(locked) => {
             store.patchProfile(selected.employee.id, { locked });
+            store.logAudit(selected.employee.id, locked ? "locked" : "unlocked");
             notify(t(locked ? "staff.toast.accountLocked" : "staff.toast.accountUnlocked").replace("{name}", selected.employee.name));
           }}
           notify={notify}
@@ -230,7 +265,7 @@ export function StaffTab({
                       <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--octo-text-primary)]">
                         <Settings size={15} aria-hidden className="shrink-0" />
                         <span className="truncate">
-                          {t("staff.grid.lastAccess")}: {formatDateTime(profile.lastAccess, locale)}
+                          {t("staff.grid.lastAccess")}: {profile.lastAccess ? formatDateTime(profile.lastAccess, locale) : t("staff.grid.neverSignedIn")}
                         </span>
                       </span>
                       {profile.locked ? (

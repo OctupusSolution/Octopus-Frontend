@@ -97,6 +97,31 @@ export function relatedItems(items: MenuItem[], to: MenuItem, limit = 4): MenuIt
   return [...sameGroup, ...sameCategory].slice(0, limit);
 }
 
+export interface ModifierGroup {
+  /** "" for a line saved before groupLabel existed — its options still show. */
+  label: string;
+  values: string;
+}
+
+/** One row per modifier group — "الحجم : متوسط", "الإضافات : جبن - هالبينو".
+ *  Shared by the cart lines and the fulfillment summary card, which print the
+ *  same rows at different sizes. */
+export function groupedModifiers(line: OrderLine): ModifierGroup[] {
+  const order: string[] = [];
+  const byGroup = new Map<string, string[]>();
+
+  for (const modifier of line.modifiers) {
+    const key = modifier.groupLabel ?? "";
+    if (!byGroup.has(key)) {
+      byGroup.set(key, []);
+      order.push(key);
+    }
+    byGroup.get(key)?.push(modifier.label);
+  }
+
+  return order.map((label) => ({ label, values: (byGroup.get(label) ?? []).join(" - ") }));
+}
+
 export interface LinePricing {
   baseSar: number;
   addonsSar: number;

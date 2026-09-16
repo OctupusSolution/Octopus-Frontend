@@ -15,7 +15,18 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5180,
+    port: 4180,
     strictPort: true,
+    // AdminApi has no CORS configured, so calls go through this dev proxy
+    // instead of hitting http://localhost:8081 directly from the browser.
+    // Frontend code should call fetch("/api/v1/...") and never the backend
+    // origin directly. See ADMIN_API_URL in .env for the target.
+    proxy: {
+      "/api": {
+        target: process.env.ADMIN_API_URL ?? "http://localhost:8081",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
   },
 });

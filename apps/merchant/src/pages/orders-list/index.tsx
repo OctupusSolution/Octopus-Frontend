@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { RefreshCw, SlidersHorizontal, ClipboardList, ChevronDown, X, Clock } from "lucide-react";
 import { StatCard } from "@/widgets/sales-summary-chart";
 import { orderStats, orderRows, type OrderStatus } from "@/shared/api/mock-orders";
@@ -222,7 +222,7 @@ export function OrdersListPage() {
           />
         ) : (
           <>
-            {/* Mobile: card accordion — no horizontal scroll, tap a row to expand its details */}
+            {/* Mobile: card accordion â€” no horizontal scroll, tap a row to expand its details */}
             <div className="mt-3 divide-y divide-[var(--octo-row-border)] sm:hidden">
               {visibleRows.map((row) => {
                 const isOpen = expandedId === row.id;

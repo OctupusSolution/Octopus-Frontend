@@ -137,6 +137,10 @@ export interface Tester {
 
 export interface SiteDraft {
   step: number;
+  /** The backend's public-link slug (`PublicSiteResponse.slug`) — the ONE
+   *  field here that maps directly onto a real Backend concept today. See
+   *  entities/site-draft/public-link-sync.ts. Empty string until claimed. */
+  slug: string;
   theme: { id: string; filter: string };
   brand: {
     businessName: string;
@@ -201,6 +205,7 @@ const SEEDED_SECTION_IDS = [
 
 export const EMPTY_SITE_DRAFT: SiteDraft = {
   step: 1,
+  slug: "",
   theme: { id: "elegant", filter: "all" },
   brand: {
     businessName: "",
@@ -341,6 +346,7 @@ export type SiteAction =
   | { type: "goTo"; step: number }
   | { type: "next" }
   | { type: "back" }
+  | { type: "patchSlug"; slug: string }
   | { type: "patchTheme"; patch: Partial<SiteDraft["theme"]> }
   | { type: "patchBrand"; patch: Partial<Omit<SiteDraft["brand"], "colors" | "typography">> }
   | { type: "patchColors"; patch: Partial<SiteDraft["brand"]["colors"]> }
@@ -382,6 +388,8 @@ export function siteDraftReducer(state: SiteDraft, action: SiteAction): SiteDraf
       return { ...state, step: clampStep(state.step + 1) };
     case "back":
       return { ...state, step: clampStep(state.step - 1) };
+    case "patchSlug":
+      return { ...state, slug: action.slug };
     case "patchTheme":
       return { ...state, theme: { ...state.theme, ...action.patch } };
     case "patchBrand":

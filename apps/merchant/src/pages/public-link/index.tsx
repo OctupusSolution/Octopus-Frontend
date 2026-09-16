@@ -4,6 +4,7 @@
 // the customer view it can open, which both outlive the Publish step's body.
 import { useState } from "react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { usePublicLinkSync } from "@/entities/site-draft";
 import { BuilderShell } from "./_shared/builder-shell";
 import { goLiveReady } from "./_shared/checklist";
 import { previewModelFromSite } from "./_shared/preview-model";
@@ -15,6 +16,7 @@ import { SitePreviewModal } from "./ui/site-preview-modal";
 export function PublicLinkBuilderPage() {
   const { t, locale } = useI18n();
   const { draft, dispatch, save } = useSiteDraft();
+  const publicLinkSync = usePublicLinkSync(draft, dispatch);
   const current = SITE_STEPS[draft.step - 1];
   const [successOpen, setSuccessOpen] = useState(false);
   const [siteOpen, setSiteOpen] = useState(false);
@@ -26,8 +28,11 @@ export function PublicLinkBuilderPage() {
   const publishReady = goLiveReady(draft);
   const liveUrl = `https://${previewModelFromSite(draft, "desktop", t, locale).url}`;
 
-  function publish() {
-    dispatch({ type: "patchPublish", patch: { published: true, publishedAt: Date.now() } });
+  async function publish() {
+    // Goes through the real backend when a dev session is configured
+    // (see shared/api/dev-backend-session.ts); otherwise falls back to the
+    // old local-only toggle, same as before this was wired up.
+    await publicLinkSync.publish();
     setSuccessOpen(true);
   }
 
@@ -42,7 +47,7 @@ export function PublicLinkBuilderPage() {
         primaryLabel={isPublishStep && draft.publish.published ? t("publicLink.publishChanges") : undefined}
         onPrimaryClick={isPublishStep ? publish : undefined}
       >
-        <current.Component draft={draft} dispatch={dispatch} />
+        <current.Component draft={draft} dispatch={dispatch} publicLinkSync={publicLinkSync} />
       </BuilderShell>
 
       <PublishSuccessModal

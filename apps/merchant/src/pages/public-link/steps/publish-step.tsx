@@ -129,7 +129,7 @@ function ShareTile({
   );
 }
 
-export function PublishStep({ draft, dispatch }: StepProps) {
+export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
   const model = previewModelFromSite(draft, "desktop", t, locale);
   const liveUrl = `https://${model.url}`;
@@ -206,7 +206,7 @@ export function PublishStep({ draft, dispatch }: StepProps) {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => dispatch({ type: "patchPublish", patch: { published: false, publishedAt: null } })}
+            onClick={() => publicLinkSync.unpublish()}
             className="ms-auto !text-[#DC2626] hover:bg-[#DC2626]/10"
           >
             {t("publicLink.unpublish")}

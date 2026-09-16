@@ -1,4 +1,4 @@
-import { Wifi, Bell, Search, Sun, Moon } from "lucide-react";
+import { Wifi, Bell, Search, Sun, Moon, PanelLeft } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTheme } from "@/app/providers/theme-provider";
@@ -34,7 +34,7 @@ function crumbsFor(pathname: string): [string, string] {
   return prefixed?.[1] ?? [labelKey("Dashboard"), labelKey("Overview")];
 }
 
-export function TopBar() {
+export function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const { pathname } = useLocation();
   const [sectionKey, pageKey] = crumbsFor(pathname);
   const { t } = useI18n();
@@ -42,9 +42,21 @@ export function TopBar() {
 
   return (
     <header className="flex items-center gap-4 border-b border-[var(--octo-divider)] px-[26px] py-4">
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        aria-label={t("sidebar.collapse")}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+      >
+        <PanelLeft size={15} />
+      </button>
+
       <nav aria-label={t("topbar.breadcrumb")} className="shrink-0 text-[12.5px]">
-        <span className="text-[var(--octo-text-faint)]">{t(sectionKey)}</span>
-        <span className="mx-1.5 text-[var(--octo-crumb)]">/</span>
+        {/* `--octo-text-faint` is tuned for text sitting on a card; the top bar
+            sits on the page surface, where it fell to ~1.9:1. The parent crumb
+            is a real label, so it takes the muted step up in both themes. */}
+        <span className="text-[var(--octo-text-muted)]">{t(sectionKey)}</span>
+        <span className="mx-1.5 text-[var(--octo-text-faint)]">/</span>
         <span className="font-medium text-[var(--octo-text-primary)]">{t(pageKey)}</span>
       </nav>
 

@@ -65,7 +65,7 @@ export function MemberSummaryCard({
         <Row icon={Globe} label={t("staff.member.field.language")}>{labels.data("staff.language", profile.languages)}</Row>
       </dl>
 
-      {showSessions && (
+      {showSessions && profile.lastAccess && (
         <div className="mt-4 rounded-[10px] bg-[var(--octo-tone-success-bg)] p-3">
           <div className="flex items-center justify-between gap-2 border-b border-[#16A34A]/20 pb-2">
             <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("staff.member.field.activeSessions")}</span>

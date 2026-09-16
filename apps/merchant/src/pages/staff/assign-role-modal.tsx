@@ -36,6 +36,7 @@ export function AssignRoleModal({
     const role = store.roles.find((r) => r.id === roleId);
     if (!role) return;
     store.patchProfile(profile.employee.id, { assignedRole: role.id });
+    store.logAudit(profile.employee.id, "roleUpdated");
     onAssigned(profile.employee.name, labels.roleName(role));
     onClose();
   };

@@ -10,9 +10,12 @@ export interface ModalProps {
   children?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Overrides the scrim. Console dialogs keep the default light wash; the
+   *  auth screens sit on a photograph-like page and need a much darker one. */
+  backdropClassName?: string;
 }
 
-export function Modal({ open, onClose, title, children, footer, className }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, className, backdropClassName }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -26,7 +29,7 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      className={clsx("fixed inset-0 z-50 flex items-center justify-center p-4", backdropClassName ?? "bg-black/30")}
       onClick={onClose}
     >
       <div

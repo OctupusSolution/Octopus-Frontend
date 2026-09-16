@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal } from "@ui/primitives";
-import { branches, staffRoles, type Branch, type Employee, type StaffRole } from "@/shared/api/mock-staff";
+import { LANGUAGE_OPTIONS, TODAY, branches, staffRoles, type Branch, type Employee, type StaffRole } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { Field, SelectInput, TextInput } from "./_shared/form";
@@ -13,6 +13,9 @@ interface AddMemberForm {
   lastName: string;
   phone: string;
   email: string;
+  dateOfBirth: string;
+  nationality: string;
+  languages: string;
   branch: Branch;
   role: StaffRole;
   employmentType: "Full time" | "Part time";
@@ -23,6 +26,9 @@ const EMPTY: AddMemberForm = {
   lastName: "",
   phone: "",
   email: "",
+  dateOfBirth: "",
+  nationality: "",
+  languages: LANGUAGE_OPTIONS[0],
   branch: branches[0],
   role: "Waiter",
   employmentType: "Full time",
@@ -53,6 +59,10 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
     if (!form.phone.trim()) next.phone = t("staff.validation.required");
     else if (!PHONE_RE.test(form.phone.trim())) next.phone = t("staff.validation.phone");
     if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) next.email = t("staff.validation.email");
+    if (form.dateOfBirth) {
+      const [y, m, d] = TODAY.split("-");
+      if (form.dateOfBirth > `${Number(y) - 16}-${m}-${d}`) next.dateOfBirth = t("staff.validation.minAge");
+    }
     if (Object.keys(next).length) {
       setErrors(next);
       return;
@@ -80,7 +90,12 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
       emergencyContactPhone: "",
       documents: [],
     };
-    store.addEmployee(employee, form.email.trim() ? { email: form.email.trim() } : undefined);
+    store.addEmployee(employee, {
+      ...(form.email.trim() ? { email: form.email.trim() } : {}),
+      ...(form.dateOfBirth ? { dateOfBirth: form.dateOfBirth } : {}),
+      ...(form.nationality.trim() ? { nationality: form.nationality.trim() } : {}),
+      languages: form.languages,
+    });
     onCreated(name);
     close();
   };
@@ -134,6 +149,19 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
             invalid={!!errors.email}
             onChange={(e) => set("email", e.target.value)}
           />
+        </Field>
+        <Field label={t("staff.member.field.dateOfBirth")} htmlFor="add-dob" error={errors.dateOfBirth}>
+          <TextInput id="add-dob" type="date" max={TODAY} value={form.dateOfBirth} invalid={!!errors.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} />
+        </Field>
+        <Field label={t("staff.member.field.nationality")} htmlFor="add-nationality">
+          <TextInput id="add-nationality" placeholder={t("staff.addMember.nationalityPlaceholder")} value={form.nationality} onChange={(e) => set("nationality", e.target.value)} />
+        </Field>
+        <Field label={t("staff.member.field.language")} htmlFor="add-language" className="sm:col-span-2">
+          <SelectInput id="add-language" value={form.languages} onChange={(e) => set("languages", e.target.value)}>
+            {LANGUAGE_OPTIONS.map((l) => (
+              <option key={l} value={l}>{labels.data("staff.language", l)}</option>
+            ))}
+          </SelectInput>
         </Field>
         <Field label={t("staff.member.field.branch")} htmlFor="add-branch">
           <SelectInput id="add-branch" value={form.branch} onChange={(e) => set("branch", e.target.value as Branch)}>

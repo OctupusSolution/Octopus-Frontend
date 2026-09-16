@@ -8,7 +8,7 @@
 // Logo / Remove beside it, sentence-case field labels, each colour's swatch
 // and hex sharing one field, labelled font examples set in the chosen face,
 // the two assets side by side, and Reset to Theme Defaults as a blue link.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RotateCcw, RotateCw, Upload } from "lucide-react";
 import clsx from "clsx";
 import { Button, Input, Select } from "@ui/primitives";
@@ -193,13 +193,95 @@ function AssetPicker({
   );
 }
 
-export function BrandStep({ draft, dispatch }: StepProps) {
+/** The backend-connected slug field — not part of `SiteDraft.brand` since it
+ *  maps to a real endpoint pair (`GET slug-availability`, `PUT slug`) with
+ *  its own async check-then-claim flow, unlike every other field on this
+ *  step which is just local state. No dev session configured means both
+ *  calls are no-ops (see public-link-sync.ts), so this still renders fine
+ *  before Identity/Setup are wired — it just always reports "available". */
+function SlugField({
+  slug,
+  draftSlug,
+  onSlugChange,
+  checkSlug,
+  claimSlug,
+}: {
+  slug: string;
+  draftSlug: string;
+  onSlugChange: (slug: string) => void;
+  checkSlug: (slug: string) => Promise<{ isAvailable: boolean; reason: string | null }>;
+  claimSlug: (slug: string) => Promise<void>;
+}) {
+  const { t } = useI18n();
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<{ isAvailable: boolean; reason: string | null } | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const dirty = draftSlug !== slug;
+
+  async function handleCheck() {
+    setChecking(true);
+    try {
+      setResult(await checkSlug(draftSlug));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleClaim() {
+    setClaiming(true);
+    try {
+      await claimSlug(draftSlug);
+      setResult(null);
+    } finally {
+      setClaiming(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className={FIELD_LABEL}>{t("publicLink.brand.slug")}</span>
+      <div className="flex items-center gap-2">
+        <Input
+          aria-label={t("publicLink.brand.slug")}
+          placeholder={t("publicLink.brand.slugPlaceholder")}
+          value={draftSlug}
+          dir="ltr"
+          className="h-10 flex-1"
+          onChange={(e) => onSlugChange(e.target.value.trim().toLowerCase())}
+        />
+        <Button variant="secondary" onClick={handleCheck} disabled={!draftSlug || checking} className="h-10 whitespace-nowrap">
+          {checking ? t("publicLink.brand.slugChecking") : t("publicLink.brand.checkAvailability")}
+        </Button>
+        {!dirty && slug && (
+          <span className="whitespace-nowrap text-[11.5px] font-medium text-[#16a34a]">{t("publicLink.brand.slugClaimed")}</span>
+        )}
+      </div>
+      {result && (
+        <span className={clsx("text-[11.5px]", result.isAvailable ? "text-[#16a34a]" : "text-[#DC2626]")}>
+          {result.isAvailable ? t("publicLink.brand.slugAvailable") : result.reason ?? t("publicLink.brand.slugUnavailable")}
+        </span>
+      )}
+      {result?.isAvailable && dirty && (
+        <Button size="sm" onClick={handleClaim} disabled={claiming} className="w-fit">
+          {t("publicLink.brand.claimSlug")}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   // Bumped by the preview's Refresh action so the frame in `key` genuinely
   // remounts rather than silently re-rendering with the same props.
   const [refreshKey, setRefreshKey] = useState(0);
+  const [draftSlug, setDraftSlug] = useState(draft.slug);
   const { brand } = draft;
+
+  // Picks up the backend's claimed slug once public-link-sync's initial
+  // fetch resolves (draft.slug starts empty until then).
+  useEffect(() => setDraftSlug(draft.slug), [draft.slug]);
 
   const model = previewModelFromSite(draft, device, t, locale);
 
@@ -242,6 +324,14 @@ export function BrandStep({ draft, dispatch }: StepProps) {
               onChange={(e) => dispatch({ type: "patchBrand", patch: { businessName: e.target.value } })}
             />
           </div>
+
+          <SlugField
+            slug={draft.slug}
+            draftSlug={draftSlug}
+            onSlugChange={setDraftSlug}
+            checkSlug={publicLinkSync.checkSlug}
+            claimSlug={publicLinkSync.claimSlug}
+          />
 
           <section className="flex flex-col gap-3">
             <p className={SECTION_TITLE}>{t("publicLink.brand.colors")}</p>

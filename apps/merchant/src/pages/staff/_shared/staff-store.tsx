@@ -3,6 +3,7 @@
 // nothing a merchant edits is lost when they switch tabs. Mock data only: no
 // request leaves the page until the staff API lands.
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { useAuth } from "@/app/providers/auth-provider";
 import {
   employees as seedEmployees,
   toMemberProfile,
@@ -13,16 +14,17 @@ import {
   MODULE_FEATURES,
   PERMISSION_ACTIONS,
   scheduleShifts,
-  SHIFT_TYPE_TIME,
+  TODAY,
   type Employee,
   type LeaveType,
   type MemberProfile,
   type ModuleId,
   type PermissionAction,
-  type StaffRole,
+  type ShiftType,
 } from "@/shared/api/mock-staff";
+import { addDays, fromISO, toISO } from "./format";
 
-export type LeaveStatus = "pending" | "approved" | "declined";
+export type LeaveStatus = "pending" | "approved" | "rejected";
 
 export interface LeaveRequest {
   id: string;
@@ -34,52 +36,56 @@ export interface LeaveRequest {
   status: LeaveStatus;
 }
 
+/** A shift definition the schedule is built from (Morning Shift, 08:00–16:00, Sun–Thu). */
 export interface ShiftRoleRecord {
   id: string;
   name: string;
-  color: string;
-  /** Minimum people in this role per branch per day. */
-  minPerDay: number;
-  staffRole: StaffRole | null;
+  start: string;
+  end: string;
+  /** Weekday indexes, 0 = Sunday. */
+  days: number[];
+  active: boolean;
+  updatedAt: string;
 }
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const CUSTOM_SHIFT = "custom";
 
-function shortDateToISO(value: string): string {
-  const [day, month] = value.split(" ");
-  return `2026-${String(MONTHS.indexOf(month) + 1).padStart(2, "0")}-${day.padStart(2, "0")}`;
+export interface ShiftCell {
+  start: string;
+  end: string;
+  roleId: string;
 }
 
-function seedLeaveRequests(): LeaveRequest[] {
-  return leaveRequestRows.map((r) => ({
-    id: r.id,
-    employeeId: seedEmployees.find((e) => e.name === r.employee)?.id ?? null,
-    employeeName: r.employee,
-    type: r.type,
-    start: shortDateToISO(r.startDate),
-    end: shortDateToISO(r.endDate),
-    status: "pending",
-  }));
+/**
+ * A day is in one of three states: a shift is scheduled, it is an explicit day
+ * off, or nobody has planned it yet. Only the last one shows "Assign Shift".
+ */
+export interface Schedule {
+  shifts: Record<string, ShiftCell>;
+  offDays: Record<string, true>;
 }
 
-/** Monday-first availability; roughly half the team has one standing day they can't work. */
-function seedAvailability(): Record<string, boolean[]> {
-  return Object.fromEntries(
-    seedEmployees.map((e) => {
-      let h = 0;
-      for (let i = 0; i < e.id.length; i++) h = (h * 31 + e.id.charCodeAt(i)) >>> 0;
-      return [e.id, Array.from({ length: 7 }, (_, day) => !(h % 2 === 0 && day === h % 7))];
-    })
-  );
-}
+export type AuditKind =
+  | "login"
+  | "created"
+  | "profileUpdated"
+  | "roleUpdated"
+  | "accessUpdated"
+  | "pinReset"
+  | "locked"
+  | "unlocked"
+  | "activated"
+  | "deactivated";
 
-const SEED_SHIFT_ROLES: ShiftRoleRecord[] = [
-  { id: "manager", name: "Restaurant Manager", color: "#0D6EFD", minPerDay: 1, staffRole: "Branch Manager" },
-  { id: "cashier", name: "Cashier", color: "#7C3AED", minPerDay: 1, staffRole: "Cashier" },
-  { id: "waiter", name: "Waiter", color: "#DB2777", minPerDay: 2, staffRole: "Waiter" },
-  { id: "kitchen", name: "Kitchen Staff", color: "#D97706", minPerDay: 1, staffRole: "Kitchen" },
-  { id: "driver", name: "Delivery Driver", color: "#16A34A", minPerDay: 0, staffRole: "Driver" },
-];
+export interface AuditEntry {
+  id: string;
+  kind: AuditKind;
+  /** ISO date-time, minutes precision. */
+  at: string;
+  actor?: string;
+  device?: string;
+  ip?: string;
+}
 
 export type ActionFlags = Record<PermissionAction, boolean>;
 export type RolePermissions = Record<ModuleId, Record<string, ActionFlags>>;
@@ -92,19 +98,13 @@ export interface RoleRecord {
   active: boolean;
 }
 
-export interface ShiftCell {
-  start: string;
-  end: string;
-  templateId: string;
+function hashOf(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return h;
 }
 
-export interface ShiftTemplate {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-  color: string;
-}
+const pad = (n: number) => String(n).padStart(2, "0");
 
 export function actionFlags(value: boolean): ActionFlags {
   return Object.fromEntries(PERMISSION_ACTIONS.map((a) => [a, value])) as ActionFlags;
@@ -134,17 +134,90 @@ function seedPermissions(): Record<string, RolePermissions> {
   );
 }
 
-function seedShifts(): Record<string, ShiftCell> {
+const SEED_SHIFT_ROLES: ShiftRoleRecord[] = [
+  { id: "morning", name: "Morning Shift", start: "08:00", end: "16:00", days: [0, 1, 2, 3, 4], active: true, updatedAt: "2026-05-12T10:30" },
+  { id: "evening", name: "Evening Shift", start: "16:00", end: "00:00", days: [0, 1, 2, 3, 4], active: true, updatedAt: "2026-05-12T10:30" },
+  { id: "night", name: "Night Shift", start: "00:00", end: "08:00", days: [0, 1, 2, 3, 4], active: true, updatedAt: "2026-05-12T10:30" },
+];
+
+const TYPE_ROLE: Record<ShiftType, string> = { Morning: "morning", Evening: "evening", Night: "night" };
+
+function seedSchedule(): Schedule {
+  const roles = new Map(SEED_SHIFT_ROLES.map((r) => [r.id, r]));
+  const shifts: Record<string, ShiftCell> = {};
+  const offDays: Record<string, true> = {};
+  const staffIds = new Set<string>();
+  let first = "9999-12-31";
+  let last = "0000-01-01";
+  for (const s of scheduleShifts) {
+    const role = roles.get(TYPE_ROLE[s.type])!;
+    shifts[`${s.employeeId}|${s.date}`] = { start: role.start, end: role.end, roleId: role.id };
+    staffIds.add(s.employeeId);
+    if (s.date < first) first = s.date;
+    if (s.date > last) last = s.date;
+  }
+  // Inside the weeks the mock schedule covers, a day without a shift was
+  // planned as a day off; outside them nothing has been planned yet.
+  for (const id of staffIds) {
+    for (let d = fromISO(first); toISO(d) <= last; d = addDays(d, 1)) {
+      const key = `${id}|${toISO(d)}`;
+      if (!shifts[key]) offDays[key] = true;
+    }
+  }
+  // The newest hire's current week is only half planned, so the grid opens
+  // with a few unassigned days to fill, as in the Assign Shift frames.
+  const newest = [...staffIds].pop();
+  if (newest) {
+    for (let i = -3; i <= 0; i++) {
+      const key = `${newest}|${toISO(addDays(fromISO(TODAY), i))}`;
+      delete shifts[key];
+      delete offDays[key];
+    }
+  }
+  return { shifts, offDays };
+}
+
+function seedLeaveRequests(): LeaveRequest[] {
+  return leaveRequestRows.map((r) => ({
+    id: r.id,
+    employeeId: seedEmployees.find((e) => e.name === r.employee)?.id ?? null,
+    employeeName: r.employee,
+    type: r.type,
+    start: r.startDate,
+    end: r.endDate,
+    status: r.status.toLowerCase() as LeaveStatus,
+  }));
+}
+
+/** Weekday-indexed (0 = Sunday); roughly half the team has one standing day they can't work. */
+function seedAvailability(): Record<string, boolean[]> {
   return Object.fromEntries(
-    scheduleShifts.map((s) => [`${s.employeeId}|${s.date}`, { start: s.start, end: s.end, templateId: s.type }])
+    seedEmployees.map((e) => {
+      const h = hashOf(e.id);
+      return [e.id, Array.from({ length: 7 }, (_, day) => !(h % 2 === 0 && day === h % 7))];
+    })
   );
 }
 
-const SEED_TEMPLATES: ShiftTemplate[] = [
-  { id: "Morning", name: "Morning", start: SHIFT_TYPE_TIME.Morning.start, end: SHIFT_TYPE_TIME.Morning.end, color: "#0D6EFD" },
-  { id: "Evening", name: "Evening", start: SHIFT_TYPE_TIME.Evening.start, end: SHIFT_TYPE_TIME.Evening.end, color: "#7C3AED" },
-  { id: "Night", name: "Night", start: SHIFT_TYPE_TIME.Night.start, end: SHIFT_TYPE_TIME.Night.end, color: "#0F172A" },
-];
+const SEED_ACTOR = "Abdulrahman Al-Faisal";
+
+function seedAudit(p: MemberProfile): AuditEntry[] {
+  const id = p.employee.id;
+  const h = hashOf(id);
+  const yesterday = toISO(addDays(fromISO(TODAY), -1));
+  const entries: AuditEntry[] = [
+    { id: `${id}-created`, kind: "created", at: `${p.employee.hireDate}T10:10`, actor: SEED_ACTOR },
+  ];
+  if (p.employee.role === "Owner") return entries;
+  const pinDate = `2026-${pad(1 + (h % 6))}-${pad(1 + (h % 27))}`;
+  return [
+    ...(p.lastAccess ? [{ id: `${id}-login`, kind: "login" as const, at: p.lastAccess, device: p.activeSection.device, ip: `182.23.45.${10 + (h % 240)}` }] : []),
+    { id: `${id}-role`, kind: "roleUpdated", at: `${yesterday}T16:30`, actor: SEED_ACTOR },
+    { id: `${id}-access`, kind: "accessUpdated", at: `${yesterday}T16:25`, actor: SEED_ACTOR },
+    ...(pinDate > p.employee.hireDate ? [{ id: `${id}-pin`, kind: "pinReset" as const, at: `${pinDate}T11:20`, actor: SEED_ACTOR }] : []),
+    ...entries,
+  ];
+}
 
 interface StaffStore {
   employees: Employee[];
@@ -155,6 +228,8 @@ interface StaffStore {
   patchProfile: (id: string, patch: Partial<MemberProfile>) => void;
   isInactive: (id: string) => boolean;
   setInactive: (id: string, inactive: boolean) => void;
+  auditOf: (id: string) => AuditEntry[];
+  logAudit: (id: string, kind: AuditKind) => void;
 
   roles: RoleRecord[];
   addRole: (role: RoleRecord, permissions: RolePermissions) => void;
@@ -165,30 +240,30 @@ interface StaffStore {
   setRolePermissions: (roleId: string, update: (prev: RolePermissions) => RolePermissions) => void;
 
   shifts: Record<string, ShiftCell>;
-  setShifts: (update: (prev: Record<string, ShiftCell>) => Record<string, ShiftCell>) => void;
-  templates: ShiftTemplate[];
-  setTemplates: (update: (prev: ShiftTemplate[]) => ShiftTemplate[]) => void;
+  offDays: Record<string, true>;
+  updateSchedule: (update: (prev: Schedule) => Schedule) => void;
+  shiftRoles: ShiftRoleRecord[];
+  setShiftRoles: (update: (prev: ShiftRoleRecord[]) => ShiftRoleRecord[]) => void;
   leaveRequests: LeaveRequest[];
   setLeaveRequests: (update: (prev: LeaveRequest[]) => LeaveRequest[]) => void;
   availability: Record<string, boolean[]>;
-  setAvailability: (update: (prev: Record<string, boolean[]>) => Record<string, boolean[]>) => void;
-  shiftRoles: ShiftRoleRecord[];
-  setShiftRoles: (update: (prev: ShiftRoleRecord[]) => ShiftRoleRecord[]) => void;
 }
 
 const StaffStoreContext = createContext<StaffStore | null>(null);
 
 export function StaffStoreProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>(() => [...seedEmployees]);
   const [overrides, setOverrides] = useState<Record<string, Partial<MemberProfile>>>({});
   const [inactiveIds, setInactiveIds] = useState<Set<string>>(() => new Set());
+  const [createdIds, setCreatedIds] = useState<Set<string>>(() => new Set());
+  const [auditLog, setAuditLog] = useState<Record<string, AuditEntry[]>>({});
   const [roles, setRoles] = useState<RoleRecord[]>(() => staffRoleDefs.map((r) => ({ ...r, active: true })));
   const [permissions, setPermissions] = useState<Record<string, RolePermissions>>(seedPermissions);
-  const [shifts, setShiftsState] = useState<Record<string, ShiftCell>>(seedShifts);
-  const [templates, setTemplatesState] = useState<ShiftTemplate[]>(SEED_TEMPLATES);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(seedLeaveRequests);
-  const [availability, setAvailability] = useState<Record<string, boolean[]>>(seedAvailability);
+  const [schedule, setSchedule] = useState<Schedule>(seedSchedule);
   const [shiftRoles, setShiftRoles] = useState<ShiftRoleRecord[]>(SEED_SHIFT_ROLES);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(seedLeaveRequests);
+  const [availability] = useState<Record<string, boolean[]>>(seedAvailability);
 
   const profiles = useMemo(
     () => new Map(employees.map((e) => [e.id, { ...toMemberProfile(e), ...overrides[e.id], employee: e }])),
@@ -197,10 +272,39 @@ export function StaffStoreProvider({ children }: { children: ReactNode }) {
 
   const profileOf = useCallback((id: string) => profiles.get(id) ?? null, [profiles]);
 
-  const addEmployee = useCallback((employee: Employee, profile?: Partial<MemberProfile>) => {
-    setEmployees((prev) => [employee, ...prev]);
-    if (profile) setOverrides((prev) => ({ ...prev, [employee.id]: profile }));
-  }, []);
+  const logAudit = useCallback(
+    (id: string, kind: AuditKind) => {
+      const now = new Date();
+      const entry: AuditEntry = {
+        id: `${id}-${kind}-${now.getTime()}`,
+        kind,
+        at: `${TODAY}T${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        actor: user?.name ?? SEED_ACTOR,
+      };
+      setAuditLog((prev) => ({ ...prev, [id]: [entry, ...(prev[id] ?? [])] }));
+    },
+    [user?.name]
+  );
+
+  const auditOf = useCallback(
+    (id: string) => {
+      const profile = profiles.get(id);
+      if (!profile) return [];
+      const base = createdIds.has(id) ? [] : seedAudit(profile);
+      return [...(auditLog[id] ?? []), ...base].sort((a, b) => b.at.localeCompare(a.at));
+    },
+    [profiles, createdIds, auditLog]
+  );
+
+  const addEmployee = useCallback(
+    (employee: Employee, profile?: Partial<MemberProfile>) => {
+      setEmployees((prev) => [employee, ...prev]);
+      setOverrides((prev) => ({ ...prev, [employee.id]: { lastAccess: "", ...profile } }));
+      setCreatedIds((prev) => new Set(prev).add(employee.id));
+      logAudit(employee.id, "created");
+    },
+    [logAudit]
+  );
 
   const updateEmployee = useCallback((id: string, patch: Partial<Employee>) => {
     setEmployees((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
@@ -208,7 +312,11 @@ export function StaffStoreProvider({ children }: { children: ReactNode }) {
 
   const removeEmployee = useCallback((id: string) => {
     setEmployees((prev) => prev.filter((e) => e.id !== id));
-    setShiftsState((prev) => Object.fromEntries(Object.entries(prev).filter(([key]) => !key.startsWith(`${id}|`))));
+    const keep = ([key]: [string, unknown]) => !key.startsWith(`${id}|`);
+    setSchedule((prev) => ({
+      shifts: Object.fromEntries(Object.entries(prev.shifts).filter(keep)),
+      offDays: Object.fromEntries(Object.entries(prev.offDays).filter(keep)) as Record<string, true>,
+    }));
   }, []);
 
   const patchProfile = useCallback((id: string, patch: Partial<MemberProfile>) => {
@@ -263,6 +371,8 @@ export function StaffStoreProvider({ children }: { children: ReactNode }) {
       patchProfile,
       isInactive,
       setInactive,
+      auditOf,
+      logAudit,
       roles,
       addRole,
       updateRole,
@@ -270,18 +380,16 @@ export function StaffStoreProvider({ children }: { children: ReactNode }) {
       memberCount,
       permissions,
       setRolePermissions,
-      shifts,
-      setShifts: setShiftsState,
-      templates,
-      setTemplates: setTemplatesState,
+      shifts: schedule.shifts,
+      offDays: schedule.offDays,
+      updateSchedule: setSchedule,
+      shiftRoles,
+      setShiftRoles,
       leaveRequests,
       setLeaveRequests,
       availability,
-      setAvailability,
-      shiftRoles,
-      setShiftRoles,
     }),
-    [employees, profileOf, addEmployee, updateEmployee, removeEmployee, patchProfile, isInactive, setInactive, roles, addRole, updateRole, removeRole, memberCount, permissions, setRolePermissions, shifts, templates, leaveRequests, availability, shiftRoles]
+    [employees, profileOf, addEmployee, updateEmployee, removeEmployee, patchProfile, isInactive, setInactive, auditOf, logAudit, roles, addRole, updateRole, removeRole, memberCount, permissions, setRolePermissions, schedule, shiftRoles, leaveRequests, availability]
   );
 
   return <StaffStoreContext.Provider value={value}>{children}</StaffStoreContext.Provider>;

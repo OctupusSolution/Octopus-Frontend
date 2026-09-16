@@ -1,6 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/refund-order-flow.tsx
 import { useMemo } from "react";
-import { Banknote, Check, FileClock, Info, Loader2, Stamp, X } from "lucide-react";
+import { Banknote, Check, Clock, FileText, Info, Stamp, X } from "lucide-react";
 import { Modal } from "@ui/primitives";
 import { formatSar } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -16,19 +16,91 @@ import type { OrderRecord } from "./types";
 const CASH_STEPS: readonly FlowStepKind[] = ["form", "pin", "result"];
 const ONLINE_STEPS: readonly FlowStepKind[] = ["form", "pin", "processing", "pending", "result"];
 
-function StampBadgeIcon({ tone }: { tone: "success" | "failed" }) {
-  const Icon = tone === "success" ? Stamp : Banknote;
-  const BadgeIcon = tone === "success" ? Check : X;
-  const badgeColor = tone === "success" ? "#16A34A" : "#DC2626";
+/** The frames draw each refund outcome as one black line-art glyph with a
+ *  small status badge clipped to its lower-right corner. */
+function BadgedIcon({
+  glyph,
+  badge,
+  badgeTone,
+  filledBadge = true,
+}: {
+  glyph: React.ReactNode;
+  badge: React.ReactNode;
+  badgeTone: string;
+  filledBadge?: boolean;
+}) {
   return (
-    <span className="relative inline-flex h-14 w-14 items-center justify-center">
-      <Icon size={48} className="text-[var(--octo-text-primary)]" strokeWidth={1.75} />
+    <span className="relative inline-flex h-20 w-20 items-center justify-center">
+      {glyph}
       <span
-        className="absolute -right-1 -top-1 grid h-6 w-6 place-items-center rounded-full text-white"
-        style={{ backgroundColor: badgeColor }}
+        className="absolute bottom-0 end-0 grid h-9 w-9 place-items-center rounded-full"
+        style={
+          filledBadge
+            ? { backgroundColor: badgeTone, color: "#FFFFFF" }
+            : { backgroundColor: "var(--octo-card)", border: `3px solid ${badgeTone}`, color: badgeTone }
+        }
       >
-        <BadgeIcon size={13} strokeWidth={3} />
+        {badge}
       </span>
+    </span>
+  );
+}
+
+function RefundSuccessIcon() {
+  return (
+    <BadgedIcon
+      glyph={<Stamp size={56} className="text-[var(--octo-text-primary)]" strokeWidth={1.9} />}
+      badge={<Check size={18} strokeWidth={3.5} />}
+      badgeTone="#22C55E"
+      filledBadge={false}
+    />
+  );
+}
+
+function RefundFailedIcon() {
+  return (
+    <BadgedIcon
+      glyph={<Banknote size={58} className="text-[var(--octo-text-primary)]" strokeWidth={1.9} />}
+      badge={<X size={18} strokeWidth={3.5} />}
+      badgeTone="#DC2626"
+    />
+  );
+}
+
+function RefundPendingIcon() {
+  return (
+    <BadgedIcon
+      glyph={<FileText size={56} className="text-[var(--octo-text-primary)]" strokeWidth={1.9} />}
+      badge={<Clock size={20} strokeWidth={2.5} />}
+      badgeTone="#F59E0B"
+      filledBadge={false}
+    />
+  );
+}
+
+/** The gateway frame's spinner is a ring of shrinking dots rather than an arc,
+ *  so it is drawn here instead of reaching for a lucide glyph. */
+function DotRingSpinner() {
+  const dots = Array.from({ length: 8 }, (_, index) => index);
+
+  return (
+    <span className="relative inline-flex h-20 w-20 animate-spin items-center justify-center [animation-duration:1.1s]">
+      {dots.map((index) => {
+        const angle = (index / dots.length) * 2 * Math.PI;
+        const size = 14 - index * 1.2;
+        return (
+          <span
+            key={index}
+            className="absolute rounded-full border-[3px] border-[var(--octo-text-primary)]"
+            style={{
+              width: `${size}px`,
+              height: `${size}px`,
+              opacity: 1 - index * 0.1,
+              transform: `translate(${Math.sin(angle) * 30}px, ${-Math.cos(angle) * 30}px)`,
+            }}
+          />
+        );
+      })}
     </span>
   );
 }
@@ -36,12 +108,14 @@ function StampBadgeIcon({ tone }: { tone: "success" | "failed" }) {
 function ProcessingStep({ amountSar }: { amountSar: number }) {
   const { t } = useI18n();
   return (
-    <Modal open onClose={() => {}} className="max-w-md text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center">
-        <Loader2 size={40} className="animate-spin text-[var(--octo-text-secondary)]" />
+    <Modal open onClose={() => {}} className="max-w-[720px] text-center">
+      <div className="mx-auto flex h-24 w-24 items-center justify-center">
+        <DotRingSpinner />
       </div>
-      <h2 className="mt-2 text-[19px] font-bold text-[var(--octo-text-primary)]">{t("orders.result.processingRefundTitle")}</h2>
-      <p className="mt-2 text-[13px] text-[var(--octo-text-secondary)]">
+      <h2 className="mt-4 text-[22px] font-bold text-[var(--octo-text-primary)]">
+        {t("orders.result.processingRefundTitle")}
+      </h2>
+      <p className="mt-2 text-[14px] text-[var(--octo-text-secondary)]">
         {t("orders.result.processingRefundSubtitle").replace("{amount}", formatSar(amountSar))}
       </p>
     </Modal>
@@ -51,33 +125,38 @@ function ProcessingStep({ amountSar }: { amountSar: number }) {
 function PendingStep({ refundId }: { refundId: string }) {
   const { t } = useI18n();
   return (
-    <Modal open onClose={() => {}} className="max-w-md text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center text-[#D97706]">
-        <FileClock size={44} strokeWidth={1.75} />
+    <Modal open onClose={() => {}} className="max-w-[720px] text-center">
+      <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center">
+        <RefundPendingIcon />
       </div>
-      <h2 className="mt-2 text-[19px] font-bold text-[var(--octo-text-primary)]">{t("orders.result.refundPendingTitle")}</h2>
-      <p className="mt-2 text-[13px] text-[var(--octo-text-secondary)]">{t("orders.result.refundPendingSubtitle")}</p>
-      <div className="mt-4 flex items-start gap-1.5 rounded-[10px] bg-[#FFFBEB] p-3 text-start text-[12.5px] text-[#92400E]">
-        <Info size={14} className="mt-px shrink-0" />
+      <h2 className="text-[22px] font-bold text-[var(--octo-text-primary)]">{t("orders.result.refundPendingTitle")}</h2>
+      <p className="mt-2 text-[14px] text-[var(--octo-text-secondary)]">{t("orders.result.refundPendingSubtitle")}</p>
+      <div className="mt-5 flex items-center gap-2 rounded-[10px] bg-[#FFFBEB] p-3.5 text-start text-[13.5px] text-[#B45309]">
+        <Info size={16} className="shrink-0" />
         <span>{t("orders.result.refundPendingNote").replace("{refundId}", refundId)}</span>
+        <span className="rounded-full bg-[var(--octo-card)] px-2.5 py-0.5 text-[12.5px] font-medium">
+          {t("orders.result.refundPendingChip")}
+        </span>
       </div>
     </Modal>
   );
 }
 
-// Pixel match for Refund Failed.png, kept as an exported-but-unused view —
-// see the Task 12 note in the plan for why nothing currently calls this.
+// Pixel match for Refund Failed.png, kept as an exported-but-unused view: the
+// design spec has no trigger for a decline, since this mock has no real
+// payment gateway that could refuse one.
 export function RefundFailedPreview({ amountSar, onRetry }: { amountSar: number; onRetry: () => void }) {
   const { t } = useI18n();
   return (
     <ResultModal
       open
       onClose={onRetry}
-      icon={<StampBadgeIcon tone="failed" />}
+      icon={<RefundFailedIcon />}
       title={t("orders.result.refundFailedTitle")}
       subtitle={t("orders.result.refundFailedSubtitle").replace("{amount}", formatSar(amountSar))}
       noteLines={[t("orders.result.refundFailedReason")]}
-      noteClassName="bg-[#FEF2F2] text-[#991B1B]"
+      noteClassName="bg-[#FEF2F2] text-[#B91C1C]"
+      noteIcon={<Info size={16} />}
       primaryLabel={t("orders.result.tryAgain")}
       onPrimary={onRetry}
     />
@@ -120,8 +199,8 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-w-lg">
-        <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{t("orders.refund.title")}</h2>
+      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
+        <h2 className="text-[22px] font-bold text-[var(--octo-text-primary)]">{t("orders.refund.title")}</h2>
         <RefundForm
           order={order}
           isCash={isCash}
@@ -132,6 +211,7 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
           methodItemsLabel={t("orders.refund.methodItems")}
           methodAmountLabel={t("orders.refund.methodAmount")}
           amountPlaceholder={t("orders.refund.amountPlaceholder")}
+          cashAmountPlaceholder={t("orders.refund.cashAmountPlaceholder")}
           maxAmountLabel={t("orders.refund.maxAmount")}
           amountFieldLabel={t("orders.refund.amountFieldLabel")}
           amountSummaryLabel={t("orders.refund.amountSummary")}
@@ -147,7 +227,6 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
           noteLabel={t("orders.note")}
           notePlaceholder={t("orders.notePlaceholder")}
           submitLabel={t("orders.next")}
-          accent={accent}
           onSubmit={flow.submit}
         />
       </Modal>
@@ -174,21 +253,21 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
   if (flow.step === "processing") return <ProcessingStep amountSar={amountSar} />;
   if (flow.step === "pending") return <PendingStep refundId={refundId} />;
 
+  // Success.png and Success (1).png both close on dismissal — neither frame
+  // carries a button of its own.
   if (isCash) {
     return (
       <ResultModal
         open
         onClose={onClose}
-        icon={<StampBadgeIcon tone="success" />}
+        icon={<RefundSuccessIcon />}
         title={t("orders.result.cashRefundTitle")}
         subtitle={t("orders.result.cashRefundSubtitle").replace("{amount}", formatSar(amountSar))}
         noteLines={[
           t("orders.result.cashRefundNote").replace("{refundId}", refundId).replace("{time}", now).replace("{type}", typeLabel),
         ]}
-        noteClassName="bg-[#F0FDF4] text-[#166534]"
-        noteIcon={<Info size={14} />}
-        primaryLabel={t("orders.result.done")}
-        onPrimary={onClose}
+        noteClassName="bg-[#F0FDF4] text-[#15803D]"
+        noteIcon={<Info size={16} />}
       />
     );
   }
@@ -197,7 +276,7 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
     <ResultModal
       open
       onClose={onClose}
-      icon={<StampBadgeIcon tone="success" />}
+      icon={<RefundSuccessIcon />}
       title={t("orders.result.refundSuccessTitle")}
       subtitle={t("orders.result.refundSuccessSubtitle")
         .replace("{amount}", formatSar(amountSar))
@@ -205,10 +284,8 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
       noteLines={[
         t("orders.result.refundSuccessNote").replace("{refundId}", refundId).replace("{time}", now).replace("{type}", typeLabel),
       ]}
-      noteClassName="bg-[#F0FDF4] text-[#166534]"
-      noteIcon={<Info size={14} />}
-      primaryLabel={t("orders.result.done")}
-      onPrimary={onClose}
+      noteClassName="bg-[#F0FDF4] text-[#15803D]"
+      noteIcon={<Info size={16} />}
     />
   );
 }

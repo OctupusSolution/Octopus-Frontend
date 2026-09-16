@@ -17,7 +17,7 @@ export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; o
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-w-lg">
+      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
         <ScopeReasonForm
           title={t("orders.void.title")}
           // No orders.void.scopeLabel key exists in i18n — this form
@@ -39,7 +39,6 @@ export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; o
           noteLabel={t("orders.note")}
           notePlaceholder={t("orders.notePlaceholder")}
           submitLabel={t("orders.next")}
-          accent={accent}
           onSubmit={flow.submit}
         />
       </Modal>
@@ -59,7 +58,13 @@ export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; o
     );
   }
 
-  const now = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const now = new Date().toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <ResultModal

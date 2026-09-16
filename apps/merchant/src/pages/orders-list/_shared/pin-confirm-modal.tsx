@@ -4,6 +4,11 @@ import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PIN_LENGTH, PinInput } from "./pin-input";
 
+// Static mock manager identity — same convention as this app's other
+// mock-auth screens; no real PIN store exists yet, so any 4 digits work.
+const MANAGER_NAME = "Reem Al-Subaie";
+const MANAGER_INITIALS = "RA";
+
 export function PinConfirmModal({
   open,
   onClose,
@@ -24,22 +29,30 @@ export function PinConfirmModal({
 
   if (!open) return null;
   const complete = pin.every((digit) => digit !== "");
+  const signedInAt = t("orders.managerAuth.todayAt").replace(
+    "{time}",
+    new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+  );
 
   return (
-    <Modal open onClose={onClose} className="max-w-md">
-      <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{t("orders.managerAuth.title")}</h2>
+    <Modal open onClose={onClose} className="max-w-[720px]">
+      <h2 className="text-[22px] font-bold text-[var(--octo-text-primary)]">{t("orders.managerAuth.title")}</h2>
 
-      {/* Static mock manager identity — same convention as this app's other
-          mock-auth screens; no real PIN store exists yet, any 4 digits work. */}
-      <div className="mt-4 flex items-center gap-3 rounded-[10px] bg-[var(--octo-hover)] p-3">
-        <div className="h-10 w-10 shrink-0 rounded-full bg-[var(--octo-track)]" aria-hidden="true" />
+      <div className="mt-5 flex items-center gap-3 rounded-xl bg-[#0D6EFD]/[0.05] p-3.5">
+        <span
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-[15px] font-bold text-white"
+          aria-hidden="true"
+        >
+          {MANAGER_INITIALS}
+        </span>
         <div>
-          <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">Reem Al-Subaie</p>
-          <p className="text-[12px] font-medium text-[#0D6EFD]">{t("orders.managerAuth.role")}</p>
+          <p className="text-[14.5px] font-bold text-[var(--octo-text-primary)]">{MANAGER_NAME}</p>
+          <p className="text-[13px] font-medium text-[#0D6EFD]">{t("orders.managerAuth.role")}</p>
+          <p className="mt-0.5 text-[12px] text-[var(--octo-text-muted)]">{signedInAt}</p>
         </div>
       </div>
 
-      <p className="mt-4 text-center text-[13px] text-[var(--octo-text-secondary)]">{t(promptKey)}</p>
+      <p className="mt-6 text-center text-[14px] text-[var(--octo-text-secondary)]">{t(promptKey)}</p>
 
       <div className="mt-4">
         <PinInput value={pin} onChange={setPin} />
@@ -49,7 +62,7 @@ export function PinConfirmModal({
         type="button"
         disabled={!complete}
         onClick={onConfirm}
-        className="mt-5 w-full rounded-[9px] py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-6 w-full rounded-[10px] py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: accent }}
       >
         {t(confirmLabelKey)}

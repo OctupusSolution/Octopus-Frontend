@@ -15,6 +15,7 @@ import { ordersToCsv } from "./_shared/csv-export";
 import { OrderDetailsModal } from "./_shared/order-details-modal";
 import { CancelOrderFlow } from "./_shared/cancel-order-flow";
 import { VoidOrderFlow } from "./_shared/void-order-flow";
+import { WastageOrderFlow } from "./_shared/wastage-order-flow";
 import type { OrderAction } from "./_shared/theme";
 import type { OrderRecord, OrderSource, OrderState } from "./_shared/types";
 
@@ -195,6 +196,10 @@ export function OrdersListPage() {
       />
       <VoidOrderFlow
         order={pendingAction?.action === "void" ? pendingAction.order : null}
+        onClose={() => setPendingAction(null)}
+      />
+      <WastageOrderFlow
+        order={pendingAction?.action === "wastage" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
       />
     </>

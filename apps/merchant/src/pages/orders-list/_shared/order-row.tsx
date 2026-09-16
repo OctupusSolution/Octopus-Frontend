@@ -39,7 +39,7 @@ const ACTION_BUTTONS: readonly {
     action: "refund",
     labelKey: "orders.action.refund",
     className: "border-[#A16207]/30 bg-[#A16207]/10 text-[#A16207]",
-    largeClassName: "border-[#A16207]/30 bg-[#FEF9C3] text-[#A16207]",
+    largeClassName: "border-[#A16207]/30 bg-[#A16207]/10 text-[#A16207]",
     icon: RotateCcw,
   },
   {

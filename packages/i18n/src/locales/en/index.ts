@@ -688,6 +688,7 @@ export const en = {
   "orders.delta.vsYesterday": "vs yesterday",
   "orders.subNote.sla": "within 15 min SLA",
   "orders.col.order": "Order",
+  "orders.col.tableNo": "Table",
   "orders.col.branch": "Branch",
   "orders.col.channel": "Channel",
   "orders.col.customer": "Customer",

@@ -10,6 +10,7 @@ export function ResultModal({
   subtitle,
   noteLines,
   noteClassName,
+  noteIcon,
   primaryLabel,
   onPrimary,
 }: {
@@ -23,6 +24,10 @@ export function ResultModal({
   subtitle: string;
   noteLines: readonly string[];
   noteClassName: string;
+  /** A small leading glyph inside the note box — only the Refund flow's
+   *  audit-line boxes (pending/success/cash-recorded) show one in the
+   *  mockups; Cancel/Void/Wastage's note boxes never do. */
+  noteIcon?: ReactNode;
   primaryLabel: string;
   onPrimary: () => void;
 }) {
@@ -35,10 +40,13 @@ export function ResultModal({
       <p className="mt-2 text-[13px] text-[var(--octo-text-secondary)]">{subtitle}</p>
 
       {noteLines.length > 0 && (
-        <div className={`mt-4 rounded-[10px] p-3 text-start text-[12.5px] ${noteClassName}`}>
-          {noteLines.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
+        <div className={`mt-4 flex items-start gap-1.5 rounded-[10px] p-3 text-start text-[12.5px] ${noteClassName}`}>
+          {noteIcon && <span className="mt-px shrink-0">{noteIcon}</span>}
+          <div>
+            {noteLines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
         </div>
       )}
 

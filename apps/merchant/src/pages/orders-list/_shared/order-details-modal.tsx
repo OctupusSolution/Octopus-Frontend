@@ -101,6 +101,20 @@ export function OrderDetailsModal({
             <span>{order.paymentMethod}</span>
           </div>
         )}
+        {order.paymentMethod && order.timeline.New && (
+          <div className="mt-1.5 flex items-center justify-between text-[12.5px]">
+            <span className="text-[var(--octo-text-muted)]">{t("orders.details.paidAt")}</span>
+            <span>
+              {new Date(order.timeline.New).toLocaleString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+        )}
         {order.transactionId && (
           <div className="mt-1.5 flex items-center justify-between text-[12.5px]">
             <span className="text-[var(--octo-text-muted)]">{t("orders.details.transactionId")}</span>
@@ -114,7 +128,7 @@ export function OrderDetailsModal({
         <Stepper order={order} className="mt-3" />
       </div>
 
-      <OrderActionButtons order={order} onAction={onAction} className="mt-4" />
+      <OrderActionButtons order={order} onAction={onAction} variant="large" className="mt-4" />
     </Modal>
   );
 }

@@ -1,5 +1,5 @@
 // apps/merchant/src/pages/orders-list/_shared/order-row.tsx
-import { ChevronDown } from "lucide-react";
+import { Ban, ChevronDown, RotateCcw, Trash2, XCircle } from "lucide-react";
 import { formatSar } from "@octopus/api-client";
 import { TD, TR } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -21,23 +21,75 @@ const SOURCE_LABEL_KEY: Record<OrderRecord["source"], string> = {
   "Phone Order": "orders.source.phone",
 };
 
-const ACTION_BUTTONS: readonly { action: OrderAction; labelKey: string; className: string }[] = [
-  { action: "void", labelKey: "orders.action.void", className: "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)]" },
-  { action: "refund", labelKey: "orders.action.refund", className: "border-[#A16207]/30 bg-[#A16207]/10 text-[#A16207]" },
-  { action: "wastage", labelKey: "orders.action.wastage", className: "border-[#7C3AED]/30 bg-[#7C3AED]/10 text-[#7C3AED]" },
-  { action: "cancel", labelKey: "orders.action.cancel", className: "border-[#DC2626]/30 bg-[#DC2626]/10 text-[#DC2626]" },
+const ACTION_BUTTONS: readonly {
+  action: OrderAction;
+  labelKey: string;
+  className: string;
+  largeClassName: string;
+  icon: typeof Ban;
+}[] = [
+  {
+    action: "void",
+    labelKey: "orders.action.void",
+    className: "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)]",
+    largeClassName: "border-[var(--octo-border-input)] bg-[var(--octo-hover)] text-[var(--octo-text-secondary)]",
+    icon: Ban,
+  },
+  {
+    action: "refund",
+    labelKey: "orders.action.refund",
+    className: "border-[#A16207]/30 bg-[#A16207]/10 text-[#A16207]",
+    largeClassName: "border-[#A16207]/30 bg-[#FEF9C3] text-[#A16207]",
+    icon: RotateCcw,
+  },
+  {
+    action: "wastage",
+    labelKey: "orders.action.wastage",
+    className: "border-[#7C3AED]/30 bg-[#7C3AED]/10 text-[#7C3AED]",
+    largeClassName: "border-[#7C3AED]/30 bg-[#7C3AED]/10 text-[#7C3AED]",
+    icon: Trash2,
+  },
+  {
+    action: "cancel",
+    labelKey: "orders.action.cancel",
+    className: "border-[#DC2626]/30 bg-[#DC2626]/10 text-[#DC2626]",
+    largeClassName: "border-[#DC2626]/30 bg-[#DC2626]/10 text-[#DC2626]",
+    icon: XCircle,
+  },
 ];
 
 export function OrderActionButtons({
   order,
   onAction,
   className,
+  variant = "compact",
 }: {
   order: OrderRecord;
   onAction: (action: OrderAction, order: OrderRecord) => void;
   className?: string;
+  /** "compact" is the row/card treatment (small pill buttons). "large" is the
+   *  Order Details modal's full-width, icon-bearing button row. */
+  variant?: "compact" | "large";
 }) {
   const { t } = useI18n();
+
+  if (variant === "large") {
+    return (
+      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${className ?? ""}`}>
+        {ACTION_BUTTONS.map(({ action, labelKey, largeClassName, icon: Icon }) => (
+          <button
+            key={action}
+            type="button"
+            onClick={() => onAction(action, order)}
+            className={`flex items-center justify-center gap-2 rounded-[10px] border py-3 text-[13.5px] font-semibold transition-opacity hover:opacity-80 ${largeClassName}`}
+          >
+            <Icon size={15} />
+            {t(labelKey)}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className ?? ""}`}>

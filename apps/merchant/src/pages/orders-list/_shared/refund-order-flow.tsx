@@ -1,6 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/refund-order-flow.tsx
 import { useMemo } from "react";
-import { Banknote, Check, FileClock, Loader2, Stamp, X } from "lucide-react";
+import { Banknote, Check, FileClock, Info, Loader2, Stamp, X } from "lucide-react";
 import { Modal } from "@ui/primitives";
 import { formatSar } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -57,8 +57,9 @@ function PendingStep({ refundId }: { refundId: string }) {
       </div>
       <h2 className="mt-2 text-[19px] font-bold text-[var(--octo-text-primary)]">{t("orders.result.refundPendingTitle")}</h2>
       <p className="mt-2 text-[13px] text-[var(--octo-text-secondary)]">{t("orders.result.refundPendingSubtitle")}</p>
-      <div className="mt-4 rounded-[10px] bg-[#FFFBEB] p-3 text-start text-[12.5px] text-[#92400E]">
-        {t("orders.result.refundPendingNote").replace("{refundId}", refundId)}
+      <div className="mt-4 flex items-start gap-1.5 rounded-[10px] bg-[#FFFBEB] p-3 text-start text-[12.5px] text-[#92400E]">
+        <Info size={14} className="mt-px shrink-0" />
+        <span>{t("orders.result.refundPendingNote").replace("{refundId}", refundId)}</span>
       </div>
     </Modal>
   );
@@ -184,6 +185,7 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
           t("orders.result.cashRefundNote").replace("{refundId}", refundId).replace("{time}", now).replace("{type}", typeLabel),
         ]}
         noteClassName="bg-[#F0FDF4] text-[#166534]"
+        noteIcon={<Info size={14} />}
         primaryLabel={t("orders.result.done")}
         onPrimary={onClose}
       />
@@ -203,6 +205,7 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
         t("orders.result.refundSuccessNote").replace("{refundId}", refundId).replace("{time}", now).replace("{type}", typeLabel),
       ]}
       noteClassName="bg-[#F0FDF4] text-[#166534]"
+      noteIcon={<Info size={14} />}
       primaryLabel={t("orders.result.done")}
       onPrimary={onClose}
     />

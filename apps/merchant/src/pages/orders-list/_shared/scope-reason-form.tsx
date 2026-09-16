@@ -63,12 +63,14 @@ export function ScopeReasonForm({
         />
       </div>
 
+      {/* The Next CTA is always plain blue in every mockup frame, regardless
+          of which action's form this is — `accent` only colors the later
+          PIN-confirm button and the result screen's note box. */}
       <button
         type="button"
         disabled={!reason}
         onClick={() => onSubmit({ scope, reason, note })}
-        className="mt-5 w-full rounded-[9px] py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        style={{ backgroundColor: accent }}
+        className="mt-5 w-full rounded-[9px] bg-[#0D6EFD] py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitLabel}
       </button>

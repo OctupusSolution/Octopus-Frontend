@@ -16,6 +16,7 @@ import { OrderDetailsModal } from "./_shared/order-details-modal";
 import { CancelOrderFlow } from "./_shared/cancel-order-flow";
 import { VoidOrderFlow } from "./_shared/void-order-flow";
 import { WastageOrderFlow } from "./_shared/wastage-order-flow";
+import { RefundOrderFlow } from "./_shared/refund-order-flow";
 import type { OrderAction } from "./_shared/theme";
 import type { OrderRecord, OrderSource, OrderState } from "./_shared/types";
 
@@ -200,6 +201,10 @@ export function OrdersListPage() {
       />
       <WastageOrderFlow
         order={pendingAction?.action === "wastage" ? pendingAction.order : null}
+        onClose={() => setPendingAction(null)}
+      />
+      <RefundOrderFlow
+        order={pendingAction?.action === "refund" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
       />
     </>

@@ -688,6 +688,7 @@ export const ar = {
   "orders.delta.vsYesterday": "مقارنة بالأمس",
   "orders.subNote.sla": "ضمن اتفاقية مستوى الخدمة 15 دقيقة",
   "orders.col.order": "الطلب",
+  "orders.col.tableNo": "الطاولة",
   "orders.col.branch": "الفرع",
   "orders.col.channel": "القناة",
   "orders.col.customer": "العميل",

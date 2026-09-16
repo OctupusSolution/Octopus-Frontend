@@ -27,10 +27,10 @@ export function RadioCardGroup<T extends string>({
           <label
             key={option.value}
             className={clsx(
-              "flex cursor-pointer items-center justify-between gap-2 rounded-[10px] border px-4 py-3 text-[13px] font-medium transition-colors",
+              "flex cursor-pointer items-center justify-between gap-2 rounded-[10px] border px-4 py-3.5 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors",
               active
-                ? "border-[#0D6EFD] bg-[var(--octo-selected)] text-[#0D6EFD]"
-                : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                ? "border-[#0D6EFD] bg-[#0D6EFD]/[0.04]"
+                : "border-[var(--octo-border-input)] hover:bg-[var(--octo-hover)]"
             )}
           >
             <input

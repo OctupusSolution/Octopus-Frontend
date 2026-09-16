@@ -28,9 +28,13 @@ export interface ActionTheme {
   accent: string;
 }
 
+// The solid fill of each action's PIN-confirm button, sampled from its own
+// "Manager Authentication & Security" frame: red for Cancel, amber for Void,
+// violet for Wastage, and the olive-yellow the Refund frame uses (which is
+// noticeably greener than the brown-amber the Refund row button carries).
 export const ACTION_THEME: Record<OrderAction, ActionTheme> = {
   cancel: { accent: "#DC2626" },
-  void: { accent: "#D97706" },
-  wastage: { accent: "#7C3AED" },
-  refund: { accent: "#A16207" },
+  void: { accent: "#F59E0B" },
+  wastage: { accent: "#9333EA" },
+  refund: { accent: "#A9A32B" },
 };

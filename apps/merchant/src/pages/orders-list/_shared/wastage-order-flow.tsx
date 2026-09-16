@@ -17,10 +17,13 @@ export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-w-lg">
+      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
         <WastageForm
           title={t("orders.wastage.title")}
           selectLabel={t("orders.wastage.selectLabel")}
+          itemsPlaceholder={t("orders.wastage.itemsPlaceholder")}
+          decrementLabel={t("orders.wastage.decrement")}
+          incrementLabel={t("orders.wastage.increment")}
           items={order.items}
           reasonLabel={t("orders.wastage.reasonLabel")}
           reasonPlaceholder={t("orders.wastage.reasonPlaceholder")}
@@ -33,7 +36,6 @@ export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null
           noteLabel={t("orders.note")}
           notePlaceholder={t("orders.notePlaceholder")}
           submitLabel={t("orders.next")}
-          accent={accent}
           onSubmit={flow.submit}
         />
       </Modal>
@@ -53,7 +55,13 @@ export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null
     );
   }
 
-  const now = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const now = new Date().toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <ResultModal

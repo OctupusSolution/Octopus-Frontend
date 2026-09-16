@@ -19,13 +19,19 @@ export function OrderFilterPills({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <PillButton active={selected === null} onClick={() => onSelect(null)} dotColor="#0D6EFD" label={t("orders.pill.all")} count={countAll} />
+      <PillButton
+        active={selected === null}
+        onClick={() => onSelect(null)}
+        tone="#0D6EFD"
+        label={t("orders.pill.all")}
+        count={countAll}
+      />
       {FILTER_PILL_STATES.map((state) => (
         <PillButton
           key={state}
           active={selected === state}
           onClick={() => onSelect(state)}
-          dotColor={STATE_STYLE[state].dot}
+          tone={STATE_STYLE[state].dot}
           label={t(STATE_LABEL_KEY[state])}
           count={countByState(state)}
         />
@@ -34,16 +40,19 @@ export function OrderFilterPills({
   );
 }
 
+// Every pill carries its own state's colour as a tint — a 10%-alpha fill with
+// the full-strength colour on the dot and the label — and the selected pill
+// inverts to that colour solid with white text.
 function PillButton({
   active,
   onClick,
-  dotColor,
+  tone,
   label,
   count,
 }: {
   active: boolean;
   onClick: () => void;
-  dotColor: string;
+  tone: string;
   label: string;
   count: number;
 }) {
@@ -51,15 +60,25 @@ function PillButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1.5 rounded-full border px-3 py-[7px] text-[12px] font-medium transition-colors ${
-        active
-          ? "border-[#0D6EFD] bg-[#0D6EFD] text-white"
-          : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-      }`}
+      aria-pressed={active}
+      className="flex items-center gap-1.5 rounded-full px-3 py-[7px] text-[12.5px] font-medium transition-opacity hover:opacity-85"
+      style={{
+        backgroundColor: active ? tone : `${tone}1A`,
+        color: active ? "#FFFFFF" : tone,
+      }}
     >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? "#fff" : dotColor }} />
+      <span
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ backgroundColor: active ? "#FFFFFF" : tone }}
+      />
       {label}
-      <span className={`rounded-full px-1.5 py-px text-[10.5px] ${active ? "bg-white/20" : "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"}`}>
+      <span
+        className="rounded-full px-1.5 py-px text-[10.5px] font-semibold"
+        style={{
+          backgroundColor: active ? "rgba(255,255,255,0.22)" : `${tone}26`,
+          color: active ? "#FFFFFF" : tone,
+        }}
+      >
         {count}
       </span>
     </button>

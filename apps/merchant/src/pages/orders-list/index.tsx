@@ -1,7 +1,6 @@
 // apps/merchant/src/pages/orders-list/index.tsx
 import { useMemo, useState } from "react";
-import { ClipboardList, Download, Search } from "lucide-react";
-import { EmptyState, Table, TBody, TH, THead } from "@ui/primitives";
+import { CalendarDays, Download, Search } from "lucide-react";
 import { useLiveOrders } from "@/shared/api/live-orders";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { orderRecords } from "./_shared/mock-data";
@@ -10,7 +9,8 @@ import { computeOrderStats, pillCount } from "./_shared/stats";
 import { OrdersStatCards } from "./_shared/stat-cards";
 import { OrderFilterPills } from "./_shared/filter-pills";
 import { SourceFilterPopover } from "./_shared/source-filter-popover";
-import { OrderCard, OrderTableRow } from "./_shared/order-row";
+import { OrderCard, OrderRowCard } from "./_shared/order-row";
+import { EmptyOrdersArt } from "./_shared/empty-orders-art";
 import { ordersToCsv } from "./_shared/csv-export";
 import { OrderDetailsModal } from "./_shared/order-details-modal";
 import { CancelOrderFlow } from "./_shared/cancel-order-flow";
@@ -64,6 +64,9 @@ export function OrdersListPage() {
 
   const stats = useMemo(() => computeOrderStats(allRecords), [allRecords]);
   const isFiltered = selectedState !== null || selectedSources.length > 0 || search.trim() !== "";
+  // With nothing in the book at all, orders.png drops the filter bar and the
+  // search row entirely and shows only the illustration.
+  const hasNoOrdersAtAll = allRecords.length === 0;
 
   function resetFilters() {
     setSelectedState(null);
@@ -80,12 +83,13 @@ export function OrdersListPage() {
       <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
+            <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[25px]">
               {t("orders.title")}
             </h1>
-            <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("orders.subtitle")}</p>
+            <p className="mt-1 text-[12.5px] text-[var(--octo-text-muted)] sm:text-[13px]">{t("orders.subtitle")}</p>
           </div>
-          <span className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-secondary)]">
+          <span className="flex items-center gap-2 rounded-[9px] bg-[var(--octo-hover)] px-3 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-secondary)]">
+            <CalendarDays size={15} className="text-[var(--octo-text-muted)]" />
             {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
           </span>
         </header>
@@ -94,98 +98,93 @@ export function OrdersListPage() {
           <OrdersStatCards stats={stats} />
         </div>
 
-        <section className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-          <div className="flex flex-wrap items-center gap-2">
-            <SourceFilterPopover selected={selectedSources} onChange={setSelectedSources} />
-            <OrderFilterPills
-              selected={selectedState}
-              onSelect={setSelectedState}
-              countAll={allRecords.length}
-              countByState={(state) => pillCount(allRecords, state)}
-            />
+        {hasNoOrdersAtAll ? (
+          <div className="flex flex-col items-center px-4 py-16 text-center">
+            <EmptyOrdersArt className="h-[168px] w-[196px] text-[var(--octo-crumb)]" />
+            <h2 className="mt-6 text-[17px] font-bold text-[var(--octo-text-primary)]">{t("orders.empty.title")}</h2>
+            <p className="mt-2 max-w-[440px] text-[13px] text-[var(--octo-text-muted)]">
+              {t("orders.empty.description")}
+            </p>
           </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[200px] flex-1">
-              <Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("orders.search.placeholder")}
-                className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[7px] ps-8 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
+        ) : (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <SourceFilterPopover selected={selectedSources} onChange={setSelectedSources} />
+              <OrderFilterPills
+                selected={selectedState}
+                onSelect={setSelectedState}
+                countAll={allRecords.length}
+                countByState={(state) => pillCount(allRecords, state)}
               />
             </div>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="flex items-center gap-1.5 rounded-[9px] bg-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-            >
-              <Download size={13} />
-              {t("orders.export")}
-            </button>
-          </div>
 
-          {visibleRows.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardList size={16} />}
-              title={t(isFiltered ? "orders.filter.empty" : "orders.empty.title")}
-              description={isFiltered ? undefined : t("orders.empty.description")}
-              action={
-                isFiltered ? (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-                  >
-                    {t("orders.filter.reset")}
-                  </button>
-                ) : undefined
-              }
-              className="mt-4"
-            />
-          ) : (
-            <>
-              {/* Mobile: card accordion — tap a row to expand its details */}
-              <div className="mt-3 divide-y divide-[var(--octo-row-border)] sm:hidden">
-                {visibleRows.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    expanded={expandedId === order.id}
-                    onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
-                    onOpenDetails={setDetailsOrder}
-                    onAction={(action, target) => setPendingAction({ action, order: target })}
-                  />
-                ))}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search size={15} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t("orders.search.placeholder")}
+                  className="w-full rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[9px] ps-10 pe-3 text-[13px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
+                />
               </div>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="flex items-center gap-2 rounded-[10px] bg-[#0D6EFD] px-4 py-[9px] text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <Download size={15} />
+                {t("orders.export")}
+              </button>
+            </div>
 
-              {/* Desktop/tablet: full data table */}
-              <div className="octo-scroll mt-3 hidden overflow-x-auto sm:block">
-                <Table>
-                  <THead>
-                    <tr>
-                      <TH>{t("orders.col.order")}</TH>
-                      <TH>{t("orders.col.tableNo")}</TH>
-                      <TH>{t("orders.col.total")}</TH>
-                      <TH>{t("orders.details.timeline")}</TH>
-                      <TH>{t("orders.col.actions")}</TH>
-                    </tr>
-                  </THead>
-                  <TBody>
+            {visibleRows.length === 0 ? (
+              <div className="flex flex-col items-center px-4 py-14 text-center">
+                <EmptyOrdersArt className="h-[132px] w-[154px] text-[var(--octo-crumb)]" />
+                <h2 className="mt-5 text-[15px] font-semibold text-[var(--octo-text-primary)]">
+                  {t("orders.filter.empty")}
+                </h2>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-4 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3.5 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                >
+                  {t("orders.filter.reset")}
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Mobile: the same card, collapsed to a tap-to-expand summary */}
+                <div className="mt-3 flex flex-col gap-2.5 lg:hidden">
+                  {visibleRows.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      expanded={expandedId === order.id}
+                      onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
+                      onOpenDetails={setDetailsOrder}
+                      onAction={(action, target) => setPendingAction({ action, order: target })}
+                    />
+                  ))}
+                </div>
+
+                {/* Desktop: the full five-column row card */}
+                <div className="octo-scroll mt-3 hidden overflow-x-auto lg:block">
+                  <div className="flex min-w-[1120px] flex-col gap-2.5">
                     {visibleRows.map((order) => (
-                      <OrderTableRow
+                      <OrderRowCard
                         key={order.id}
                         order={order}
                         onOpenDetails={setDetailsOrder}
                         onAction={(action, target) => setPendingAction({ action, order: target })}
                       />
                     ))}
-                  </TBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </section>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
 
       <OrderDetailsModal

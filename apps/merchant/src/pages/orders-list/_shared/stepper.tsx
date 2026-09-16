@@ -20,10 +20,45 @@ export const STATE_LABEL_KEY: Record<OrderState, string> = {
   Canceled: "orders.state.canceled",
 };
 
-export function Stepper({ order, className }: { order: OrderRecord; className?: string }) {
+function stageTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** The state chip the row shows under its timeline, and the details modal
+ *  shows beside the order id. */
+export function OrderStateBadge({ state, className }: { state: OrderState; className?: string }) {
+  const { t } = useI18n();
+  const style = STATE_STYLE[state];
+
+  return (
+    <span
+      className={`inline-block rounded-full px-2 py-[3px] text-[11.5px] font-medium ${className ?? ""}`}
+      style={{ backgroundColor: style.bg, color: style.text }}
+    >
+      {t(STATE_LABEL_KEY[state])}
+    </span>
+  );
+}
+
+export function Stepper({
+  order,
+  className,
+  /** "row" caps the timeline with the order's state chip (the list rows).
+   *  "detail" swaps that for a per-stage timestamp under each label, and
+   *  marks stages the order never reached as Pending (the details modal). */
+  variant = "row",
+}: {
+  order: OrderRecord;
+  className?: string;
+  variant?: "row" | "detail";
+}) {
   const { t } = useI18n();
   const stages = stageStatuses(order);
-  const pill = STATE_STYLE[order.state];
 
   return (
     <div className={className}>
@@ -32,25 +67,33 @@ export function Stepper({ order, className }: { order: OrderRecord; className?: 
           <div key={stage.stage} className="flex flex-1 flex-col items-center last:flex-none last:items-end">
             <div className="flex w-full items-center">
               <span
-                className={`grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full ${
                   stage.done ? "bg-[#16A34A] text-white" : "bg-[var(--octo-track)] text-[var(--octo-text-faint)]"
                 }`}
               >
-                <Check size={11} strokeWidth={3} />
+                <Check size={10} strokeWidth={3} />
               </span>
               {index < stages.length - 1 && (
                 <span className={`h-px flex-1 ${stage.done ? "bg-[#16A34A]" : "bg-[var(--octo-divider)]"}`} />
               )}
             </div>
-            <span className="mt-1 whitespace-nowrap text-[10.5px] text-[var(--octo-text-faint)]">
+            <span
+              className={`mt-1 whitespace-nowrap text-[10.5px] ${
+                stage.done ? "text-[var(--octo-text-secondary)]" : "text-[var(--octo-text-faint)]"
+              }`}
+            >
               {t(STAGE_LABEL_KEY[stage.stage])}
             </span>
+            {variant === "detail" && (
+              <span className="mt-0.5 whitespace-nowrap text-[10px] text-[var(--octo-text-faint)]">
+                {stage.timestamp ? stageTime(stage.timestamp) : t("orders.details.pending")}
+              </span>
+            )}
           </div>
         ))}
       </div>
-      <span className="mt-1 inline-block text-[11px] font-semibold" style={{ color: pill.text }}>
-        {t(STATE_LABEL_KEY[order.state])}
-      </span>
+
+      {variant === "row" && <OrderStateBadge state={order.state} className="mt-1.5" />}
     </div>
   );
 }

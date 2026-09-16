@@ -1,7 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/order-row.tsx
-import { Ban, ChevronDown, RotateCcw, Trash2, XCircle } from "lucide-react";
+import { Ban, ChevronDown, CreditCard, RotateCcw, Trash2, User, XCircle } from "lucide-react";
 import { formatSar } from "@octopus/api-client";
-import { TD, TR } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Stepper } from "./stepper";
 import type { OrderAction } from "./theme";
@@ -21,6 +20,16 @@ const SOURCE_LABEL_KEY: Record<OrderRecord["source"], string> = {
   "Phone Order": "orders.source.phone",
 };
 
+// Each payment state carries its own colour in the frames: blue for an online
+// card payment, green for cash in hand, amber for a part-payment, and plain
+// muted grey for nothing collected yet.
+const PAYMENT_TONE: Record<OrderRecord["payment"], string> = {
+  "Paid Online": "#0D6EFD",
+  "Paid Cash": "#16A34A",
+  Unpaid: "var(--octo-text-muted)",
+  "Partially Paid": "#D97706",
+};
+
 const ACTION_BUTTONS: readonly {
   action: OrderAction;
   labelKey: string;
@@ -31,7 +40,7 @@ const ACTION_BUTTONS: readonly {
   {
     action: "void",
     labelKey: "orders.action.void",
-    className: "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)]",
+    className: "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)]",
     largeClassName: "border-[var(--octo-border-input)] bg-[var(--octo-hover)] text-[var(--octo-text-secondary)]",
     icon: Ban,
   },
@@ -57,6 +66,27 @@ const ACTION_BUTTONS: readonly {
     icon: XCircle,
   },
 ];
+
+/** The pedestal-table glyph the frames put before a table number — lucide has
+ *  no equivalent (its `Table` is a data grid). */
+export function TableGlyph({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M2.5 4.75h11" />
+      <path d="M8 4.75v6.5" />
+      <path d="M5.5 11.75h5" />
+    </svg>
+  );
+}
 
 export function OrderActionButtons({
   order,
@@ -93,13 +123,14 @@ export function OrderActionButtons({
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className ?? ""}`}>
-      {ACTION_BUTTONS.map(({ action, labelKey, className: btnClassName }) => (
+      {ACTION_BUTTONS.map(({ action, labelKey, className: btnClassName, icon: Icon }) => (
         <button
           key={action}
           type="button"
           onClick={() => onAction(action, order)}
-          className={`rounded-[8px] border px-2.5 py-[5px] text-[11.5px] font-medium transition-opacity hover:opacity-80 ${btnClassName}`}
+          className={`flex items-center gap-1.5 rounded-[8px] border px-2.5 py-[6px] text-[12px] font-medium transition-opacity hover:opacity-80 ${btnClassName}`}
         >
+          <Icon size={13} />
           {t(labelKey)}
         </button>
       ))}
@@ -107,7 +138,27 @@ export function OrderActionButtons({
   );
 }
 
-export function OrderTableRow({
+function OrderIdBlock({ order, onOpenDetails }: { order: OrderRecord; onOpenDetails: (order: OrderRecord) => void }) {
+  const { t } = useI18n();
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => onOpenDetails(order)}
+        className="text-[14px] font-bold text-[#0D6EFD] hover:underline"
+      >
+        {order.id}
+      </button>
+      <div className="mt-0.5 text-[12px] text-[var(--octo-text-secondary)]">{order.date}</div>
+      <div className="mt-0.5 text-[12px] text-[#0D6EFD]">{t(SOURCE_LABEL_KEY[order.source])}</div>
+    </>
+  );
+}
+
+/** One order as its own bordered card, split into five divider-separated
+ *  column groups — the frames show no table chrome and no column headers. */
+export function OrderRowCard({
   order,
   onOpenDetails,
   onAction,
@@ -119,36 +170,53 @@ export function OrderTableRow({
   const { t } = useI18n();
 
   return (
-    <TR>
-      <TD className="align-top">
-        <button type="button" onClick={() => onOpenDetails(order)} className="font-semibold text-[#0D6EFD] hover:underline">
-          {order.id}
-        </button>
-        <div className="mt-0.5 text-[11.5px] text-[var(--octo-text-faint)]">{order.date}</div>
-        <div className="mt-0.5 text-[11px] text-[var(--octo-text-muted)]">{t(SOURCE_LABEL_KEY[order.source])}</div>
-      </TD>
-      <TD className="align-top">
-        {order.table && <div>{order.table}</div>}
-        {order.guests != null && (
-          <div className="text-[11.5px] text-[var(--octo-text-muted)]">
-            {t("orders.row.guests").replace("{n}", String(order.guests))}
+    <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3">
+      <div className="flex items-center gap-4">
+        <div className="w-[128px] shrink-0">
+          <OrderIdBlock order={order} onOpenDetails={onOpenDetails} />
+        </div>
+
+        <div className="w-[118px] shrink-0 border-s border-[var(--octo-divider)] ps-4">
+          {order.table && (
+            <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+              <span className="text-[var(--octo-text-muted)]">
+                <TableGlyph />
+              </span>
+              {order.table}
+            </div>
+          )}
+          {order.guests != null && (
+            <div className="mt-1 flex items-center gap-1.5 text-[12.5px] text-[var(--octo-text-secondary)]">
+              <User size={13} className="text-[var(--octo-text-muted)]" />
+              {t("orders.row.guests").replace("{n}", String(order.guests))}
+            </div>
+          )}
+        </div>
+
+        <div className="w-[130px] shrink-0 border-s border-[var(--octo-divider)] ps-4">
+          <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+            <CreditCard size={13} className="text-[var(--octo-text-muted)]" />
+            {formatSar(order.totalSar)}
           </div>
-        )}
-      </TD>
-      <TD className="align-top">
-        <div className="font-medium text-[var(--octo-text-primary)]">{formatSar(order.totalSar)}</div>
-        <div className="text-[11.5px] text-[var(--octo-text-muted)]">{t(PAYMENT_LABEL_KEY[order.payment])}</div>
-      </TD>
-      <TD className="align-top">
-        <Stepper order={order} />
-      </TD>
-      <TD className="align-top">
-        <OrderActionButtons order={order} onAction={onAction} />
-      </TD>
-    </TR>
+          <div className="mt-1 text-[12px]" style={{ color: PAYMENT_TONE[order.payment] }}>
+            {t(PAYMENT_LABEL_KEY[order.payment])}
+          </div>
+        </div>
+
+        <div className="min-w-[260px] flex-1 border-s border-[var(--octo-divider)] ps-4">
+          <Stepper order={order} />
+        </div>
+
+        <div className="shrink-0 border-s border-[var(--octo-divider)] ps-4">
+          <OrderActionButtons order={order} onAction={onAction} />
+        </div>
+      </div>
+    </div>
   );
 }
 
+/** Narrow screens get the same card, collapsed to a tap-to-expand summary —
+ *  the five-column row cannot survive a phone width. */
 export function OrderCard({
   order,
   expanded,
@@ -165,32 +233,44 @@ export function OrderCard({
   const { t } = useI18n();
 
   return (
-    <div className="py-2.5">
-      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-center justify-between gap-3 text-start">
-        <span className="flex items-baseline gap-2 truncate">
-          <span
-            role="link"
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenDetails(order);
-            }}
-            className="text-[12.5px] font-semibold text-[#0D6EFD] hover:underline"
-          >
-            {order.id}
+    <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3.5 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <OrderIdBlock order={order} onOpenDetails={onOpenDetails} />
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-label={t("orders.details.summary")}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[var(--octo-text-faint)] transition-colors hover:bg-[var(--octo-hover)]"
+        >
+          <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {order.table && (
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+            <span className="text-[var(--octo-text-muted)]">
+              <TableGlyph />
+            </span>
+            {order.table}
           </span>
-          <span className="truncate text-[11.5px] text-[var(--octo-text-secondary)]">{order.date}</span>
+        )}
+        <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+          <CreditCard size={13} className="text-[var(--octo-text-muted)]" />
+          {formatSar(order.totalSar)}
         </span>
-        <ChevronDown size={15} className={`shrink-0 text-[var(--octo-text-faint)] transition-transform ${expanded ? "rotate-180" : ""}`} />
-      </button>
+        <span className="text-[12px]" style={{ color: PAYMENT_TONE[order.payment] }}>
+          {t(PAYMENT_LABEL_KEY[order.payment])}
+        </span>
+      </div>
 
       {expanded && (
-        <div className="mt-2 flex flex-col gap-2 text-[12px]">
-          <div className="flex items-center justify-between text-[var(--octo-text-secondary)]">
-            <span>{order.table ?? t(SOURCE_LABEL_KEY[order.source])}</span>
-            <span className="font-medium text-[var(--octo-text-primary)]">{formatSar(order.totalSar)}</span>
-          </div>
+        <div className="mt-3 flex flex-col gap-3">
           <Stepper order={order} />
-          <OrderActionButtons order={order} onAction={onAction} className="mt-1" />
+          <OrderActionButtons order={order} onAction={onAction} />
         </div>
       )}
     </div>

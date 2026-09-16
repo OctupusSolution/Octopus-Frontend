@@ -13,6 +13,8 @@ import { SourceFilterPopover } from "./_shared/source-filter-popover";
 import { OrderCard, OrderTableRow } from "./_shared/order-row";
 import { ordersToCsv } from "./_shared/csv-export";
 import { OrderDetailsModal } from "./_shared/order-details-modal";
+import { CancelOrderFlow } from "./_shared/cancel-order-flow";
+import { VoidOrderFlow } from "./_shared/void-order-flow";
 import type { OrderAction } from "./_shared/theme";
 import type { OrderRecord, OrderSource, OrderState } from "./_shared/types";
 
@@ -185,6 +187,15 @@ export function OrdersListPage() {
           setDetailsOrder(null);
           setPendingAction({ action, order });
         }}
+      />
+
+      <CancelOrderFlow
+        order={pendingAction?.action === "cancel" ? pendingAction.order : null}
+        onClose={() => setPendingAction(null)}
+      />
+      <VoidOrderFlow
+        order={pendingAction?.action === "void" ? pendingAction.order : null}
+        onClose={() => setPendingAction(null)}
       />
     </>
   );

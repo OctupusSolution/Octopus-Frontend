@@ -20,6 +20,7 @@ const ITEM_CATALOG: readonly OrderItem[] = [
 // stats.ts derives the stat cards from the resulting list rather than
 // hardcoding its own numbers, so these counts are the single source of
 // truth (and mock-data.test.ts pins them so the two can't drift).
+// Note: the design spec's mockup frames show different headline stat figures (140 total / 8 open / 100 completed / 12 cancelled) than this fixture produces (140 / 40 / 25 / 6) — intentional, since this follows the binding implementation plan's own STATE_PLAN, not the spec's example numbers.
 const STATE_PLAN: readonly { state: OrderState; lastStage: TimelineStage; count: number }[] = [
   { state: "New", lastStage: "New", count: 4 },
   { state: "Accepted", lastStage: "Accepted", count: 4 },

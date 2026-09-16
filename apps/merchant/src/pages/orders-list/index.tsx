@@ -26,8 +26,14 @@ function downloadCsv(filename: string, csv: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  // Firefox requires the anchor to be in the DOM for `.click()` to trigger
+  // a download, and revoking the object URL synchronously can cancel the
+  // download before it starts in some browsers — so append, click, remove,
+  // then defer the revoke.
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function OrdersListPage() {
@@ -72,114 +78,114 @@ export function OrdersListPage() {
   return (
     <>
       <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
-            {t("orders.title")}
-          </h1>
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("orders.subtitle")}</p>
-        </div>
-        <span className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-secondary)]">
-          {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-        </span>
-      </header>
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
+              {t("orders.title")}
+            </h1>
+            <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("orders.subtitle")}</p>
+          </div>
+          <span className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-secondary)]">
+            {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+          </span>
+        </header>
 
-      <div className="mt-4">
-        <OrdersStatCards stats={stats} />
-      </div>
-
-      <section className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-        <div className="flex flex-wrap items-center gap-2">
-          <SourceFilterPopover selected={selectedSources} onChange={setSelectedSources} />
-          <OrderFilterPills
-            selected={selectedState}
-            onSelect={setSelectedState}
-            countAll={allRecords.length}
-            countByState={(state) => pillCount(allRecords, state)}
-          />
+        <div className="mt-4">
+          <OrdersStatCards stats={stats} />
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[200px] flex-1">
-            <Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("orders.search.placeholder")}
-              className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[7px] ps-8 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
+        <section className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <SourceFilterPopover selected={selectedSources} onChange={setSelectedSources} />
+            <OrderFilterPills
+              selected={selectedState}
+              onSelect={setSelectedState}
+              countAll={allRecords.length}
+              countByState={(state) => pillCount(allRecords, state)}
             />
           </div>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="flex items-center gap-1.5 rounded-[9px] bg-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-          >
-            <Download size={13} />
-            {t("orders.export")}
-          </button>
-        </div>
 
-        {visibleRows.length === 0 ? (
-          <EmptyState
-            icon={<ClipboardList size={16} />}
-            title={t(isFiltered ? "orders.filter.empty" : "orders.empty.title")}
-            description={isFiltered ? undefined : t("orders.empty.description")}
-            action={
-              isFiltered ? (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-                >
-                  {t("orders.filter.reset")}
-                </button>
-              ) : undefined
-            }
-            className="mt-4"
-          />
-        ) : (
-          <>
-            {/* Mobile: card accordion — tap a row to expand its details */}
-            <div className="mt-3 divide-y divide-[var(--octo-row-border)] sm:hidden">
-              {visibleRows.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  expanded={expandedId === order.id}
-                  onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
-                  onOpenDetails={setDetailsOrder}
-                  onAction={(action, target) => setPendingAction({ action, order: target })}
-                />
-              ))}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[200px] flex-1">
+              <Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("orders.search.placeholder")}
+                className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[7px] ps-8 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
+              />
             </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="flex items-center gap-1.5 rounded-[9px] bg-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-white transition-opacity hover:opacity-90"
+            >
+              <Download size={13} />
+              {t("orders.export")}
+            </button>
+          </div>
 
-            {/* Desktop/tablet: full data table */}
-            <div className="octo-scroll mt-3 hidden overflow-x-auto sm:block">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>{t("orders.col.order")}</TH>
-                    <TH>{t("orders.details.tableNo")}</TH>
-                    <TH>{t("orders.col.total")}</TH>
-                    <TH>{t("orders.details.timeline")}</TH>
-                    <TH>{t("orders.col.actions")}</TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {visibleRows.map((order) => (
-                    <OrderTableRow
-                      key={order.id}
-                      order={order}
-                      onOpenDetails={setDetailsOrder}
-                      onAction={(action, target) => setPendingAction({ action, order: target })}
-                    />
-                  ))}
-                </TBody>
-              </Table>
-            </div>
-          </>
-        )}
-      </section>
+          {visibleRows.length === 0 ? (
+            <EmptyState
+              icon={<ClipboardList size={16} />}
+              title={t(isFiltered ? "orders.filter.empty" : "orders.empty.title")}
+              description={isFiltered ? undefined : t("orders.empty.description")}
+              action={
+                isFiltered ? (
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                  >
+                    {t("orders.filter.reset")}
+                  </button>
+                ) : undefined
+              }
+              className="mt-4"
+            />
+          ) : (
+            <>
+              {/* Mobile: card accordion — tap a row to expand its details */}
+              <div className="mt-3 divide-y divide-[var(--octo-row-border)] sm:hidden">
+                {visibleRows.map((order) => (
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    expanded={expandedId === order.id}
+                    onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
+                    onOpenDetails={setDetailsOrder}
+                    onAction={(action, target) => setPendingAction({ action, order: target })}
+                  />
+                ))}
+              </div>
+
+              {/* Desktop/tablet: full data table */}
+              <div className="octo-scroll mt-3 hidden overflow-x-auto sm:block">
+                <Table>
+                  <THead>
+                    <tr>
+                      <TH>{t("orders.col.order")}</TH>
+                      <TH>{t("orders.col.tableNo")}</TH>
+                      <TH>{t("orders.col.total")}</TH>
+                      <TH>{t("orders.details.timeline")}</TH>
+                      <TH>{t("orders.col.actions")}</TH>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {visibleRows.map((order) => (
+                      <OrderTableRow
+                        key={order.id}
+                        order={order}
+                        onOpenDetails={setDetailsOrder}
+                        onAction={(action, target) => setPendingAction({ action, order: target })}
+                      />
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </section>
       </div>
 
       <OrderDetailsModal

@@ -20,10 +20,12 @@ export function CancelOrderFlow({ order, onClose }: { order: OrderRecord | null;
       <Modal open onClose={onClose} className="max-w-lg">
         <ScopeReasonForm
           title={t("orders.cancel.title")}
+          scopeLabel={t("orders.cancel.scopeLabel")}
           scopeOptions={[
             { value: "entire", label: t("orders.cancel.scopeEntire") },
             { value: "specific", label: t("orders.cancel.scopeSpecific") },
           ]}
+          reasonLabel={t("orders.cancel.reasonLabel")}
           reasonPlaceholder={t("orders.cancel.reasonPlaceholder")}
           reasonOptions={[
             { value: "wrongOrder", label: t("orders.cancel.reason.wrongOrder") },

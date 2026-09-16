@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { CalendarPlus, Plus } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PageTabs } from "./_shared/page-tabs";
-import { StaffStoreProvider } from "./_shared/staff-store";
+import { StaffStoreProvider, useStaffStore } from "./_shared/staff-store";
 import { buttonClass } from "./_shared/buttons";
 import { StaffTab } from "./staff-tab";
 import { RolesPermissionsTab } from "./roles-permissions-tab";
-import { ShiftsTab } from "./shifts-tab";
+import { ShiftsTab, type ShiftsDialog, type ShiftsSubTab } from "./shifts-tab";
 
 type TabId = "staff" | "roles" | "shifts";
 const TAB_IDS: readonly TabId[] = ["staff", "roles", "shifts"];
@@ -27,6 +27,9 @@ function StaffPageContent() {
   const tab: TabId = requested && TAB_IDS.includes(requested) ? requested : "staff";
   const [addOpen, setAddOpen] = useState(false);
   const [memberId, setMemberId] = useState<string | null>(null);
+  const [shiftsSub, setShiftsSub] = useState<ShiftsSubTab>("schedule");
+  const [shiftsDialog, setShiftsDialog] = useState<ShiftsDialog>(null);
+  const hasShiftRoles = useStaffStore().shiftRoles.length > 0;
 
   const header: Record<TabId, { title: string; subtitle: string }> = {
     staff: { title: t("staff.header.title"), subtitle: t("staff.header.subtitle") },
@@ -57,6 +60,30 @@ function StaffPageContent() {
             {t("staff.header.addNewMember")}
           </button>
         )}
+        {tab === "shifts" && shiftsSub === "schedule" && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setShiftsDialog("bulkAssign")} className={buttonClass("outline", "lg")}>
+              <CalendarPlus size={20} />
+              {t("staff.shiftsTab.bulkAssignShift")}
+            </button>
+            <button type="button" onClick={() => setShiftsDialog("assign")} className={buttonClass("primary", "lg")}>
+              <Plus size={20} strokeWidth={2.5} />
+              {t("staff.assignShift.submit")}
+            </button>
+          </div>
+        )}
+        {tab === "shifts" && shiftsSub === "shiftRoles" && hasShiftRoles && (
+          <button type="button" onClick={() => setShiftsDialog("addShiftRole")} className={buttonClass("primary", "lg")}>
+            <Plus size={20} strokeWidth={2.5} />
+            {t("staff.shiftRoles.add")}
+          </button>
+        )}
+        {tab === "shifts" && shiftsSub === "timeOff" && (
+          <button type="button" onClick={() => setShiftsDialog("addTimeOff")} className={buttonClass("primary", "lg")}>
+            <Plus size={20} strokeWidth={2.5} />
+            {t("staff.timeOff.add")}
+          </button>
+        )}
       </header>
 
       <PageTabs
@@ -76,7 +103,23 @@ function StaffPageContent() {
           <StaffTab addOpen={addOpen} onAddOpenChange={setAddOpen} selectedId={memberId} onSelect={setMemberId} />
         )}
         {tab === "roles" && <RolesPermissionsTab />}
-        {tab === "shifts" && <ShiftsTab />}
+        {tab === "shifts" && (
+          <ShiftsTab
+            sub={shiftsSub}
+            onSubChange={(sub) => {
+              setShiftsSub(sub);
+              setShiftsDialog(null);
+            }}
+            dialog={shiftsDialog}
+            onDialogChange={setShiftsDialog}
+            onViewProfile={(id) => {
+              setMemberId(id);
+              const next = new URLSearchParams(params);
+              next.delete("tab");
+              setParams(next);
+            }}
+          />
+        )}
       </div>
     </div>
   );

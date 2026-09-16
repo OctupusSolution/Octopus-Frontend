@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
 import type { OrderLine, OrderLineModifier } from "@octopus/api-client";
-import type { FulfillmentChannel } from "@/shared/lib/fulfillment";
+import type { FulfillmentChannel, PickupTiming } from "@/shared/lib/fulfillment";
 
 const STORAGE_KEY = "octopus_cart_session";
 
@@ -14,6 +14,10 @@ export interface OrderingSessionState {
   tableNumber: string | null;
   lines: OrderLine[];
   promoCode: string | null;
+  /** Gratuity for the floor staff, chosen on the dine-in screen. */
+  tipSar: number;
+  /** Whether a collected order is wanted now or at a set time. */
+  pickupTiming: PickupTiming | null;
 }
 
 const INITIAL_STATE: OrderingSessionState = {
@@ -24,6 +28,8 @@ const INITIAL_STATE: OrderingSessionState = {
   tableNumber: null,
   lines: [],
   promoCode: null,
+  tipSar: 0,
+  pickupTiming: null,
 };
 
 type Action =
@@ -31,6 +37,8 @@ type Action =
   | { type: "SET_DELIVERY_ADDRESS"; address: string }
   | { type: "SET_BRANCH"; branchId: string }
   | { type: "SET_TABLE"; tableNumber: string }
+  | { type: "SET_TIP"; tipSar: number }
+  | { type: "SET_PICKUP_TIMING"; timing: PickupTiming }
   | {
       type: "ADD_LINE";
       menuItemId: string;
@@ -77,6 +85,10 @@ function reducer(state: OrderingSessionState, action: Action): OrderingSessionSt
       return { ...state, branchId: action.branchId };
     case "SET_TABLE":
       return { ...state, tableNumber: action.tableNumber };
+    case "SET_TIP":
+      return { ...state, tipSar: action.tipSar };
+    case "SET_PICKUP_TIMING":
+      return { ...state, pickupTiming: action.timing };
     case "ADD_LINE":
       return {
         ...state,
@@ -132,7 +144,7 @@ function reducer(state: OrderingSessionState, action: Action): OrderingSessionSt
     case "APPLY_PROMO":
       return { ...state, promoCode: action.code };
     case "CLEAR_CART":
-      return { ...state, lines: [], promoCode: null };
+      return { ...state, lines: [], promoCode: null, tipSar: 0 };
     default:
       return state;
   }
@@ -144,6 +156,8 @@ interface OrderingSessionContextValue {
   setDeliveryAddress: (address: string) => void;
   setBranch: (branchId: string) => void;
   setTable: (tableNumber: string) => void;
+  setTip: (tipSar: number) => void;
+  setPickupTiming: (timing: PickupTiming) => void;
   addLine: (
     menuItemId: string,
     name: string,
@@ -207,6 +221,8 @@ export function OrderingSessionProvider({ children }: { children: ReactNode }) {
     setDeliveryAddress: (address) => dispatch({ type: "SET_DELIVERY_ADDRESS", address }),
     setBranch: (branchId) => dispatch({ type: "SET_BRANCH", branchId }),
     setTable: (tableNumber) => dispatch({ type: "SET_TABLE", tableNumber }),
+    setTip: (tipSar) => dispatch({ type: "SET_TIP", tipSar }),
+    setPickupTiming: (timing) => dispatch({ type: "SET_PICKUP_TIMING", timing }),
     addLine: (menuItemId, name, unitPriceSar, quantity, modifiers, notes, customerImageName, customerImageSize) =>
       dispatch({
         type: "ADD_LINE", menuItemId, name, unitPriceSar, quantity, modifiers, notes,

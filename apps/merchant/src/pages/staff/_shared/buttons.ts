@@ -18,6 +18,10 @@ const VARIANTS = {
   danger: "bg-[#DC2626] text-white hover:bg-[#b91c1c]",
   warningSoft: "bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)] hover:brightness-95",
   successOutline: "border border-[#16A34A] bg-[var(--octo-card)] text-[var(--octo-tone-success-text)] hover:bg-[var(--octo-tone-success-bg)]",
+  successSoft: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)] hover:brightness-95",
+  dangerSoft: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)] hover:brightness-95",
+  infoSoft: "bg-[var(--octo-selected)] text-[#0D6EFD] hover:brightness-95",
+  neutralSoft: "bg-[var(--octo-hover)] text-[var(--octo-text-primary)] hover:brightness-95",
   ghost: "text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)] hover:text-[var(--octo-text-primary)]",
 } as const;
 

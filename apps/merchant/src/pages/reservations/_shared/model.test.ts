@@ -103,6 +103,11 @@ describe("tableLabel", () => {
     expect(tableLabel("T-02")).toBe("Table 2");
   });
 
+  it("formats the floor plan's unhyphenated numbers too", () => {
+    expect(tableLabel("T4")).toBe("Table 4");
+    expect(tableLabel("T22")).toBe("Table 22");
+  });
+
   it("returns anything that isn't T-NN unchanged, rather than throwing", () => {
     expect(tableLabel("Room A")).toBe("Room A");
     expect(tableLabel("")).toBe("");

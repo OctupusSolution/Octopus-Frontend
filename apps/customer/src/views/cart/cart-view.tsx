@@ -111,7 +111,7 @@ export function CartView({ categories, items }: CartViewProps) {
             <CartTotals
               pricing={pricing}
               discountSar={discountSar}
-              onContinue={() => router.push("/checkout")}
+              onContinue={() => router.push("/fulfillment")}
             />
           </div>
         )}

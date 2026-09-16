@@ -7,7 +7,9 @@ import clsx from "clsx";
 
 export function StepShell({ aside, children }: { aside?: ReactNode; children: ReactNode }) {
   return (
-    <div className={clsx("grid gap-5", aside && "lg:grid-cols-[minmax(0,1fr)_330px]")}>
+    // 384px is the aside's width in the frames, which lay a 1200px content
+    // column out as 790 + 26 + 384.
+    <div className={clsx("grid gap-6", aside && "lg:grid-cols-[minmax(0,1fr)_384px]")}>
       <div className="min-w-0">{children}</div>
       {aside && <aside className="min-w-0">{aside}</aside>}
     </div>

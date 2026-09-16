@@ -23,7 +23,6 @@ import {
   addMonths,
   formatDayHeader,
   formatMonthYear,
-  formatTime,
   formatWeekRange,
   formatWeekdayDate,
   fromISO,
@@ -33,16 +32,16 @@ import {
 import { useStaffLabels } from "../_shared/labels";
 import { RowMenu } from "../_shared/row-menu";
 import { useStaffStore } from "../_shared/staff-store";
-import { StatusPill } from "../_shared/status-pill";
 import { ToastBanner, useToast } from "../_shared/toast";
-import { BulkActionsModal } from "./bulk-actions-modal";
+import { AssignShiftModal, type AssignPreset } from "./assign-shift-modal";
 import { EditShiftModal, type ShiftTarget } from "./edit-shift-modal";
 import { MonthGrid } from "./month-grid";
 import { printSchedule } from "./print-schedule";
-import { employeeHours, formatCurrency, MAX_WEEK_HOURS, shiftKey, STANDARD_WEEK_HOURS, summarizeWeek } from "./schedule-utils";
+import { employeeHours, formatCurrency, MAX_WEEK_HOURS, pillLabel, shiftKey, STANDARD_WEEK_HOURS, summarizeWeek } from "./schedule-utils";
 import { WhatsAppModal } from "./whatsapp-modal";
 
 type ViewMode = "week" | "month";
+export type ScheduleDialog = "assign" | "bulkAssign" | null;
 
 function SummaryTile({ icon, value, unit, label, tint, iconBg }: { icon: ReactNode; value: string; unit?: string; label: string; tint: string; iconBg: string }) {
   return (
@@ -61,7 +60,7 @@ function SummaryTile({ icon, value, unit, label, tint, iconBg }: { icon: ReactNo
   );
 }
 
-export function ScheduleView() {
+export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialog; onDialogChange: (dialog: ScheduleDialog) => void }) {
   const { t, locale } = useI18n();
   const labels = useStaffLabels();
   const store = useStaffStore();
@@ -72,15 +71,14 @@ export function ScheduleView() {
   const [branchFilter, setBranchFilter] = useState<"all" | Branch>("all");
   const [menuId, setMenuId] = useState<string | null>(null);
   const [editing, setEditing] = useState<ShiftTarget | null>(null);
-  const [bulkOpen, setBulkOpen] = useState(false);
+  const [assignPreset, setAssignPreset] = useState<AssignPreset>({});
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
-  const [publishedWeeks, setPublishedWeeks] = useState<Set<string>>(() => new Set());
 
   const weekStart = startOfWeek(anchor);
   const weekStartISO = toISO(weekStart);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(fromISO(weekStartISO), i)), [weekStartISO]);
-  const todayISO = TODAY;
   const weekRange = formatWeekRange(weekStart, locale);
+  const schedule = useMemo(() => ({ shifts: store.shifts, offDays: store.offDays }), [store.shifts, store.offDays]);
 
   const staff = useMemo(
     () =>
@@ -90,42 +88,53 @@ export function ScheduleView() {
     [store, branchFilter]
   );
 
-  const summary = useMemo(
-    () => summarizeWeek(staff, days, store.shifts, store.shiftRoles, branchFilter),
-    [staff, days, store.shifts, store.shiftRoles, branchFilter]
-  );
+  const summary = useMemo(() => summarizeWeek(staff, days, schedule), [staff, days, schedule]);
 
   const shiftLabel = (employeeId: string, day: Date) => {
-    const cell = store.shifts[shiftKey(employeeId, day)];
-    return cell ? `${formatTime(cell.start, locale)}- ${formatTime(cell.end, locale)}` : t("staff.shiftsTab.off");
+    const key = shiftKey(employeeId, day);
+    const cell = store.shifts[key];
+    if (cell) return pillLabel(cell, locale);
+    return store.offDays[key] ? t("staff.shiftsTab.off") : "—";
   };
 
   const move = (direction: 1 | -1) => setAnchor((prev) => (mode === "week" ? addDays(prev, direction * 7) : addMonths(prev, direction)));
 
-  const copyWeekForward = (employeeIds: string[]) => {
-    store.setShifts((prev) => {
-      const next = { ...prev };
-      for (const id of employeeIds) {
-        for (const d of days) {
-          const source = prev[shiftKey(id, d)];
-          const targetKey = shiftKey(id, addDays(d, 7));
-          if (source) next[targetKey] = { ...source };
-          else delete next[targetKey];
-        }
+  const openAssign = (dialogMode: Exclude<ScheduleDialog, null>, preset: AssignPreset) => {
+    setAssignPreset(preset);
+    onDialogChange(dialogMode);
+  };
+
+  const closeAssign = () => {
+    onDialogChange(null);
+    setAssignPreset({});
+  };
+
+  const copyWeekForward = (employeeId: string) =>
+    store.updateSchedule((prev) => {
+      const shifts = { ...prev.shifts };
+      const offDays = { ...prev.offDays };
+      for (const d of days) {
+        const from = shiftKey(employeeId, d);
+        const to = shiftKey(employeeId, addDays(d, 7));
+        delete shifts[to];
+        delete offDays[to];
+        if (prev.shifts[from]) shifts[to] = { ...prev.shifts[from] };
+        else if (prev.offDays[from]) offDays[to] = true;
       }
-      return next;
+      return { shifts, offDays };
     });
-  };
 
-  const clearWeek = (employeeIds: string[]) => {
-    store.setShifts((prev) => {
-      const next = { ...prev };
-      for (const id of employeeIds) for (const d of days) delete next[shiftKey(id, d)];
-      return next;
+  const clearWeek = (employeeId: string) =>
+    store.updateSchedule((prev) => {
+      const shifts = { ...prev.shifts };
+      const offDays = { ...prev.offDays };
+      for (const d of days) {
+        delete shifts[shiftKey(employeeId, d)];
+        delete offDays[shiftKey(employeeId, d)];
+      }
+      return { shifts, offDays };
     });
-  };
 
-  const scheduledCount = staff.reduce((n, e) => n + days.filter((d) => store.shifts[shiftKey(e.id, d)]).length, 0);
   const branchLabel = branchFilter === "all" ? t("staff.filter.allBranches") : branchFilter;
 
   const print = (exportPdf: boolean) => {
@@ -160,7 +169,6 @@ export function ScheduleView() {
         <div className="shrink-0 xl:w-[160px]">
           <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{t("staff.shiftsTab.weeklySummary")}</h2>
           <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{weekRange}</p>
-          {publishedWeeks.has(weekStartISO) && <StatusPill className="mt-2" tone="success" label={t("staff.shiftsTab.published")} />}
         </div>
         <div className="grid min-w-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 min-[1400px]:grid-cols-5">
           <SummaryTile icon={<Clock size={24} />} value={`${summary.totalHours}${t("staff.shiftsTab.hoursUnit")}`} label={t("staff.shiftsTab.totalHours")} tint="bg-[var(--octo-tone-info-bg)]" iconBg="bg-[#0D6EFD]" />
@@ -219,7 +227,7 @@ export function ScheduleView() {
           <button type="button" onClick={() => move(1)} aria-label={t(mode === "week" ? "staff.shiftsTab.nextWeek" : "staff.shiftsTab.nextMonth")} className={buttonClass("secondary", "lg", "w-11 px-0")}>
             <ChevronRight size={20} className="rtl:rotate-180" />
           </button>
-          {toISO(anchor) !== todayISO && (
+          {toISO(anchor) !== TODAY && (
             <button type="button" onClick={() => setAnchor(fromISO(TODAY))} className={buttonClass("ghost", "md")}>
               {t("staff.shiftsTab.today")}
             </button>
@@ -227,7 +235,7 @@ export function ScheduleView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 xl:ms-auto">
-          <div className="w-[160px]">
+          <div className="w-[170px]">
             <SelectInput aria-label={t("staff.filter.allBranches")} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value as "all" | Branch)}>
               <option value="all">{t("staff.filter.allBranches")}</option>
               {branches.map((b) => (
@@ -235,9 +243,6 @@ export function ScheduleView() {
               ))}
             </SelectInput>
           </div>
-          <button type="button" onClick={() => setBulkOpen(true)} className={buttonClass("warningSoft", "md")}>
-            {t("staff.shiftsTab.bulkActions")}
-          </button>
           <button type="button" onClick={() => setWhatsAppOpen(true)} className={buttonClass("successOutline", "md")}>
             <MessageCircle size={20} aria-hidden />
             {t("staff.shiftsTab.sendViaWhatsApp")}
@@ -282,7 +287,7 @@ export function ScheduleView() {
                   {t("staff.shiftsTab.allEmployees")}
                 </th>
                 {days.map((d) => {
-                  const isToday = toISO(d) === todayISO;
+                  const isToday = toISO(d) === TODAY;
                   return (
                     <th
                       key={toISO(d)}
@@ -330,16 +335,21 @@ export function ScheduleView() {
                               key: "copy",
                               label: t("staff.shiftsTab.rowMenu.copyWeek"),
                               onSelect: () => {
-                                copyWeekForward([e.id]);
+                                copyWeekForward(e.id);
                                 notify(t("staff.shiftsTab.toastCopyWeek").replace("{name}", e.name));
                               },
+                            },
+                            {
+                              key: "apply",
+                              label: t("staff.shiftsTab.rowMenu.applyMultipleDays"),
+                              onSelect: () => openAssign("bulkAssign", { employeeIds: [e.id] }),
                             },
                             {
                               key: "delete",
                               label: t("staff.shiftsTab.rowMenu.deleteWeek"),
                               tone: "danger",
                               onSelect: () => {
-                                clearWeek([e.id]);
+                                clearWeek(e.id);
                                 notify(t("staff.shiftsTab.toastDeleteWeek").replace("{name}", e.name));
                               },
                             },
@@ -349,24 +359,37 @@ export function ScheduleView() {
                     </th>
                     {days.map((d) => {
                       const iso = toISO(d);
-                      const cell = store.shifts[shiftKey(e.id, iso)];
-                      const label = shiftLabel(e.id, d);
+                      const key = shiftKey(e.id, iso);
+                      const cell = store.shifts[key];
+                      const off = store.offDays[key];
+                      const dateLabel = formatWeekdayDate(d, locale);
                       return (
                         <td key={iso} className="border-e border-[var(--octo-divider)] px-2 py-2 align-middle last:border-e-0">
-                          <button
-                            type="button"
-                            onClick={() => setEditing({ employeeId: e.id, date: iso })}
-                            aria-label={t("staff.shiftsTab.editShiftFor").replace("{name}", e.name).replace("{date}", formatWeekdayDate(d, locale)).replace("{shift}", label)}
-                            style={cell ? { borderColor: color, color, backgroundColor: `${color}12` } : undefined}
-                            className={clsx(
-                              "flex h-10 w-full items-center justify-center truncate rounded-[8px] border px-1 text-[13px] font-medium transition-[filter,border-color,color] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                              cell
-                                ? "hover:brightness-95"
-                                : "border-dashed border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:border-[#0D6EFD] hover:text-[#0D6EFD]"
-                            )}
-                          >
-                            {label}
-                          </button>
+                          {cell || off ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditing({ employeeId: e.id, date: iso })}
+                              aria-label={t("staff.shiftsTab.editShiftFor").replace("{name}", e.name).replace("{date}", dateLabel).replace("{shift}", shiftLabel(e.id, d))}
+                              style={cell ? { borderColor: color, color, backgroundColor: `${color}12` } : undefined}
+                              className={clsx(
+                                "flex h-10 w-full items-center justify-center truncate rounded-[8px] border px-1 text-[13px] font-medium transition-[filter,border-color,color] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                                cell
+                                  ? "hover:brightness-95"
+                                  : "border-dashed border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:border-[#0D6EFD] hover:text-[#0D6EFD]"
+                              )}
+                            >
+                              {shiftLabel(e.id, d)}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openAssign("assign", { employeeIds: [e.id], dates: [iso] })}
+                              aria-label={t("staff.shiftsTab.assignShiftFor").replace("{name}", e.name).replace("{date}", dateLabel)}
+                              className="flex h-10 w-full items-center justify-center truncate rounded-[8px] bg-[#0D6EFD] px-1 text-[13px] font-medium text-white transition-colors hover:bg-[#0b5ed7] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 focus-visible:ring-offset-1"
+                            >
+                              {t("staff.assignShift.submit")}
+                            </button>
+                          )}
                         </td>
                       );
                     })}
@@ -380,25 +403,8 @@ export function ScheduleView() {
 
       <EditShiftModal target={editing} onClose={() => setEditing(null)} notify={notify} />
 
-      <BulkActionsModal
-        open={bulkOpen}
-        onClose={() => setBulkOpen(false)}
-        weekRange={weekRange}
-        staffCount={staff.length}
-        shiftCount={scheduledCount}
-        onPublish={() => {
-          setPublishedWeeks((prev) => new Set(prev).add(weekStartISO));
-          notify(t("staff.shiftsTab.toastPublished").replace("{range}", weekRange));
-        }}
-        onCopyForward={() => {
-          copyWeekForward(staff.map((e) => e.id));
-          notify(t("staff.shiftsTab.toastCopiedAll").replace("{range}", formatWeekRange(addDays(weekStart, 7), locale)));
-        }}
-        onClear={() => {
-          clearWeek(staff.map((e) => e.id));
-          notify(t("staff.shiftsTab.toastCleared").replace("{range}", weekRange));
-        }}
-      />
+      <AssignShiftModal mode="single" open={dialog === "assign"} preset={assignPreset} staff={staff} days={days} onClose={closeAssign} notify={notify} />
+      <AssignShiftModal mode="bulk" open={dialog === "bulkAssign"} preset={assignPreset} staff={staff} days={days} onClose={closeAssign} notify={notify} />
 
       <WhatsAppModal
         open={whatsAppOpen}
@@ -414,4 +420,3 @@ export function ScheduleView() {
     </>
   );
 }
-

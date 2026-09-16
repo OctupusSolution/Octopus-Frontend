@@ -1,6 +1,6 @@
-import { branches, type Employee } from "@/shared/api/mock-staff";
-import { shiftDurationHours, toISO } from "../_shared/format";
-import type { ShiftCell, ShiftRoleRecord } from "../_shared/staff-store";
+import type { Employee } from "@/shared/api/mock-staff";
+import { formatClock, formatTime, shiftDurationHours, toISO } from "../_shared/format";
+import type { LeaveRequest, Schedule, ShiftCell } from "../_shared/staff-store";
 
 export const STANDARD_WEEK_HOURS = 40;
 export const MAX_WEEK_HOURS = 48;
@@ -32,44 +32,28 @@ export interface WeekSummary {
   totalHours: number;
   employeesScheduled: number;
   overtimeHours: number;
+  /** Employee-days in the week that are neither a shift nor a planned day off. */
   openShifts: number;
   laborCost: number;
 }
 
-export function summarizeWeek(
-  staff: Employee[],
-  days: Date[],
-  shifts: Record<string, ShiftCell>,
-  shiftRoles: ShiftRoleRecord[],
-  branchFilter: string
-): WeekSummary {
+export function summarizeWeek(staff: Employee[], days: Date[], schedule: Schedule): WeekSummary {
   let totalHours = 0;
   let overtimeHours = 0;
   let employeesScheduled = 0;
   let laborCost = 0;
+  let openShifts = 0;
 
   for (const e of staff) {
-    const hours = employeeHours(e.id, days, shifts);
+    const hours = employeeHours(e.id, days, schedule.shifts);
     const overtime = Math.max(0, hours - STANDARD_WEEK_HOURS);
     totalHours += hours;
     overtimeHours += overtime;
     if (hours > 0) employeesScheduled += 1;
     laborCost += hours * hourlyRate(e) + overtime * hourlyRate(e) * OVERTIME_PREMIUM;
-  }
-
-  // An open shift is a seat the Shift Roles coverage rules ask for (per role,
-  // per branch, per day) that nobody on the schedule is filling.
-  const branchList = branchFilter === "all" ? [...branches] : [branchFilter];
-  let openShifts = 0;
-  for (const d of days) {
-    for (const branch of branchList) {
-      for (const role of shiftRoles) {
-        if (role.minPerDay <= 0) continue;
-        const filled = staff.filter(
-          (e) => e.branch === branch && role.staffRole !== null && e.role === role.staffRole && shifts[shiftKey(e.id, d)]
-        ).length;
-        openShifts += Math.max(0, role.minPerDay - filled);
-      }
+    for (const d of days) {
+      const key = shiftKey(e.id, d);
+      if (!schedule.shifts[key] && !schedule.offDays[key]) openShifts += 1;
     }
   }
 
@@ -86,4 +70,18 @@ export function formatCurrency(amount: number, locale: string, withUnit = true):
   const number = new Intl.NumberFormat(locale === "ar" ? "ar-u-nu-latn" : "en-US", { maximumFractionDigits: 0 }).format(amount);
   if (!withUnit) return number;
   return locale === "ar" ? `${number} ر.س` : `SAR ${number}`;
+}
+
+/** "9:00AM- 6:00PM" — the compact label the schedule grid pills use. */
+export function pillLabel(cell: ShiftCell, locale: string): string {
+  return `${formatTime(cell.start, locale)}- ${formatTime(cell.end, locale)}`;
+}
+
+/** "08:00 AM – 04:00 PM" — the long label cards and tables use. */
+export function rangeLabel(start: string, end: string, locale: string): string {
+  return `${formatClock(start, locale)} – ${formatClock(end, locale)}`;
+}
+
+export function approvedLeaveOn(requests: LeaveRequest[], employeeId: string, date: string): LeaveRequest | undefined {
+  return requests.find((r) => r.employeeId === employeeId && r.status === "approved" && r.start <= date && r.end >= date);
 }

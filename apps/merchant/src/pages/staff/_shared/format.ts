@@ -82,6 +82,56 @@ export function formatTime(hhmm: string, locale: string, spaced = false): string
   return `${hour12}:${pad(m)}${spaced ? " " : ""}${suffix}`;
 }
 
+/** "08:00" -> "08:00 AM" (en) — the zero-padded style the shift frames use. */
+export function formatClock(hhmm: string, locale: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  if (locale === "ar") {
+    return new Intl.DateTimeFormat(tag(locale), { hour: "2-digit", minute: "2-digit" }).format(new Date(2000, 0, 1, h, m));
+  }
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${pad(hour12)}:${pad(m)} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** "2026-09-15" -> "Sep 15 2026" (en). */
+export function formatShortDate(iso: string, locale: string): string {
+  const d = fromISO(iso);
+  if (locale === "ar") {
+    return new Intl.DateTimeFormat(tag(locale), { day: "numeric", month: "short", year: "numeric" }).format(d);
+  }
+  const month = new Intl.DateTimeFormat("en-US", { month: "short" }).format(d);
+  return `${month} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+// 2026-08-09 is a Sunday, so offsetting from it by a weekday index (0 = Sunday)
+// gives a real date whose weekday name Intl can spell in either locale.
+const A_SUNDAY = new Date(2026, 7, 9);
+
+export function weekdayName(dayIndex: number, locale: string, style: "long" | "short" = "long"): string {
+  return new Intl.DateTimeFormat(tag(locale), { weekday: style }).format(addDays(A_SUNDAY, dayIndex));
+}
+
+/** [0,1,2,3,4] -> "Sunday – Thursday"; [1,3] -> "Mon, Wed"; all seven -> `everyDay`. */
+export function formatDaysSpan(days: readonly number[], locale: string, everyDay: string): string {
+  const sorted = [...new Set(days)].sort((a, b) => a - b);
+  if (sorted.length === 0) return "—";
+  if (sorted.length === 7) return everyDay;
+  if (sorted.length === 1) return weekdayName(sorted[0], locale);
+  const contiguous = sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1);
+  if (contiguous) return `${weekdayName(sorted[0], locale)} – ${weekdayName(sorted[sorted.length - 1], locale)}`;
+  return sorted.map((d) => weekdayName(d, locale, "short")).join(locale === "ar" ? "، " : ", ");
+}
+
+/** Audit timestamps: "Today, 09:15 AM", "Yesterday, 04:30 PM", or "10 May 2024, 11:20 AM". */
+export function formatAuditTime(at: string, locale: string, todayISO: string, words: { today: string; yesterday: string }): string {
+  const [datePart, timePart = "00:00"] = at.split("T");
+  const time = formatClock(timePart, locale);
+  const comma = locale === "ar" ? "،" : ",";
+  if (datePart === todayISO) return `${words.today}${comma} ${time}`;
+  if (datePart === toISO(addDays(fromISO(todayISO), -1))) return `${words.yesterday}${comma} ${time}`;
+  const date = new Intl.DateTimeFormat(longTag(locale), { day: "numeric", month: "short", year: "numeric" }).format(fromISO(datePart));
+  return `${date}${comma} ${time}`;
+}
+
 export function shiftDurationHours(start: string, end: string): number {
   const toMin = (t: string) => {
     const [h, m] = t.split(":").map(Number);

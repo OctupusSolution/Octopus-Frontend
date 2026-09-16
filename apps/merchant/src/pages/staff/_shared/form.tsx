@@ -15,6 +15,7 @@ export function Field({
   children,
   className,
   htmlFor,
+  required,
 }: {
   label: string;
   error?: string;
@@ -22,11 +23,17 @@ export function Field({
   children: ReactNode;
   className?: string;
   htmlFor?: string;
+  required?: boolean;
 }) {
   return (
     <div className={clsx("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={htmlFor} className="text-[13px] font-medium text-[var(--octo-text-primary)]">
         {label}
+        {required && (
+          <span aria-hidden className="ms-1 text-[#DC2626]">
+            *
+          </span>
+        )}
       </label>
       {children}
       {error ? (

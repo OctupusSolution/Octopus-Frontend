@@ -1,12 +1,15 @@
-// The signup flow. Ten steps, driven by the shared Wizard, wrapped in a
-// header of its own — logo, language, theme — because it renders outside the
-// app shell: the sidebar it would show does not exist yet at this point.
+// The signup flow. Seven steps, driven by the shared Wizard, wrapped in a
+// header of its own — logo, help, language, avatar — because it renders
+// outside the app shell: the sidebar it would show does not exist yet at this
+// point.
+//
+// No theme toggle: the wizard is drawn light-only (see wizard.tsx), so a
+// control that promised to darken it would be lying.
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Languages, Moon, Sun } from "lucide-react";
+import { CircleHelp, Globe } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
-import { useTheme } from "@/app/providers/theme-provider";
 import { Wizard } from "./_shared/wizard";
 import { STEPS, STEP_COUNT } from "./_shared/steps";
 import type { OnboardingDraft } from "./_shared/draft";
@@ -19,15 +22,30 @@ const DRAFT_CONFIG: OnboardingDraftConfig = {
   stepCount: STEP_COUNT,
 };
 
+/** "Omar Al-Harbi" → "OA"; a one-word name gives its first two letters. */
+function initials(name: string | undefined): string | null {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return null;
+  return parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0];
+}
+
 export function OnboardingPage() {
-  const { t, dir, locale, setLocale } = useI18n();
-  const { theme, toggleTheme } = useTheme();
+  const { t, locale, setLocale } = useI18n();
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { createBusiness } = useTenantConfig();
 
   function handleFinish(draft: OnboardingDraft) {
     if (!draft.vertical || !draft.type) return;
+    // Signing up (features/session/signup) is what mints a real session now
+    // — there is no local fallback that can fake one from a draft anymore,
+    // since a real account needs a password only the merchant knows. Landing
+    // on /onboarding directly with no session has nowhere useful to go but
+    // back to signup.
+    if (!isAuthenticated) {
+      navigate("/signup", { replace: true });
+      return;
+    }
     createBusiness({
       vertical: draft.vertical,
       businessType: draft.type,
@@ -35,52 +53,42 @@ export function OnboardingPage() {
       branchCount: draft.brand.branchCount,
       businessName: draft.brand.businessName.trim() || "My Business",
     });
-    // `passwordSet` comes from `accountCreated`, not from the password value.
-    // The password is deliberately not persisted (see use-onboarding-draft.ts),
-    // so after a mid-flow refresh it is "" even for a merchant who set one —
-    // deriving the flag from it would hand them the Set Password screen the
-    // moment they finished paying, with no way back to the account modal
-    // (`accountCreated` is persisted, so that modal never reopens). The flag
-    // itself is the honest signal: the account form cannot be submitted without
-    // a non-empty password, so `accountCreated` means one was set.
-    signIn(draft.account.email.trim() || "owner@octopus.sa", draft.accountCreated);
     navigate("/", { replace: true });
   }
 
-  const BackArrow = dir === "rtl" ? ArrowRight : ArrowLeft;
-
   const chrome = (
     <header className="border-b border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-      <div className="mx-auto grid max-w-[1180px] grid-cols-[1fr_auto_1fr] items-center px-5 py-4">
+      <div className="mx-auto flex max-w-[1248px] items-center justify-between px-6 py-3.5">
         <button
           type="button"
           onClick={() => navigate("/login")}
-          className="inline-flex items-center gap-1.5 justify-self-start text-[12px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:text-[var(--octo-text-primary)]"
+          aria-label={t("onboarding.backToSignIn")}
+          className="flex items-center gap-2"
         >
-          <BackArrow size={14} />
-          <span className="hidden sm:inline">{t("onboarding.backToSignIn")}</span>
-        </button>
-        <div className="flex items-center gap-2 justify-self-center">
           <img src={LOGO_URL} alt="OCTOPUS" width={30} height={30} className="rounded-lg object-contain" />
-          <span className="text-[15px] font-bold tracking-tight text-[var(--octo-text-primary)]">OCTOPUS</span>
-        </div>
-        <div className="flex items-center justify-self-end gap-2">
+          <span className="text-[16px] font-bold tracking-tight text-[var(--octo-text-primary)]">OCTOPUS</span>
+        </button>
+
+        <div className="flex items-center gap-2.5">
+          <span className="hidden items-center gap-1.5 rounded-[10px] bg-[var(--octo-shell)] px-4 py-2.5 text-[13px] font-semibold text-[var(--octo-text-primary)] sm:inline-flex">
+            <CircleHelp size={16} className="text-[var(--octo-text-secondary)]" />
+            {t("onboarding.getStarted.needHelp")}
+          </span>
           <button
             type="button"
             onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
             aria-label={t("topbar.language")}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+            className="grid h-10 w-10 place-items-center rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
           >
-            <Languages size={15} />
+            <Globe size={17} />
           </button>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={t("topbar.theme")}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
-            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
+          {/* Initials, not a photo, the way the frame draws it. The merchant
+              signed up before the wizard, so the session's name is normally
+              there; the frame's own "OM" stands in on the one demoable path
+              that has no session (landing on /onboarding directly). */}
+          <span className="grid h-10 w-10 place-items-center rounded-full bg-[#0D6EFD] text-[12.5px] font-bold uppercase text-white">
+            {initials(user?.name) ?? "OM"}
+          </span>
         </div>
       </div>
     </header>

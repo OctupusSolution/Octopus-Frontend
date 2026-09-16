@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { OrderLine } from "@octopus/api-client";
 import { useI18n } from "@/app/providers";
 import { formatAmount } from "@/shared/lib/pricing";
-import { computeLinePricing } from "@/shared/lib/storefront";
+import { computeLinePricing, groupedModifiers } from "@/shared/lib/storefront";
 import { QuantityStepper } from "@/shared/ui";
 
 export interface CartLinesProps {
@@ -13,25 +13,6 @@ export interface CartLinesProps {
   hrefFor: (line: OrderLine) => string;
   onQuantityChange: (lineId: string, quantity: number) => void;
   onRemove: (lineId: string) => void;
-}
-
-/** One row per modifier group — "الحجم : متوسط", "الإضافات : شموع - رسالة".
- *  A line saved before groupLabel existed has no group name; its options still
- *  show, on a row of their own. */
-function groupedModifiers(line: OrderLine): { label: string; values: string }[] {
-  const order: string[] = [];
-  const byGroup = new Map<string, string[]>();
-
-  for (const modifier of line.modifiers) {
-    const key = modifier.groupLabel ?? "";
-    if (!byGroup.has(key)) {
-      byGroup.set(key, []);
-      order.push(key);
-    }
-    byGroup.get(key)?.push(modifier.label);
-  }
-
-  return order.map((label) => ({ label, values: (byGroup.get(label) ?? []).join(" - ") }));
 }
 
 export function CartLines({ lines, imageFor, hrefFor, onQuantityChange, onRemove }: CartLinesProps) {

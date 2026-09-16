@@ -4,15 +4,14 @@
 // + quick-links hub outright. Task 12 wires in the three dialogs built in
 // Tasks 9-11 (add/edit form, detail, cancel) — the module's last seam.
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { Plus, Printer, Search } from "lucide-react";
 import { Button, EmptyState, Input, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import {
-  reservations as initialReservations,
-  type Reservation,
-  type ReservationStatus,
-} from "@/shared/api/mock-reservations";
+import type { Reservation, ReservationStatus } from "@/shared/api/mock-reservations";
+import { useReservations } from "./_shared/reservations-store";
+import { NEW_RESERVATION_PATH } from "./_shared/paths";
 import { KpiCards } from "./_shared/kpi-cards";
 import { FilterBar } from "./_shared/filter-bar";
 import {
@@ -55,7 +54,10 @@ type FormState = { mode: "add" } | { mode: "edit"; id: string; tab?: FormTab } |
 
 export function ReservationsPage() {
   const { t, locale } = useI18n();
-  const [rows, setRows] = useState<Reservation[]>(initialReservations);
+  const navigate = useNavigate();
+  // Held in a module store, not component state: the Add page is its own
+  // route and must be able to append a row this page then shows.
+  const [rows, setRows] = useReservations();
   const [filters, setFilters] = useState<ListFilters>(EMPTY_FILTERS);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
@@ -80,10 +82,9 @@ export function ReservationsPage() {
   // Openers. Each closes the other two dialogs first — only one is ever
   // showing, however it was reached (row menu, row body click, or a footer
   // button inside another dialog).
+  // Adding is a full page now: details, then picking the table on the floor.
   function openAddReservation() {
-    setDetailId(null);
-    setCancelId(null);
-    setFormState({ mode: "add" });
+    navigate(NEW_RESERVATION_PATH);
   }
 
   function openEdit(id: string, tab?: FormTab) {

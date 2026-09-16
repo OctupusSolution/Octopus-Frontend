@@ -8,7 +8,7 @@ import {
   Settings, ClipboardList, CreditCard, ReceiptText, BarChart3,
   CalendarClock, Package, Megaphone, UserCog, Wallet, MessageCircle, Plug,
   Heart, Building2, TrendingDown, Sparkles, ShieldCheck, MapPin, Bell, Repeat,
-  Box,
+  Box, Blocks,
 } from "lucide-react";
 
 const ICONS: Record<string, React.ElementType> = {
@@ -18,6 +18,7 @@ const ICONS: Record<string, React.ElementType> = {
   Settings, ClipboardList, CreditCard, ReceiptText, BarChart3,
   CalendarClock, Package, Megaphone, UserCog, Wallet, MessageCircle, Plug,
   Heart, Building2, TrendingDown, Sparkles, ShieldCheck, MapPin, Bell, Repeat,
+  Blocks,
 };
 
 export function CatalogIcon({ name, size = 18, className }: { name: string; size?: number; className?: string }) {

@@ -8,16 +8,9 @@ import { withDependencies, withoutDependents, type ModuleId } from "@/shared/cat
 import { GetStartedStep } from "../steps/get-started-step";
 import { InsightsAside } from "../steps/insights-aside";
 import { ModulesSummaryAside } from "../steps/modules-summary-aside";
-import { BusinessDetailsStep } from "../steps/business-details-step";
-import { BusinessDetailsAside } from "../steps/business-details-aside";
 import { IntegrationsStepSlot } from "../steps/integrations-step-slot";
-import { ReviewStep } from "../steps/review-step";
-import { PublicLinkStep } from "../steps/public-link-step";
-import { DashboardPreviewStep } from "../steps/dashboard-preview-step";
 import { PaymentStep } from "../steps/payment-step";
-import { ReviewPlanAside } from "../steps/review-plan-aside";
-import { PublicLinkAside } from "../steps/public-link-aside";
-import { DashboardPreviewAside } from "../steps/dashboard-preview-aside";
+import { GoLiveStep } from "../steps/go-live-step";
 
 /** Enabling pulls in prerequisites; disabling drops anything that depended on
  * `id`. Same dependency-resolution rule the Create Business wizard uses — the
@@ -53,10 +46,22 @@ export interface StepDef {
   Aside?: ComponentType<StepProps>;
   canContinue: (draft: OnboardingDraft) => boolean;
   showPriceBar: boolean;
-  /** Whether the footer offers "Save As Draft" beside Back and Continue. The
-   *  design puts it on step 8 — the last screen a merchant sees before the
-   *  account and payment steps, and so the natural place to stop for now. */
+  /** Whether the footer offers "Save As Draft" beside Back and Continue. No
+   *  step in the seven-step flow does — the field stays so that putting it
+   *  back on a step is a one-line change rather than a re-wiring of the
+   *  wizard footer and the draft's `keep()`. */
   showSaveDraft?: boolean;
+  /** Hides the numbered rail. Only the landing step does this: its frame is a
+   *  welcome page, and a rail on it would announce a journey the merchant has
+   *  not agreed to start yet. */
+  hideRail?: boolean;
+  /** Hides the sticky Back/Continue footer. The landing step carries its own
+   *  full-width call to action inside the page, so a second one pinned to the
+   *  bottom would be two buttons for one decision. */
+  hideFooter?: boolean;
+  /** Draws the heading block and the step content inside one white panel
+   *  instead of straight on the page background. */
+  cardHeader?: boolean;
 }
 
 export const STEPS: readonly StepDef[] = [
@@ -64,43 +69,41 @@ export const STEPS: readonly StepDef[] = [
     id: "getStarted",
     labelKey: "onboarding.rail.getStarted",
     // No titleKey/subtitleKey: this step renders its own hero headline, so the
-    // shared "Step n of m / title / subtitle" block is skipped for it.
+    // shared "Step n of m / title / subtitle" block is skipped for it. It also
+    // hides the rail — the frame shows the doorway as a landing page, not as
+    // the first stop on a numbered journey.
     Component: GetStartedStep,
     canContinue: () => true,
     showPriceBar: false,
+    hideRail: true,
+    hideFooter: true,
   },
   {
-    id: "businessType",
-    labelKey: "onboarding.rail.businessType",
-    titleKey: "onboarding.step1.title",
-    subtitleKey: "onboarding.step1.subtitle",
+    id: "businessProfile",
+    labelKey: "onboarding.rail.businessProfile",
+    titleKey: "onboarding.businessProfile.title",
+    subtitleKey: "onboarding.businessProfile.subtitle",
     Component: ({ draft, dispatch }) => (
       <VerticalStep selected={draft.vertical} onSelect={(id) => dispatch({ type: "setVertical", id })} />
     ),
     Aside: InsightsAside,
     canContinue: (d) => d.vertical !== null,
     showPriceBar: false,
+    // The frame wraps this step's heading and card grid in one white panel,
+    // with the AI Insights aside outside it. Every other step puts its heading
+    // straight on the page background.
+    cardHeader: true,
   },
   {
     id: "services",
     labelKey: "onboarding.rail.services",
-    titleKey: "onboarding.step2.title",
-    subtitleKey: "onboarding.step2.subtitle",
+    titleKey: "onboarding.services.title",
+    subtitleKey: "onboarding.services.subtitle",
     Component: ({ draft, dispatch }) => (
       <TypeStep selected={draft.type} onSelect={(code) => dispatch({ type: "setType", code })} />
     ),
     canContinue: (d) => d.type !== null,
     showPriceBar: false,
-  },
-  {
-    id: "businessDetails",
-    labelKey: "onboarding.rail.businessDetails",
-    titleKey: "onboarding.details.title",
-    subtitleKey: "onboarding.details.subtitle",
-    Component: BusinessDetailsStep,
-    Aside: BusinessDetailsAside,
-    canContinue: (d) => d.brand.businessName.trim() !== "" && d.brand.city !== "",
-    showPriceBar: true,
   },
   {
     id: "modules",
@@ -131,43 +134,24 @@ export const STEPS: readonly StepDef[] = [
     showPriceBar: true,
   },
   {
-    id: "review",
-    labelKey: "onboarding.rail.review",
-    titleKey: "onboarding.review.title",
-    subtitleKey: "onboarding.review.subtitle",
-    Component: ReviewStep,
-    Aside: ReviewPlanAside,
-    canContinue: () => true,
-    showPriceBar: false,
-  },
-  {
-    id: "publicLink",
-    labelKey: "onboarding.rail.publicLink",
-    titleKey: "onboarding.publicLink.title",
-    subtitleKey: "onboarding.publicLink.subtitle",
-    Component: PublicLinkStep,
-    Aside: PublicLinkAside,
-    canContinue: () => true,
-    showPriceBar: false,
-    showSaveDraft: true,
-  },
-  {
-    id: "dashboardPreview",
-    labelKey: "onboarding.rail.dashboardPreview",
-    titleKey: "onboarding.dashboardPreview.title",
-    subtitleKey: "onboarding.dashboardPreview.subtitle",
-    Component: DashboardPreviewStep,
-    Aside: DashboardPreviewAside,
-    canContinue: () => true,
-    showPriceBar: false,
-  },
-  {
     id: "payment",
     labelKey: "onboarding.rail.payment",
     titleKey: "onboarding.payment.title",
     subtitleKey: "onboarding.payment.subtitle",
     Component: PaymentStep,
     canContinue: (d) => d.paid,
+    showPriceBar: false,
+    // The payment step draws its own Back/Pay row: the primary button is the
+    // payment, whose amount and disabled state live inside that component.
+    hideFooter: true,
+  },
+  {
+    id: "goLive",
+    labelKey: "onboarding.rail.goLive",
+    titleKey: "onboarding.goLive.title",
+    subtitleKey: "onboarding.goLive.subtitle",
+    Component: GoLiveStep,
+    canContinue: () => true,
     showPriceBar: false,
   },
 ];

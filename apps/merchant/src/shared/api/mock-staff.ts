@@ -242,25 +242,27 @@ export function toMemberProfile(e: Employee): MemberProfile {
 
 /* ------------------------------------------------------------------ Leave requests */
 
-export type LeaveType = "Annual" | "Sick" | "Unpaid" | "Emergency";
+export const LEAVE_TYPES = ["Annual", "Sick", "Personal", "Maternity", "Paternity", "Bereavement", "Emergency", "Unpaid"] as const;
+export type LeaveType = (typeof LEAVE_TYPES)[number];
 
 export interface LeaveRequestRow {
   id: string;
   employee: string;
   type: LeaveType;
-  startDate: string;
-  endDate: string;
-  days: number;
+  startDate: string; // ISO
+  endDate: string; // ISO
+  status: "Pending" | "Approved" | "Rejected";
 }
 
 export const leaveRequestRows: readonly LeaveRequestRow[] = [
-  { id: "LR-201", employee: "Noura Al-Dosari", type: "Annual", startDate: "12 Aug", endDate: "18 Aug", days: 7 },
-  { id: "LR-202", employee: "Yousef Al-Rashidi", type: "Sick", startDate: "9 Aug", endDate: "10 Aug", days: 2 },
-  { id: "LR-203", employee: "Rania Al-Amri", type: "Unpaid", startDate: "20 Aug", endDate: "22 Aug", days: 3 },
-  { id: "LR-204", employee: "Bandar Al-Juhani", type: "Emergency", startDate: "8 Aug", endDate: "8 Aug", days: 1 },
-  { id: "LR-205", employee: "Maha Al-Tamimi", type: "Annual", startDate: "25 Aug", endDate: "31 Aug", days: 7 },
-  { id: "LR-206", employee: "Salem Al-Ghamdi", type: "Sick", startDate: "11 Aug", endDate: "12 Aug", days: 2 },
-  { id: "LR-207", employee: "Dana Al-Otaibi", type: "Annual", startDate: "14 Aug", endDate: "16 Aug", days: 3 },
+  { id: "LR-201", employee: "Noura Al-Dosari", type: "Annual", startDate: "2026-08-12", endDate: "2026-08-18", status: "Pending" },
+  { id: "LR-202", employee: "Yousef Al-Rashidi", type: "Sick", startDate: "2026-08-09", endDate: "2026-08-10", status: "Approved" },
+  { id: "LR-203", employee: "Rania Al-Amri", type: "Personal", startDate: "2026-08-20", endDate: "2026-08-20", status: "Approved" },
+  { id: "LR-204", employee: "Hind Al-Ghamdi", type: "Maternity", startDate: "2026-09-01", endDate: "2026-11-29", status: "Rejected" },
+  { id: "LR-205", employee: "Khalid Al-Mutairi", type: "Paternity", startDate: "2026-08-24", endDate: "2026-08-26", status: "Approved" },
+  { id: "LR-206", employee: "Salem Al-Ghamdi", type: "Bereavement", startDate: "2026-08-11", endDate: "2026-08-13", status: "Approved" },
+  { id: "LR-207", employee: "Bandar Al-Juhani", type: "Emergency", startDate: "2026-08-08", endDate: "2026-08-08", status: "Approved" },
+  { id: "LR-208", employee: "Dana Al-Otaibi", type: "Annual", startDate: "2026-09-15", endDate: "2026-09-17", status: "Pending" },
 ] as const;
 
 /* ================================================================== SCHEDULE */

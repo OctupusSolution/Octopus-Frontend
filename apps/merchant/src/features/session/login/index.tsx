@@ -1,12 +1,14 @@
-// MOCK AUTH — replace with the real /auth/login endpoint when the backend exists.
-// Any email plus password "octopus" signs in; nothing sensitive is ever stored.
+// Real /auth/login. Backend refuses any bad credential the same generic way
+// (401, no distinction between "wrong password" and "no such account") — see
+// AuthEndpoints.cs — so the password field carries a fixed generic error
+// message rather than pretending to know which part was wrong.
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock } from "lucide-react";
-import { Input, Checkbox, Button } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { GoogleIcon, MicrosoftIcon, AppleIcon } from "./social-icons";
+import { AuthField, AuthButton } from "../_shared/auth-field";
+import { SocialRow, type SocialProvider } from "../_shared/social-row";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -15,143 +17,99 @@ interface LoginErrors {
   password?: string;
 }
 
-type SocialProvider = "google" | "microsoft" | "apple";
-
-const SOCIAL_PROVIDERS: { id: SocialProvider; icon: (size: number) => JSX.Element; labelKey: "login.google" | "login.microsoft" | "login.apple"; ariaKey: "login.continueWithGoogle" | "login.continueWithMicrosoft" | "login.continueWithApple" }[] = [
-  { id: "google", icon: (size) => <GoogleIcon size={size} />, labelKey: "login.google", ariaKey: "login.continueWithGoogle" },
-  { id: "microsoft", icon: (size) => <MicrosoftIcon size={size} />, labelKey: "login.microsoft", ariaKey: "login.continueWithMicrosoft" },
-  { id: "apple", icon: (size) => <AppleIcon size={size} />, labelKey: "login.apple", ariaKey: "login.continueWithApple" },
-];
-
-export function LoginForm() {
-  const { signIn } = useAuth();
+export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }) {
+  const { signInWithPassword } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  function clearError(field: keyof LoginErrors) {
-    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const next: LoginErrors = {};
     if (!email.trim()) next.email = t("login.error.emailRequired");
     else if (!EMAIL_RE.test(email.trim())) next.email = t("login.error.emailInvalid");
     if (!password) next.password = t("login.error.passwordRequired");
-    else if (password !== "octopus") next.password = t("login.error.passwordIncorrect");
 
     setErrors(next);
     if (next.email || next.password) return;
 
-    // remember is captured but a mock prototype always persists the session
-    // under "octopus.session" — swap for real session expiry when wired to an API.
-    signIn(email.trim());
-    navigate("/", { replace: true });
+    setSubmitting(true);
+    try {
+      await signInWithPassword(email, password);
+      navigate("/", { replace: true });
+    } catch {
+      // Every login failure (wrong password, unverified email, unknown
+      // account) comes back as the same generic 401 — see AuthEndpoints.cs.
+      setErrors({ password: t("login.error.passwordIncorrect") });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  // Mock OAuth — same fake-session shortcut as the email form, no provider is
-  // actually contacted. Swap for a real redirect flow once auth exists.
-  function handleSocialSignIn(provider: SocialProvider) {
-    signIn(`owner@${provider}.demo`);
-    navigate("/", { replace: true });
+  // Social sign-in isn't wired to a real OAuth flow yet — no provider is
+  // contacted, so this can't mint a session the way it used to as a mock.
+  function handleSocialSignIn(_provider: SocialProvider) {
+    setErrors({ password: t("auth.error.socialUnavailable") });
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col">
-      <h1 className="text-[26px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)]">{t("login.signIn")}</h1>
-      <p className="mt-1.5 text-[13px] text-[var(--octo-text-muted)]">
-        {t("login.welcome")}
-      </p>
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex flex-col gap-6 rounded-[26px] bg-[var(--octo-card)] p-6 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.30)] sm:p-10"
+    >
+      <h1 className="text-[34px] font-bold leading-tight tracking-tight text-[var(--octo-text-primary)]">
+        {t("auth.signIn.title")}
+      </h1>
 
-      <div className="mt-7 grid grid-cols-3 gap-2.5">
-        {SOCIAL_PROVIDERS.map(({ id, icon, labelKey, ariaKey }) => (
-          <button
-            key={id}
-            type="button"
-            aria-label={t(ariaKey)}
-            onClick={() => handleSocialSignIn(id)}
-            className="flex items-center justify-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2.5 text-[11.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:border-[var(--octo-text-faint)] hover:bg-[var(--octo-hover)]"
-          >
-            {icon(15)}
-            <span className="hidden sm:inline">{t(labelKey)}</span>
-          </button>
-        ))}
-      </div>
+      <SocialRow onPick={handleSocialSignIn} />
 
-      <div className="mt-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.07em] text-[var(--octo-text-faint)]">
-          {t("login.orContinueWithEmail")}
-        </span>
-        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
-      </div>
+      <AuthField
+        label={t("auth.email")}
+        icon={<Mail size={19} />}
+        type="email"
+        value={email}
+        onChange={(v) => { setEmail(v); setErrors((p) => ({ ...p, email: undefined })); }}
+        placeholder={t("auth.emailPlaceholder")}
+        error={errors.email}
+        autoComplete="email"
+      />
 
-      <div className="mt-6 flex flex-col gap-4">
-        <Input
-          type="email"
-          label={t("login.email")}
-          icon={<Mail size={14} />}
-          placeholder="owner@albahri.sa"
-          autoComplete="email"
-          value={email}
-          error={errors.email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            clearError("email");
-          }}
-        />
-
-        <Input
+      <div className="flex flex-col gap-2">
+        <AuthField
+          label={t("auth.password")}
+          icon={<Lock size={19} />}
           type="password"
-          label={t("login.password")}
-          icon={<Lock size={14} />}
-          placeholder="••••••••"
-          autoComplete="current-password"
           value={password}
+          onChange={(v) => { setPassword(v); setErrors((p) => ({ ...p, password: undefined })); }}
+          placeholder={t("auth.passwordPlaceholder")}
           error={errors.password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            clearError("password");
-          }}
+          autoComplete="current-password"
         />
-
-        <div className="flex items-center justify-between">
-          <Checkbox
-            label={t("login.rememberMe")}
-            checked={remember}
-            onChange={(e) => setRemember(e.target.checked)}
-          />
-          <button
-            type="button"
-            className="text-[11.5px] font-medium text-[#0D6EFD] hover:underline"
-          >
-            {t("login.forgotPassword")}
-          </button>
-        </div>
-      </div>
-
-      <Button type="submit" className="mt-6 w-full !py-2.5 !text-[13px] justify-center font-semibold">
-        {t("login.signIn")}
-      </Button>
-
-      <p className="mt-5 text-center text-[12.5px] text-[var(--octo-text-muted)]">
-        {t("login.noAccount")}{" "}
         <button
           type="button"
-          onClick={() => navigate("/onboarding")}
-          className="font-semibold text-[#0D6EFD] hover:underline"
+          onClick={onForgotPassword}
+          className="self-end text-[14px] text-ocean-blue underline underline-offset-2 transition-colors hover:text-[#0B5ED7]"
         >
-          {t("login.createAccount")}
+          {t("auth.forgetPassword")}
         </button>
-      </p>
+      </div>
 
-      <p className="mt-6 rounded-lg bg-[var(--octo-hover)] px-3 py-2 text-center text-[11px] text-[var(--octo-text-faint)]">
-        {t("login.demoHint")} <span className="font-mono text-[var(--octo-text-secondary)]">octopus</span>
+      <AuthButton disabled={submitting}>{t("auth.signInSubmit")}</AuthButton>
+
+      <p className="text-center text-[14px] text-[var(--octo-text-muted)]">
+        {t("auth.noAccount")}{" "}
+        <button
+          type="button"
+          onClick={() => navigate("/signup")}
+          className="font-semibold text-ocean-blue transition-colors hover:underline"
+        >
+          {t("auth.createAccountSubmit")}
+        </button>
       </p>
     </form>
   );

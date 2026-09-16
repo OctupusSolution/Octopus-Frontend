@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed, Package,
   Users, Megaphone, Truck, Wallet, UserCog, BarChart3, Settings, HelpCircle,
   ChevronDown, Search, PanelLeft, LogOut, Building2, Check,
-  Clock3, Armchair, PencilRuler, Plug, Ticket, CreditCard, Link2,
+  Clock3, Armchair, Plug, Ticket, CreditCard, Link2,
 } from "lucide-react";
 import clsx from "clsx";
 import { routes } from "@/app/routes/registry";
@@ -54,8 +54,11 @@ const SECTIONS: NavSection[] = [
       // straight to it rather than opening a dropdown.
       { id: "reservations", label: "Reservations", icon: CalendarClock },
       { id: "waitlist", label: "Wait list", icon: Clock3, path: "/reservations/waitlist" },
-      { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan" },
-      { id: "floor-plan-builder", label: "Floor Plan Builder", icon: PencilRuler, placeholder: true },
+      // A group with its own path: the Live Floor Plan and the Builder are two
+      // views of one floor, and every builder route sits under this path so
+      // the group stays lit while the merchant is inside any of them.
+      { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan",
+        items: ["Live Floor Plan", "Floor Plan Builder"] },
       { id: "public-link", label: "Public Link Builder", icon: Link2, path: "/public-link" },
       // No sub-items: a menu is now the root entity and /menu is the library
       // of them, so the entry navigates straight there rather than opening a
@@ -103,7 +106,6 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   reservations: "bookings",
   waitlist: "bookings",
   "floor-plan": "bookings",
-  "floor-plan-builder": "bookings",
   inventory: "inventory",
   "delivery-aggregators": "delivery",
   customers: "customers",
@@ -131,6 +133,8 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 // Sidebar sub-items that already have a routed page. Items without an entry
 // stay inert placeholders until their page is built.
 const ITEM_PATHS: Record<string, string> = {
+  "Live Floor Plan": "/reservations/floor-plan",
+  "Floor Plan Builder": "/reservations/floor-plan/builder",
   "Live Orders (all channels)": "/orders",
   "Order History": "/orders/history",
   "Pre-Orders & Scheduled": "/orders/preorders",
@@ -596,8 +600,16 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
 
   return (
     <aside
+      // The sidebar is always the dark navy brand panel, independent of the
+      // console's own light/dark toggle — but `.octo-scroll`'s colors read
+      // `[data-theme]` off <html>, so in light mode the nav's scrollbar was
+      // painted with the light palette (a pale thumb on a near-white track)
+      // on top of navy, reading as a mismatched native bar. Pinning the
+      // attribute here, scoped to just this subtree, keeps the nav's
+      // scrollbar dark regardless of what the rest of the console is doing.
+      data-theme="dark"
       className={clsx(
-        "relative flex shrink-0 flex-col transition-[width] bg-[#001E4B]",
+        "relative flex shrink-0 flex-col overflow-hidden transition-[width] bg-[#001E4B]",
         collapsed ? "w-[64px]" : "w-[248px]"
       )}
       onMouseLeave={() => collapsed && setFlyout(null)}
@@ -630,7 +642,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
 
       {/* The frame drops the uppercase section captions — the sections survive
           purely as the vertical gaps that still group the nav. */}
-      <nav className={clsx("octo-scroll flex-1 overflow-y-auto overflow-x-visible pb-2 pt-2.5", collapsed ? "px-2" : "px-2.5")}>
+      <nav className={clsx("octo-scroll min-h-0 flex-1 overflow-y-auto overflow-x-visible pb-2 pt-2.5", collapsed ? "px-2" : "px-2.5")}>
         {visibleSections.map((section) => (
           <div key={section.label} className="mb-3">
             {section.groups.map(renderGroup)}

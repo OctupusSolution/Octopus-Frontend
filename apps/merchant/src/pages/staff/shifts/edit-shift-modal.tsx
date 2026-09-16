@@ -5,10 +5,10 @@ import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "../_shared/buttons";
 import { Field, TextInput } from "../_shared/form";
-import { formatTime, formatWeekdayDate, fromISO, shiftDurationHours } from "../_shared/format";
+import { formatWeekdayDate, fromISO, shiftDurationHours } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
-import { useStaffStore } from "../_shared/staff-store";
-import { shiftKey } from "./schedule-utils";
+import { CUSTOM_SHIFT, useStaffStore } from "../_shared/staff-store";
+import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
 
 export interface ShiftTarget {
   employeeId: string;
@@ -16,7 +16,6 @@ export interface ShiftTarget {
 }
 
 const OFF = "off";
-const CUSTOM = "custom";
 
 export function EditShiftModal({
   target,
@@ -36,13 +35,12 @@ export function EditShiftModal({
   const [error, setError] = useState("");
 
   const employee = target ? store.employees.find((e) => e.id === target.employeeId) ?? null : null;
-  const existing = target ? store.shifts[shiftKey(target.employeeId, target.date)] : undefined;
 
   useEffect(() => {
     if (!target) return;
     const cell = store.shifts[shiftKey(target.employeeId, target.date)];
-    const template = cell && store.templates.find((tpl) => tpl.id === cell.templateId && tpl.start === cell.start && tpl.end === cell.end);
-    setChoice(cell ? (template ? template.id : CUSTOM) : OFF);
+    const role = cell && store.shiftRoles.find((r) => r.id === cell.roleId && r.start === cell.start && r.end === cell.end);
+    setChoice(cell ? (role ? role.id : CUSTOM_SHIFT) : OFF);
     setStart(cell?.start ?? "09:00");
     setEnd(cell?.end ?? "17:00");
     setError("");
@@ -52,50 +50,48 @@ export function EditShiftModal({
 
   if (!target || !employee) return null;
 
+  const key = shiftKey(employee.id, target.date);
   const day = fromISO(target.date);
-  const weekdayIndex = (day.getDay() + 6) % 7;
-  const unavailable = store.availability[employee.id]?.[weekdayIndex] === false;
-  const onLeave = store.leaveRequests.find(
-    (r) => r.employeeId === employee.id && r.status === "approved" && r.start <= target.date && r.end >= target.date
-  );
+  const unavailable = store.availability[employee.id]?.[day.getDay()] === false;
+  const onLeave = approvedLeaveOn(store.leaveRequests, employee.id, target.date);
 
   const pick = (id: string) => {
     setChoice(id);
     setError("");
-    const template = store.templates.find((tpl) => tpl.id === id);
-    if (template) {
-      setStart(template.start);
-      setEnd(template.end);
+    const role = store.shiftRoles.find((r) => r.id === id);
+    if (role) {
+      setStart(role.start);
+      setEnd(role.end);
     }
   };
 
+  const write = (next: "shift" | "off" | "clear") =>
+    store.updateSchedule((prev) => {
+      const shifts = { ...prev.shifts };
+      const offDays = { ...prev.offDays };
+      delete shifts[key];
+      delete offDays[key];
+      if (next === "shift") shifts[key] = { start, end, roleId: choice };
+      if (next === "off") offDays[key] = true;
+      return { shifts, offDays };
+    });
+
   const save = () => {
-    const key = shiftKey(employee.id, target.date);
-    if (choice === OFF) {
-      store.setShifts((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    } else {
-      if (!start || !end || start === end) {
-        setError(t("staff.validation.timeRange"));
-        return;
-      }
-      store.setShifts((prev) => ({ ...prev, [key]: { start, end, templateId: choice === CUSTOM ? CUSTOM : choice } }));
+    if (choice !== OFF && (!start || !end || start === end)) {
+      setError(t("staff.validation.timeRange"));
+      return;
     }
+    write(choice === OFF ? "off" : "shift");
     notify(t("staff.shiftsTab.toastShiftSaved").replace("{name}", employee.name));
     onClose();
   };
 
   const options = [
     { id: OFF, title: t("staff.shiftsTab.dayOff"), detail: t("staff.shiftsTab.noShift") },
-    ...store.templates.map((tpl) => ({
-      id: tpl.id,
-      title: labels.data("staff.template", tpl.name),
-      detail: `${formatTime(tpl.start, locale)} – ${formatTime(tpl.end, locale)}`,
-    })),
-    { id: CUSTOM, title: t("staff.shiftsTab.customTime"), detail: t("staff.shiftsTab.customTimeDetail") },
+    ...store.shiftRoles
+      .filter((r) => r.active || r.id === choice)
+      .map((r) => ({ id: r.id, title: labels.data("staff.shiftRole", r.name), detail: rangeLabel(r.start, r.end, locale) })),
+    { id: CUSTOM_SHIFT, title: t("staff.shiftsTab.customTime"), detail: t("staff.shiftsTab.customTimeDetail") },
   ];
 
   return (
@@ -106,11 +102,17 @@ export function EditShiftModal({
       className="max-w-lg"
       footer={
         <>
-          {existing && (
-            <button type="button" onClick={() => pick(OFF)} className={buttonClass("ghost", "md", "me-auto text-[var(--octo-tone-danger-text)]")}>
-              {t("staff.shiftsTab.removeShift")}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              write("clear");
+              notify(t("staff.shiftsTab.toastShiftCleared").replace("{name}", employee.name));
+              onClose();
+            }}
+            className={buttonClass("ghost", "md", "me-auto text-[var(--octo-tone-danger-text)]")}
+          >
+            {t("staff.shiftsTab.removeShift")}
+          </button>
           <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
           <button type="button" onClick={save} className={buttonClass("primary")}>{t("common.save")}</button>
         </>
@@ -151,7 +153,7 @@ export function EditShiftModal({
 
       {choice !== OFF && (
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Field label={t("staff.shiftsTab.templates.startTime")} htmlFor="shift-start" error={error}>
+          <Field label={t("staff.shiftRoles.startTime")} htmlFor="shift-start" error={error}>
             <TextInput
               id="shift-start"
               type="time"
@@ -159,19 +161,19 @@ export function EditShiftModal({
               invalid={!!error}
               onChange={(e) => {
                 setStart(e.target.value);
-                setChoice(CUSTOM);
+                setChoice(CUSTOM_SHIFT);
                 setError("");
               }}
             />
           </Field>
-          <Field label={t("staff.shiftsTab.templates.endTime")} htmlFor="shift-end">
+          <Field label={t("staff.shiftRoles.endTime")} htmlFor="shift-end">
             <TextInput
               id="shift-end"
               type="time"
               value={end}
               onChange={(e) => {
                 setEnd(e.target.value);
-                setChoice(CUSTOM);
+                setChoice(CUSTOM_SHIFT);
                 setError("");
               }}
             />
@@ -187,4 +189,3 @@ export function EditShiftModal({
     </Modal>
   );
 }
-

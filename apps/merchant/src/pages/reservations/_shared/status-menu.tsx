@@ -38,7 +38,10 @@ export function StatusMenu({ value, onSelect, open, onOpenChange }: StatusMenuPr
       {open && (
         <div
           role="menu"
-          className="absolute z-20 mt-1 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+          // Evenly separated pills, as the frame draws them. Stacked edge to
+          // edge, their rounded corners notched into each other and the list
+          // read as unevenly spaced — most visibly in dark mode.
+          className="absolute z-20 mt-1 w-44 space-y-1 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
         >
           {STATUS_OPTIONS.map((status) => {
             const tone = TONE[status];

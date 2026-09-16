@@ -20,6 +20,7 @@ import { Field, SelectInput, TextInput } from "./_shared/form";
 import { EMAIL_RE, PHONE_RE, useStaffLabels } from "./_shared/labels";
 import { useStaffStore } from "./_shared/staff-store";
 import { Switch } from "./_shared/switch";
+import { ActivityAuditCard } from "./activity-audit-card";
 import { MemberSummaryCard } from "./member-summary-card";
 import { ModulesSelect } from "./modules-select";
 
@@ -469,7 +470,7 @@ export function MemberDetails({
         )}
       </div>
 
-      <MemberSummaryCard profile={profile} status={status} showSessions={false} className="hidden xl:sticky xl:top-4 xl:block" />
+      <ActivityAuditCard employeeId={profile.employee.id} name={profile.employee.name} className="lg:col-span-2 xl:sticky xl:top-4 xl:col-span-1" />
 
       <ConfirmModal
         open={lockConfirmOpen}

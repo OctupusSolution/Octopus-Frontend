@@ -1,15 +1,15 @@
-// Step 1 — which business is this? OCTOPUS is multi-vertical, and this single
+// Step 2 — which business is this? OCTOPUS is multi-vertical, and this single
 // choice decides which product the merchant ends up with.
 //
-// Only restaurants can be provisioned today. The rest are shown honestly as
-// "coming soon" — clearly locked, not hidden (which would misrepresent the
-// platform) or faked (which would misrepresent the product). The lock badge
-// stays at full contrast even while the rest of the card is muted, so
-// "not available yet" reads immediately rather than just looking disabled.
-import { Check, Lock } from "lucide-react";
+// All twelve verticals are shown and all twelve can be picked, the way the
+// frame draws them — no lock badges. Only `restaurants` has its own type
+// catalogue today, so every pick continues into the same Services step; the
+// catalogue's `status` field records that and is where a second vertical's
+// routing would hook in (see shared/catalog/verticals.ts).
 import clsx from "clsx";
 import { verticals, type VerticalId } from "@/shared/catalog";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CatalogIcon } from "@/shared/lib/catalog-icon";
 import { verticalIcon } from "@/pages/onboarding/_shared/assets";
 
 export function VerticalStep({
@@ -22,57 +22,40 @@ export function VerticalStep({
   const { t } = useI18n();
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
       {verticals.map((vertical) => {
-        const available = vertical.status === "available";
         const active = selected === vertical.id;
 
         return (
           <button
             key={vertical.id}
             type="button"
-            disabled={!available}
             onClick={() => onSelect(vertical.id)}
-            title={available ? t("onboarding.vertical.available") : t("onboarding.vertical.comingSoon")}
+            aria-pressed={active}
             className={clsx(
-              "relative flex flex-col items-center gap-1.5 rounded-xl border p-6 text-center transition-all duration-200",
+              "relative flex cursor-pointer flex-col items-center justify-between gap-2 rounded-[12px] border px-3 pb-4 pt-5 text-center transition-all duration-200",
               active
-                ? "border-[#0D6EFD] bg-[var(--octo-selected)] shadow-[0_0_0_3px_rgba(13,110,253,0.08)]"
-                : available
-                  ? "border-[var(--octo-border-card)] bg-[var(--octo-card)]"
-                  : "border-[var(--octo-border-card)] bg-[var(--octo-hover)]",
-              available
-                ? "cursor-pointer hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
-                : "cursor-not-allowed"
+                ? "border-[#0D6EFD] bg-[var(--octo-selected)]"
+                : "border-[var(--octo-border-input)] bg-[var(--octo-card)] hover:border-[#c7d9f8] hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
             )}
           >
-            <img
-              src={verticalIcon(vertical.image)}
-              alt=""
-              width={64}
-              height={64}
-              className={clsx("h-16 w-16 object-contain", !available && "opacity-50 grayscale-[30%]")}
-            />
-            <span
-              className={clsx(
-                "text-[12.5px] font-semibold",
-                available ? "text-[var(--octo-text-primary)]" : "text-[var(--octo-text-muted)]"
-              )}
-            >
-              {t(vertical.nameKey)}
-            </span>
-
-            {active && (
-              <span className="absolute end-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-[#0D6EFD] text-white">
-                <Check size={11} strokeWidth={3} />
+            {vertical.image ? (
+              <img
+                src={verticalIcon(vertical.image)}
+                alt=""
+                width={80}
+                height={80}
+                className="h-20 w-20 object-contain"
+              />
+            ) : (
+              // No 3D render exists for this vertical yet. A flat glyph in the
+              // set's own violet is visibly a placeholder rather than a
+              // borrowed picture from a neighbouring card.
+              <span className="grid h-20 w-20 place-items-center rounded-[16px] bg-[#efecff] text-[#5b4bd6]">
+                <CatalogIcon name={vertical.icon} size={38} />
               </span>
             )}
-
-            {!available && (
-              <span className="absolute end-2 top-2 grid h-6 w-6 place-items-center rounded-full border border-[var(--octo-border-card)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
-                <Lock size={12} />
-              </span>
-            )}
+            <span className="text-[15px] font-bold text-[var(--octo-text-primary)]">{t(vertical.nameKey)}</span>
           </button>
         );
       })}

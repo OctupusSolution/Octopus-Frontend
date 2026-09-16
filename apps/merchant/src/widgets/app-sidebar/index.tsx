@@ -48,8 +48,9 @@ const SECTIONS: NavSection[] = [
   {
     label: "Operations",
     groups: [
-      { id: "orders", label: "Orders", icon: ClipboardList,
-        items: ["Live Orders (all channels)", "Order History", "Pre-Orders & Scheduled"] },
+      // No sub-items: Live Orders is the only Orders page, so the entry
+      // navigates straight to it rather than opening a dropdown.
+      { id: "orders", label: "Orders", icon: ClipboardList },
       // No sub-items: Reservations is a single page, so the entry navigates
       // straight to it rather than opening a dropdown.
       { id: "reservations", label: "Reservations", icon: CalendarClock },
@@ -135,9 +136,6 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 const ITEM_PATHS: Record<string, string> = {
   "Live Floor Plan": "/reservations/floor-plan",
   "Floor Plan Builder": "/reservations/floor-plan/builder",
-  "Live Orders (all channels)": "/orders",
-  "Order History": "/orders/history",
-  "Pre-Orders & Scheduled": "/orders/preorders",
   "Customer List & Profiles": "/customers",
   "Segments": "/customers/segments",
   "Feedback & Complaints": "/customers/feedback",

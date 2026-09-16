@@ -1,5 +1,4 @@
-// Mock data shared by the Kitchen Display (kds-page.tsx, kds-ticket-board.tsx)
-// and Pre-Orders (preorders/index.tsx, mock-preorders.ts) pages.
+// The row shape the Kitchen Display reads, via live-orders.ts's toOrderRow.
 // pages/orders-list has its own richer order model — see
 // pages/orders-list/_shared/types.ts — and no longer uses this file.
 

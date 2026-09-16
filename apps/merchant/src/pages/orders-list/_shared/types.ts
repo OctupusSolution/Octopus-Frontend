@@ -1,7 +1,7 @@
 // apps/merchant/src/pages/orders-list/_shared/types.ts
 // The Orders page's own order model — deliberately separate from
-// shared/api/mock-orders.ts's OrderStatus/OrderRow, which kds-page.tsx,
-// kds-ticket-board.tsx and preorders/index.tsx still depend on unchanged.
+// shared/api/mock-orders.ts's OrderStatus/OrderRow, which kds-page.tsx and
+// kds-ticket-board.tsx still depend on unchanged.
 // This page needs a richer status/payment/timeline shape than that model
 // carries, so it gets its own.
 

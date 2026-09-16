@@ -72,8 +72,7 @@ export function WastageForm({
               <button
                 type="button"
                 onClick={() => setQty(item.name, selected[item.name] > 0 ? selected[item.name] + 1 : 1)}
-                className="grid h-6 w-6 place-items-center rounded-full text-white"
-                style={{ backgroundColor: accent }}
+                className="grid h-6 w-6 place-items-center rounded-full bg-[#0D6EFD] text-white"
               >
                 <Plus size={12} />
               </button>
@@ -109,8 +108,7 @@ export function WastageForm({
         type="button"
         disabled={selectedItems.length === 0 || !reason}
         onClick={() => onSubmit({ items: selectedItems, reason, note })}
-        className="mt-5 w-full rounded-[9px] py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        style={{ backgroundColor: accent }}
+        className="mt-5 w-full rounded-[9px] bg-[#0D6EFD] py-3 text-[14px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {submitLabel}
       </button>

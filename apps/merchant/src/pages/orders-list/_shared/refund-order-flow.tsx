@@ -136,6 +136,7 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
           amountFieldLabel={t("orders.refund.amountFieldLabel")}
           amountSummaryLabel={t("orders.refund.amountSummary")}
           selectedSummaryLabel={t("orders.refund.selectedSummary")}
+          reasonLabel={t("orders.refund.reasonLabel")}
           reasonPlaceholder={t("orders.refund.reasonPlaceholder")}
           reasonOptions={[
             { value: "wrongInput", label: t("orders.refund.reason.wrongInput") },

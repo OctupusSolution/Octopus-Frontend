@@ -22,6 +22,7 @@ export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null
           title={t("orders.wastage.title")}
           selectLabel={t("orders.wastage.selectLabel")}
           items={order.items}
+          reasonLabel={t("orders.wastage.reasonLabel")}
           reasonPlaceholder={t("orders.wastage.reasonPlaceholder")}
           reasonOptions={[
             { value: "overcooked", label: t("orders.wastage.reason.overcooked") },

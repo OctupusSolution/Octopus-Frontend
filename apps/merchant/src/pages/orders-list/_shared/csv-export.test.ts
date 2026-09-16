@@ -42,4 +42,12 @@ describe("ordersToCsv", () => {
     const line = csv.split("\n")[1];
     expect(line).toContain(",,,QR Code,");
   });
+
+  it("neutralizes formula-injection payloads in exported fields", () => {
+    const csv = ordersToCsv([order({ table: "=HYPERLINK(http://evil,x)" })]);
+    const line = csv.split("\n")[1];
+    // The leading `'` forces spreadsheet apps to treat the cell as text
+    // instead of evaluating it as a live formula.
+    expect(line).toContain("'=HYPERLINK(http://evil,x)");
+  });
 });

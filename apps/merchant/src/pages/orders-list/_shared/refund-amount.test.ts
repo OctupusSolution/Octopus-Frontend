@@ -37,11 +37,21 @@ describe("selectedItemsTotalSar", () => {
   ];
 
   it("sums only the selected items, quantity included", () => {
-    expect(selectedItemsTotalSar(items, new Set(["Beef Burger", "French Fries"]))).toBe(32 + 2 * 14);
+    // Indices 0 and 1 are "Beef Burger" and "French Fries" in the fixture above.
+    expect(selectedItemsTotalSar(items, new Set([0, 1]))).toBe(32 + 2 * 14);
   });
 
   it("returns 0 when nothing is selected", () => {
     expect(selectedItemsTotalSar(items, new Set())).toBe(0);
+  });
+
+  it("distinguishes two items with the same name by index (live orders can repeat names)", () => {
+    const duplicateNameItems: OrderItem[] = [
+      { name: "Beef Burger", qty: 1, priceSar: 32 },
+      { name: "Beef Burger", qty: 1, priceSar: 40 },
+    ];
+    // Selecting only index 1 should total the second line's price, not both.
+    expect(selectedItemsTotalSar(duplicateNameItems, new Set([1]))).toBe(40);
   });
 });
 

@@ -5,8 +5,8 @@ export function maxRefundableSar(order: OrderRecord): number {
   return order.totalSar;
 }
 
-export function selectedItemsTotalSar(items: readonly OrderItem[], selectedNames: ReadonlySet<string>): number {
-  return items.filter((item) => selectedNames.has(item.name)).reduce((sum, item) => sum + item.priceSar * item.qty, 0);
+export function selectedItemsTotalSar(items: readonly OrderItem[], selectedIndices: ReadonlySet<number>): number {
+  return items.filter((_, index) => selectedIndices.has(index)).reduce((sum, item) => sum + item.priceSar * item.qty, 0);
 }
 
 export function clampAmountSar(raw: string, max: number): number {

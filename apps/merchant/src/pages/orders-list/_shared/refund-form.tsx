@@ -29,6 +29,7 @@ export function RefundForm({
   amountFieldLabel,
   amountSummaryLabel,
   selectedSummaryLabel,
+  reasonLabel,
   reasonPlaceholder,
   reasonOptions,
   noteLabel,
@@ -50,6 +51,7 @@ export function RefundForm({
   amountFieldLabel: string;
   amountSummaryLabel: string;
   selectedSummaryLabel: string;
+  reasonLabel: string;
   reasonPlaceholder: string;
   reasonOptions: readonly { value: string; label: string }[];
   noteLabel: string;
@@ -61,29 +63,29 @@ export function RefundForm({
   const max = maxRefundableSar(order);
   const [type, setType] = useState<"full" | "partial">("full");
   const [method, setMethod] = useState<"items" | "amount">("amount");
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [amountInput, setAmountInput] = useState("");
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
 
-  function toggleItem(name: string) {
-    setSelectedItems((prev) => {
+  function toggleItem(index: number) {
+    setSelectedIndices((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
       return next;
     });
   }
 
-  const itemsTotal = selectedItemsTotalSar(order.items, selectedItems);
+  const itemsTotal = selectedItemsTotalSar(order.items, selectedIndices);
   const amountSar = type === "full" ? max : method === "items" ? itemsTotal : clampAmountSar(amountInput, max);
-  const canSubmit = type === "full" || (method === "items" ? selectedItems.size > 0 : amountSar > 0);
+  const canSubmit = type === "full" || (method === "items" ? selectedIndices.size > 0 : amountSar > 0);
 
   function submit() {
     onSubmit({
       type,
       method: isCash ? "amount" : method,
-      selectedItems: Array.from(selectedItems),
+      selectedItems: Array.from(selectedIndices).map((index) => order.items[index].name),
       amountSar,
       reason,
       note,
@@ -140,17 +142,17 @@ export function RefundForm({
 
       {type === "partial" && !isCash && method === "items" && (
         <div className="mt-4 rounded-[10px] border border-[var(--octo-border-input)] p-1">
-          {order.items.map((item) => (
-            <label key={item.name} className="flex items-center justify-between gap-2 rounded-[8px] px-2.5 py-2">
-              <Checkbox label={item.name} checked={selectedItems.has(item.name)} onChange={() => toggleItem(item.name)} />
+          {order.items.map((item, index) => (
+            <div key={index} className="flex items-center justify-between gap-2 rounded-[8px] px-2.5 py-2">
+              <Checkbox label={item.name} checked={selectedIndices.has(index)} onChange={() => toggleItem(index)} />
               <span className="text-[12.5px] text-[var(--octo-text-secondary)]">{formatSar(item.priceSar * item.qty)}</span>
-            </label>
+            </div>
           ))}
         </div>
       )}
 
       <div className="mt-4">
-        <Select value={reason} onChange={(event) => setReason(event.target.value)}>
+        <Select label={reasonLabel} value={reason} onChange={(event) => setReason(event.target.value)}>
           <option value="" disabled>
             {reasonPlaceholder}
           </option>
@@ -175,7 +177,7 @@ export function RefundForm({
       <div className="mt-4 flex items-center justify-between rounded-[10px] bg-[var(--octo-hover)] px-3 py-2 text-[12.5px]">
         <span className="text-[var(--octo-text-muted)]">
           {type === "partial" && !isCash && method === "items"
-            ? selectedSummaryLabel.replace("{n}", String(selectedItems.size))
+            ? selectedSummaryLabel.replace("{n}", String(selectedIndices.size))
             : amountSummaryLabel}
         </span>
         <span className="font-semibold text-[#0D6EFD]">{formatSar(amountSar)}</span>

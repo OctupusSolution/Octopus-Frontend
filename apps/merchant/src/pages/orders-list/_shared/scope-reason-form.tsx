@@ -11,7 +11,9 @@ export interface ScopeReasonPayload {
 
 export function ScopeReasonForm({
   title,
+  scopeLabel,
   scopeOptions,
+  reasonLabel,
   reasonPlaceholder,
   reasonOptions,
   noteLabel,
@@ -21,7 +23,9 @@ export function ScopeReasonForm({
   onSubmit,
 }: {
   title: string;
+  scopeLabel: string;
   scopeOptions: readonly RadioCardOption<string>[];
+  reasonLabel: string;
   reasonPlaceholder: string;
   reasonOptions: readonly { value: string; label: string }[];
   noteLabel: string;
@@ -38,10 +42,11 @@ export function ScopeReasonForm({
     <div>
       <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{title}</h2>
 
-      <RadioCardGroup name="scope" options={scopeOptions} value={scope} onChange={setScope} className="mt-4" />
+      <p className="mt-4 text-[12px] font-semibold text-[var(--octo-text-secondary)]">{scopeLabel}</p>
+      <RadioCardGroup name="scope" options={scopeOptions} value={scope} onChange={setScope} className="mt-2" />
 
       <div className="mt-4">
-        <Select value={reason} onChange={(event) => setReason(event.target.value)}>
+        <Select label={reasonLabel} value={reason} onChange={(event) => setReason(event.target.value)}>
           <option value="" disabled>
             {reasonPlaceholder}
           </option>

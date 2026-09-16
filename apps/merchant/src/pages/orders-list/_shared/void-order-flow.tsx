@@ -20,10 +20,15 @@ export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; o
       <Modal open onClose={onClose} className="max-w-lg">
         <ScopeReasonForm
           title={t("orders.void.title")}
+          // No orders.void.scopeLabel key exists in i18n — this form
+          // intentionally reuses cancel's scope-label wording since both
+          // flows share the same "entire vs specific" radio choice.
+          scopeLabel={t("orders.cancel.scopeLabel")}
           scopeOptions={[
             { value: "entire", label: t("orders.void.scopeEntire") },
             { value: "specific", label: t("orders.void.scopeSpecific") },
           ]}
+          reasonLabel={t("orders.void.reasonLabel")}
           reasonPlaceholder={t("orders.void.reasonPlaceholder")}
           reasonOptions={[
             { value: "wrongInput", label: t("orders.void.reason.wrongInput") },

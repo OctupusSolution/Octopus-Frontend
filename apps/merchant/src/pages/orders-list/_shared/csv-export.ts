@@ -2,8 +2,14 @@
 import type { OrderRecord } from "./types";
 
 function escapeCsvField(value: string): string {
-  if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
-  return value;
+  // Guard against formula injection: a field starting with =, +, -, @, tab,
+  // or CR is evaluated as a live formula by Excel/Sheets on open. Prefixing
+  // with a literal single quote forces the cell to be read as text. Table
+  // numbers in particular come straight from customer input via
+  // live-orders-bridge.ts, so they can't be trusted as plain text.
+  const guarded = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  if (/[",\n]/.test(guarded)) return `"${guarded.replace(/"/g, '""')}"`;
+  return guarded;
 }
 
 export function ordersToCsv(rows: readonly OrderRecord[]): string {

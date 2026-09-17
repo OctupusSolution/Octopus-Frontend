@@ -5,8 +5,8 @@ import { Modal, Segmented, Select, Textarea } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { customerName } from "./format";
 import { Avatar } from "./avatar";
-import { TAG_STYLE, TAG_LABEL_KEY } from "./theme";
-import type { CustomerRecord } from "./types";
+import { TAG_STYLE, DEFAULT_TAG_STYLE, TAG_LABEL_KEY } from "./theme";
+import type { CustomerRecord, CustomerTag } from "./types";
 
 type RequestType = "deposit" | "balance" | "custom";
 type Method = "link" | "whatsapp" | "sms";
@@ -53,11 +53,15 @@ export function PaymentLinkModal({
         <div>
           <div className="font-semibold text-[var(--octo-text-primary)]">{name}</div>
           <div className="mt-1 flex flex-wrap gap-1">
-            {customer.tags.map((tag) => (
-              <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: TAG_STYLE[tag].text, backgroundColor: TAG_STYLE[tag].bg }}>
-                {t(TAG_LABEL_KEY[tag])}
-              </span>
-            ))}
+            {customer.tags.map((tag) => {
+              const style = TAG_STYLE[tag as CustomerTag] ?? DEFAULT_TAG_STYLE;
+              const labelKey = TAG_LABEL_KEY[tag as CustomerTag];
+              return (
+                <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: style.text, backgroundColor: style.bg }}>
+                  {labelKey ? t(labelKey) : tag}
+                </span>
+              );
+            })}
           </div>
           <div className="mt-1 text-[11.5px] text-[var(--octo-text-muted)]">{customer.phone} · {customer.email}</div>
         </div>

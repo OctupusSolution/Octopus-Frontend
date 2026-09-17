@@ -22,6 +22,11 @@ export const TAG_STYLE: Record<CustomerTag, TagStyle> = {
 
 export const BLOCKED_STYLE: TagStyle = { text: "#6B7280", bg: "#F1F5F9", icon: Ban };
 
+// Fallback style for a free-text tag (added via "Add Tag") that isn't one of
+// the known `CustomerTag` enum values in TAG_STYLE — neutral gray, same as
+// BLOCKED_STYLE, since there's no dedicated color/icon for arbitrary text.
+export const DEFAULT_TAG_STYLE: TagStyle = { text: "#6B7280", bg: "#F1F5F9", icon: Ban };
+
 export const TAG_LABEL_KEY: Record<CustomerTag, string> = {
   VIP: "customers.tag.vip",
   "Frequent Diner": "customers.tag.frequentDiner",

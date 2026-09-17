@@ -14,7 +14,7 @@ const LABEL_KEY: Record<StatCardKey, string> = {
   totalSpend: "customers.stat.totalSpend",
 };
 
-export function CustomerStatCards() {
+export function CustomerStatCards({ isEmpty }: { isEmpty?: boolean }) {
   const { t } = useI18n();
 
   return (
@@ -23,7 +23,11 @@ export function CustomerStatCards() {
         const theme = STAT_CARD_THEME[key];
         const Icon = theme.icon;
         const stat = customerStats[key];
-        const value = key === "totalSpend" ? (stat as { display: string }).display : (stat as { value: number }).value.toLocaleString();
+        // When the customer list is genuinely empty, every KPI reads 0 (per
+        // CRM-Empty state.png) instead of the decorative mock totals — the
+        // icon/tile/label rendering below is unchanged either way.
+        const value = isEmpty ? "0" : key === "totalSpend" ? (stat as { display: string }).display : (stat as { value: number }).value.toLocaleString();
+        const delta = isEmpty ? "0%" : stat.delta;
 
         return (
           <div key={key} className={`rounded-2xl p-4 ${theme.cardBg}`}>
@@ -36,7 +40,7 @@ export function CustomerStatCards() {
             <div className="mt-1 text-[12px] text-[var(--octo-text-muted)]">{t(LABEL_KEY[key])}</div>
             <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px]">
               <BarChart3 size={13} className="text-[#16A34A]" strokeWidth={2.5} />
-              <span className="font-semibold text-[#16A34A]">{stat.delta}</span>
+              <span className="font-semibold text-[#16A34A]">{delta}</span>
               <span className="text-[var(--octo-text-faint)]">
                 {t(key === "totalSpend" ? "customers.stat.deltaVsLastMonth" : "customers.stat.deltaVsYesterday")}
               </span>

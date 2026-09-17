@@ -153,7 +153,7 @@ export function CustomersPage() {
         </header>
 
         <div className="mt-4">
-          <CustomerStatCards />
+          <CustomerStatCards isEmpty={customers.length === 0} />
         </div>
 
         {customers.length === 0 ? (

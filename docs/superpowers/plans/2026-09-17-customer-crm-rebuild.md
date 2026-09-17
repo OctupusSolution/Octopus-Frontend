@@ -435,11 +435,11 @@ describe("customerRecords", () => {
 });
 ```
 
-Check the repo's test runner first (`grep -r "\"test\":" apps/merchant/package.json` or look at an existing `*.test.ts` for its import style, e.g. `orders-list/_shared/mock-data.test.ts`) and match its exact import/assertion style if it differs from the `vitest` shown here.
+Confirmed: `apps/merchant/package.json`'s `"test"` script is `vitest run`, and `orders-list/_shared/mock-data.test.ts` uses exactly the `import { describe, expect, it } from "vitest"` style shown above — no adjustment needed.
 
 - [ ] **Step 6: Run the test to verify it fails**
 
-Run: `pnpm --filter merchant test -- mock-data.test.ts` (or the equivalent command the repo's existing `*.test.ts` files use — check `package.json`'s `test` script)
+Run: `npm run test --workspace=apps/merchant -- mock-data.test.ts`
 Expected: FAIL — `mock-data.ts` doesn't exist yet, or fields don't match.
 
 - [ ] **Step 7: Confirm it passes**
@@ -449,7 +449,7 @@ Expected: PASS, 3 tests green.
 
 - [ ] **Step 8: Typecheck**
 
-Run: `pnpm --filter merchant typecheck` (or repo equivalent)
+Run: `npx tsc -b apps/merchant` (from the repo root; emits nothing on success since `noEmit: true`)
 Expected: no errors from the four new files.
 
 - [ ] **Step 9: Commit**
@@ -927,7 +927,7 @@ Expected: no matches (the old keys are gone and nothing outside this module refe
 
 - [ ] **Step 5: Typecheck**
 
-Run: `pnpm --filter i18n typecheck` (or repo equivalent) — confirms `en`/`ar` still satisfy whatever type (`Record<string, string>` or a generated key union) `packages/i18n` exports.
+Run: `npx tsc -b apps/merchant` — this repo has no standalone `packages/i18n` project reference; the merchant app's typecheck already covers `en`/`ar` transitively through `@i18n/index`, and this repo's own `src/shared/i18n/keys.test.ts` (covered by Step 4's test run) is what actually asserts `en`/`ar` key parity, not a type.
 
 - [ ] **Step 6: Commit**
 
@@ -1262,7 +1262,7 @@ git rm apps/merchant/src/pages/customers/styles.ts
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 Expected: no errors. (`detail/index.tsx` will still fail — it's rewritten in Task 7. If your typecheck runs the whole `merchant` project rather than per-file, ignore pre-existing errors from `pages/customers/detail`, `pages/customers/segments`, `pages/customers/feedback` for now; they're resolved by Tasks 7 and 9.)
 
 - [ ] **Step 7: Manual verification**
@@ -1677,7 +1677,7 @@ Wire `onOpenPaymentLink={() => setPaymentLinkFor(customer)}` on `<CustomerRow>`,
 
 - [ ] **Step 4: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 5: Manual verification**
 
@@ -2091,7 +2091,7 @@ Render the menu/modals as siblings near `<PaymentLinkModal .../>`:
 
 - [ ] **Step 8: Typecheck**
 
-Run: `pnpm --filter merchant typecheck` — confirm the `tags: string[]` widening from Step 7 doesn't break `customer-row.tsx`'s tag-label lookup (it indexes `TAG_STYLE` by tag; switch that lookup to `TAG_STYLE[tag] ?? DEFAULT_TAG_STYLE` and the i18n label lookup to fall back to the raw tag string when no `customers.tag.*` key matches it).
+Run: `npx tsc -b apps/merchant` — confirm the `tags: string[]` widening from Step 7 doesn't break `customer-row.tsx`'s tag-label lookup (it indexes `TAG_STYLE` by tag; switch that lookup to `TAG_STYLE[tag] ?? DEFAULT_TAG_STYLE` and the i18n label lookup to fall back to the raw tag string when no `customers.tag.*` key matches it).
 
 - [ ] **Step 9: Manual verification**
 
@@ -2435,7 +2435,7 @@ Add import `AddCustomerModal` from `./_shared/add-customer-modal`; add state `co
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 7: Manual verification**
 
@@ -2704,7 +2704,7 @@ export const DEFAULT_TAG_STYLE: TagStyle = { text: "#475569", bg: "var(--octo-tr
 
 - [ ] **Step 2: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 3: Manual verification**
 
@@ -3109,7 +3109,7 @@ Add import `SendMessageWizard` from `./_shared/send-message-wizard`; add state `
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 7: Manual verification**
 
@@ -3205,7 +3205,7 @@ Expected: zero matches now that the pages that used them are deleted/rewritten.
 
 - [ ] **Step 7: Typecheck and lint**
 
-Run: `pnpm --filter merchant typecheck` and `pnpm --filter merchant lint` (or repo equivalents)
+Run: `npx tsc -b apps/merchant` and `npm run lint --workspace=apps/merchant` (or repo equivalents)
 Expected: clean — no dangling imports of the deleted modules anywhere.
 
 - [ ] **Step 8: Manual verification**
@@ -3249,7 +3249,7 @@ Switch the app to Arabic (`ar`) via whatever control the app shell exposes (chec
 
 - [ ] **Step 4: Full test suite**
 
-Run: `pnpm --filter merchant test` and `pnpm --filter merchant typecheck` and `pnpm --filter merchant lint` (or repo equivalents) one more time across the whole app, not just this module, to catch any cross-module regression from the registry/sidebar edits.
+Run: `npm run test --workspace=apps/merchant` and `npx tsc -b apps/merchant` and `npm run lint --workspace=apps/merchant` one more time across the whole app, not just this module, to catch any cross-module regression from the registry/sidebar edits.
 
 - [ ] **Step 5: Report findings**
 

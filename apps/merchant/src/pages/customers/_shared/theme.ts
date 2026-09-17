@@ -2,7 +2,7 @@
 // Hex colors match this page's own design frames, same convention as
 // orders-list/_shared/theme.ts — not shared design tokens.
 import type { ComponentType } from "react";
-import { Crown, UtensilsCrossed, Cake, Sparkles, AlertTriangle, Ban, Users, UserCheck, UserPlus, Repeat, Wallet } from "lucide-react";
+import { Crown, UtensilsCrossed, Cake, Sparkles, AlertTriangle, Ban, Users, UserCheck, UserPlus, Repeat, Wallet, MapPin, Clock, Star, BarChart3 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CustomerTag } from "./types";
 
@@ -53,6 +53,24 @@ export const STAT_CARD_THEME: Record<StatCardKey, StatCardTheme> = {
   vip: { icon: Crown, tile: "#0EA5E9", cardBg: "bg-[#0EA5E9]/[0.08]" },
   returning: { icon: Repeat, tile: "#CA8A04", cardBg: "bg-[#CA8A04]/[0.08]" },
   totalSpend: { icon: Wallet, tile: "#0D6EFD", cardBg: "bg-[#0D6EFD]/[0.08]" },
+};
+
+// The detail page's 5 header stat tiles (Total Visits / Total Spend / Last
+// Visit / Loyalty Points / Avg Spend) — same icon-badge-on-tinted-tile idea
+// as STAT_CARD_THEME above, just a smaller badge to fit the compact tile.
+export type DetailStatKey = "totalVisits" | "totalSpend" | "lastVisit" | "loyaltyPoints" | "avgSpend";
+
+export interface DetailStatTileTheme {
+  icon: LucideIcon;
+  tile: string;
+}
+
+export const DETAIL_STAT_TILE_THEME: Record<DetailStatKey, DetailStatTileTheme> = {
+  totalVisits: { icon: MapPin, tile: "#0D6EFD" },
+  totalSpend: { icon: Wallet, tile: "#16A34A" },
+  lastVisit: { icon: Clock, tile: "#EC4899" },
+  loyaltyPoints: { icon: Star, tile: "#F59E0B" },
+  avgSpend: { icon: BarChart3, tile: "#8B5CF6" },
 };
 
 export const ROW_ACTION_THEME = {

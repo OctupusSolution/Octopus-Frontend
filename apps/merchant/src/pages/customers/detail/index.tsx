@@ -1,13 +1,13 @@
 // apps/merchant/src/pages/customers/detail/index.tsx
 import { useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Coins, Pencil, Plus, Users } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Users } from "lucide-react";
 import { Button, EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { customerRecords } from "../_shared/mock-data";
 import { customerName, formatDate, formatReservationDateTime } from "../_shared/format";
 import { Avatar } from "../_shared/avatar";
-import { TAG_STYLE, DEFAULT_TAG_STYLE, BLOCKED_STYLE, TAG_LABEL_KEY } from "../_shared/theme";
+import { TAG_STYLE, DEFAULT_TAG_STYLE, BLOCKED_STYLE, TAG_LABEL_KEY, DETAIL_STAT_TILE_THEME, type DetailStatTileTheme } from "../_shared/theme";
 import { PaymentLinkModal } from "../_shared/payment-link-modal";
 import { AddNoteModal } from "../_shared/add-note-modal";
 import { AddTagModal } from "../_shared/add-tag-modal";
@@ -79,11 +79,11 @@ export function CustomerDetailPage() {
       {toast && <div className="mt-3 rounded-[9px] bg-[#22C55E]/10 px-3 py-2 text-[11.5px] font-medium text-[#16a34a]">{toast}</div>}
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} />
-        <StatTile label={t("customers.detail.totalSpend")} value={`SAR ${customer.totalSpendSar}`} />
-        <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} />
-        <StatTile label={t("customers.detail.loyaltyPoints")} value={`${customer.loyaltyPoints.toLocaleString(localeTag)} pts`} icon={<Coins size={14} className="text-[#F59E0B]" />} />
-        <StatTile label={t("customers.detail.avgSpend")} value={`SAR ${customer.avgSpendSar}`} />
+        <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} theme={DETAIL_STAT_TILE_THEME.totalVisits} />
+        <StatTile label={t("customers.detail.totalSpend")} value={`SAR ${customer.totalSpendSar}`} theme={DETAIL_STAT_TILE_THEME.totalSpend} />
+        <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} theme={DETAIL_STAT_TILE_THEME.lastVisit} />
+        <StatTile label={t("customers.detail.loyaltyPoints")} value={`${customer.loyaltyPoints.toLocaleString(localeTag)} pts`} theme={DETAIL_STAT_TILE_THEME.loyaltyPoints} />
+        <StatTile label={t("customers.detail.avgSpend")} value={`SAR ${customer.avgSpendSar}`} theme={DETAIL_STAT_TILE_THEME.avgSpend} />
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -229,11 +229,15 @@ export function CustomerDetailPage() {
   );
 }
 
-function StatTile({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
+function StatTile({ label, value, theme }: { label: string; value: string; theme: DetailStatTileTheme }) {
+  const Icon = theme.icon;
   return (
     <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[14px] py-[12px]">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{label}</div>
-      <div className="mt-1.5 flex items-center gap-1.5 text-[17px] font-bold text-[var(--octo-text-primary)]">{icon}{value}</div>
+      <div className="grid h-9 w-9 place-items-center rounded-lg" style={{ backgroundColor: theme.tile }}>
+        <Icon size={16} className="text-white" />
+      </div>
+      <div className="mt-2 text-[17px] font-bold text-[var(--octo-text-primary)]">{value}</div>
+      <div className="mt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{label}</div>
     </div>
   );
 }

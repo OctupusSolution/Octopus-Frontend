@@ -12,6 +12,7 @@ import { PaymentLinkModal } from "./_shared/payment-link-modal";
 import { RowActionsMenu, type RowActionId } from "./_shared/row-actions-menu";
 import { AddNoteModal } from "./_shared/add-note-modal";
 import { AddTagModal } from "./_shared/add-tag-modal";
+import { AddCustomerModal } from "./_shared/add-customer-modal";
 import { BulkActionBar } from "./_shared/bulk-action-bar";
 import { customersToCsv } from "./_shared/csv-export";
 import { Pagination } from "@/pages/inventory/_shared/pagination";
@@ -47,6 +48,7 @@ export function CustomersPage() {
   const [rowMenu, setRowMenu] = useState<{ anchor: HTMLElement; customer: CustomerRecord } | null>(null);
   const [noteFor, setNoteFor] = useState<CustomerRecord | null>(null);
   const [tagTarget, setTagTarget] = useState<{ ids: string[] } | null>(null);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -144,7 +146,7 @@ export function CustomersPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm">{t("customers.sendMessageCta")}</Button>
-            <Button variant="primary" size="sm">{t("customers.addCustomer.cta")}</Button>
+            <Button variant="primary" size="sm" onClick={() => setAddCustomerOpen(true)}>{t("customers.addCustomer.cta")}</Button>
           </div>
         </header>
 
@@ -158,7 +160,7 @@ export function CustomersPage() {
             icon={<Users size={18} />}
             title={t("customers.empty.title")}
             description={t("customers.empty.description")}
-            action={<Button variant="primary">{t("customers.empty.cta")}</Button>}
+            action={<Button variant="primary" onClick={() => setAddCustomerOpen(true)}>{t("customers.empty.cta")}</Button>}
           />
         ) : (
           <>
@@ -273,6 +275,14 @@ export function CustomersPage() {
           setCustomers((prev) =>
             prev.map((c) => (tagTarget.ids.includes(c.id) && !c.tags.includes(tag) ? { ...c, tags: [...c.tags, tag] } : c))
           );
+        }}
+      />
+      <AddCustomerModal
+        open={addCustomerOpen}
+        onClose={() => setAddCustomerOpen(false)}
+        onCreate={(customer) => {
+          setCustomers((prev) => [customer, ...prev]);
+          setToast(t("customers.addCustomer.createdConfirm"));
         }}
       />
     </>

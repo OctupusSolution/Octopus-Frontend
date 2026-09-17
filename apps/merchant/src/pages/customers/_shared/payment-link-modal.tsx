@@ -5,7 +5,7 @@ import { Modal, Segmented, Select, Textarea } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { customerName } from "./format";
 import { Avatar } from "./avatar";
-import { TAG_STYLE } from "./theme";
+import { TAG_STYLE, TAG_LABEL_KEY } from "./theme";
 import type { CustomerRecord } from "./types";
 
 type RequestType = "deposit" | "balance" | "custom";
@@ -55,7 +55,7 @@ export function PaymentLinkModal({
           <div className="mt-1 flex flex-wrap gap-1">
             {customer.tags.map((tag) => (
               <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: TAG_STYLE[tag].text, backgroundColor: TAG_STYLE[tag].bg }}>
-                {tag}
+                {t(TAG_LABEL_KEY[tag])}
               </span>
             ))}
           </div>

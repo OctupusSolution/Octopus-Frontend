@@ -73,8 +73,10 @@ const SECTIONS: NavSection[] = [
   {
     label: "Business",
     groups: [
-      { id: "customers", label: "Customer CRM", icon: Users,
-        items: ["Customer List & Profiles", "Segments", "Feedback & Complaints"] },
+      // No sub-items: Customer CRM is now a single list+detail page, so the
+      // entry navigates straight to it rather than opening a dropdown. Same
+      // shape as Orders/Reservations/Menu/Staff above.
+      { id: "customers", label: "Customer CRM", icon: Users },
       { id: "marketing", label: "Marketing", icon: Megaphone,
         items: ["Loyalty Program", "Gift Cards", "Subscriptions & Memberships", "Campaigns"] },
       { id: "promotions", label: "Promotions", icon: Ticket, path: "/marketing/promotions" },
@@ -136,9 +138,6 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 const ITEM_PATHS: Record<string, string> = {
   "Live Floor Plan": "/reservations/floor-plan",
   "Floor Plan Builder": "/reservations/floor-plan/builder",
-  "Customer List & Profiles": "/customers",
-  "Segments": "/customers/segments",
-  "Feedback & Complaints": "/customers/feedback",
   "Loyalty Program": "/marketing/loyalty",
   "Gift Cards": "/marketing/gift-cards",
   "Subscriptions & Memberships": "/marketing/subscriptions",

@@ -1,9 +1,15 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/audience-step.tsx
 import { useState } from "react";
-import { Tabs } from "@ui/primitives";
+import { Select, Tabs } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ALL_TAGS } from "../types";
+
+const VISIT_FREQUENCY_OPTIONS = ["Weekly", "Monthly", "Occasional", "First-time"] as const;
+const AGE_RANGE_OPTIONS = ["18y : 24y", "25y : 30y", "31y : 40y", "41y : 50y", "51y+"] as const;
 
 export interface AudienceFilters {
+  tag: string;
+  visitFrequency: string;
   totalSpendFrom: string;
   totalSpendTo: string;
   lastVisitFrom: string;
@@ -11,10 +17,14 @@ export interface AudienceFilters {
   customerSinceFrom: string;
   customerSinceTo: string;
   gender: "" | "Male" | "Female";
+  ageRange: string;
 }
 
 export const EMPTY_AUDIENCE_FILTERS: AudienceFilters = {
-  totalSpendFrom: "", totalSpendTo: "", lastVisitFrom: "", lastVisitTo: "", customerSinceFrom: "", customerSinceTo: "", gender: "",
+  // `ageRange` defaults to the first preset bracket (rather than "") since this
+  // Select has no empty/placeholder option — same convention as the "source"
+  // field in add-customer-modal.tsx.
+  tag: "", visitFrequency: "", totalSpendFrom: "", totalSpendTo: "", lastVisitFrom: "", lastVisitTo: "", customerSinceFrom: "", customerSinceTo: "", gender: "", ageRange: AGE_RANGE_OPTIONS[0],
 };
 
 export function AudienceStep({ value, onChange, onNext }: { value: AudienceFilters; onChange: (next: AudienceFilters) => void; onNext: () => void }) {
@@ -39,6 +49,20 @@ export function AudienceStep({ value, onChange, onNext }: { value: AudienceFilte
 
       {tab === "filters" && (
         <div className="mt-4 flex flex-col gap-4">
+          <SelectField
+            label={t("customers.sendMessage.filter.tags")}
+            value={value.tag}
+            onChange={(v) => set("tag", v)}
+            placeholder={t("customers.sendMessage.filter.tagsPlaceholder")}
+            options={ALL_TAGS}
+          />
+          <SelectField
+            label={t("customers.sendMessage.filter.visitFrequency")}
+            value={value.visitFrequency}
+            onChange={(v) => set("visitFrequency", v)}
+            placeholder={t("customers.sendMessage.filter.visitFrequencyPlaceholder")}
+            options={VISIT_FREQUENCY_OPTIONS}
+          />
           <RangeRow label={t("customers.sendMessage.filter.totalSpend")} from={value.totalSpendFrom} to={value.totalSpendTo} onFrom={(v) => set("totalSpendFrom", v)} onTo={(v) => set("totalSpendTo", v)} type="text" prefix="SAR" />
           <RangeRow label={t("customers.sendMessage.filter.lastVisit")} from={value.lastVisitFrom} to={value.lastVisitTo} onFrom={(v) => set("lastVisitFrom", v)} onTo={(v) => set("lastVisitTo", v)} type="date" />
           <RangeRow label={t("customers.sendMessage.filter.customerSince")} from={value.customerSinceFrom} to={value.customerSinceTo} onFrom={(v) => set("customerSinceFrom", v)} onTo={(v) => set("customerSinceTo", v)} type="date" />
@@ -58,6 +82,13 @@ export function AudienceStep({ value, onChange, onNext }: { value: AudienceFilte
               ))}
             </div>
           </div>
+
+          <SelectField
+            label={t("customers.sendMessage.filter.ageRange")}
+            value={value.ageRange}
+            onChange={(v) => set("ageRange", v)}
+            options={AGE_RANGE_OPTIONS}
+          />
         </div>
       )}
 
@@ -67,6 +98,22 @@ export function AudienceStep({ value, onChange, onNext }: { value: AudienceFilte
       <button type="button" onClick={onNext} className="mt-6 w-full rounded-[10px] bg-[#0D6EFD] py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90">
         {t("customers.sendMessage.next")}
       </button>
+    </div>
+  );
+}
+
+function SelectField({
+  label, value, onChange, options, placeholder,
+}: { label: string; value: string; onChange: (v: string) => void; options: readonly string[]; placeholder?: string }) {
+  return (
+    <div>
+      <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{label}</p>
+      <Select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1.5">
+        {placeholder && <option value="">{placeholder}</option>}
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </Select>
     </div>
   );
 }

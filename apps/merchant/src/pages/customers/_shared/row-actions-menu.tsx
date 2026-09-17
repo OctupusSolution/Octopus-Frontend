@@ -43,7 +43,7 @@ export function RowActionsMenu({
       ref={ref}
       role="menu"
       className="fixed z-50 w-[200px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
-      style={{ top: rect.bottom + 6, insetInlineStart: rect.left }}
+      style={{ top: rect.bottom + 6, left: rect.left }}
     >
       {items.map((item) => (
         <button

@@ -18,6 +18,7 @@ function matchesAudience(customer: CustomerRecord, filters: AudienceFilters): bo
   if (filters.customerSinceFrom && customer.customerSince < filters.customerSinceFrom) return false;
   if (filters.customerSinceTo && customer.customerSince > filters.customerSinceTo) return false;
   if (filters.gender && customer.gender !== filters.gender) return false;
+  if (filters.tag && !customer.tags.includes(filters.tag)) return false;
   return true;
 }
 

@@ -1,9 +1,13 @@
 // apps/merchant/src/pages/customers/_shared/row-actions-menu.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { CustomerRecord } from "./types";
 
 export type RowActionId = "addNote" | "history" | "sendWhatsapp" | "sendEmail" | "addTag" | "toggleBlock" | "delete";
+
+const GAP = 6;
+const ESTIMATED_ITEM_HEIGHT = 42;
+const ITEM_COUNT = 7;
 
 export function RowActionsMenu({
   anchor,
@@ -18,6 +22,7 @@ export function RowActionsMenu({
 }) {
   const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
+  const [style, setStyle] = useState<CSSProperties>({});
 
   useEffect(() => {
     const onPointer = (event: MouseEvent) => {
@@ -27,7 +32,32 @@ export function RowActionsMenu({
     return () => document.removeEventListener("mousedown", onPointer);
   }, [anchor, onClose]);
 
-  const rect = anchor.getBoundingClientRect();
+  // `position: fixed` so the menu escapes any scrolling table/card container;
+  // it anchors to the reading-direction "start" edge (never lets its 200px
+  // width hang past a viewport edge) and flips above the trigger when there's
+  // no room below. Mirrors staff/_shared/row-menu.tsx's positioning strategy.
+  useLayoutEffect(() => {
+    const rect = anchor.getBoundingClientRect();
+    const rtl = document.documentElement.dir === "rtl";
+    const height = ITEM_COUNT * ESTIMATED_ITEM_HEIGHT + 16;
+    const below = rect.bottom + GAP + height <= window.innerHeight;
+    setStyle({
+      position: "fixed",
+      ...(below ? { top: rect.bottom + GAP } : { bottom: window.innerHeight - rect.top + GAP }),
+      ...(rtl ? { left: rect.left } : { right: window.innerWidth - rect.right }),
+    });
+  }, [anchor]);
+
+  useEffect(() => {
+    const close = () => onClose();
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [onClose]);
+
   const items: { id: RowActionId; label: string; danger?: boolean }[] = [
     { id: "addNote", label: t("customers.rowAction.addNote") },
     { id: "history", label: t("customers.rowAction.history") },
@@ -43,7 +73,7 @@ export function RowActionsMenu({
       ref={ref}
       role="menu"
       className="fixed z-50 w-[200px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
-      style={{ top: rect.bottom + 6, left: rect.left }}
+      style={style}
     >
       {items.map((item) => (
         <button

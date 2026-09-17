@@ -3203,6 +3203,8 @@ export const ar = {
   "reports.customers.cohort.note": "نسبة عملاء كل شهر ما زالوا نشطين حسب الأشهر منذ أول طلب",
   "reports.customers.table.title": "أعلى 20 عميلاً إنفاقاً",
   "reports.customers.col.rank": "#",
+  "reports.customers.col.customer": "العميل",
+  "reports.customers.col.visits": "الزيارات",
   "reports.customers.col.spend": "الإنفاق",
   "reports.customers.col.avgBasket": "متوسط السلة",
   "reports.customers.col.frequency": "التكرار",

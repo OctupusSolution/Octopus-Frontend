@@ -1,8 +1,8 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/review-send-step.tsx
 import { useState } from "react";
-import { MessageCircle } from "lucide-react";
 import { Button } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { WhatsAppGlyph } from "../whatsapp-glyph";
 import type { CommunicationChannel } from "../types";
 
 type SendTiming = "now" | "later" | "batches";
@@ -36,7 +36,7 @@ export function ReviewSendStep({
         {channels.map((channel) => (
           <div key={channel} className="flex items-center justify-between rounded-[9px] border border-[var(--octo-divider)] px-3 py-2.5">
             <span className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-              <MessageCircle size={15} className="text-[#25D366]" /> {channel}
+              <WhatsAppGlyph size={15} /> {channel}
             </span>
             <span className="text-end text-[11.5px] text-[var(--octo-text-muted)]">
               {t("customers.sendMessage.review.estMessages")}: {totalSelected} · {t("customers.sendMessage.review.estCost")}: SAR {estimatedCost}

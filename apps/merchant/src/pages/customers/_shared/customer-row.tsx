@@ -4,9 +4,9 @@ import { Checkbox } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./avatar";
 import { customerName, formatDate } from "./format";
-import { TAG_STYLE, BLOCKED_STYLE, ROW_ACTION_THEME, TAG_LABEL_KEY } from "./theme";
+import { TAG_STYLE, BLOCKED_STYLE, DEFAULT_TAG_STYLE, ROW_ACTION_THEME, TAG_LABEL_KEY } from "./theme";
 import { WhatsAppGlyph } from "./whatsapp-glyph";
-import type { CustomerRecord } from "./types";
+import type { CustomerRecord, CustomerTag } from "./types";
 
 export function CustomerRow({
   customer,
@@ -42,11 +42,15 @@ export function CustomerRow({
                 {t("customers.tag.blocked")}
               </span>
             )}
-            {customer.tags.map((tag) => (
-              <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: TAG_STYLE[tag].text, backgroundColor: TAG_STYLE[tag].bg }}>
-                {t(TAG_LABEL_KEY[tag])}
-              </span>
-            ))}
+            {customer.tags.map((tag) => {
+              const style = TAG_STYLE[tag as CustomerTag] ?? DEFAULT_TAG_STYLE;
+              const labelKey = TAG_LABEL_KEY[tag as CustomerTag];
+              return (
+                <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: style.text, backgroundColor: style.bg }}>
+                  {labelKey ? t(labelKey) : tag}
+                </span>
+              );
+            })}
           </div>
           <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[var(--octo-text-muted)]">
             <WhatsAppGlyph size={12} /> {customer.phone}

@@ -1390,6 +1390,7 @@ export const en = {
   "customers.addNote.title": "Add Note",
   "customers.addNote.placeholder": "Write a note about this customer",
   "customers.addNote.save": "Save Note",
+  "customers.addNote.cancel": "Cancel",
   "customers.addTag.title": "Add Tag",
   "customers.addTag.placeholder": "Enter tag name",
   "customers.addTag.save": "Add",

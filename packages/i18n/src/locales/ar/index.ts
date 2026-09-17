@@ -1390,6 +1390,7 @@ export const ar = {
   "customers.addNote.title": "إضافة ملاحظة",
   "customers.addNote.placeholder": "اكتب ملاحظة عن هذا العميل",
   "customers.addNote.save": "حفظ الملاحظة",
+  "customers.addNote.cancel": "إلغاء",
   "customers.addTag.title": "إضافة وسم",
   "customers.addTag.placeholder": "أدخل اسم الوسم",
   "customers.addTag.save": "إضافة",

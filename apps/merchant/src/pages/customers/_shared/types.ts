@@ -40,7 +40,10 @@ export interface CustomerRecord {
   firstName: string;
   lastName: string;
   gender: "Male" | "Female";
-  tags: CustomerTag[];
+  // Free-text: the known `CustomerTag` enum seeds the styled/translated
+  // subset (see TAG_STYLE / TAG_LABEL_KEY), but "Add Tag" lets merchants
+  // attach arbitrary custom tags beyond that fixed list.
+  tags: string[];
   phone: string; // "+9665XXXXXXXX"
   email: string;
   isBlocked: boolean;

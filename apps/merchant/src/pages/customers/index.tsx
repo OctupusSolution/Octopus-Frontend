@@ -15,6 +15,7 @@ import { AddTagModal } from "./_shared/add-tag-modal";
 import { AddCustomerModal } from "./_shared/add-customer-modal";
 import { BulkActionBar } from "./_shared/bulk-action-bar";
 import { customersToCsv } from "./_shared/csv-export";
+import { SendMessageWizard } from "./_shared/send-message-wizard";
 import { Pagination } from "@/pages/inventory/_shared/pagination";
 import type { CustomerRecord, CustomerTag } from "./_shared/types";
 
@@ -49,6 +50,7 @@ export function CustomersPage() {
   const [noteFor, setNoteFor] = useState<CustomerRecord | null>(null);
   const [tagTarget, setTagTarget] = useState<{ ids: string[] } | null>(null);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -145,7 +147,7 @@ export function CustomersPage() {
             <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("customers.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm">{t("customers.sendMessageCta")}</Button>
+            <Button variant="secondary" size="sm" onClick={() => setSendMessageOpen(true)}>{t("customers.sendMessageCta")}</Button>
             <Button variant="primary" size="sm" onClick={() => setAddCustomerOpen(true)}>{t("customers.addCustomer.cta")}</Button>
           </div>
         </header>
@@ -284,6 +286,12 @@ export function CustomersPage() {
           setCustomers((prev) => [customer, ...prev]);
           setToast(t("customers.addCustomer.createdConfirm"));
         }}
+      />
+      <SendMessageWizard
+        open={sendMessageOpen}
+        customers={customers}
+        onClose={() => setSendMessageOpen(false)}
+        onSent={(count) => setToast(t("customers.sendMessage.sentConfirm").replace("{count}", String(count)))}
       />
     </>
   );

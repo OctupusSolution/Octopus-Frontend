@@ -3199,6 +3199,8 @@ export const en = {
   "reports.customers.cohort.note": "Percentage of each month's new customers still active by months since first order",
   "reports.customers.table.title": "Top 20 Customers by Spend",
   "reports.customers.col.rank": "#",
+  "reports.customers.col.customer": "Customer",
+  "reports.customers.col.visits": "Visits",
   "reports.customers.col.spend": "Spend",
   "reports.customers.col.avgBasket": "Avg Basket",
   "reports.customers.col.frequency": "Frequency",

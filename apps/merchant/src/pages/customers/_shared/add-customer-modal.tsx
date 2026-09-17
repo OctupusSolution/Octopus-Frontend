@@ -60,6 +60,12 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
     setChannels((prev) => (prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel]));
   }
 
+  function handleClose() {
+    if (addTagOpen) return; // let the nested Add Tag modal own this Escape/backdrop-click
+    reset();
+    onClose();
+  }
+
   function handleSubmit() {
     if (!canSubmit) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -81,7 +87,7 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
       firstVisit: today,
       preferredBranch: branch,
       preferredAreaTable: areaTable,
-      referredBy: referredBy.trim() || undefined,
+      referredBy: referredBy.trim() || source || undefined,
       marketingConsent: marketing ? "Opted in" : "Opted out",
       cuisinePreference: [],
       dietaryPreference: "",
@@ -101,7 +107,7 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title={t("customers.addCustomer.title")} className="max-w-[640px] max-h-[85vh] overflow-y-auto octo-scroll">
+      <Modal open={open} onClose={handleClose} title={t("customers.addCustomer.title")} className="max-w-[640px] max-h-[85vh] overflow-y-auto octo-scroll">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t("customers.addCustomer.firstName")} required>
             <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("customers.addCustomer.firstNamePlaceholder")} />

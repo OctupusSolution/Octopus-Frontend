@@ -4,7 +4,7 @@ import { Checkbox } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./avatar";
 import { customerName, formatDate } from "./format";
-import { TAG_STYLE, BLOCKED_STYLE, ROW_ACTION_THEME } from "./theme";
+import { TAG_STYLE, BLOCKED_STYLE, ROW_ACTION_THEME, TAG_LABEL_KEY } from "./theme";
 import { WhatsAppGlyph } from "./whatsapp-glyph";
 import type { CustomerRecord } from "./types";
 
@@ -44,7 +44,7 @@ export function CustomerRow({
             )}
             {customer.tags.map((tag) => (
               <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: TAG_STYLE[tag].text, backgroundColor: TAG_STYLE[tag].bg }}>
-                {t(`customers.tag.${tag === "VIP" ? "vip" : tag === "Frequent Diner" ? "frequentDiner" : tag === "Birthday May" ? "birthdayMay" : tag === "New Customer" ? "newCustomer" : "atRisk"}`)}
+                {t(TAG_LABEL_KEY[tag])}
               </span>
             ))}
           </div>

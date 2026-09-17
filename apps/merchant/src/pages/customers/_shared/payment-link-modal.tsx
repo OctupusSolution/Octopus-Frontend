@@ -99,15 +99,18 @@ export function PaymentLinkModal({
         </div>
       </label>
 
-      <div className="mt-4">
-        <Textarea
-          label={t("customers.paymentLink.description")}
+      <label className="mt-4 flex flex-col gap-1.5">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
+          {t("customers.paymentLink.description")} <span className="text-[#EF4444]">*</span>
+        </span>
+        <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           placeholder={t("customers.paymentLink.descriptionPlaceholder")}
           rows={3}
+          className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD] disabled:cursor-not-allowed disabled:opacity-50"
         />
-      </div>
+      </label>
 
       <div className="mt-4">
         <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("customers.paymentLink.method")}</p>

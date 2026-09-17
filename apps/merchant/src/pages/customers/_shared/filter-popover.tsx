@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Checkbox } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { TAG_LABEL_KEY } from "./theme";
 import { ALL_TAGS, type CustomerTag } from "./types";
 
 function usePopover() {
@@ -46,7 +47,7 @@ export function TagsFilterPopover({ selected, onApply }: { selected: readonly Cu
             {ALL_TAGS.map((tag) => (
               <Checkbox
                 key={tag}
-                label={tag}
+                label={t(TAG_LABEL_KEY[tag])}
                 checked={draft.includes(tag)}
                 onChange={() => setDraft((prev) => (prev.includes(tag) ? prev.filter((t2) => t2 !== tag) : [...prev, tag]))}
               />

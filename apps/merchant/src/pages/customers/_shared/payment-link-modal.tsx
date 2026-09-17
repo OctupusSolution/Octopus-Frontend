@@ -41,8 +41,13 @@ export function PaymentLinkModal({
     setMessage("");
   }
 
+  function handleClose() {
+    reset();
+    onClose();
+  }
+
   return (
-    <Modal open onClose={onClose} title={t("customers.paymentLink.title")} className="max-w-[560px]">
+    <Modal open onClose={handleClose} title={t("customers.paymentLink.title")} className="max-w-[560px]">
       <div className="flex items-center gap-3 rounded-xl border border-[var(--octo-divider)] p-3">
         <Avatar name={name} size={44} />
         <div>

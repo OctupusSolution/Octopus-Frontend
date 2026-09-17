@@ -22,6 +22,14 @@ export const TAG_STYLE: Record<CustomerTag, TagStyle> = {
 
 export const BLOCKED_STYLE: TagStyle = { text: "#6B7280", bg: "#F1F5F9", icon: Ban };
 
+export const TAG_LABEL_KEY: Record<CustomerTag, string> = {
+  VIP: "customers.tag.vip",
+  "Frequent Diner": "customers.tag.frequentDiner",
+  "Birthday May": "customers.tag.birthdayMay",
+  "New Customer": "customers.tag.newCustomer",
+  "At Risk": "customers.tag.atRisk",
+};
+
 export type StatCardKey = "total" | "active" | "newThisMonth" | "vip" | "returning" | "totalSpend";
 
 export interface StatCardTheme {

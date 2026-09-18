@@ -69,8 +69,8 @@ export function CustomersPage() {
       "top-customers-by-spend.csv",
       [
         t("reports.customers.col.rank"),
-        t("customers.col.customer"),
-        t("customers.col.visits"),
+        t("reports.customers.col.customer"),
+        t("reports.customers.col.visits"),
         t("reports.customers.col.spend"),
         t("reports.customers.col.avgBasket"),
         t("reports.customers.col.frequency"),
@@ -159,8 +159,8 @@ function TopCustomersTable({ exportTop }: { exportTop: () => void }) {
             <tr className="border-b border-[var(--octo-divider)]">
               {[
                 "reports.customers.col.rank",
-                "customers.col.customer",
-                "customers.col.visits",
+                "reports.customers.col.customer",
+                "reports.customers.col.visits",
                 "reports.customers.col.spend",
                 "reports.customers.col.avgBasket",
                 "reports.customers.col.frequency",

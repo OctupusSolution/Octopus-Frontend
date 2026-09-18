@@ -37,7 +37,7 @@ export function CustomerRow({
       </div>
 
       <div className="flex min-w-[212px] flex-1 items-start gap-2 border-e border-[var(--octo-divider)] px-2.5 xl:min-w-0">
-        <Avatar name={name} size={32} />
+        <Avatar name={name} photo={customer.avatarUrl} size={32} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-semibold text-[var(--octo-text-primary)]">{name}</div>
           <TagChips tags={customer.tags} blocked={customer.isBlocked} className="mt-1 !gap-1" />

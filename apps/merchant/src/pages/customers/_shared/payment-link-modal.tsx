@@ -73,7 +73,7 @@ export function PaymentLinkModal({
   return (
     <Modal open onClose={handleClose} title={t("customers.paymentLink.title")} className={`max-w-[760px] max-h-[94vh] overflow-y-auto octo-scroll ${CRM_MODAL_CLASS}`}>
       <div className="flex items-center gap-4 rounded-xl border border-[var(--octo-border-card)] p-3">
-        <Avatar name={name} size={80} />
+        <Avatar name={name} photo={customer.avatarUrl} size={80} />
         <div className="min-w-0">
           <div className="text-[16px] font-medium text-[var(--octo-text-primary)]">{name}</div>
           <TagChips tags={customer.tags} blocked={customer.isBlocked} className="mt-1.5" />

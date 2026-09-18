@@ -1,4 +1,5 @@
 // apps/merchant/src/pages/customers/_shared/mock-data.ts
+import { avatarPhoto } from "./avatar-photos";
 import type { CustomerRecord, CustomerTag } from "./types";
 
 const NAME_POOL: readonly [string, string, "Male" | "Female"][] = [
@@ -104,6 +105,7 @@ const REEM_AL_SUBAIE: CustomerRecord = {
   firstName: "Reem",
   lastName: "Al-Subaie",
   gender: "Female",
+  avatarUrl: avatarPhoto("Female", 1),
   dateOfBirth: "1997-05-12",
   tags: ["VIP", "Frequent Diner", "Birthday May"],
   phone: "+966510002877",
@@ -152,8 +154,14 @@ const REEM_AL_SUBAIE: CustomerRecord = {
 
 export const customerRecords: readonly CustomerRecord[] = [
   REEM_AL_SUBAIE,
-  ...NAME_POOL.map((entry, index) => buildCustomer(index, entry)),
+  ...withPhotos(NAME_POOL.map((entry, index) => buildCustomer(index, entry))),
 ];
+
+// Photo #1 of the women's set belongs to Reem, so the generated women start at #2.
+function withPhotos(customers: CustomerRecord[]): CustomerRecord[] {
+  const next = { Female: 2, Male: 1 };
+  return customers.map((customer) => ({ ...customer, avatarUrl: avatarPhoto(customer.gender, next[customer.gender]++) }));
+}
 
 // The 6 header stat cards are hand-authored to match the mockup's exact
 // headline numbers ("SAE 1,40M" read as a currency-code/decimal-separator

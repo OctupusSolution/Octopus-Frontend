@@ -61,8 +61,9 @@ function buildCustomer(index: number, [firstName, lastName, gender]: readonly [s
     firstName,
     lastName,
     gender,
+    dateOfBirth: new Date(Date.UTC(1966 + ((index * 7) % 38), (index * 5) % 12, 1 + ((index * 11) % 28))).toISOString().slice(0, 10),
     tags: [...tags],
-    phone: `+9665${String(10000000 + index * 137).slice(0, 8)}`,
+    phone: `+9665${String(20000000 + index * 137).slice(0, 8)}`,
     email: `${firstName.toLowerCase()}.${lastName.replace("Al-", "").toLowerCase()}@gmail.com`,
     isBlocked: false,
     visits,
@@ -103,6 +104,7 @@ const REEM_AL_SUBAIE: CustomerRecord = {
   firstName: "Reem",
   lastName: "Al-Subaie",
   gender: "Female",
+  dateOfBirth: "1997-05-12",
   tags: ["VIP", "Frequent Diner", "Birthday May"],
   phone: "+966510002877",
   email: "Reemelsubaie@gmail.com",
@@ -159,10 +161,10 @@ export const customerRecords: readonly CustomerRecord[] = [
 // filter-pill count that must equal the visible/generated row count the
 // way Orders' stats do.
 export const customerStats = {
-  total: { value: 2845, delta: "+15%" },
-  active: { value: 1986, delta: "+10%" },
-  newThisMonth: { value: 156, delta: "+15%" },
-  vip: { value: 312, delta: "+12%" },
-  returning: { value: 1247, delta: "+20%" },
-  totalSpend: { display: "SAR 1.40M", delta: "+50%" },
+  total: { value: 2845, delta: "15%" },
+  active: { value: 1986, delta: "10%" },
+  newThisMonth: { value: 156, delta: "15%" },
+  vip: { value: 312, delta: "12%" },
+  returning: { value: 1247, delta: "20%" },
+  totalSpend: { display: "SAR 1.40M", delta: "50%" },
 } as const;

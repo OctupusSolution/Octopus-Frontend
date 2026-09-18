@@ -26,4 +26,9 @@ describe("customerRecords", () => {
     const ids = new Set(customerRecords.map((c) => c.id));
     expect(ids.size).toBe(customerRecords.length);
   });
+
+  it("gives every record a unique phone number", () => {
+    const phones = new Set(customerRecords.map((c) => c.phone));
+    expect(phones.size).toBe(customerRecords.length);
+  });
 });

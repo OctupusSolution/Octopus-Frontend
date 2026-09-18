@@ -435,11 +435,11 @@ describe("customerRecords", () => {
 });
 ```
 
-Check the repo's test runner first (`grep -r "\"test\":" apps/merchant/package.json` or look at an existing `*.test.ts` for its import style, e.g. `orders-list/_shared/mock-data.test.ts`) and match its exact import/assertion style if it differs from the `vitest` shown here.
+Confirmed: `apps/merchant/package.json`'s `"test"` script is `vitest run`, and `orders-list/_shared/mock-data.test.ts` uses exactly the `import { describe, expect, it } from "vitest"` style shown above — no adjustment needed.
 
 - [ ] **Step 6: Run the test to verify it fails**
 
-Run: `pnpm --filter merchant test -- mock-data.test.ts` (or the equivalent command the repo's existing `*.test.ts` files use — check `package.json`'s `test` script)
+Run: `npm run test --workspace=apps/merchant -- mock-data.test.ts`
 Expected: FAIL — `mock-data.ts` doesn't exist yet, or fields don't match.
 
 - [ ] **Step 7: Confirm it passes**
@@ -449,7 +449,7 @@ Expected: PASS, 3 tests green.
 
 - [ ] **Step 8: Typecheck**
 
-Run: `pnpm --filter merchant typecheck` (or repo equivalent)
+Run: `npx tsc -b apps/merchant` (from the repo root; emits nothing on success since `noEmit: true`)
 Expected: no errors from the four new files.
 
 - [ ] **Step 9: Commit**
@@ -927,7 +927,7 @@ Expected: no matches (the old keys are gone and nothing outside this module refe
 
 - [ ] **Step 5: Typecheck**
 
-Run: `pnpm --filter i18n typecheck` (or repo equivalent) — confirms `en`/`ar` still satisfy whatever type (`Record<string, string>` or a generated key union) `packages/i18n` exports.
+Run: `npx tsc -b apps/merchant` — this repo has no standalone `packages/i18n` project reference; the merchant app's typecheck already covers `en`/`ar` transitively through `@i18n/index`, and this repo's own `src/shared/i18n/keys.test.ts` (covered by Step 4's test run) is what actually asserts `en`/`ar` key parity, not a type.
 
 - [ ] **Step 6: Commit**
 
@@ -1262,7 +1262,7 @@ git rm apps/merchant/src/pages/customers/styles.ts
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 Expected: no errors. (`detail/index.tsx` will still fail — it's rewritten in Task 7. If your typecheck runs the whole `merchant` project rather than per-file, ignore pre-existing errors from `pages/customers/detail`, `pages/customers/segments`, `pages/customers/feedback` for now; they're resolved by Tasks 7 and 9.)
 
 - [ ] **Step 7: Manual verification**
@@ -1677,7 +1677,7 @@ Wire `onOpenPaymentLink={() => setPaymentLinkFor(customer)}` on `<CustomerRow>`,
 
 - [ ] **Step 4: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 5: Manual verification**
 
@@ -2091,7 +2091,7 @@ Render the menu/modals as siblings near `<PaymentLinkModal .../>`:
 
 - [ ] **Step 8: Typecheck**
 
-Run: `pnpm --filter merchant typecheck` — confirm the `tags: string[]` widening from Step 7 doesn't break `customer-row.tsx`'s tag-label lookup (it indexes `TAG_STYLE` by tag; switch that lookup to `TAG_STYLE[tag] ?? DEFAULT_TAG_STYLE` and the i18n label lookup to fall back to the raw tag string when no `customers.tag.*` key matches it).
+Run: `npx tsc -b apps/merchant` — confirm the `tags: string[]` widening from Step 7 doesn't break `customer-row.tsx`'s tag-label lookup (it indexes `TAG_STYLE` by tag; switch that lookup to `TAG_STYLE[tag] ?? DEFAULT_TAG_STYLE` and the i18n label lookup to fall back to the raw tag string when no `customers.tag.*` key matches it).
 
 - [ ] **Step 9: Manual verification**
 
@@ -2435,7 +2435,7 @@ Add import `AddCustomerModal` from `./_shared/add-customer-modal`; add state `co
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 7: Manual verification**
 
@@ -2456,10 +2456,77 @@ git commit -m "feat(customers): add the Add New Customer modal"
 - Modify: `apps/merchant/src/pages/customers/detail/index.tsx` (full rewrite)
 
 **Interfaces:**
-- Consumes: Task 1 types/format/theme, Task 3 `Avatar`, Task 4 `PaymentLinkModal`, Task 5 `AddNoteModal`/`AddTagModal`, Task 6 `Field`.
-- Produces: nothing new consumed by later tasks — this is a leaf page.
+- Consumes: Task 1 types/format/theme, Task 3 `Avatar`, Task 4 `PaymentLinkModal`, Task 5 `AddNoteModal`/`AddTagModal`.
+- Produces: `EditInfoModal({ open, title, fields, saveLabel, onClose, onSave })` — used only inside this task's own `detail/index.tsx`, not consumed elsewhere.
 
-- [ ] **Step 1: Rewrite `detail/index.tsx`**
+**Plan-defect fix applied here (pre-flight ruling):** the spec (`docs/superpowers/specs/2026-09-17-customer-crm-rebuild-design.md`, "Detail page" section) calls for the About/Preferences pencil icons to "open a small inline-field edit modal", and Task 2 already reserves `customers.detail.editAbout.title` / `customers.detail.editPreferences.title` / `customers.detail.save` for exactly that. An earlier draft of this task wired both pencils to `() => setToast(null)` — a no-op that would have shipped three unused i18n keys and silently dropped a spec requirement. Fixed below: both pencils open a real (small, generic) edit modal.
+
+- [ ] **Step 1: Write `edit-info-modal.tsx`**
+
+```tsx
+// apps/merchant/src/pages/customers/_shared/edit-info-modal.tsx
+import { useEffect, useState } from "react";
+import { Button, Input, Modal } from "@ui/primitives";
+
+export interface EditField {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export function EditInfoModal({
+  open,
+  title,
+  fields,
+  saveLabel,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  title: string;
+  fields: EditField[];
+  saveLabel: string;
+  onClose: () => void;
+  onSave: (values: Record<string, string>) => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  // Re-sync the draft from the current field values every time the modal
+  // opens, so a second edit doesn't show stale text left over from the
+  // first (this modal instance stays mounted the whole time the detail
+  // page is open — it only toggles visibility).
+  useEffect(() => {
+    if (open) setDraft(Object.fromEntries(fields.map((f) => [f.key, f.value])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      footer={
+        <Button variant="primary" size="sm" onClick={() => { onSave(draft); onClose(); }}>
+          {saveLabel}
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-3">
+        {fields.map((field) => (
+          <Input
+            key={field.key}
+            label={field.label}
+            value={draft[field.key] ?? ""}
+            onChange={(event) => setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))}
+          />
+        ))}
+      </div>
+    </Modal>
+  );
+}
+```
+
+- [ ] **Step 2: Rewrite `detail/index.tsx`**
 
 ```tsx
 // apps/merchant/src/pages/customers/detail/index.tsx
@@ -2475,6 +2542,7 @@ import { TAG_STYLE, DEFAULT_TAG_STYLE } from "../_shared/theme";
 import { PaymentLinkModal } from "../_shared/payment-link-modal";
 import { AddNoteModal } from "../_shared/add-note-modal";
 import { AddTagModal } from "../_shared/add-tag-modal";
+import { EditInfoModal } from "../_shared/edit-info-modal";
 import type { CustomerRecord } from "../_shared/types";
 
 export function CustomerDetailPage() {
@@ -2486,6 +2554,8 @@ export function CustomerDetailPage() {
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
+  const [aboutEditOpen, setAboutEditOpen] = useState(false);
+  const [preferencesEditOpen, setPreferencesEditOpen] = useState(false);
 
   const back = (
     <Button variant="ghost" size="sm" icon={<ArrowLeft size={13} className="rtl:rotate-180" />} onClick={() => navigate("/customers")}>
@@ -2542,7 +2612,7 @@ export function CustomerDetailPage() {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <Panel title={t("customers.detail.about.title")} onEdit={() => setToast(null)}>
+        <Panel title={t("customers.detail.about.title")} onEdit={() => setAboutEditOpen(true)}>
           <InfoRow label={t("customers.detail.about.customerSince")} value={formatDate(customer.customerSince, locale)} />
           <InfoRow label={t("customers.detail.about.firstVisit")} value={formatDate(customer.firstVisit, locale)} />
           <InfoRow label={t("customers.detail.about.preferredBranch")} value={customer.preferredBranch || "—"} />
@@ -2552,7 +2622,7 @@ export function CustomerDetailPage() {
           <InfoRow label={t("customers.detail.about.marketingConsent")} value={t(customer.marketingConsent === "Opted in" ? "customers.marketingConsent.optedIn" : "customers.marketingConsent.optedOut")} />
         </Panel>
 
-        <Panel title={t("customers.detail.preferences.title")} onEdit={() => setToast(null)}>
+        <Panel title={t("customers.detail.preferences.title")} onEdit={() => setPreferencesEditOpen(true)}>
           <InfoRow label={t("customers.detail.preferences.cuisine")} value={customer.cuisinePreference.join(", ") || "—"} />
           <InfoRow label={t("customers.detail.preferences.dietary")} value={customer.dietaryPreference || "—"} />
           <InfoRow label={t("customers.detail.preferences.occasion")} value={customer.occasion || "—"} />
@@ -2640,6 +2710,46 @@ export function CustomerDetailPage() {
       <PaymentLinkModal customer={paymentLinkOpen ? customer : null} onClose={() => setPaymentLinkOpen(false)} onSent={() => setToast(t("customers.paymentLink.sentConfirm"))} />
       <AddNoteModal open={noteOpen} onClose={() => setNoteOpen(false)} onSave={(text) => patch((c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }))} />
       <AddTagModal open={tagOpen} onClose={() => setTagOpen(false)} onSave={(tag) => patch((c) => ({ tags: c.tags.includes(tag) ? c.tags : [...c.tags, tag] }))} />
+      <EditInfoModal
+        open={aboutEditOpen}
+        title={t("customers.detail.editAbout.title")}
+        saveLabel={t("customers.detail.save")}
+        fields={[
+          { key: "preferredBranch", label: t("customers.detail.about.preferredBranch"), value: customer.preferredBranch },
+          { key: "preferredAreaTable", label: t("customers.detail.about.preferredAreaTable"), value: customer.preferredAreaTable },
+          { key: "referredBy", label: t("customers.detail.about.referredBy"), value: customer.referredBy ?? "" },
+        ]}
+        onClose={() => setAboutEditOpen(false)}
+        onSave={(values) =>
+          patch(() => ({
+            preferredBranch: values.preferredBranch,
+            preferredAreaTable: values.preferredAreaTable,
+            referredBy: values.referredBy.trim() || undefined,
+          }))
+        }
+      />
+      <EditInfoModal
+        open={preferencesEditOpen}
+        title={t("customers.detail.editPreferences.title")}
+        saveLabel={t("customers.detail.save")}
+        fields={[
+          { key: "cuisinePreference", label: t("customers.detail.preferences.cuisine"), value: customer.cuisinePreference.join(", ") },
+          { key: "dietaryPreference", label: t("customers.detail.preferences.dietary"), value: customer.dietaryPreference },
+          { key: "occasion", label: t("customers.detail.preferences.occasion"), value: customer.occasion },
+          { key: "visitTime", label: t("customers.detail.preferences.visitTime"), value: customer.visitTime },
+          { key: "specialRequests", label: t("customers.detail.preferences.specialRequests"), value: customer.specialRequests },
+        ]}
+        onClose={() => setPreferencesEditOpen(false)}
+        onSave={(values) =>
+          patch(() => ({
+            cuisinePreference: values.cuisinePreference.split(",").map((s) => s.trim()).filter(Boolean),
+            dietaryPreference: values.dietaryPreference,
+            occasion: values.occasion,
+            visitTime: values.visitTime,
+            specialRequests: values.specialRequests,
+          }))
+        }
+      />
     </div>
   );
 }
@@ -2702,18 +2812,18 @@ export const DEFAULT_TAG_STYLE: TagStyle = { text: "#475569", bg: "var(--octo-tr
 
 (again, use a real top-of-file `import { Tag } from "lucide-react"` in the actual file rather than inline `require`.)
 
-- [ ] **Step 2: Typecheck**
+- [ ] **Step 3: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
-- [ ] **Step 3: Manual verification**
+- [ ] **Step 4: Manual verification**
 
-`run` skill: navigate to `/customers/CUST-1001` (Reem Al-Subaie), compare against `apps/assets/Customer CRM/customer details.png`. Click Add Note / Add Tag / Block / Payment Link from the bottom bar and confirm each works.
+`run` skill: navigate to `/customers/CUST-1001` (Reem Al-Subaie), compare against `apps/assets/Customer CRM/customer details.png`. Click Add Note / Add Tag / Block / Payment Link from the bottom bar, and click both pencil icons (About, Preferences) to confirm the edit modal opens pre-filled, saves, and updates the panel.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add apps/merchant/src/pages/customers/detail/index.tsx apps/merchant/src/pages/customers/_shared/theme.ts
+git add apps/merchant/src/pages/customers/detail/index.tsx apps/merchant/src/pages/customers/_shared/theme.ts apps/merchant/src/pages/customers/_shared/edit-info-modal.tsx
 git commit -m "feat(customers): rebuild the Customer Info detail page"
 ```
 
@@ -3109,7 +3219,7 @@ Add import `SendMessageWizard` from `./_shared/send-message-wizard`; add state `
 
 - [ ] **Step 6: Typecheck**
 
-Run: `pnpm --filter merchant typecheck`
+Run: `npx tsc -b apps/merchant`
 
 - [ ] **Step 7: Manual verification**
 
@@ -3205,7 +3315,7 @@ Expected: zero matches now that the pages that used them are deleted/rewritten.
 
 - [ ] **Step 7: Typecheck and lint**
 
-Run: `pnpm --filter merchant typecheck` and `pnpm --filter merchant lint` (or repo equivalents)
+Run: `npx tsc -b apps/merchant` and `npm run lint --workspace=apps/merchant` (or repo equivalents)
 Expected: clean — no dangling imports of the deleted modules anywhere.
 
 - [ ] **Step 8: Manual verification**
@@ -3249,7 +3359,7 @@ Switch the app to Arabic (`ar`) via whatever control the app shell exposes (chec
 
 - [ ] **Step 4: Full test suite**
 
-Run: `pnpm --filter merchant test` and `pnpm --filter merchant typecheck` and `pnpm --filter merchant lint` (or repo equivalents) one more time across the whole app, not just this module, to catch any cross-module regression from the registry/sidebar edits.
+Run: `npm run test --workspace=apps/merchant` and `npx tsc -b apps/merchant` and `npm run lint --workspace=apps/merchant` one more time across the whole app, not just this module, to catch any cross-module regression from the registry/sidebar edits.
 
 - [ ] **Step 5: Report findings**
 

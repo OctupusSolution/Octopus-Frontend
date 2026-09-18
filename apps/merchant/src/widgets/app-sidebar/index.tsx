@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed, Package,
   Users, Megaphone, Truck, Wallet, UserCog, BarChart3, Settings, HelpCircle,
   ChevronDown, Search, PanelLeft, LogOut, Building2, Check,
-  Clock3, Armchair, Plug, Ticket, CreditCard, Link2,
+  Clock3, Armchair, Ticket, CreditCard, Link2,
 } from "lucide-react";
 import clsx from "clsx";
 import { routes } from "@/app/routes/registry";
@@ -25,7 +25,7 @@ interface NavGroup {
   items?: string[];
   /** Destination for a group whose id is not itself a route id — the entries
    *  promoted out of a parent group (Wait list, Floor Plan, Promotions,
-   *  Payments, Integrations) all point at a nested route. */
+   *  Payments) all point at a nested route. */
   path?: string;
   /** No page exists yet, so the entry renders but does not navigate. */
   placeholder?: boolean;
@@ -35,11 +35,10 @@ interface NavSection {
   groups: NavGroup[];
 }
 
-// The frame promotes six pages out of their parent groups and onto the top
+// The frame promotes five pages out of their parent groups and onto the top
 // level. They MOVE rather than duplicate: Reservations no longer lists Floor
 // Plan or Waitlist, Marketing no longer lists Promotions, Finance no longer
-// lists Payments, Settings no longer lists Integrations. One page, one place
-// in the nav.
+// lists Payments. One page, one place in the nav.
 const SECTIONS: NavSection[] = [
   {
     label: "Overview",
@@ -94,7 +93,6 @@ const SECTIONS: NavSection[] = [
 const FOOTER_GROUPS: NavGroup[] = [
   { id: "settings", label: "Settings", icon: Settings,
     items: ["My Businesses", "Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
-  { id: "integrations", label: "Integrations", icon: Plug, path: "/settings/integrations" },
 ];
 
 // Which module owns each nav group. A group whose module the tenant did not
@@ -117,7 +115,6 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   staff: "hr",
   reports: "reports",
   settings: "core",
-  integrations: "integrations",
 };
 
 // A handful of sub-pages belong to a different module than their parent, so

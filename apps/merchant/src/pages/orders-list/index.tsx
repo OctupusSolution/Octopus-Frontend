@@ -11,6 +11,7 @@ import { OrderFilterPills } from "./_shared/filter-pills";
 import { SourceFilterPopover } from "./_shared/source-filter-popover";
 import { OrderCard, OrderRowCard } from "./_shared/order-row";
 import { EmptyOrdersArt } from "./_shared/empty-orders-art";
+import { Pagination } from "@/pages/inventory/_shared/pagination";
 import { ordersToCsv } from "./_shared/csv-export";
 import { OrderDetailsModal } from "./_shared/order-details-modal";
 import { CancelOrderFlow } from "./_shared/cancel-order-flow";
@@ -36,6 +37,8 @@ function downloadCsv(filename: string, csv: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+const PAGE_SIZE = 10;
+
 export function OrdersListPage() {
   const { t } = useI18n();
   const { orders: liveOrders } = useLiveOrders();
@@ -43,6 +46,7 @@ export function OrdersListPage() {
   const [selectedState, setSelectedState] = useState<OrderState | null>(null);
   const [selectedSources, setSelectedSources] = useState<readonly OrderSource[]>([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [detailsOrder, setDetailsOrder] = useState<OrderRecord | null>(null);
   const [pendingAction, setPendingAction] = useState<{ action: OrderAction; order: OrderRecord } | null>(null);
 
@@ -68,13 +72,20 @@ export function OrdersListPage() {
   // search row entirely and shows only the illustration.
   const hasNoOrdersAtAll = allRecords.length === 0;
 
+  const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageRows = visibleRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   function resetFilters() {
     setSelectedState(null);
     setSelectedSources([]);
     setSearch("");
+    setPage(1);
   }
 
   function handleExport() {
+    // The export follows the active filters, not just the visible page —
+    // exporting is expected to cover everything the filters matched.
     downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(visibleRows));
   }
 
@@ -109,10 +120,19 @@ export function OrdersListPage() {
         ) : (
           <>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <SourceFilterPopover selected={selectedSources} onChange={setSelectedSources} />
+              <SourceFilterPopover
+                selected={selectedSources}
+                onChange={(sources) => {
+                  setSelectedSources(sources);
+                  setPage(1);
+                }}
+              />
               <OrderFilterPills
                 selected={selectedState}
-                onSelect={setSelectedState}
+                onSelect={(state) => {
+                  setSelectedState(state);
+                  setPage(1);
+                }}
                 countAll={allRecords.length}
                 countByState={(state) => pillCount(allRecords, state)}
               />
@@ -123,7 +143,10 @@ export function OrdersListPage() {
                 <Search size={15} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
                 <input
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
                   placeholder={t("orders.search.placeholder")}
                   className="w-full rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[9px] ps-10 pe-3 text-[13px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
                 />
@@ -156,7 +179,7 @@ export function OrdersListPage() {
               <>
                 {/* Mobile: the same card, collapsed to a tap-to-expand summary */}
                 <div className="mt-3 flex flex-col gap-2.5 lg:hidden">
-                  {visibleRows.map((order) => (
+                  {pageRows.map((order) => (
                     <OrderCard
                       key={order.id}
                       order={order}
@@ -171,7 +194,7 @@ export function OrdersListPage() {
                 {/* Desktop: the full five-column row card */}
                 <div className="octo-scroll mt-3 hidden overflow-x-auto lg:block">
                   <div className="flex min-w-[1120px] flex-col gap-2.5">
-                    {visibleRows.map((order) => (
+                    {pageRows.map((order) => (
                       <OrderRowCard
                         key={order.id}
                         order={order}
@@ -181,6 +204,15 @@ export function OrdersListPage() {
                     ))}
                   </div>
                 </div>
+
+                <Pagination
+                  page={currentPage}
+                  pageCount={pageCount}
+                  total={visibleRows.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setPage}
+                  showingLabel={t("orders.showing")}
+                />
               </>
             )}
           </>

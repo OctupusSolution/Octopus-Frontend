@@ -1,68 +1,66 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/channel-content-step.tsx
-import clsx from "clsx";
-import { Button } from "@ui/primitives";
+// No frame exists for this step; it reuses step 1/3's type scale, the Add
+// Customer channel pills and the full-width primary button.
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CheckboxPill, PRIMARY_SUBMIT_CLASS, TEXTAREA_CLASS } from "../form-controls";
+import { ChannelIcon } from "./channel-icon";
 import type { CommunicationChannel } from "../types";
+
+const OPTIONS: readonly CommunicationChannel[] = ["WhatsApp", "SMS", "Email"];
+export const MESSAGE_MAX_LENGTH = 1000;
 
 export function ChannelContentStep({
   channels,
   onChannelsChange,
   message,
   onMessageChange,
-  onBack,
   onNext,
 }: {
   channels: CommunicationChannel[];
   onChannelsChange: (next: CommunicationChannel[]) => void;
   message: string;
   onMessageChange: (next: string) => void;
-  onBack: () => void;
   onNext: () => void;
 }) {
   const { t } = useI18n();
-  const options: CommunicationChannel[] = ["WhatsApp", "SMS", "Email"];
 
   function toggle(channel: CommunicationChannel) {
     onChannelsChange(channels.includes(channel) ? channels.filter((c) => c !== channel) : [...channels, channel]);
   }
 
   return (
-    <div>
-      <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("customers.sendMessage.channel.title")}</p>
-      <div className="mt-1.5 flex gap-2">
-        {options.map((channel) => (
-          <button
+    <div className="mt-4">
+      <p className="text-[16px] text-[var(--octo-text-primary)]">{t("customers.sendMessage.channel.title")}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {OPTIONS.map((channel) => (
+          <CheckboxPill
             key={channel}
-            type="button"
+            label={t(`customers.sendMessage.channel.${channel.toLowerCase()}`)}
+            icon={<ChannelIcon channel={channel} size={18} />}
+            checked={channels.includes(channel)}
             onClick={() => toggle(channel)}
-            className={clsx(
-              "flex-1 rounded-[9px] border px-3 py-2 text-[12.5px] font-medium transition-colors",
-              channels.includes(channel) ? "border-[#0D6EFD] bg-[#0D6EFD]/5 text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)]"
-            )}
-          >
-            {t(`customers.sendMessage.channel.${channel.toLowerCase()}`)}
-          </button>
+          />
         ))}
       </div>
 
-      <label className="mt-4 flex flex-col gap-1.5">
-        <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("customers.sendMessage.content.title")}</span>
+      <label className="mt-5 flex flex-col gap-2">
+        <span className="text-[16px] text-[var(--octo-text-primary)]">{t("customers.sendMessage.content.title")}</span>
         <textarea
           value={message}
+          maxLength={MESSAGE_MAX_LENGTH}
           onChange={(event) => onMessageChange(event.target.value)}
           placeholder={t("customers.sendMessage.content.placeholder")}
-          rows={5}
-          className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-faint)] focus:border-[#0D6EFD] focus:ring-2 focus:ring-[#0D6EFD]/30"
+          rows={7}
+          className={TEXTAREA_CLASS}
         />
-        <span className="text-end text-[11px] text-[var(--octo-text-faint)]">{t("customers.sendMessage.content.charCount").replace("{count}", String(message.length))}</span>
+        <span className="text-end text-[12px] text-[var(--octo-text-muted)]">
+          {t("customers.sendMessage.content.charCount").replace("{count}", `${message.length}/${MESSAGE_MAX_LENGTH}`)}
+        </span>
       </label>
 
-      <div className="mt-6 flex gap-2">
-        <Button variant="secondary" onClick={onBack} className="flex-1">{t("customers.sendMessage.back")}</Button>
-        <Button variant="primary" onClick={onNext} disabled={channels.length === 0 || message.trim() === ""} className="flex-1">
-          {t("customers.sendMessage.next")}
-        </Button>
-      </div>
+      <button type="button" onClick={onNext} disabled={channels.length === 0 || message.trim() === ""} className={PRIMARY_SUBMIT_CLASS}>
+        {t("customers.sendMessage.next")}
+      </button>
     </div>
   );
 }

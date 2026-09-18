@@ -1,37 +1,30 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/index.tsx
 import { useMemo, useState } from "react";
+import clsx from "clsx";
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { AudienceStep, EMPTY_AUDIENCE_FILTERS, type AudienceFilters } from "./audience-step";
+import { CRM_MODAL_CLASS } from "../action-button";
+import type { SavedSegment } from "../customer-store";
+import { AudienceStep } from "./audience-step";
 import { ChannelContentStep } from "./channel-content-step";
-import { ReviewSendStep } from "./review-send-step";
-import type { CommunicationChannel } from "../types";
-import type { CustomerRecord } from "../types";
+import { ReviewSendStep, type SendTiming } from "./review-send-step";
+import { EMPTY_AUDIENCE_FILTERS, audienceOf, type AudienceFilters } from "./audience";
+import type { CommunicationChannel, CustomerRecord } from "../types";
 
 type Step = 1 | 2 | 3;
-
-function matchesAudience(customer: CustomerRecord, filters: AudienceFilters): boolean {
-  if (filters.totalSpendFrom && customer.totalSpendSar < Number(filters.totalSpendFrom)) return false;
-  if (filters.totalSpendTo && customer.totalSpendSar > Number(filters.totalSpendTo)) return false;
-  if (filters.lastVisitFrom && customer.lastVisit < filters.lastVisitFrom) return false;
-  if (filters.lastVisitTo && customer.lastVisit > filters.lastVisitTo) return false;
-  if (filters.customerSinceFrom && customer.customerSince < filters.customerSinceFrom) return false;
-  if (filters.customerSinceTo && customer.customerSince > filters.customerSinceTo) return false;
-  if (filters.gender && customer.gender !== filters.gender) return false;
-  if (filters.tag && !customer.tags.includes(filters.tag)) return false;
-  return true;
-}
 
 export function SendMessageWizard({
   open,
   customers,
+  segments,
   onClose,
   onSent,
 }: {
   open: boolean;
   customers: readonly CustomerRecord[];
+  segments: readonly SavedSegment[];
   onClose: () => void;
-  onSent: (count: number) => void;
+  onSent: (count: number, timing: SendTiming) => void;
 }) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>(1);
@@ -39,7 +32,7 @@ export function SendMessageWizard({
   const [channels, setChannels] = useState<CommunicationChannel[]>(["WhatsApp"]);
   const [message, setMessage] = useState("");
 
-  const totalSelected = useMemo(() => customers.filter((c) => matchesAudience(c, filters)).length, [customers, filters]);
+  const totalSelected = useMemo(() => audienceOf(customers, filters).length, [customers, filters]);
 
   function reset() {
     setStep(1);
@@ -58,34 +51,53 @@ export function SendMessageWizard({
     { id: 2, label: t("customers.sendMessage.step.channelContent") },
     { id: 3, label: t("customers.sendMessage.step.reviewSend") },
   ];
+  // Blue progress runs from step 1 to the next step (send message.png shows
+  // 1→2 blue while on step 1; send message (1).png is fully blue on step 3).
+  const progress = step === 1 ? "50%" : "100%";
 
   return (
-    <Modal open={open} onClose={close} title={t("customers.sendMessage.title")} className="max-w-[560px] max-h-[85vh] overflow-y-auto octo-scroll">
-      <div className="flex items-center gap-2">
-        {STEPS.map((s, index) => (
-          <div key={s.id} className="flex flex-1 items-center gap-2">
-            <span
-              className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold ${
-                step >= s.id ? "bg-[#0D6EFD] text-white" : "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"
-              }`}
-            >
-              {s.id}
-            </span>
-            <span className={`text-[11.5px] font-medium ${step === s.id ? "text-[var(--octo-text-primary)]" : "text-[var(--octo-text-muted)]"}`}>{s.label}</span>
-            {index < STEPS.length - 1 && <span className={`h-px flex-1 ${step > s.id ? "bg-[#0D6EFD]" : "bg-[var(--octo-divider)]"}`} />}
-          </div>
-        ))}
-      </div>
+    <Modal open={open} onClose={close} title={t("customers.sendMessage.title")} className={`max-w-[760px] max-h-[94vh] overflow-y-auto octo-scroll ${CRM_MODAL_CLASS}`}>
+      <nav aria-label={t("customers.sendMessage.stepsLabel")} className="relative mt-1">
+        <div className="absolute inset-x-[64px] top-[14px] h-[3px] rounded-full bg-[var(--octo-track)]" aria-hidden="true">
+          <div className="h-full rounded-full bg-[#0D6EFD] transition-[width]" style={{ width: progress }} />
+        </div>
+        <ol className="relative flex items-start justify-between">
+          {STEPS.map((s) => {
+            const done = step > s.id;
+            const current = step === s.id;
+            const reachable = s.id < step;
+            return (
+              <li key={s.id} className="flex w-[128px] flex-col items-center">
+                <button
+                  type="button"
+                  disabled={!reachable}
+                  onClick={() => setStep(s.id)}
+                  aria-current={current ? "step" : undefined}
+                  className={clsx(
+                    "grid h-[30px] w-[30px] place-items-center rounded-full text-[13px] font-medium",
+                    done && "bg-[#0D6EFD] text-white",
+                    current && "border-2 border-[#0D6EFD] bg-[var(--octo-card)] text-[#0D6EFD]",
+                    !done && !current && "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
+                    reachable && "cursor-pointer hover:opacity-90"
+                  )}
+                >
+                  {s.id}
+                </button>
+                <span className={clsx("mt-2 whitespace-nowrap text-[15px]", done || current ? "text-[#0D6EFD]" : "text-[var(--octo-text-secondary)]")}>{s.label}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
 
-      <div className="mt-5">
-        {step === 1 && <AudienceStep value={filters} onChange={setFilters} onNext={() => setStep(2)} />}
+      <div className="mt-3">
+        {step === 1 && <AudienceStep value={filters} segments={segments} totalSelected={totalSelected} onChange={setFilters} onNext={() => setStep(2)} />}
         {step === 2 && (
           <ChannelContentStep
             channels={channels}
             onChannelsChange={setChannels}
             message={message}
             onMessageChange={setMessage}
-            onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
         )}
@@ -93,8 +105,7 @@ export function SendMessageWizard({
           <ReviewSendStep
             totalSelected={totalSelected}
             channels={channels}
-            onBack={() => setStep(2)}
-            onSend={() => { onSent(totalSelected); close(); }}
+            onSend={(timing) => { onSent(totalSelected, timing); close(); }}
           />
         )}
       </div>

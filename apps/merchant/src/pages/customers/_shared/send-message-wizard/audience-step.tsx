@@ -1,147 +1,232 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/audience-step.tsx
-import { useState } from "react";
-import { Select, Tabs } from "@ui/primitives";
+import { useState, type ReactNode } from "react";
+import clsx from "clsx";
+import { Bookmark, Check, X } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import type { SavedSegment } from "../customer-store";
+import { DateField, PRIMARY_SUBMIT_CLASS, RadioBox, SelectBox } from "../form-controls";
+import { useTagLabel } from "../tag-chips";
 import { ALL_TAGS } from "../types";
+import { AGE_RANGES, EMPTY_AUDIENCE_FILTERS, VISIT_FREQUENCIES, type AudienceFilters } from "./audience";
 
-const VISIT_FREQUENCY_OPTIONS = ["Weekly", "Monthly", "Occasional", "First-time"] as const;
-const AGE_RANGE_OPTIONS = ["18y : 24y", "25y : 30y", "31y : 40y", "41y : 50y", "51y+"] as const;
+type Tab = "filters" | "segments" | "savedAudiences";
 
-export interface AudienceFilters {
-  tag: string;
-  visitFrequency: string;
-  totalSpendFrom: string;
-  totalSpendTo: string;
-  lastVisitFrom: string;
-  lastVisitTo: string;
-  customerSinceFrom: string;
-  customerSinceTo: string;
-  gender: "" | "Male" | "Female";
-  ageRange: string;
-}
-
-export const EMPTY_AUDIENCE_FILTERS: AudienceFilters = {
-  // `ageRange` defaults to the first preset bracket (rather than "") since this
-  // Select has no empty/placeholder option — same convention as the "source"
-  // field in add-customer-modal.tsx.
-  tag: "", visitFrequency: "", totalSpendFrom: "", totalSpendTo: "", lastVisitFrom: "", lastVisitTo: "", customerSinceFrom: "", customerSinceTo: "", gender: "", ageRange: AGE_RANGE_OPTIONS[0],
-};
-
-export function AudienceStep({ value, onChange, onNext }: { value: AudienceFilters; onChange: (next: AudienceFilters) => void; onNext: () => void }) {
+export function AudienceStep({
+  value,
+  segments,
+  totalSelected,
+  onChange,
+  onNext,
+}: {
+  value: AudienceFilters;
+  segments: readonly SavedSegment[];
+  totalSelected: number;
+  onChange: (next: AudienceFilters) => void;
+  onNext: () => void;
+}) {
   const { t } = useI18n();
-  const [tab, setTab] = useState("filters");
+  const tagLabel = useTagLabel();
+  const [tab, setTab] = useState<Tab>("filters");
 
   function set<K extends keyof AudienceFilters>(key: K, val: AudienceFilters[K]) {
     onChange({ ...value, [key]: val });
   }
 
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "filters", label: t("customers.sendMessage.tab.filters") },
+    { id: "segments", label: t("customers.sendMessage.tab.segments") },
+    { id: "savedAudiences", label: t("customers.sendMessage.tab.savedAudiences") },
+  ];
+
   return (
     <div>
-      <Tabs
-        value={tab}
-        onChange={setTab}
-        items={[
-          { id: "filters", label: t("customers.sendMessage.tab.filters") },
-          { id: "segments", label: t("customers.sendMessage.tab.segments") },
-          { id: "savedAudiences", label: t("customers.sendMessage.tab.savedAudiences") },
-        ]}
-      />
+      <div role="tablist" className="inline-flex gap-[46px] border-b border-[var(--octo-divider)]">
+        {tabs.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => setTab(item.id)}
+            className={clsx(
+              "-mb-px border-b-2 pb-2 text-[17px] transition-colors",
+              tab === item.id ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
 
-      {tab === "filters" && (
-        <div className="mt-4 flex flex-col gap-4">
-          <SelectField
-            label={t("customers.sendMessage.filter.tags")}
-            value={value.tag}
-            onChange={(v) => set("tag", v)}
-            placeholder={t("customers.sendMessage.filter.tagsPlaceholder")}
-            options={ALL_TAGS}
-          />
-          <SelectField
-            label={t("customers.sendMessage.filter.visitFrequency")}
-            value={value.visitFrequency}
-            onChange={(v) => set("visitFrequency", v)}
-            placeholder={t("customers.sendMessage.filter.visitFrequencyPlaceholder")}
-            options={VISIT_FREQUENCY_OPTIONS}
-          />
-          <RangeRow label={t("customers.sendMessage.filter.totalSpend")} from={value.totalSpendFrom} to={value.totalSpendTo} onFrom={(v) => set("totalSpendFrom", v)} onTo={(v) => set("totalSpendTo", v)} type="text" prefix="SAR" />
-          <RangeRow label={t("customers.sendMessage.filter.lastVisit")} from={value.lastVisitFrom} to={value.lastVisitTo} onFrom={(v) => set("lastVisitFrom", v)} onTo={(v) => set("lastVisitTo", v)} type="date" />
-          <RangeRow label={t("customers.sendMessage.filter.customerSince")} from={value.customerSinceFrom} to={value.customerSinceTo} onFrom={(v) => set("customerSinceFrom", v)} onTo={(v) => set("customerSinceTo", v)} type="date" />
-
-          <div>
-            <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("customers.sendMessage.filter.gender")}</p>
-            <div className="mt-1.5 flex gap-2">
-              {(["Male", "Female"] as const).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => set("gender", value.gender === g ? "" : g)}
-                  className={`flex-1 rounded-[9px] border px-3 py-2 text-[12.5px] ${value.gender === g ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)]"}`}
-                >
-                  {g}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <SelectField
-            label={t("customers.sendMessage.filter.ageRange")}
-            value={value.ageRange}
-            onChange={(v) => set("ageRange", v)}
-            options={AGE_RANGE_OPTIONS}
-          />
+      {value.segment && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-[8px] bg-[#0D6EFD]/[0.06] px-3 py-2 text-[13px] text-[#0D6EFD]">
+          <span className="inline-flex items-center gap-1.5">
+            <Bookmark size={15} /> {t("customers.sendMessage.usingAudience").replace("{name}", value.segment.name)}
+          </span>
+          <button type="button" onClick={() => set("segment", null)} aria-label={t("customers.sendMessage.clearAudience")} className="rounded p-0.5 hover:bg-[#0D6EFD]/10">
+            <X size={15} />
+          </button>
         </div>
       )}
 
-      {tab === "segments" && <p className="mt-4 text-[12.5px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.segmentsEmpty")}</p>}
-      {tab === "savedAudiences" && <p className="mt-4 text-[12.5px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.savedAudiencesEmpty")}</p>}
+      {tab === "filters" && (
+        <div className="mt-4 flex flex-col gap-3.5">
+          <Group label={t("customers.sendMessage.filter.tags")}>
+            <SelectBox value={value.tag} onChange={(v) => set("tag", v)} placeholderShown={value.tag === ""} ariaLabel={t("customers.sendMessage.filter.tags")}>
+              <option value="">{t("customers.sendMessage.filter.tagsPlaceholder")}</option>
+              {ALL_TAGS.map((tag) => <option key={tag} value={tag}>{tagLabel(tag)}</option>)}
+            </SelectBox>
+          </Group>
+          <Group label={t("customers.sendMessage.filter.visitFrequency")}>
+            <SelectBox
+              value={value.visitFrequency}
+              onChange={(v) => set("visitFrequency", v as AudienceFilters["visitFrequency"])}
+              placeholderShown={value.visitFrequency === ""}
+              ariaLabel={t("customers.sendMessage.filter.visitFrequency")}
+            >
+              <option value="">{t("customers.sendMessage.filter.visitFrequencyPlaceholder")}</option>
+              {VISIT_FREQUENCIES.map((f) => <option key={f} value={f}>{t(`customers.sendMessage.frequency.${f}`)}</option>)}
+            </SelectBox>
+          </Group>
+          <RangeRow label={t("customers.sendMessage.filter.totalSpend")}>
+            {(["totalSpendFrom", "totalSpendTo"] as const).map((key, i) => (
+              <SubField key={key} label={t(i === 0 ? "customers.filter.from" : "customers.filter.to")}>
+                <div className="flex h-10 items-center gap-3 rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/25">
+                  <span className="text-[14px] text-[var(--octo-text-primary)]">SAR</span>
+                  <input
+                    value={value[key]}
+                    inputMode="decimal"
+                    aria-label={`${t("customers.sendMessage.filter.totalSpend")} ${t(i === 0 ? "customers.filter.from" : "customers.filter.to")}`}
+                    onChange={(e) => set(key, e.target.value.replace(/[^\d.]/g, ""))}
+                    placeholder={t("customers.sendMessage.filter.enterAmount")}
+                    className="h-full w-full flex-1 bg-transparent text-[14px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-muted)]"
+                  />
+                </div>
+              </SubField>
+            ))}
+          </RangeRow>
+          <DateRange label={t("customers.sendMessage.filter.lastVisit")} from={value.lastVisitFrom} to={value.lastVisitTo} onFrom={(v) => set("lastVisitFrom", v)} onTo={(v) => set("lastVisitTo", v)} />
+          <DateRange label={t("customers.sendMessage.filter.customerSince")} from={value.customerSinceFrom} to={value.customerSinceTo} onFrom={(v) => set("customerSinceFrom", v)} onTo={(v) => set("customerSinceTo", v)} />
 
-      <button type="button" onClick={onNext} className="mt-6 w-full rounded-[10px] bg-[#0D6EFD] py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90">
+          <Group label={t("customers.sendMessage.filter.gender")} indent>
+            <div role="radiogroup" aria-label={t("customers.sendMessage.filter.gender")} className="grid grid-cols-2 gap-6">
+              {(["Male", "Female"] as const).map((g) => (
+                <RadioBox
+                  key={g}
+                  label={t(g === "Male" ? "customers.addCustomer.male" : "customers.addCustomer.female")}
+                  checked={value.gender === g}
+                  onClick={() => set("gender", value.gender === g ? "" : g)}
+                />
+              ))}
+            </div>
+          </Group>
+
+          <Group label={t("customers.sendMessage.filter.ageRange")}>
+            <SelectBox value={value.ageRange} onChange={(v) => set("ageRange", v as AudienceFilters["ageRange"])} placeholderShown={value.ageRange === ""} ariaLabel={t("customers.sendMessage.filter.ageRange")}>
+              <option value="">{t("customers.sendMessage.filter.ageRangePlaceholder")}</option>
+              {AGE_RANGES.map((r) => <option key={r} value={r}>{t(`customers.sendMessage.age.${r}`)}</option>)}
+            </SelectBox>
+          </Group>
+        </div>
+      )}
+
+      {tab === "segments" && (
+        <div className="mt-4 flex flex-col gap-2">
+          <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.segmentsHint")}</p>
+          {ALL_TAGS.map((tag) => (
+            <ChoiceRow
+              key={tag}
+              label={tagLabel(tag)}
+              selected={value.tag === tag && !value.segment}
+              onClick={() => onChange({ ...EMPTY_AUDIENCE_FILTERS, tag })}
+            />
+          ))}
+        </div>
+      )}
+
+      {tab === "savedAudiences" && (
+        <div className="mt-4 flex flex-col gap-2">
+          {segments.length === 0 ? (
+            <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.savedAudiencesEmpty")}</p>
+          ) : (
+            segments.map((segment) => (
+              <ChoiceRow
+                key={segment.id}
+                label={segment.name}
+                selected={value.segment?.id === segment.id}
+                onClick={() => onChange({ ...EMPTY_AUDIENCE_FILTERS, segment: { id: segment.id, name: segment.name, filters: segment.filters } })}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onNext}
+        title={t("customers.sendMessage.matchCount").replace("{count}", totalSelected.toLocaleString("en-US"))}
+        className={clsx(PRIMARY_SUBMIT_CLASS, "!mt-5")}
+      >
         {t("customers.sendMessage.next")}
       </button>
     </div>
   );
 }
 
-function SelectField({
-  label, value, onChange, options, placeholder,
-}: { label: string; value: string; onChange: (v: string) => void; options: readonly string[]; placeholder?: string }) {
+function Group({ label, indent, children }: { label: string; indent?: boolean; children: ReactNode }) {
   return (
     <div>
-      <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{label}</p>
-      <Select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1.5">
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </Select>
+      <p className={clsx("mb-2 text-[16px] text-[var(--octo-text-primary)]", indent && "px-2.5")}>{label}</p>
+      {children}
     </div>
   );
 }
 
-function RangeRow({
-  label, from, to, onFrom, onTo, type, prefix,
-}: { label: string; from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void; type: "text" | "date"; prefix?: string }) {
-  const { t } = useI18n();
+function RangeRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{label}</p>
-      <div className="mt-1.5 grid grid-cols-2 gap-2">
-        {[{ label: t("customers.filter.from"), value: from, onChange: onFrom }, { label: t("customers.filter.to"), value: to, onChange: onTo }].map((field) => (
-          <label key={field.label} className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--octo-text-faint)]">
-            {field.label}
-            <span className="flex items-stretch rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)]">
-              {prefix && <span className="flex items-center px-2 text-[12px] normal-case text-[var(--octo-text-muted)]">{prefix}</span>}
-              <input
-                type={type}
-                value={field.value}
-                onChange={(e) => field.onChange(e.target.value)}
-                placeholder={prefix ? t("customers.sendMessage.filter.enterAmount") : undefined}
-                className="w-full flex-1 rounded-e-[9px] bg-transparent px-2.5 py-1.5 text-[12.5px] normal-case text-[var(--octo-text-primary)] outline-none"
-              />
-            </span>
-          </label>
-        ))}
-      </div>
+      <p className="text-[16px] text-[var(--octo-text-primary)]">{label}</p>
+      <div className="mt-1 grid grid-cols-2 gap-6">{children}</div>
     </div>
+  );
+}
+
+function SubField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[12.5px] text-[var(--octo-text-primary)]">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+function DateRange({ label, from, to, onFrom, onTo }: { label: string; from: string; to: string; onFrom: (v: string) => void; onTo: (v: string) => void }) {
+  const { t } = useI18n();
+  return (
+    <RangeRow label={label}>
+      <SubField label={t("customers.filter.from")}>
+        <DateField value={from} onChange={onFrom} placeholder={t("customers.sendMessage.filter.selectDate")} ariaLabel={`${label} ${t("customers.filter.from")}`} />
+      </SubField>
+      <SubField label={t("customers.filter.to")}>
+        <DateField value={to} onChange={onTo} placeholder={t("customers.sendMessage.filter.selectDate")} ariaLabel={`${label} ${t("customers.filter.to")}`} />
+      </SubField>
+    </RangeRow>
+  );
+}
+
+function ChoiceRow({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={clsx(
+        "flex h-11 items-center justify-between rounded-[8px] border px-3 text-start text-[14px] transition-colors",
+        selected ? "border-[#0D6EFD] bg-[#0D6EFD]/[0.04] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+      )}
+    >
+      {label}
+      {selected && <Check size={16} />}
+    </button>
   );
 }

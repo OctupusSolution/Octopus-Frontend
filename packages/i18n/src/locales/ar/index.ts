@@ -713,6 +713,7 @@ export const ar = {
   "orders.action.cancel": "إلغاء",
   "orders.search.placeholder": "بحث",
   "orders.export": "تصدير",
+  "orders.showing": "عرض {from}–{to} من {total}",
   "orders.empty.title": "لا توجد طلبات بعد!",
   "orders.empty.description": "لا توجد طلبات لعرضها حاليًا. ستظهر الطلبات الجديدة هنا فور تقديمها.",
   "orders.details.tableNo": "رقم الطاولة:",

@@ -713,6 +713,7 @@ export const en = {
   "orders.action.cancel": "Cancel",
   "orders.search.placeholder": "Search",
   "orders.export": "Export",
+  "orders.showing": "Showing {from}–{to} of {total}",
   "orders.empty.title": "No Orders Yet!",
   "orders.empty.description": "There are no orders to display right now. New orders will appear here once they're placed.",
   "orders.details.tableNo": "Table No:",

@@ -20,6 +20,7 @@ const STATUS = {
 const ENV_PATH_VARS = new Set([
   "onboardingId", "menuId", "sectionId", "itemId", "groupId", "optionId",
   "offerId", "mediaId", "branchId", "testerId", "simulationId",
+  "staffMemberId", "leaveRequestId", "shiftId", "roleId", "shiftRoleId",
 ]);
 
 const PATH_SAMPLES = {

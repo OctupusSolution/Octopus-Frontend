@@ -70,7 +70,7 @@ export function CustomerDetailPage() {
 
       <header className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 xl:flex-nowrap">
         <div className="flex min-w-[280px] items-center gap-4 xl:w-[380px] xl:shrink-0 xl:border-e xl:border-[var(--octo-divider)] xl:pe-4">
-          <Avatar name={name} size={96} />
+          <Avatar name={name} photo={customer.avatarUrl} size={96} />
           <div className="min-w-0">
             <div className="truncate text-[18px] font-medium text-[var(--octo-text-primary)]">{name}</div>
             <TagChips tags={customer.tags} blocked={customer.isBlocked} className="mt-1.5" />

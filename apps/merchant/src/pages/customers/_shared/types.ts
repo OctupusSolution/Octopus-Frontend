@@ -40,6 +40,8 @@ export interface CustomerRecord {
   firstName: string;
   lastName: string;
   gender: "Male" | "Female";
+  /** Profile photo; customers without one fall back to their initials. */
+  avatarUrl?: string;
   dateOfBirth?: string; // ISO date
   // Free-text: the known `CustomerTag` enum seeds the styled/translated
   // subset (see TAG_STYLE / TAG_LABEL_KEY), but "Add Tag" lets merchants

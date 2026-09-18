@@ -19,8 +19,8 @@ export function combinePhone(digits: string): string {
 
 export function PhoneField({ digits, onChange }: { digits: string; onChange: (digits: string) => void }) {
   return (
-    <div className="flex items-stretch rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
-      <span dir="ltr" className="flex items-center gap-1.5 border-e border-[var(--octo-border-input)] px-3 text-[12.5px] text-[var(--octo-text-primary)]">
+    <div className="flex h-10 items-stretch rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
+      <span dir="ltr" className="flex items-center gap-1.5 border-e border-[var(--octo-border-input)] px-3 text-[14px] text-[var(--octo-text-primary)]">
         <SaudiFlag />
         +966
       </span>
@@ -30,7 +30,7 @@ export function PhoneField({ digits, onChange }: { digits: string; onChange: (di
         value={digits}
         onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
         placeholder="000 000 000"
-        className="w-full flex-1 rounded-e-[9px] bg-transparent px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-faint)] rtl:text-end"
+        className="w-full flex-1 rounded-e-[8px] bg-transparent px-3 text-[14px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-muted)] rtl:text-end"
       />
     </div>
   );

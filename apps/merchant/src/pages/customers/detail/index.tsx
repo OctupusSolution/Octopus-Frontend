@@ -1,190 +1,252 @@
 // apps/merchant/src/pages/customers/detail/index.tsx
 import { useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Pencil, Plus, Users } from "lucide-react";
-import { Button, EmptyState } from "@ui/primitives";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Ban, CalendarDays, CreditCard, Link2, Mail, MessageSquarePlus, Share, SquarePen, Tag, Trash2, Users, Utensils } from "lucide-react";
+import { EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { customerRecords } from "../_shared/mock-data";
-import { customerName, formatDate, formatReservationDateTime } from "../_shared/format";
+import { customerStore, useCustomers } from "../_shared/customer-store";
+import { customerName, formatDate, formatReservationDateTime, formatSar, formatSarWhole } from "../_shared/format";
 import { Avatar } from "../_shared/avatar";
-import { TAG_STYLE, DEFAULT_TAG_STYLE, BLOCKED_STYLE, TAG_LABEL_KEY, DETAIL_STAT_TILE_THEME, type DetailStatTileTheme } from "../_shared/theme";
+import { ActionButton } from "../_shared/action-button";
+import { TagChips } from "../_shared/tag-chips";
+import { Toast, useToast } from "../_shared/toast";
+import { WhatsAppGlyph } from "../_shared/whatsapp-glyph";
+import {
+  ACTION_TINT, DETAIL_STAT_TILE_THEME, PAYMENT_STATUS_STYLE, RESERVATION_STATUS_STYLE, type DetailStatTileTheme,
+} from "../_shared/theme";
 import { PaymentLinkModal } from "../_shared/payment-link-modal";
 import { AddNoteModal } from "../_shared/add-note-modal";
 import { AddTagModal } from "../_shared/add-tag-modal";
 import { EditInfoModal } from "../_shared/edit-info-modal";
-import type { CustomerRecord, CustomerTag } from "../_shared/types";
+import type { CustomerRecord } from "../_shared/types";
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, locale } = useI18n();
-  const [customer, setCustomer] = useState<CustomerRecord | undefined>(() => customerRecords.find((c) => c.id === id));
-  const [toast, setToast] = useState<string | null>(null);
+  const customer = useCustomers().find((c) => c.id === id);
+  const [toast, showToast] = useToast();
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
   const [aboutEditOpen, setAboutEditOpen] = useState(false);
   const [preferencesEditOpen, setPreferencesEditOpen] = useState(false);
 
-  const back = (
-    <Button variant="ghost" size="sm" icon={<ArrowLeft size={13} className="rtl:rotate-180" />} onClick={() => navigate("/customers")}>
-      {t("customers.detail.back")}
-    </Button>
+  const heading = (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => navigate("/customers")}
+        aria-label={t("customers.detail.back")}
+        title={t("customers.detail.back")}
+        className="grid h-8 w-8 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+      >
+        <ArrowLeft size={20} className="rtl:rotate-180" />
+      </button>
+      <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)]">{t("customers.detail.title")}</h1>
+    </div>
   );
 
   if (!customer) {
     return (
-      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-        {back}
+      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-6">
+        {heading}
         <EmptyState className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]" icon={<Users size={18} />} title={t("customers.detail.notFound")} />
       </div>
     );
   }
 
+  const current = customer;
   function patch(updater: (c: CustomerRecord) => Partial<CustomerRecord>) {
-    setCustomer((prev) => (prev ? { ...prev, ...updater(prev) } : prev));
+    customerStore.updateCustomer(current.id, updater);
   }
 
   const name = customerName(customer);
   const localeTag = locale === "ar" ? "ar-SA" : "en-US";
 
   return (
-    <div className="px-4 pb-24 pt-4 sm:px-[26px] sm:pt-5">
-      {back}
+    <div className="px-4 pb-10 pt-4 sm:px-[26px] sm:pt-6">
+      {heading}
 
-      <header className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-        <Avatar name={name} size={56} />
-        <div>
-          <h1 className="text-[17px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[19px]">{name}</h1>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {customer.isBlocked && (
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: BLOCKED_STYLE.text, backgroundColor: BLOCKED_STYLE.bg }}>
-                {t("customers.tag.blocked")}
-              </span>
-            )}
-            {customer.tags.map((tag) => {
-              const style = TAG_STYLE[tag as CustomerTag] ?? DEFAULT_TAG_STYLE;
-              const labelKey = TAG_LABEL_KEY[tag as CustomerTag];
-              return (
-                <span key={tag} className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ color: style.text, backgroundColor: style.bg }}>
-                  {labelKey ? t(labelKey) : tag}
-                </span>
-              );
-            })}
+      <header className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 xl:flex-nowrap">
+        <div className="flex min-w-[280px] items-center gap-4 xl:w-[380px] xl:shrink-0 xl:border-e xl:border-[var(--octo-divider)] xl:pe-4">
+          <Avatar name={name} size={96} />
+          <div className="min-w-0">
+            <div className="truncate text-[18px] font-medium text-[var(--octo-text-primary)]">{name}</div>
+            <TagChips tags={customer.tags} blocked={customer.isBlocked} className="mt-1.5" />
+            <div className="mt-2 flex items-center gap-1.5 text-[14px] text-[var(--octo-text-secondary)]">
+              <WhatsAppGlyph size={13} /> <span dir="ltr">{customer.phone}</span>
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[14px] text-[var(--octo-text-secondary)]">
+              <Mail size={13} className="shrink-0" /> <span className="truncate">{customer.email || "—"}</span>
+            </div>
           </div>
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">{customer.phone} · {customer.email}</p>
+        </div>
+        <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} theme={DETAIL_STAT_TILE_THEME.totalVisits} />
+          <StatTile label={t("customers.detail.totalSpend")} value={formatSarWhole(customer.totalSpendSar)} theme={DETAIL_STAT_TILE_THEME.totalSpend} />
+          <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} theme={DETAIL_STAT_TILE_THEME.lastVisit} />
+          <StatTile
+            label={t("customers.detail.loyaltyPoints")}
+            value={t("customers.detail.pointsValue").replace("{points}", customer.loyaltyPoints.toLocaleString(localeTag))}
+            theme={DETAIL_STAT_TILE_THEME.loyaltyPoints}
+          />
+          <StatTile label={t("customers.detail.avgSpend")} value={formatSarWhole(customer.avgSpendSar)} theme={DETAIL_STAT_TILE_THEME.avgSpend} />
         </div>
       </header>
 
-      {toast && <div className="mt-3 rounded-[9px] bg-[#22C55E]/10 px-3 py-2 text-[11.5px] font-medium text-[#16a34a]">{toast}</div>}
-
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} theme={DETAIL_STAT_TILE_THEME.totalVisits} />
-        <StatTile label={t("customers.detail.totalSpend")} value={`SAR ${customer.totalSpendSar}`} theme={DETAIL_STAT_TILE_THEME.totalSpend} />
-        <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} theme={DETAIL_STAT_TILE_THEME.lastVisit} />
-        <StatTile label={t("customers.detail.loyaltyPoints")} value={`${customer.loyaltyPoints.toLocaleString(localeTag)} pts`} theme={DETAIL_STAT_TILE_THEME.loyaltyPoints} />
-        <StatTile label={t("customers.detail.avgSpend")} value={`SAR ${customer.avgSpendSar}`} theme={DETAIL_STAT_TILE_THEME.avgSpend} />
-      </div>
-
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <Panel title={t("customers.detail.about.title")} onEdit={() => setAboutEditOpen(true)}>
-          <InfoRow label={t("customers.detail.about.customerSince")} value={formatDate(customer.customerSince, locale)} />
-          <InfoRow label={t("customers.detail.about.firstVisit")} value={formatDate(customer.firstVisit, locale)} />
-          <InfoRow label={t("customers.detail.about.preferredBranch")} value={customer.preferredBranch || "—"} />
-          <InfoRow label={t("customers.detail.about.preferredAreaTable")} value={customer.preferredAreaTable || "—"} />
-          {customer.vipSince && <InfoRow label={t("customers.detail.about.vipSince")} value={formatDate(customer.vipSince, locale)} />}
-          <InfoRow label={t("customers.detail.about.referredBy")} value={customer.referredBy ?? "—"} />
-          <InfoRow label={t("customers.detail.about.marketingConsent")} value={t(customer.marketingConsent === "Opted in" ? "customers.marketingConsent.optedIn" : "customers.marketingConsent.optedOut")} />
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Panel
+          title={t("customers.detail.about.title")}
+          action={<PanelIconButton label={t("customers.detail.editAbout.title")} onClick={() => setAboutEditOpen(true)} icon={<SquarePen size={22} strokeWidth={1.75} />} />}
+        >
+          <dl className="flex flex-col gap-2">
+            <InfoRow label={t("customers.detail.about.customerSince")} value={formatDate(customer.customerSince, locale)} />
+            <InfoRow label={t("customers.detail.about.firstVisit")} value={formatDate(customer.firstVisit, locale)} />
+            <InfoRow label={t("customers.detail.about.preferredBranch")} value={customer.preferredBranch || "—"} />
+            <InfoRow label={t("customers.detail.about.preferredAreaTable")} value={customer.preferredAreaTable || "—"} />
+            {customer.vipSince && <InfoRow label={t("customers.detail.about.vipSince")} value={formatDate(customer.vipSince, locale)} />}
+            <InfoRow label={t("customers.detail.about.referredBy")} value={customer.referredBy ?? "—"} />
+            <InfoRow label={t("customers.detail.about.marketingConsent")} value={t(customer.marketingConsent === "Opted in" ? "customers.marketingConsent.optedIn" : "customers.marketingConsent.optedOut")} />
+          </dl>
         </Panel>
 
-        <Panel title={t("customers.detail.preferences.title")} onEdit={() => setPreferencesEditOpen(true)}>
-          <InfoRow label={t("customers.detail.preferences.cuisine")} value={customer.cuisinePreference.join(", ") || "—"} />
-          <InfoRow label={t("customers.detail.preferences.dietary")} value={customer.dietaryPreference || "—"} />
-          <InfoRow label={t("customers.detail.preferences.occasion")} value={customer.occasion || "—"} />
-          <InfoRow label={t("customers.detail.preferences.visitTime")} value={customer.visitTime || "—"} />
-          <InfoRow label={t("customers.detail.preferences.communication")} value={customer.communicationPreference.join(", ") || "—"} />
-          <InfoRow label={t("customers.detail.preferences.specialRequests")} value={customer.specialRequests || "—"} />
+        <Panel
+          title={t("customers.detail.preferences.title")}
+          action={<PanelIconButton label={t("customers.detail.editPreferences.title")} onClick={() => setPreferencesEditOpen(true)} icon={<SquarePen size={22} strokeWidth={1.75} />} />}
+        >
+          <dl className="flex flex-col gap-2">
+            <InfoRow label={t("customers.detail.preferences.cuisine")} value={customer.cuisinePreference.join(", ") || "—"} />
+            <InfoRow label={t("customers.detail.preferences.dietary")} value={customer.dietaryPreference || "—"} />
+            <InfoRow label={t("customers.detail.preferences.occasion")} value={customer.occasion || "—"} />
+            <InfoRow label={t("customers.detail.preferences.visitTime")} value={customer.visitTime || "—"} />
+            <InfoRow
+              label={t("customers.detail.preferences.communication")}
+              value={customer.communicationPreference.map((c) => t(`customers.addCustomer.channel.${c.toLowerCase()}`)).join(", ") || "—"}
+            />
+            <InfoRow label={t("customers.detail.preferences.specialRequests")} value={customer.specialRequests || "—"} />
+          </dl>
         </Panel>
 
-        <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{t("customers.detail.notes.title")}</h2>
-            <button type="button" onClick={() => setNoteOpen(true)} className="grid h-6 w-6 place-items-center rounded-md text-[#0D6EFD] transition-colors hover:bg-[var(--octo-hover)]" aria-label="Add note">
-              <Plus size={14} />
-            </button>
-          </div>
+        <Panel
+          title={t("customers.detail.notes.title")}
+          action={<PanelIconButton label={t("customers.addNote.title")} onClick={() => setNoteOpen(true)} icon={<MessageSquarePlus size={22} strokeWidth={1.75} />} />}
+        >
           {customer.notes.length === 0 ? (
-            <p className="mt-2.5 text-[12px] text-[var(--octo-text-muted)]">{t("customers.detail.notes.empty")}</p>
+            <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.detail.notes.empty")}</p>
           ) : (
-            <ul className="mt-2.5 flex flex-col gap-2">
+            <ul className="flex list-disc flex-col gap-2.5 ps-6 text-[14px] text-[var(--octo-text-primary)] marker:text-[var(--octo-text-primary)]">
               {customer.notes.map((note, index) => (
-                <li key={index} className="text-[12px] text-[var(--octo-text-secondary)]">
-                  <span className="font-semibold text-[var(--octo-text-primary)]">{formatDate(note.date, locale)}</span> - {note.text}
+                <li key={index}>
+                  <span className="font-semibold">{formatDate(note.date, locale)}</span> - {note.text}
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <ListPanel title={t("customers.detail.reservations.title")}>
-          {customer.recentReservations.map((res, index) => (
-            <li key={index} className="flex items-center justify-between rounded-[9px] border border-[var(--octo-divider)] px-2.5 py-2 text-[12px]">
-              <span>{formatReservationDateTime(res.date, locale)}<br /><span className="text-[var(--octo-text-muted)]">{res.table} - {res.guests} {t("customers.detail.guests")}</span></span>
-              <span className="rounded-full bg-[#FDF3D6] px-2 py-0.5 text-[11px] font-medium text-[#B9860A]">{t(`customers.detail.reservationStatus.${res.status.toLowerCase()}`)}</span>
-            </li>
-          ))}
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <ListPanel title={t("customers.detail.reservations.title")} viewAllTo="/reservations" empty={customer.recentReservations.length === 0}>
+          {customer.recentReservations.map((res, index) => {
+            const style = RESERVATION_STATUS_STYLE[res.status];
+            return (
+              <li key={index} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
+                <CalendarDays size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] leading-snug text-[var(--octo-text-primary)]">{formatReservationDateTime(res.date, locale)}</div>
+                  <div className="text-[13.5px] text-[var(--octo-text-secondary)]">{res.table} - {res.guests} {t("customers.detail.guests")}</div>
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[13px]" style={{ color: style.text, backgroundColor: style.bg }}>
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.text }} />
+                  {t(`customers.detail.reservationStatus.${res.status.toLowerCase()}`)}
+                </span>
+              </li>
+            );
+          })}
         </ListPanel>
 
-        <ListPanel title={t("customers.detail.orders.title")}>
+        <ListPanel title={t("customers.detail.orders.title")} viewAllTo="/orders" empty={customer.recentOrders.length === 0}>
           {customer.recentOrders.map((order) => (
-            <li key={order.id} className="rounded-[9px] border border-[var(--octo-divider)] px-2.5 py-2 text-[12px]">
-              <div className="text-[var(--octo-text-muted)]">{formatDate(order.date, locale)} - {order.id}</div>
-              <div className="mt-0.5">{order.items}</div>
-              <div className="mt-0.5 font-semibold text-[#0D6EFD]">SAR {order.totalSar.toFixed(2)}</div>
+            <li key={order.id} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
+              <Utensils size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[14px] text-[var(--octo-text-primary)]">{formatDate(order.date, locale)} - {order.id}</div>
+                <div className="truncate text-[13.5px] text-[var(--octo-text-secondary)]">{order.items}</div>
+                <div className="text-[16px] font-semibold text-[#0D6EFD]">{formatSar(order.totalSar)}</div>
+              </div>
             </li>
           ))}
         </ListPanel>
 
-        <ListPanel title={t("customers.detail.payments.title")}>
-          {customer.recentPayments.map((payment, index) => (
-            <li key={index} className="flex items-center justify-between rounded-[9px] border border-[var(--octo-divider)] px-2.5 py-2 text-[12px]">
-              <span>{formatDate(payment.date, locale)}<br /><span className="text-[var(--octo-text-muted)]">**** **** **** {payment.cardLast4}</span></span>
-              <span className="text-end">
-                <span className="block rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-medium text-[#16A34A]">{t(`customers.detail.${payment.status.toLowerCase()}`)}</span>
-                <span className="mt-1 block font-semibold text-[#0D6EFD]">SAR {payment.amountSar.toFixed(2)}</span>
-              </span>
-            </li>
-          ))}
+        <ListPanel title={t("customers.detail.payments.title")} viewAllTo="/finance/payments" empty={customer.recentPayments.length === 0}>
+          {customer.recentPayments.map((payment, index) => {
+            const style = PAYMENT_STATUS_STYLE[payment.status];
+            return (
+              <li key={index} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
+                <CreditCard size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[14px] text-[var(--octo-text-secondary)]">{formatDate(payment.date, locale)}</div>
+                  <div className="text-[14px] text-[var(--octo-text-primary)]" dir="ltr">**** **** **** {payment.cardLast4}</div>
+                  <div className="text-[16px] font-semibold text-[#0D6EFD]">{formatSar(payment.amountSar)}</div>
+                </div>
+                <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[13px]" style={{ color: style.text, backgroundColor: style.bg }}>
+                  {t(`customers.detail.${payment.status.toLowerCase()}`)}
+                </span>
+              </li>
+            );
+          })}
         </ListPanel>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
-        <Button variant="secondary" size="sm">{t("customers.row.newReservations")}</Button>
-        <Button variant="secondary" size="sm" onClick={() => setPaymentLinkOpen(true)}>{t("customers.row.paymentLink")}</Button>
-        <Button variant="secondary" size="sm" onClick={() => setToast(t("customers.rowAction.whatsappSent"))}>{t("customers.rowAction.sendWhatsapp")}</Button>
-        <Button variant="secondary" size="sm" onClick={() => setToast(t("customers.rowAction.emailSent"))}>{t("customers.rowAction.sendEmail")}</Button>
-        <Button variant="secondary" size="sm" onClick={() => setTagOpen(true)}>{t("customers.rowAction.addTag")}</Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => { patch((c) => ({ isBlocked: !c.isBlocked })); setToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked")); }}
-        >
-          {t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block")}
-        </Button>
-        <Button
-          variant="danger"
-          size="sm"
-          onClick={() => { if (window.confirm(t("customers.rowAction.deleteConfirm"))) navigate("/customers"); }}
-        >
-          {t("customers.rowAction.delete")}
-        </Button>
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:flex xl:justify-between">
+        <ActionButton size="md" className="xl:flex-1" icon={<CalendarDays size={18} />} label={t("customers.row.newReservations")} tint={ACTION_TINT.newReservations} onClick={() => navigate("/reservations/new")} />
+        <ActionButton size="md" className="xl:flex-1" icon={<Link2 size={18} />} label={t("customers.row.paymentLink")} tint={ACTION_TINT.paymentLink} onClick={() => setPaymentLinkOpen(true)} />
+        <ActionButton size="md" className="xl:flex-1" icon={<WhatsAppGlyph size={20} />} label={t("customers.rowAction.sendWhatsapp")} tint={ACTION_TINT.whatsapp} onClick={() => showToast(t("customers.rowAction.whatsappSent"))} />
+        <ActionButton size="md" className="xl:flex-1" icon={<Share size={19} />} label={t("customers.rowAction.sendEmail")} tint={ACTION_TINT.email} onClick={() => showToast(t("customers.rowAction.emailSent"))} />
+        <ActionButton size="md" className="xl:flex-1" icon={<Tag size={19} />} label={t("customers.rowAction.addTag")} onClick={() => setTagOpen(true)} />
+        <ActionButton
+          size="md"
+          className="xl:flex-1"
+          icon={<Ban size={19} />}
+          label={t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block")}
+          onClick={() => {
+            patch((c) => ({ isBlocked: !c.isBlocked }));
+            showToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
+          }}
+        />
+        <ActionButton
+          size="md"
+          className="xl:flex-1"
+          icon={<Trash2 size={19} />}
+          label={t("customers.rowAction.delete")}
+          tint={ACTION_TINT.danger}
+          onClick={() => {
+            if (!window.confirm(t("customers.rowAction.deleteConfirm"))) return;
+            customerStore.setCustomers((prev) => prev.filter((c) => c.id !== current.id));
+            navigate("/customers");
+          }}
+        />
       </div>
 
-      <PaymentLinkModal customer={paymentLinkOpen ? customer : null} onClose={() => setPaymentLinkOpen(false)} onSent={() => setToast(t("customers.paymentLink.sentConfirm"))} />
-      <AddNoteModal open={noteOpen} onClose={() => setNoteOpen(false)} onSave={(text) => patch((c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }))} />
-      <AddTagModal open={tagOpen} onClose={() => setTagOpen(false)} onSave={(tag) => patch((c) => ({ tags: c.tags.includes(tag) ? c.tags : [...c.tags, tag] }))} />
+      <Toast message={toast} />
+      <PaymentLinkModal customer={paymentLinkOpen ? customer : null} onClose={() => setPaymentLinkOpen(false)} onSent={() => showToast(t("customers.paymentLink.sentConfirm"))} />
+      <AddNoteModal
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        onSave={(text) => {
+          patch((c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }));
+          showToast(t("customers.addNote.savedConfirm"));
+        }}
+      />
+      <AddTagModal
+        open={tagOpen}
+        onClose={() => setTagOpen(false)}
+        onSave={(tag) => {
+          patch((c) => ({ tags: c.tags.includes(tag) ? c.tags : [...c.tags, tag] }));
+          showToast(t("customers.addTag.savedConfirm").replace("{tag}", tag));
+        }}
+      />
       <EditInfoModal
         open={aboutEditOpen}
         title={t("customers.detail.editAbout.title")}
@@ -195,13 +257,14 @@ export function CustomerDetailPage() {
           { key: "referredBy", label: t("customers.detail.about.referredBy"), value: customer.referredBy ?? "" },
         ]}
         onClose={() => setAboutEditOpen(false)}
-        onSave={(values) =>
+        onSave={(values) => {
           patch(() => ({
             preferredBranch: values.preferredBranch,
             preferredAreaTable: values.preferredAreaTable,
             referredBy: values.referredBy.trim() || undefined,
-          }))
-        }
+          }));
+          showToast(t("customers.detail.savedConfirm"));
+        }}
       />
       <EditInfoModal
         open={preferencesEditOpen}
@@ -215,15 +278,16 @@ export function CustomerDetailPage() {
           { key: "specialRequests", label: t("customers.detail.preferences.specialRequests"), value: customer.specialRequests },
         ]}
         onClose={() => setPreferencesEditOpen(false)}
-        onSave={(values) =>
+        onSave={(values) => {
           patch(() => ({
             cuisinePreference: values.cuisinePreference.split(",").map((s) => s.trim()).filter(Boolean),
             dietaryPreference: values.dietaryPreference,
             occasion: values.occasion,
             visitTime: values.visitTime,
             specialRequests: values.specialRequests,
-          }))
-        }
+          }));
+          showToast(t("customers.detail.savedConfirm"));
+        }}
       />
     </div>
   );
@@ -232,56 +296,60 @@ export function CustomerDetailPage() {
 function StatTile({ label, value, theme }: { label: string; value: string; theme: DetailStatTileTheme }) {
   const Icon = theme.icon;
   return (
-    <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[14px] py-[12px]">
-      <div className="grid h-9 w-9 place-items-center rounded-lg" style={{ backgroundColor: theme.tile }}>
-        <Icon size={16} className="text-white" />
+    <div className={`flex min-w-0 flex-col items-center rounded-xl px-2 py-3 text-center ${theme.cardBg}`}>
+      <div className="grid h-10 w-10 place-items-center rounded-[8px]" style={{ backgroundColor: theme.tile }}>
+        <Icon size={22} className="text-white" />
       </div>
-      <div className="mt-2 text-[17px] font-bold text-[var(--octo-text-primary)]">{value}</div>
-      <div className="mt-0.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{label}</div>
+      <div className="mt-3 w-full truncate text-[20px] font-medium leading-tight text-[var(--octo-text-primary)]">{value}</div>
+      <div className="mt-1 w-full truncate text-[15px] text-[var(--octo-text-muted)]">{label}</div>
     </div>
   );
 }
 
-function Panel({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
+function PanelIconButton({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
   return (
-    <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+    <button type="button" onClick={onClick} aria-label={label} title={label} className="grid h-8 w-8 place-items-center rounded-md text-[#3B82F6] transition-colors hover:bg-[var(--octo-hover)]">
+      {icon}
+    </button>
+  );
+}
+
+function Panel({ title, action, children }: { title: string; action: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3.5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{title}</h2>
-        <button type="button" onClick={onEdit} className="grid h-6 w-6 place-items-center rounded-md text-[#0D6EFD] transition-colors hover:bg-[var(--octo-hover)]" aria-label={`Edit ${title}`}>
-          <Pencil size={13} />
-        </button>
+        <h2 className="text-[17px] font-semibold text-[var(--octo-text-primary)]">{title}</h2>
+        {action}
       </div>
-      <div className="mt-2.5 flex flex-col gap-2">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between text-[12px]">
-      <span className="text-[var(--octo-text-muted)]">{label}</span>
-      <span className="font-medium text-[var(--octo-text-primary)]">{value}</span>
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="shrink-0 text-[12.5px] text-[var(--octo-text-secondary)]">{label}</dt>
+      <dd className="min-w-0 text-end text-[15px] text-[var(--octo-text-primary)]">{value}</dd>
     </div>
   );
 }
 
-function ListPanel({ title, children }: { title: string; children: ReactNode }) {
+function ListPanel({ title, viewAllTo, empty, children }: { title: string; viewAllTo: string; empty: boolean; children: ReactNode }) {
   const { t } = useI18n();
   return (
-    <section className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+    <section className="rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3.5">
       <div className="flex items-center justify-between">
-        <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{title}</h2>
-        {/* Inert — no dedicated history route exists yet, so this doesn't act as a link. */}
-        <button
-          type="button"
-          title={t("customers.detail.viewAll")}
-          aria-disabled="true"
-          className="cursor-default text-[11.5px] font-medium text-[var(--octo-text-faint)]"
-        >
+        <h2 className="text-[17px] font-semibold text-[var(--octo-text-primary)]">{title}</h2>
+        <Link to={viewAllTo} className="text-[15px] text-[#3B82F6] underline underline-offset-2 hover:opacity-80">
           {t("customers.detail.viewAll")}
-        </button>
+        </Link>
       </div>
-      <ul className="mt-2.5 flex flex-col gap-2">{children}</ul>
+      {empty ? (
+        <p className="mt-3 text-[13px] text-[var(--octo-text-muted)]">{t("customers.detail.historyEmpty")}</p>
+      ) : (
+        <ul className="mt-3 flex flex-col gap-3">{children}</ul>
+      )}
     </section>
   );
 }

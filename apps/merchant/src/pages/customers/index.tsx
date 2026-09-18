@@ -1,13 +1,13 @@
 // apps/merchant/src/pages/customers/index.tsx
-import { useMemo, useState } from "react";
-import { Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Bookmark, MessageSquareMore, Plus, RotateCcw, Search, Users } from "lucide-react";
 import { Button, EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { customerRecords } from "./_shared/mock-data";
-import { customerName } from "./_shared/format";
+import { customerStore, useCustomers, useSavedSegments } from "./_shared/customer-store";
 import { CustomerStatCards } from "./_shared/stat-cards";
 import { CustomerRow } from "./_shared/customer-row";
-import { TagsFilterPopover, RangeFilterPopover, type RangeValue } from "./_shared/filter-popover";
+import { TagsFilterPopover, RangeFilterPopover } from "./_shared/filter-popover";
 import { PaymentLinkModal } from "./_shared/payment-link-modal";
 import { RowActionsMenu, type RowActionId } from "./_shared/row-actions-menu";
 import { AddNoteModal } from "./_shared/add-note-modal";
@@ -16,8 +16,15 @@ import { AddCustomerModal } from "./_shared/add-customer-modal";
 import { BulkActionBar } from "./_shared/bulk-action-bar";
 import { customersToCsv } from "./_shared/csv-export";
 import { SendMessageWizard } from "./_shared/send-message-wizard";
+import { SaveSegmentModal } from "./_shared/save-segment-modal";
+import { EmptyCustomersIllustration } from "./_shared/empty-illustration";
+import { EMPTY_LIST_FILTERS, hasActiveFilters, matchesListFilters, type ListFilters } from "./_shared/list-filter";
+import { mergeCustomers } from "./_shared/merge";
+import { Toast, useToast } from "./_shared/toast";
 import { Pagination } from "@/pages/inventory/_shared/pagination";
-import type { CustomerRecord, CustomerTag } from "./_shared/types";
+import type { CustomerRecord } from "./_shared/types";
+
+const PAGE_SIZE = 10;
 
 function downloadCsv(filename: string, csv: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -36,52 +43,46 @@ function downloadCsv(filename: string, csv: string) {
 }
 
 export function CustomersPage() {
-  const { t } = useI18n();
-  const [customers, setCustomers] = useState<CustomerRecord[]>(() => [...customerRecords]);
-  const [search, setSearch] = useState("");
-  const [tagFilter, setTagFilter] = useState<CustomerTag[]>([]);
-  const [visitsRange, setVisitsRange] = useState<RangeValue>({ from: "", to: "" });
-  const [spendRange, setSpendRange] = useState<RangeValue>({ from: "", to: "" });
-  const [lastVisitRange, setLastVisitRange] = useState<RangeValue>({ from: "", to: "" });
+  const { t, locale } = useI18n();
+  const navigate = useNavigate();
+  const customers = useCustomers();
+  const segments = useSavedSegments();
+  const [filters, setFiltersState] = useState<ListFilters>(EMPTY_LIST_FILTERS);
+  const [page, setPage] = useState(1);
   const [paymentLinkFor, setPaymentLinkFor] = useState<CustomerRecord | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, showToast] = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rowMenu, setRowMenu] = useState<{ anchor: HTMLElement; customer: CustomerRecord } | null>(null);
   const [noteFor, setNoteFor] = useState<CustomerRecord | null>(null);
   const [tagTarget, setTagTarget] = useState<{ ids: string[] } | null>(null);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
 
-  const visibleRows = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return customers.filter((c) => {
-      if (query && !(customerName(c).toLowerCase().includes(query) || c.phone.includes(query) || c.email.toLowerCase().includes(query))) return false;
-      if (tagFilter.length > 0 && !tagFilter.some((tag) => c.tags.includes(tag))) return false;
-      if (visitsRange.from && c.visits < Number(visitsRange.from)) return false;
-      if (visitsRange.to && c.visits > Number(visitsRange.to)) return false;
-      if (spendRange.from && c.totalSpendSar < Number(spendRange.from)) return false;
-      if (spendRange.to && c.totalSpendSar > Number(spendRange.to)) return false;
-      if (lastVisitRange.from && c.lastVisit < lastVisitRange.from) return false;
-      if (lastVisitRange.to && c.lastVisit > lastVisitRange.to) return false;
-      return true;
-    });
-  }, [customers, search, tagFilter, visitsRange, spendRange, lastVisitRange]);
-
-  const isFiltered = tagFilter.length > 0 || visitsRange.from !== "" || visitsRange.to !== "" || spendRange.from !== "" || spendRange.to !== "" || lastVisitRange.from !== "" || lastVisitRange.to !== "" || search.trim() !== "";
+  // Any change to search/filters starts again from page 1.
+  function setFilters(patch: Partial<ListFilters>) {
+    setFiltersState((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  }
 
   function resetFilters() {
-    setSearch("");
-    setTagFilter([]);
-    setVisitsRange({ from: "", to: "" });
-    setSpendRange({ from: "", to: "" });
-    setLastVisitRange({ from: "", to: "" });
+    setFiltersState(EMPTY_LIST_FILTERS);
+    setPage(1);
   }
 
-  function updateCustomer(id: string, patch: Partial<CustomerRecord> | ((c: CustomerRecord) => Partial<CustomerRecord>)) {
-    setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...(typeof patch === "function" ? patch(c) : patch) } : c)));
-  }
+  const visibleRows = useMemo(() => customers.filter((c) => matchesListFilters(c, filters)), [customers, filters]);
+  const isFiltered = hasActiveFilters(filters);
+
+  // Selection only ever covers rows the current filters show — a row
+  // hidden by a filter (or deleted) drops out, so a bulk action never
+  // touches customers the merchant can't see.
+  useEffect(() => {
+    const visibleIds = new Set(visibleRows.map((c) => c.id));
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => visibleIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visibleRows]);
 
   function handleRowAction(action: RowActionId, customer: CustomerRecord) {
     switch (action) {
@@ -89,25 +90,25 @@ export function CustomersPage() {
         setNoteFor(customer);
         break;
       case "history":
-        setToast(t("customers.rowAction.historyComingSoon"));
+        navigate(`/customers/${customer.id}`);
         break;
       case "sendWhatsapp":
-        setToast(t("customers.rowAction.whatsappSent"));
+        showToast(t("customers.rowAction.whatsappSent"));
         break;
       case "sendEmail":
-        setToast(t("customers.rowAction.emailSent"));
+        showToast(t("customers.rowAction.emailSent"));
         break;
       case "addTag":
         setTagTarget({ ids: [customer.id] });
         break;
       case "toggleBlock":
-        updateCustomer(customer.id, (c) => ({ isBlocked: !c.isBlocked }));
-        setToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
+        customerStore.updateCustomer(customer.id, (c) => ({ isBlocked: !c.isBlocked }));
+        showToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
         break;
       case "delete":
         if (window.confirm(t("customers.rowAction.deleteConfirm"))) {
-          setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
-          setSelectedIds((prev) => { const next = new Set(prev); next.delete(customer.id); return next; });
+          customerStore.setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+          showToast(t("customers.rowAction.deleted"));
         }
         break;
     }
@@ -116,87 +117,130 @@ export function CustomersPage() {
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
 
-  const selectedCustomers = customers.filter((c) => selectedIds.has(c.id));
+  const selectedCustomers = visibleRows.filter((c) => selectedIds.has(c.id));
+  const countText = (key: string) => t(key).replace("{count}", String(selectedCustomers.length));
 
   function handleBulkDelete() {
-    if (!window.confirm(t("customers.bulk.deleteConfirm").replace("{count}", String(selectedIds.size)))) return;
-    setToast(t("customers.bulk.deletedConfirm").replace("{count}", String(selectedIds.size)));
-    setCustomers((prev) => prev.filter((c) => !selectedIds.has(c.id)));
+    if (!window.confirm(countText("customers.bulk.deleteConfirm"))) return;
+    showToast(countText("customers.bulk.deletedConfirm"));
+    customerStore.setCustomers((prev) => prev.filter((c) => !selectedIds.has(c.id)));
     setSelectedIds(new Set());
+  }
+
+  function handleBulkMerge() {
+    if (selectedCustomers.length < 2) {
+      showToast(t("customers.bulk.mergeNeedsTwo"));
+      return;
+    }
+    const merged = mergeCustomers(selectedCustomers);
+    const removed = new Set(selectedCustomers.slice(1).map((c) => c.id));
+    customerStore.setCustomers((prev) => prev.filter((c) => !removed.has(c.id)).map((c) => (c.id === merged.id ? merged : c)));
+    setSelectedIds(new Set([merged.id]));
+    showToast(countText("customers.bulk.mergedConfirm"));
   }
 
   function handleBulkExport() {
     downloadCsv(`customers-${new Date().toISOString().slice(0, 10)}.csv`, customersToCsv(selectedCustomers));
+    showToast(countText("customers.bulk.exportedConfirm"));
   }
 
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageRows = visibleRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const isEmpty = customers.length === 0;
 
   return (
     <>
-      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
+      <div className="px-4 pb-8 pt-4 sm:px-[26px] sm:pt-6">
         <header className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">{t("customers.title")}</h1>
-            <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">{t("customers.subtitle")}</p>
+            <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)]">{t("customers.title")}</h1>
+            <p className="mt-1.5 text-[14px] text-[var(--octo-text-muted)]">{t("customers.subtitle")}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setSendMessageOpen(true)}>{t("customers.sendMessageCta")}</Button>
-            <Button variant="primary" size="sm" onClick={() => setAddCustomerOpen(true)}>{t("customers.addCustomer.cta")}</Button>
-          </div>
-        </header>
-
-        <div className="mt-4">
-          <CustomerStatCards isEmpty={customers.length === 0} />
-        </div>
-
-        {customers.length === 0 ? (
-          <EmptyState
-            className="mt-8"
-            icon={<Users size={18} />}
-            title={t("customers.empty.title")}
-            description={t("customers.empty.description")}
-            action={<Button variant="primary" onClick={() => setAddCustomerOpen(true)}>{t("customers.empty.cta")}</Button>}
-          />
-        ) : (
-          <>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] flex-1">
-                <Search size={13} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-muted)]" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("customers.searchPlaceholder")}
-                  className="w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2 ps-8 pe-3 text-[12.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
-                />
-              </div>
-              <TagsFilterPopover selected={tagFilter} onApply={(tags) => setTagFilter([...tags])} />
-              <RangeFilterPopover label={t("customers.filter.visits")} kind="number" value={visitsRange} onApply={setVisitsRange} />
-              <RangeFilterPopover label={t("customers.filter.totalSpend")} kind="currency" value={spendRange} onApply={setSpendRange} />
-              <RangeFilterPopover label={t("customers.filter.lastVisit")} kind="date" value={lastVisitRange} onApply={setLastVisitRange} />
-              {isFiltered && (
-                <button type="button" onClick={resetFilters} className="rounded-[9px] px-3 py-2 text-[12px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]">
-                  {t("customers.filter.reset")}
-                </button>
-              )}
+          {!isEmpty && (
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setToast(t("customers.saveSegment"))}
-                className="ms-auto inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-2 text-[12px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+                onClick={() => setSendMessageOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-[#3B82F6] bg-[var(--octo-card)] px-3.5 text-[16px] font-semibold text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/5"
               >
+                <MessageSquareMore size={20} strokeWidth={1.75} className="rtl:-scale-x-100" />
+                {t("customers.sendMessageCta")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddCustomerOpen(true)}
+                className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#3B82F6] px-4 text-[16px] font-semibold text-white transition-opacity hover:opacity-90"
+              >
+                <Plus size={18} strokeWidth={2.25} />
+                {t("customers.addCustomer.cta")}
+              </button>
+            </div>
+          )}
+        </header>
+
+        <div className="mt-6">
+          <CustomerStatCards isEmpty={isEmpty} />
+        </div>
+
+        {isEmpty ? (
+          <div className="mt-24 flex flex-col items-center text-center">
+            <EmptyCustomersIllustration className="text-[#CBD5E1]" />
+            <h2 className="mt-8 text-[16px] font-semibold text-[var(--octo-text-primary)]">{t("customers.empty.title")}</h2>
+            <p className="mt-1 text-[14px] text-[var(--octo-text-muted)]">{t("customers.empty.description")}</p>
+            <button
+              type="button"
+              onClick={() => setAddCustomerOpen(true)}
+              className="mt-5 inline-flex h-11 w-full max-w-[660px] items-center justify-center gap-2 rounded-[8px] bg-[#3B82F6] text-[16px] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <Plus size={18} strokeWidth={2.25} />
+              {t("customers.empty.cta")}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search size={20} strokeWidth={1.5} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-muted)]" />
+                <input
+                  value={filters.search}
+                  onChange={(event) => setFilters({ search: event.target.value })}
+                  placeholder={t("customers.searchPlaceholder")}
+                  aria-label={t("customers.searchPlaceholder")}
+                  className="h-10 w-full rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-3 ps-10 text-[14px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-muted)] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30"
+                />
+              </div>
+              <TagsFilterPopover selected={filters.tags} onApply={(tags) => setFilters({ tags })} />
+              <RangeFilterPopover label={t("customers.filter.visits")} kind="number" value={filters.visits} onApply={(visits) => setFilters({ visits })} />
+              <RangeFilterPopover label={t("customers.filter.totalSpend")} kind="currency" value={filters.spend} onApply={(spend) => setFilters({ spend })} />
+              <RangeFilterPopover label={t("customers.filter.lastVisit")} kind="date" value={filters.lastVisit} onApply={(lastVisit) => setFilters({ lastVisit })} />
+              <button
+                type="button"
+                onClick={resetFilters}
+                disabled={!isFiltered}
+                className="inline-flex h-10 items-center gap-1.5 rounded-[8px] bg-[#3B82F6]/[0.06] px-3 text-[14px] font-medium text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/10 disabled:cursor-default disabled:opacity-60"
+              >
+                <RotateCcw size={18} strokeWidth={1.75} />
+                {t("customers.filter.reset")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isFiltered) showToast(t("customers.segment.needsFilter"));
+                  else setSaveSegmentOpen(true);
+                }}
+                className="inline-flex h-10 items-center gap-1.5 rounded-[8px] border border-[#3B82F6] bg-[var(--octo-card)] px-3 text-[14px] font-medium text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/5"
+              >
+                <Bookmark size={18} strokeWidth={1.75} />
                 {t("customers.saveSegment")}
               </button>
             </div>
-
-            {toast && (
-              <div className="mt-2 rounded-[9px] bg-[#22C55E]/10 px-3 py-2 text-[11.5px] font-medium text-[#16a34a]">{toast}</div>
-            )}
 
             {visibleRows.length === 0 ? (
               <EmptyState
@@ -207,28 +251,29 @@ export function CustomersPage() {
               />
             ) : (
               <>
-                {selectedIds.size > 0 && (
+                {selectedCustomers.length > 0 && (
                   <BulkActionBar
-                    count={selectedIds.size}
-                    onSendWhatsapp={() => setToast(t("customers.bulk.whatsappSentConfirm").replace("{count}", String(selectedIds.size)))}
-                    onSendEmail={() => setToast(t("customers.bulk.emailSentConfirm").replace("{count}", String(selectedIds.size)))}
+                    count={selectedCustomers.length}
+                    onClearSelection={() => setSelectedIds(new Set())}
+                    onSendWhatsapp={() => showToast(countText("customers.bulk.whatsappSentConfirm"))}
+                    onSendEmail={() => showToast(countText("customers.bulk.emailSentConfirm"))}
                     onPaymentLink={() => setPaymentLinkFor(selectedCustomers[0] ?? null)}
-                    onAddTag={() => setTagTarget({ ids: [...selectedIds] })}
-                    onMerge={() => setToast(t("customers.bulk.mergedConfirm"))}
+                    onAddTag={() => setTagTarget({ ids: selectedCustomers.map((c) => c.id) })}
+                    onMerge={handleBulkMerge}
                     onExport={handleBulkExport}
                     onDelete={handleBulkDelete}
                   />
                 )}
 
-                <div className="mt-3 flex flex-col gap-2.5">
+                <div className="mt-5 flex flex-col gap-4">
                   {pageRows.map((customer) => (
                     <CustomerRow
                       key={customer.id}
                       customer={customer}
                       selected={selectedIds.has(customer.id)}
                       onToggleSelect={() => toggleSelect(customer.id)}
-                      onEdit={() => {}}
-                      onNewReservation={() => {}}
+                      onEdit={() => navigate(`/customers/${customer.id}`)}
+                      onNewReservation={() => navigate("/reservations/new")}
                       onOpenPaymentLink={() => setPaymentLinkFor(customer)}
                       onOpenRowActions={(anchor) => setRowMenu({ anchor, customer })}
                     />
@@ -248,10 +293,11 @@ export function CustomersPage() {
           </>
         )}
       </div>
+      <Toast message={toast} />
       <PaymentLinkModal
         customer={paymentLinkFor}
         onClose={() => setPaymentLinkFor(null)}
-        onSent={() => setToast(t("customers.paymentLink.sentConfirm"))}
+        onSent={() => showToast(t("customers.paymentLink.sentConfirm"))}
       />
       {rowMenu && (
         <RowActionsMenu
@@ -266,7 +312,8 @@ export function CustomersPage() {
         onClose={() => setNoteFor(null)}
         onSave={(text) => {
           if (!noteFor) return;
-          updateCustomer(noteFor.id, (c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }));
+          customerStore.updateCustomer(noteFor.id, (c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }));
+          showToast(t("customers.addNote.savedConfirm"));
         }}
       />
       <AddTagModal
@@ -274,24 +321,45 @@ export function CustomersPage() {
         onClose={() => setTagTarget(null)}
         onSave={(tag) => {
           if (!tagTarget) return;
-          setCustomers((prev) =>
+          customerStore.setCustomers((prev) =>
             prev.map((c) => (tagTarget.ids.includes(c.id) && !c.tags.includes(tag) ? { ...c, tags: [...c.tags, tag] } : c))
           );
+          showToast(t("customers.addTag.savedConfirm").replace("{tag}", tag));
         }}
       />
       <AddCustomerModal
         open={addCustomerOpen}
         onClose={() => setAddCustomerOpen(false)}
         onCreate={(customer) => {
-          setCustomers((prev) => [customer, ...prev]);
-          setToast(t("customers.addCustomer.createdConfirm"));
+          customerStore.setCustomers((prev) => [customer, ...prev]);
+          showToast(t("customers.addCustomer.createdConfirm"));
+        }}
+      />
+      <SaveSegmentModal
+        open={saveSegmentOpen}
+        defaultName={t("customers.segment.defaultName").replace("{n}", String(segments.length + 1))}
+        onClose={() => setSaveSegmentOpen(false)}
+        onSave={(name) => {
+          customerStore.addSegment(name, filters);
+          showToast(t("customers.segment.savedConfirm").replace("{name}", name));
         }}
       />
       <SendMessageWizard
         open={sendMessageOpen}
         customers={customers}
+        segments={segments}
         onClose={() => setSendMessageOpen(false)}
-        onSent={(count) => setToast(t("customers.sendMessage.sentConfirm").replace("{count}", String(count)))}
+        onSent={(count, timing) => {
+          const n = count.toLocaleString("en-US");
+          if (timing.kind === "later") {
+            const at = new Date(timing.at).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+            showToast(t("customers.sendMessage.scheduledConfirm").replace("{count}", n).replace("{at}", at));
+          } else if (timing.kind === "batches") {
+            showToast(t("customers.sendMessage.batchedConfirm").replace("{count}", n).replace("{size}", String(timing.batchSize)));
+          } else {
+            showToast(t("customers.sendMessage.sentConfirm").replace("{count}", n));
+          }
+        }}
       />
     </>
   );

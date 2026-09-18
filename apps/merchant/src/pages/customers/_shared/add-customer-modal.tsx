@@ -1,34 +1,29 @@
 // apps/merchant/src/pages/customers/_shared/add-customer-modal.tsx
 import { useState } from "react";
-import clsx from "clsx";
-import { X } from "lucide-react";
-import { Input, Modal, Select, Textarea } from "@ui/primitives";
+import { Plus } from "lucide-react";
+import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CRM_MODAL_CLASS } from "./action-button";
 import { Field } from "./form-field";
+import { CheckboxPill, DateField, PRIMARY_SUBMIT_CLASS, RadioBox, SelectBox, TEXTAREA_CLASS, TEXT_INPUT_CLASS } from "./form-controls";
 import { PhoneField, combinePhone } from "./phone-field";
 import { Switch } from "./switch";
 import { AddTagModal } from "./add-tag-modal";
+import { TagChips } from "./tag-chips";
+import { validateNewCustomer, type NewCustomerErrors } from "./validate-customer";
 import type { CommunicationChannel, CustomerRecord } from "./types";
 
-function GenderOption({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={clsx(
-        "flex flex-1 items-center gap-2 rounded-[9px] border px-3 py-2 text-[12.5px] transition-colors",
-        active ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)]"
-      )}
-    >
-      <span className={clsx("grid h-4 w-4 shrink-0 place-items-center rounded-full border", active ? "border-[#0D6EFD]" : "border-[var(--octo-border-input)]")}>
-        {active && <span className="h-2 w-2 rounded-full bg-[#0D6EFD]" />}
-      </span>
-      {label}
-    </button>
-  );
-}
-
 const CHANNELS: readonly CommunicationChannel[] = ["WhatsApp", "SMS", "Email"];
+const BRANCHES = ["Riyadh", "Jeddah", "Dammam", "Khobar"] as const;
+const AREAS = ["Indoor", "Outdoor", "Private Room", "Bar Seating"] as const;
+const SOURCES = [
+  { value: "Walk-in", key: "customers.addCustomer.source.walkIn" },
+  { value: "Website", key: "customers.addCustomer.source.website" },
+  { value: "Instagram", key: "customers.addCustomer.source.instagram" },
+  { value: "Referral", key: "customers.addCustomer.source.referral" },
+] as const;
+
+const DEFAULT_TAGS = ["VIP", "Frequent Diner"];
 
 export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (customer: CustomerRecord) => void }) {
   const { t } = useI18n();
@@ -45,15 +40,22 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
   const [note, setNote] = useState("");
   const [channels, setChannels] = useState<CommunicationChannel[]>(["WhatsApp"]);
   const [marketing, setMarketing] = useState(true);
-  const [tags, setTags] = useState<string[]>(["VIP", "Frequent Diner"]);
+  const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
   const [addTagOpen, setAddTagOpen] = useState(false);
-
-  const canSubmit = firstName.trim() !== "" && lastName.trim() !== "" && phoneDigits.trim() !== "";
+  const [errors, setErrors] = useState<NewCustomerErrors>({});
+  const [submitted, setSubmitted] = useState(false);
 
   function reset() {
     setFirstName(""); setLastName(""); setPhoneDigits(""); setEmail(""); setDob(""); setGender("Male");
     setBranch(""); setAreaTable(""); setSource("Walk-in"); setReferredBy(""); setNote("");
-    setChannels(["WhatsApp"]); setMarketing(true); setTags(["VIP", "Frequent Diner"]);
+    setChannels(["WhatsApp"]); setMarketing(true); setTags(DEFAULT_TAGS);
+    setErrors({}); setSubmitted(false);
+  }
+
+  // After the first submit attempt, errors update live as the user fixes them.
+  function revalidate(patch: Partial<Parameters<typeof validateNewCustomer>[0]>) {
+    if (!submitted) return;
+    setErrors(validateNewCustomer({ firstName, lastName, phoneDigits, email, ...patch }));
   }
 
   function toggleChannel(channel: CommunicationChannel) {
@@ -67,13 +69,17 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
   }
 
   function handleSubmit() {
-    if (!canSubmit) return;
+    const found = validateNewCustomer({ firstName, lastName, phoneDigits, email });
+    setSubmitted(true);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
     const today = new Date().toISOString().slice(0, 10);
     const customer: CustomerRecord = {
       id: `CUST-${Date.now()}`,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       gender,
+      dateOfBirth: dob || undefined,
       tags,
       phone: combinePhone(phoneDigits.trim()),
       email: email.trim(),
@@ -105,74 +111,73 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
     onClose();
   }
 
+  const err = (key: keyof NewCustomerErrors) => (errors[key] ? t(errors[key] as string) : undefined);
+
   return (
     <>
-      <Modal open={open} onClose={handleClose} title={t("customers.addCustomer.title")} className="max-w-[640px] max-h-[85vh] overflow-y-auto octo-scroll">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t("customers.addCustomer.firstName")} required>
-            <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t("customers.addCustomer.firstNamePlaceholder")} />
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title={t("customers.addCustomer.title")}
+        className={`max-w-[760px] max-h-[92vh] overflow-y-auto octo-scroll ${CRM_MODAL_CLASS}`}
+      >
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+          <Field label={t("customers.addCustomer.firstName")} required error={err("firstName")}>
+            <input className={TEXT_INPUT_CLASS} value={firstName} onChange={(e) => { setFirstName(e.target.value); revalidate({ firstName: e.target.value }); }} placeholder={t("customers.addCustomer.firstNamePlaceholder")} aria-invalid={!!errors.firstName} />
           </Field>
-          <Field label={t("customers.addCustomer.lastName")} required>
-            <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t("customers.addCustomer.lastNamePlaceholder")} />
+          <Field label={t("customers.addCustomer.lastName")} required error={err("lastName")}>
+            <input className={TEXT_INPUT_CLASS} value={lastName} onChange={(e) => { setLastName(e.target.value); revalidate({ lastName: e.target.value }); }} placeholder={t("customers.addCustomer.lastNamePlaceholder")} aria-invalid={!!errors.lastName} />
           </Field>
-          <Field label={t("customers.addCustomer.phone")} required>
-            <PhoneField digits={phoneDigits} onChange={setPhoneDigits} />
+          <Field label={t("customers.addCustomer.phone")} required error={err("phone")}>
+            <PhoneField digits={phoneDigits} onChange={(d) => { setPhoneDigits(d); revalidate({ phoneDigits: d }); }} />
           </Field>
-          <Field label={t("customers.addCustomer.email")}>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("customers.addCustomer.emailPlaceholder")} />
+          <Field label={t("customers.addCustomer.email")} error={err("email")}>
+            <input type="email" className={TEXT_INPUT_CLASS} value={email} onChange={(e) => { setEmail(e.target.value); revalidate({ email: e.target.value }); }} placeholder={t("customers.addCustomer.emailPlaceholder")} aria-invalid={!!errors.email} />
           </Field>
           <Field label={t("customers.addCustomer.dob")}>
-            <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} placeholder={t("customers.addCustomer.dobPlaceholder")} />
+            <DateField value={dob} onChange={setDob} placeholder={t("customers.addCustomer.dobPlaceholder")} ariaLabel={t("customers.addCustomer.dob")} withYear />
           </Field>
           <Field label={t("customers.addCustomer.gender")}>
-            <div className="flex gap-2">
-              <GenderOption label={t("customers.addCustomer.male")} active={gender === "Male"} onClick={() => setGender("Male")} />
-              <GenderOption label={t("customers.addCustomer.female")} active={gender === "Female"} onClick={() => setGender("Female")} />
+            <div role="radiogroup" aria-label={t("customers.addCustomer.gender")} className="flex gap-6">
+              <RadioBox label={t("customers.addCustomer.male")} checked={gender === "Male"} onClick={() => setGender("Male")} />
+              <RadioBox label={t("customers.addCustomer.female")} checked={gender === "Female"} onClick={() => setGender("Female")} />
             </div>
           </Field>
           <Field label={t("customers.addCustomer.branch")}>
-            <Select value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <SelectBox value={branch} onChange={setBranch} placeholderShown={branch === ""} ariaLabel={t("customers.addCustomer.branch")}>
               <option value="">{t("customers.addCustomer.branchPlaceholder")}</option>
-              {["Riyadh", "Jeddah", "Dammam", "Khobar"].map((b) => <option key={b} value={b}>{b}</option>)}
-            </Select>
+              {BRANCHES.map((b) => <option key={b} value={b}>{t(`customers.branch.${b.toLowerCase()}`)}</option>)}
+            </SelectBox>
           </Field>
           <Field label={t("customers.addCustomer.areaTable")}>
-            <Select value={areaTable} onChange={(e) => setAreaTable(e.target.value)}>
+            <SelectBox value={areaTable} onChange={setAreaTable} placeholderShown={areaTable === ""} ariaLabel={t("customers.addCustomer.areaTable")}>
               <option value="">{t("customers.addCustomer.areaTablePlaceholder")}</option>
-              {["Indoor", "Outdoor", "Private Room", "Bar Seating"].map((a) => <option key={a} value={a}>{a}</option>)}
-            </Select>
+              {AREAS.map((a) => <option key={a} value={a}>{t(`customers.area.${a.replace(/ /g, "").replace(/^./, (c) => c.toLowerCase())}`)}</option>)}
+            </SelectBox>
           </Field>
           <Field label={t("customers.addCustomer.source")}>
-            <Select value={source} onChange={(e) => setSource(e.target.value)}>
-              <option value="Walk-in">{t("customers.addCustomer.source.walkIn")}</option>
-              <option value="Website">{t("customers.addCustomer.source.website")}</option>
-              <option value="Instagram">{t("customers.addCustomer.source.instagram")}</option>
-              <option value="Referral">{t("customers.addCustomer.source.referral")}</option>
-            </Select>
+            <SelectBox value={source} onChange={setSource} ariaLabel={t("customers.addCustomer.source")}>
+              {SOURCES.map((s) => <option key={s.value} value={s.value}>{t(s.key)}</option>)}
+            </SelectBox>
           </Field>
           <Field label={t("customers.addCustomer.referredBy")}>
-            <Input value={referredBy} onChange={(e) => setReferredBy(e.target.value)} placeholder={t("customers.addCustomer.referredByPlaceholder")} />
+            <input className={TEXT_INPUT_CLASS} value={referredBy} onChange={(e) => setReferredBy(e.target.value)} placeholder={t("customers.addCustomer.referredByPlaceholder")} />
           </Field>
         </div>
 
-        <Field label={t("customers.addCustomer.note")} className="mt-4">
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("customers.addCustomer.notePlaceholder")} rows={3} />
+        <Field label={t("customers.addCustomer.note")} className="mt-3.5">
+          <textarea className={TEXTAREA_CLASS} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("customers.addCustomer.notePlaceholder")} rows={3} />
         </Field>
 
         <Field label={t("customers.addCustomer.preferenceCommunication")} className="mt-4">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {CHANNELS.map((channel) => (
-              <button
+              <CheckboxPill
                 key={channel}
-                type="button"
+                label={t(`customers.addCustomer.channel.${channel.toLowerCase()}`)}
+                checked={channels.includes(channel)}
                 onClick={() => toggleChannel(channel)}
-                className={clsx(
-                  "rounded-[9px] border px-3 py-2 text-[12.5px] font-medium transition-colors",
-                  channels.includes(channel) ? "border-[#0D6EFD] bg-[#0D6EFD]/5 text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)]"
-                )}
-              >
-                {t(`customers.addCustomer.channel.${channel.toLowerCase()}`)}
-              </button>
+              />
             ))}
           </div>
         </Field>
@@ -180,37 +185,26 @@ export function AddCustomerModal({ open, onClose, onCreate }: { open: boolean; o
         <div className="mt-4 flex items-start gap-3">
           <Switch checked={marketing} onChange={setMarketing} label={t("customers.addCustomer.marketingTitle")} />
           <div>
-            <div className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("customers.addCustomer.marketingTitle")}</div>
-            <div className="text-[11.5px] text-[var(--octo-text-muted)]">{t("customers.addCustomer.marketingDescription")}</div>
+            <div className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("customers.addCustomer.marketingTitle")}</div>
+            <div className="mt-0.5 text-[12.5px] text-[var(--octo-text-muted)]">{t("customers.addCustomer.marketingDescription")}</div>
           </div>
         </div>
 
-        <Field label={t("customers.addCustomer.tagLabel")} className="mt-4">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {tags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-[var(--octo-track)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--octo-text-secondary)]">
-                {tag}
-                <button type="button" onClick={() => setTags((prev) => prev.filter((t2) => t2 !== tag))} aria-label={`Remove ${tag}`}>
-                  <X size={11} className="text-[#EF4444]" />
-                </button>
-              </span>
-            ))}
+        <div className="mt-4">
+          <div className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("customers.addCustomer.tagLabel")}</div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {tags.length > 0 && <TagChips tags={tags} size="md" uniform onRemove={(tag) => setTags((prev) => prev.filter((t2) => t2 !== tag))} className="!gap-2.5" />}
             <button
               type="button"
               onClick={() => setAddTagOpen(true)}
-              className="rounded-full border border-dashed border-[var(--octo-border-input)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+              className="inline-flex h-8 items-center gap-1 rounded-full border border-[var(--octo-border-input)] px-3 text-[13px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
             >
-              + {t("customers.addCustomer.addTagCta")}
+              <Plus size={15} /> {t("customers.addCustomer.addTagCta")}
             </button>
           </div>
-        </Field>
+        </div>
 
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onClick={handleSubmit}
-          className="mt-6 w-full rounded-[10px] bg-[#0D6EFD] py-2.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <button type="button" onClick={handleSubmit} className={PRIMARY_SUBMIT_CLASS}>
           {t("customers.addCustomer.submit")}
         </button>
       </Modal>

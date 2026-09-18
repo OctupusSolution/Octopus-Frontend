@@ -6,7 +6,7 @@ import type { CustomerRecord } from "./types";
 export type RowActionId = "addNote" | "history" | "sendWhatsapp" | "sendEmail" | "addTag" | "toggleBlock" | "delete";
 
 const GAP = 6;
-const ESTIMATED_ITEM_HEIGHT = 42;
+const ESTIMATED_ITEM_HEIGHT = 46;
 const ITEM_COUNT = 7;
 
 export function RowActionsMenu({
@@ -58,13 +58,13 @@ export function RowActionsMenu({
     };
   }, [onClose]);
 
-  const items: { id: RowActionId; label: string; danger?: boolean }[] = [
+  const items: { id: RowActionId; label: string; danger?: boolean; muted?: boolean }[] = [
     { id: "addNote", label: t("customers.rowAction.addNote") },
     { id: "history", label: t("customers.rowAction.history") },
     { id: "sendWhatsapp", label: t("customers.rowAction.sendWhatsapp") },
     { id: "sendEmail", label: t("customers.rowAction.sendEmail") },
     { id: "addTag", label: t("customers.rowAction.addTag") },
-    { id: "toggleBlock", label: t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block") },
+    { id: "toggleBlock", label: t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block"), muted: true },
     { id: "delete", label: t("customers.rowAction.delete"), danger: true },
   ];
 
@@ -72,7 +72,7 @@ export function RowActionsMenu({
     <div
       ref={ref}
       role="menu"
-      className="fixed z-50 w-[200px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
+      className="fixed z-50 flex w-[180px] flex-col gap-1.5 rounded-xl bg-[var(--octo-card)] p-2 shadow-[0_8px_24px_rgba(16,24,40,0.14)]"
       style={style}
     >
       {items.map((item) => (
@@ -81,8 +81,12 @@ export function RowActionsMenu({
           type="button"
           role="menuitem"
           onClick={() => { onAction(item.id); onClose(); }}
-          className={`flex w-full items-center rounded-[8px] px-2.5 py-1.5 text-start text-[12.5px] transition-colors hover:bg-[var(--octo-hover)] ${
-            item.danger ? "text-[#EF4444]" : "text-[var(--octo-text-primary)]"
+          className={`flex h-10 w-full items-center rounded-[6px] px-2.5 text-start text-[14px] transition-[filter] hover:brightness-95 ${
+            item.danger
+              ? "bg-[#FEF2F2] text-[#EF4444]"
+              : item.muted
+                ? "bg-[var(--octo-track)] text-[var(--octo-text-muted)]"
+                : "bg-[var(--octo-hover)] text-[var(--octo-text-primary)]"
           }`}
         >
           {item.label}

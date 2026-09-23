@@ -12,8 +12,10 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { PageHeader, PageShell } from "../../_shared/page-header";
 import { FLOOR_PLAN_BUILDER_PATH, LIVE_FLOOR_PLAN_PATH, SCRATCH_PATH } from "../../_shared/paths";
 import { ToastBanner, useToast } from "../../_shared/toast";
-import { useFloorPlan, useLiveTables } from "../../_shared/use-floor-plan";
+import { useAdminText } from "../../_shared/admin-text";
+import { useBuilderStep, useFloorPlan, useLiveTables } from "../../_shared/use-floor-plan";
 import { DEFAULT_VIEW, type ViewOptions } from "../_shared/canvas-toolbar";
+import { EditLockNotice, useEditLock } from "../_shared/edit-lock";
 import { PlanReview, PublishConfirmModal, PublishSuccessModal } from "../_shared/publish-flow";
 import { StepBadge, StepProgress } from "../_shared/step-progress";
 import { useAutosave, usePlanEditor } from "../_shared/use-plan-editor";
@@ -53,6 +55,9 @@ export function QuickBoxLayoutPage() {
   });
 
   const [step, setStep] = useState<QuickStep>(boot.step);
+  const at = useAdminText();
+  const lock = useEditLock();
+  useBuilderStep(step);
   const [furthest, setFurthest] = useState<QuickStep>(boot.step === 1 && boot.doc.tables.length > 0 && boot.hadDraft ? 2 : boot.step);
   const [stepRevision, setStepRevision] = useState(0);
   const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW);
@@ -100,10 +105,10 @@ export function QuickBoxLayoutPage() {
     notify(t("floorPlan.actions.draftSaved"));
   }
 
-  function confirmPublish() {
+  async function confirmPublish() {
     published.current = true;
     const doc = editor.doc;
-    const outcome = floorPlan.publish(doc);
+    const outcome = await floorPlan.publish(doc);
     setConfirmOpen(false);
     setSuccessDoc(doc);
     if (outcome === "memoryOnly") notify(t("floorPlan.storage.memoryOnly"), "error");
@@ -118,6 +123,7 @@ export function QuickBoxLayoutPage() {
 
   return (
     <PageShell>
+      <EditLockNotice lock={lock} onTookOver={() => notify(at("lock.tookOver"))} />
       <div ref={topRef} className="scroll-mt-4">
         <PageHeader
           title={t("floorPlan.quick.title")}

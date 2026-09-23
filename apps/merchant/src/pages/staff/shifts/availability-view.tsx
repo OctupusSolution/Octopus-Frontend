@@ -1,13 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, UserRound } from "lucide-react";
 import clsx from "clsx";
+import { getStaffAvailability, type AvailabilityRowResponse } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
 import { TODAY } from "@/shared/api/mock-staff";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "../_shared/avatar";
 import { buttonClass } from "../_shared/buttons";
 import { addDays, formatWeekRange, formatWeekdayDate, fromISO, startOfWeek, toISO } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
+import { useCatalogNames } from "../_shared/catalog-names";
 import { useStaffStore } from "../_shared/staff-store";
 import { StatusPill, type PillTone } from "../_shared/status-pill";
 import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
@@ -23,9 +26,33 @@ export function AvailabilityView({
   onOpenSchedule: () => void;
 }) {
   const { t, locale } = useI18n();
+  const { activeBusinessId } = useAuth();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const store = useStaffStore();
   const [shiftFor, setShiftFor] = useState<string | null>(null);
+
+  // The local `store.availability` toggle has no server field behind it
+  // (BACKEND_GAPS 6.5: GET /availability is read-only and was never called).
+  // This fetches the real thing for today and lets it stand in wherever it
+  // has an answer, falling back to the local guess only where it doesn't.
+  const [serverAvailability, setServerAvailability] = useState<Map<string, AvailabilityRowResponse> | null>(null);
+  useEffect(() => {
+    if (!activeBusinessId) return;
+    let cancelled = false;
+    getStaffAvailability(activeBusinessId, { date: TODAY, pageSize: 200 })
+      .then((res) => {
+        if (!cancelled) setServerAvailability(new Map(res.data.map((row) => [row.staffMemberId, row])));
+      })
+      .catch(() => {
+        if (!cancelled) setServerAvailability(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBusinessId]);
+
+  const isTimeOfDay = (s: string) => /^\d{1,2}:\d{2}/.test(s);
 
   const today = fromISO(TODAY);
   const week = useMemo(() => {
@@ -36,12 +63,24 @@ export function AvailabilityView({
   const staff = store.employees.filter((e) => e.role !== "Owner" && !store.isInactive(e.id));
 
   const statusOf = (employeeId: string): AvailabilityStatus => {
+    const row = serverAvailability?.get(employeeId);
+    if (row) {
+      if (row.timeOffTypeNameEn || row.timeOffTypeNameAr) return "onLeave";
+      return row.status === "Available" ? "available" : "unavailable";
+    }
     if (approvedLeaveOn(store.leaveRequests, employeeId, TODAY)) return "onLeave";
     if (store.availability[employeeId]?.[today.getDay()] === false) return "unavailable";
     return "available";
   };
 
   const dayLabel = (employeeId: string, date: Date) => {
+    // The server row is only ever for TODAY (the fetch above is a single
+    // date), so it only stands in on that column — other days in the week
+    // dialog keep reading the local schedule.
+    const row = toISO(date) === TODAY ? serverAvailability?.get(employeeId) : undefined;
+    if (row?.shiftStart && row.shiftEnd && isTimeOfDay(row.shiftStart) && isTimeOfDay(row.shiftEnd)) {
+      return rangeLabel(row.shiftStart, row.shiftEnd, locale);
+    }
     const key = shiftKey(employeeId, date);
     const cell = store.shifts[key];
     if (cell) return rangeLabel(cell.start, cell.end, locale);
@@ -82,7 +121,7 @@ export function AvailabilityView({
                       <span className="min-w-0">
                         <span className="block truncate font-medium text-[var(--octo-text-primary)]">{e.name}</span>
                         <span className="block truncate text-[13px] text-[#0D6EFD]">
-                          {labels.data("staff.jobTitle", store.profileOf(e.id)?.jobTitle ?? "")}
+                          {names.jobTitle(store.profileOf(e.id)?.jobTitle ?? "")}
                         </span>
                       </span>
                     </span>

@@ -1,11 +1,23 @@
 // Offer Info — the first of the offer editor's five tabs.
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import { Select } from "@ui/primitives";
+import { checkOfferSlugAvailability } from "@octopus/api-client";
 import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { MediaTile } from "@/shared/ui/media-tile";
 import type { Offer } from "@/entities/menu";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** The API takes lowercase words joined by hyphens; this mirrors
+ *  entities/menu/offers-sync.ts's own toSlug, which is what actually gets
+ *  sent on save, not the underscored value the field shows while typing. */
+const toApiSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const DEBOUNCE_MS = 400;
+
+type SlugCheck = "idle" | "checking" | "available" | "taken" | "error";
 
 const inputClass =
   "mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]";
@@ -54,7 +66,35 @@ export function TabInfo({
   onPatch: (patch: Partial<Offer>) => void;
 }) {
   const { t } = useI18n();
+  const { activeBusinessId } = useAuth();
   const picker = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
+
+  const apiSlug = toApiSlug(offer.slug);
+  const [slugCheck, setSlugCheck] = useState<SlugCheck>("idle");
+
+  useEffect(() => {
+    if (!activeBusinessId || apiSlug === "") {
+      setSlugCheck("idle");
+      return;
+    }
+    let cancelled = false;
+    setSlugCheck("checking");
+    const timer = window.setTimeout(() => {
+      checkOfferSlugAvailability(activeBusinessId, apiSlug, UUID.test(offer.id) ? offer.id : undefined)
+        .then((res) => {
+          if (!cancelled) setSlugCheck(res.available ? "available" : "taken");
+        })
+        .catch(() => {
+          if (!cancelled) setSlugCheck("error");
+        });
+    }, DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // offer.id only affects which slug the check excludes, not when it reruns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBusinessId, apiSlug]);
 
   return (
     <div className="max-w-[720px] space-y-4">
@@ -86,6 +126,21 @@ export function TabInfo({
           value={offer.slug}
           onChange={(e) => onPatch({ slug: e.target.value })}
         />
+        {slugCheck !== "idle" && (
+          <p
+            className={clsx(
+              "mt-1.5 flex items-center gap-1.5 text-[12.5px]",
+              slugCheck === "available" && "text-[var(--octo-tone-success-text)]",
+              slugCheck === "taken" && "text-error",
+              (slugCheck === "checking" || slugCheck === "error") && "text-[var(--octo-text-muted)]"
+            )}
+          >
+            {slugCheck === "checking" && <Loader2 size={13} className="animate-spin" aria-hidden />}
+            {slugCheck === "available" && <Check size={13} aria-hidden />}
+            {slugCheck === "taken" && <X size={13} aria-hidden />}
+            {t(`menuOffer.slugCheck.${slugCheck}`)}
+          </p>
+        )}
       </label>
 
       <div>

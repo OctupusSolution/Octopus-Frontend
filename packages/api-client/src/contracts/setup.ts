@@ -49,9 +49,9 @@ export interface ModuleOfferingResponse {
   name: LocalizedText;
   description: LocalizedText | null;
   iconRef: string | null;
-  /** e.g. "Included" vs. an optional add-on — exact values are backend enum
-   *  strings, not enumerated here since they weren't confirmed against code. */
+  /** ModuleInclusion: "Mandatory" | "Optional". */
   inclusion: string;
+  /** PricingMode: "Included" (amountMinor null) | "Priced". */
   pricingMode: string;
   amountMinor: number | null;
   requiredModuleCodes: string[];
@@ -127,9 +127,42 @@ export interface QuoteResponse {
 
 export type BusinessSetupStatus = "Draft" | "AwaitingPayment" | "Paid" | "Completed" | "Cancelled";
 
+/** Wire values of `allowedActions` (SetupAllowedActions.cs) — the UI enables
+ *  controls from these, not from `status`. */
+export type SetupAction = "EditSetup" | "Checkout" | "ConfirmPayment" | "CancelCheckout" | "CancelSetup" | "OpenBusiness";
+
+/** Wire values of `nextStep` (SetupNextStep.cs). */
+export type SetupNextStep = "BusinessProfile" | "Services" | "Modules" | "Integrations" | "Payment" | "GoLive";
+
+/** The only filter GET /v1/business-setups accepts; anything else (including
+ *  none) is 422 onboarding.setup.status-filter-invalid. */
+export const OPEN_SETUP_STATUS_FILTER = "open";
+
+/** A problem blocking pricing or payment. Same shape for a setup's `issues`
+ *  and the quote preview's `issues` problem extension. There is no message —
+ *  `code` is one of e.g. "business-type-unavailable",
+ *  "business-variant-unavailable", "module-unavailable", "add-on-unavailable",
+ *  "add-on-requires-module", "price-missing". */
 export interface SetupIssueResponse {
   code: string;
-  message: string;
+  itemCode: string | null;
+  categoryCode: string | null;
+  providerCode: string | null;
+}
+
+/** Top-level problem+json extension members the Onboarding errors carry
+ *  (OnboardingErrors.cs): `issues` on onboarding.quote.selection-invalid /
+ *  onboarding.setup.has-issues, `quote` on onboarding.quote.changed,
+ *  `setupStatus` on not-editable / checkout.not-in-progress, `payment` on
+ *  checkout.in-progress, `missing` on setup.incomplete, `currentVersion` on
+ *  setup.version-conflict. */
+export interface SetupProblemExtensions {
+  issues?: SetupIssueResponse[];
+  quote?: QuoteResponse;
+  setupStatus?: BusinessSetupStatus;
+  payment?: SetupPaymentResponse;
+  missing?: string[];
+  currentVersion?: number;
 }
 
 export interface SetupPaymentResponse {
@@ -151,7 +184,7 @@ export interface BusinessSetupResponse {
   status: BusinessSetupStatus;
   /** Echo back as `expectedVersion` on every write. */
   version: number;
-  nextStep: string | null;
+  nextStep: SetupNextStep | null;
   businessName: string | null;
   businessTypeCode: string | null;
   businessVariantCode: string | null;
@@ -163,7 +196,7 @@ export interface BusinessSetupResponse {
   canCheckout: boolean;
   payment: SetupPaymentResponse | null;
   provisioning: SetupProvisioningResponse | null;
-  allowedActions: string[];
+  allowedActions: SetupAction[];
   createdAtUtc: string;
   updatedAtUtc: string;
 }
@@ -172,7 +205,7 @@ export interface BusinessSetupSummaryResponse {
   setupId: string;
   status: BusinessSetupStatus;
   businessName: string | null;
-  nextStep: string | null;
+  nextStep: SetupNextStep | null;
   updatedAtUtc: string;
 }
 

@@ -22,7 +22,7 @@ export const STATE_STYLE: Record<OrderState, StateStyle> = {
   Canceled: { text: "#DC2626", bg: "#DC26261A", dot: "#DC2626" },
 };
 
-export type OrderAction = "cancel" | "void" | "wastage" | "refund";
+export type OrderAction = "cancel" | "void" | "wastage" | "refund" | "payment";
 
 export interface ActionTheme {
   accent: string;
@@ -32,9 +32,13 @@ export interface ActionTheme {
 // "Manager Authentication & Security" frame: red for Cancel, amber for Void,
 // violet for Wastage, and the olive-yellow the Refund frame uses (which is
 // noticeably greener than the brown-amber the Refund row button carries).
+// "payment" has no frame of its own (BACKEND_GAPS.md 6b.18) — it takes the
+// same green "Paid Cash" tone order-row.tsx already uses for money in hand,
+// not a PIN-confirm colour, since recording a payment needs no approval.
 export const ACTION_THEME: Record<OrderAction, ActionTheme> = {
   cancel: { accent: "#DC2626" },
   void: { accent: "#F59E0B" },
   wastage: { accent: "#9333EA" },
   refund: { accent: "#A9A32B" },
+  payment: { accent: "#16A34A" },
 };

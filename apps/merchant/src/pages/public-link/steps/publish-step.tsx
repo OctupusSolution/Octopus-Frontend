@@ -16,6 +16,7 @@ import {
   Download,
   ExternalLink,
   Globe,
+  History,
   Mail,
   MessageCircle,
   Share2,
@@ -30,6 +31,7 @@ import { previewModelFromSite } from "../_shared/preview-model";
 import { DeviceFrame } from "../ui/device-frame";
 import { QrCode } from "../ui/qr-code";
 import { SitePreviewModal } from "../ui/site-preview-modal";
+import { PublicLinkVersionsModal } from "../ui/versions-modal";
 import type { SiteAction } from "../_shared/site-draft";
 import type { StepProps } from "../_shared/steps";
 
@@ -138,6 +140,7 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const [copiedSocial, setCopiedSocial] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
   const [siteView, setSiteView] = useState<PreviewDevice | null>(null);
   const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
   const qrRef = useRef<HTMLDivElement>(null);
@@ -203,16 +206,29 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
               )}
             </span>
           )}
+          <Button size="sm" variant="ghost" onClick={() => setVersionsOpen(true)} className="ms-auto">
+            <History size={14} className="me-1" />
+            {t("publicLink.versions.open")}
+          </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => publicLinkSync.unpublish()}
-            className="ms-auto !text-[#DC2626] hover:bg-[#DC2626]/10"
+            className="!text-[#DC2626] hover:bg-[#DC2626]/10"
           >
             {t("publicLink.unpublish")}
           </Button>
         </div>
       )}
+
+      <PublicLinkVersionsModal
+        open={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        listVersions={publicLinkSync.listVersions}
+        getVersion={publicLinkSync.getVersion}
+        onRestore={publicLinkSync.restoreVersion}
+        onRollback={publicLinkSync.rollbackVersion}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         {/* Go-live checklist */}

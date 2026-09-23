@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Modal } from "@ui/primitives";
-import { LANGUAGE_OPTIONS, TODAY, branches, staffRoles, type Branch, type Employee, type StaffRole } from "@/shared/api/mock-staff";
+import { LANGUAGE_OPTIONS, TODAY, branches, type Branch, type Employee, type StaffRole } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { Field, SelectInput, TextInput } from "./_shared/form";
 import { EMAIL_RE, PHONE_RE, useStaffLabels } from "./_shared/labels";
 import { toISO } from "./_shared/format";
 import { useStaffStore } from "./_shared/staff-store";
+import { useLocalName, useTx } from "./_shared/text";
+import { useAssignableRoles } from "./_shared/use-assignable-roles";
 
 interface AddMemberForm {
   firstName: string;
@@ -17,7 +19,10 @@ interface AddMemberForm {
   nationality: string;
   languages: string;
   branch: Branch;
-  role: StaffRole;
+  /** Ids from the business's catalogs / roles; "" = none. */
+  jobTitleId: string;
+  departmentId: string;
+  roleId: string;
   employmentType: "Full time" | "Part time";
 }
 
@@ -30,7 +35,9 @@ const EMPTY: AddMemberForm = {
   nationality: "",
   languages: LANGUAGE_OPTIONS[0],
   branch: branches[0],
-  role: "Waiter",
+  jobTitleId: "",
+  departmentId: "",
+  roleId: "",
   employmentType: "Full time",
 };
 
@@ -38,6 +45,9 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
   const { t } = useI18n();
   const labels = useStaffLabels();
   const store = useStaffStore();
+  const tx = useTx();
+  const localName = useLocalName();
+  const assignable = useAssignableRoles();
   const [form, setForm] = useState<AddMemberForm>(EMPTY);
   const [errors, setErrors] = useState<Partial<Record<keyof AddMemberForm, string>>>({});
 
@@ -69,13 +79,14 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
     }
 
     const name = `${form.firstName.trim()} ${form.lastName.trim()}`;
+    const role = assignable.find((r) => r.id === form.roleId);
     const highest = store.employees.reduce((max, e) => Math.max(max, Number(e.id.replace(/\D/g, "")) || 0), 0);
     const employee: Employee = {
       id: `EMP-${String(highest + 1).padStart(3, "0")}`,
       name,
       nameAr: name,
       phone: form.phone.trim(),
-      role: form.role,
+      role: (role?.name ?? "") as StaffRole,
       branch: form.branch,
       status: "Off Duty",
       todayShift: "—",
@@ -95,6 +106,9 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
       ...(form.dateOfBirth ? { dateOfBirth: form.dateOfBirth } : {}),
       ...(form.nationality.trim() ? { nationality: form.nationality.trim() } : {}),
       languages: form.languages,
+      jobTitle: form.jobTitleId,
+      department: form.departmentId,
+      assignedRole: form.roleId,
     });
     onCreated(name);
     close();
@@ -170,16 +184,39 @@ export function AddMemberModal({ open, onClose, onCreated }: { open: boolean; on
             ))}
           </SelectInput>
         </Field>
-        <Field label={t("staff.addMember.position")} htmlFor="add-role">
-          <SelectInput id="add-role" value={form.role} onChange={(e) => set("role", e.target.value as StaffRole)}>
-            {staffRoles
-              .filter((r) => r !== "Owner")
-              .map((r) => (
-                <option key={r} value={r}>{labels.staffRole(r)}</option>
+        <Field
+          label={t("staff.addMember.position")}
+          htmlFor="add-title"
+          hint={store.jobTitles.length === 0 ? tx("Add job titles from “Job titles & departments”.", "أضف المسميات من «المسميات والأقسام».") : undefined}
+        >
+          <SelectInput id="add-title" value={form.jobTitleId} onChange={(e) => set("jobTitleId", e.target.value)}>
+            <option value="">{tx("No job title", "بدون مسمى وظيفي")}</option>
+            {store.jobTitles
+              .filter((j) => j.isActive)
+              .map((j) => (
+                <option key={j.id} value={j.id}>{localName(j)}</option>
               ))}
           </SelectInput>
         </Field>
-        <Field label={t("staff.member.field.employmentType")} htmlFor="add-type" className="sm:col-span-2">
+        <Field label={t("staff.member.field.department")} htmlFor="add-dept">
+          <SelectInput id="add-dept" value={form.departmentId} onChange={(e) => set("departmentId", e.target.value)}>
+            <option value="">{tx("No department", "بدون قسم")}</option>
+            {store.departments
+              .filter((d) => d.isActive)
+              .map((d) => (
+                <option key={d.id} value={d.id}>{localName(d)}</option>
+              ))}
+          </SelectInput>
+        </Field>
+        <Field label={t("staff.member.field.assignedRole")} htmlFor="add-role" hint={tx("What the member may do. Job titles grant nothing.", "ما يمكن للموظف فعله. المسمى الوظيفي لا يمنح صلاحيات.")}>
+          <SelectInput id="add-role" value={form.roleId} onChange={(e) => set("roleId", e.target.value)}>
+            <option value="">{tx("No role yet", "بدون دور حاليًا")}</option>
+            {assignable.map((r) => (
+              <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
+            ))}
+          </SelectInput>
+        </Field>
+        <Field label={t("staff.member.field.employmentType")} htmlFor="add-type">
           <SelectInput id="add-type" value={form.employmentType} onChange={(e) => set("employmentType", e.target.value as AddMemberForm["employmentType"])}>
             <option value="Full time">{t("staff.member.employment.fullTime")}</option>
             <option value="Part time">{t("staff.member.employment.partTime")}</option>

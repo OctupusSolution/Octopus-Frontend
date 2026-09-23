@@ -36,40 +36,47 @@ function ModalHeader({ title, subtitle, onClose }: { title: string; subtitle?: s
   );
 }
 
-export function UpdateTableModal({
+/** The update form's body, with no `<Modal>` of its own — so a caller that
+ *  already has the table open in a modal (the live floor's own detail
+ *  dialog) can show it inline, merged with the rest of the table's detail,
+ *  rather than stacking a second modal on top of the first. `embedded` drops
+ *  the form's own header and Cancel button, since a merged view has nothing
+ *  separate to cancel out of — only Reset (clears the override) and Save
+ *  stay. */
+export function UpdateTableForm({
   entry,
-  open,
-  onClose,
   now,
   onSave,
   onReset,
+  onCancel,
+  embedded = false,
 }: {
-  entry: LiveEntry | null;
-  open: boolean;
-  onClose: () => void;
+  entry: LiveEntry;
   now: number;
   onSave: (state: LiveTableState) => void;
   onReset: () => void;
+  onCancel?: () => void;
+  embedded?: boolean;
 }) {
   const { t } = useI18n();
   const [form, setForm] = useState<LiveTableState | null>(null);
   const [arrival, setArrival] = useState<(typeof ARRIVAL_OPTIONS)[number]>("60");
 
   useEffect(() => {
-    if (open && entry) {
-      setForm(entry.state);
-      const minutes = Math.max(0, Math.round((entry.state.since - now) / MINUTE));
-      setArrival((ARRIVAL_OPTIONS.find((o) => Number(o) >= minutes) ?? "120") as (typeof ARRIVAL_OPTIONS)[number]);
-    }
-  }, [open, entry, now]);
+    setForm(entry.state);
+    const minutes = Math.max(0, Math.round((entry.state.since - now) / MINUTE));
+    setArrival((ARRIVAL_OPTIONS.find((o) => Number(o) >= minutes) ?? "120") as (typeof ARRIVAL_OPTIONS)[number]);
+    // Seeded once per table, when the form first mounts for it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.table.id]);
 
-  if (!entry || !form) return null;
+  if (!form) return null;
   const { table } = entry;
   const blocked = table.blocked;
   const withGuest = form.status === "occupied" || form.status === "reserved";
 
   function save() {
-    if (!form || !entry) return;
+    if (!form) return;
     let since = form.since;
     if (form.status === "reserved") since = now + Number(arrival) * MINUTE;
     else if (form.status !== entry.state.status) since = now;
@@ -84,16 +91,18 @@ export function UpdateTableModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} className="max-w-lg p-6">
-      <ModalHeader
-        title={t("floorPlan.live.update.title").replace("{number}", table.number)}
-        subtitle={t("floorPlan.live.update.subtitle")}
-        onClose={onClose}
-      />
+    <>
+      {!embedded && (
+        <ModalHeader
+          title={t("floorPlan.live.update.title").replace("{number}", table.number)}
+          subtitle={t("floorPlan.live.update.subtitle")}
+          onClose={onCancel ?? (() => undefined)}
+        />
+      )}
       {blocked ? (
-        <p className="mt-4 rounded-xl bg-[var(--octo-soft-bg)] p-4 text-[13.5px] text-[var(--octo-text-secondary)]">{t("floorPlan.live.update.blocked")}</p>
+        <p className={clsx("rounded-xl bg-[var(--octo-soft-bg)] p-4 text-[13.5px] text-[var(--octo-text-secondary)]", !embedded && "mt-4")}>{t("floorPlan.live.update.blocked")}</p>
       ) : (
-        <div className="mt-5 flex flex-col gap-4">
+        <div className={clsx("flex flex-col gap-4", !embedded && "mt-5")}>
           <div>
             <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">{t("floorPlan.live.detail.status")}</p>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
@@ -156,9 +165,11 @@ export function UpdateTableModal({
           <span />
         )}
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
-          <Button variant="secondary" onClick={onClose} className="h-10 justify-center px-4 text-[13px]">
-            {t("floorPlan.common.cancel")}
-          </Button>
+          {!embedded && (
+            <Button variant="secondary" onClick={onCancel} className="h-10 justify-center px-4 text-[13px]">
+              {t("floorPlan.common.cancel")}
+            </Button>
+          )}
           {!blocked && (
             <Button onClick={save} className="h-10 justify-center px-5 text-[13px]">
               {t("floorPlan.common.save")}
@@ -166,7 +177,7 @@ export function UpdateTableModal({
           )}
         </div>
       </div>
-    </Modal>
+    </>
   );
 }
 

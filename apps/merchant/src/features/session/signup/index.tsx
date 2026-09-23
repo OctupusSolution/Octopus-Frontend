@@ -8,7 +8,8 @@ import { Mail, Lock, User, Building2 } from "lucide-react";
 import { register, ApiError } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthField, AuthButton } from "../_shared/auth-field";
-import { SocialRow, type SocialProvider } from "../_shared/social-row";
+import { SocialRow } from "../_shared/social-row";
+import { useExternalSignIn, type ExternalLinkRouteState } from "../_shared/use-external-sign-in";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -76,10 +77,13 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
     }
   }
 
-  // Social sign-in isn't wired to a real OAuth flow yet.
-  function handleSocialSignUp(_provider: SocialProvider) {
-    setErrors({ email: t("auth.error.socialUnavailable") });
-  }
+  // A provider whose verified email already has a password account can't be
+  // linked from here — the owner has to sign in first, so the pending link
+  // travels to the sign-in page, which finishes it.
+  const social = useExternalSignIn((externalLink) => {
+    const state: ExternalLinkRouteState = { externalLink };
+    navigate("/login", { state });
+  });
 
   return (
     <form
@@ -91,7 +95,16 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
         {t("auth.signUp.title")}
       </h1>
 
-      <SocialRow onPick={handleSocialSignUp} />
+      <SocialRow
+        intent="signup"
+        onCredential={(provider, credential, mail) => void social.signIn(provider, credential, mail)}
+        busy={social.busy}
+      />
+      {social.error && (
+        <p role="alert" className="-mt-2 text-[13px] text-error">
+          {social.error}
+        </p>
+      )}
 
       <AuthField
         label={t("auth.fullName")}

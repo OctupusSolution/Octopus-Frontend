@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { CalendarDays, CircleX, Plus, RefreshCw, Send, SearchX, X } from "lucide-react";
+import { CalendarDays, CircleX, Plus, RefreshCw, Send, SearchX, Settings, X } from "lucide-react";
 import {
   DEFAULT_FILTERS,
   computeStats,
@@ -22,18 +22,22 @@ import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { downloadCsv } from "@/pages/reports/_shared/export";
 import { openExternal } from "@/pages/reservations/_shared/download";
 import { whatsappHref } from "@/pages/reservations/_shared/guest-actions";
+import { describeWaitlistError } from "./_shared/waitlist-api";
 import { ConfirmModal } from "@/pages/reservations/floor-plan/_shared/confirm-modal";
 import { ToastBanner, useToast } from "@/pages/reservations/floor-plan/_shared/toast";
 import { useNow } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
 import { EmptyWaitlistIllustration } from "./_shared/glyphs";
 import { CHANNEL_KEY, SOURCE_KEY, STATUS_KEY, fill } from "./_shared/labels";
 import { waitlistSeatPath } from "./_shared/paths";
-import { useAreas, useSeatingFloor, useWaitlist } from "./_shared/use-waitlist";
+import { useAreas, useSeatingFloor, useWaitlist, useWaitlistDayStats } from "./_shared/use-waitlist";
+import { useWaitlistExtraText } from "./_shared/extra-text";
 import { GuestFormModal } from "./guest-form-modal";
 import { HistoryModal } from "./history-modal";
+import { WaitlistSettingsModal } from "./settings-modal";
 import { WaitlistStatCards } from "./stat-cards";
 import { WaitlistToolbar } from "./toolbar";
 import { WaitlistTable, type RowHandlers } from "./waitlist-table";
+import { ManageApprovalPinLink } from "@/features/session/approval-pin";
 
 type Confirm = { kind: "remove"; entries: WaitlistEntry[] } | null;
 
@@ -44,6 +48,13 @@ export function WaitlistPage() {
   const { activeBusiness } = useTenantConfig();
   const waitlist = useWaitlist();
   const { entries } = waitlist;
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [removePin, setRemovePin] = useState("");
+  // A failed call shows in the banner instead of being dropped.
+  function run(job: Promise<unknown> | undefined) {
+    setActionError(null);
+    job?.catch((err) => setActionError(describeWaitlistError(err)));
+  }
   const { doc: floor } = useSeatingFloor();
   const areas = useAreas();
   const clock = useNow();
@@ -60,6 +71,8 @@ export function WaitlistPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const text = useWaitlistExtraText();
 
   // The Seat Guest screen hands its confirmation back through router state.
   useEffect(() => {
@@ -69,7 +82,11 @@ export function WaitlistPage() {
     navigate(location.pathname, { replace: true, state: null });
   }, [location.state, location.pathname, navigate, showToast]);
 
-  const stats = useMemo(() => computeStats(entries, now), [entries, now]);
+  // The server's day counters win; counters computed from the loaded rows are
+  // the fallback while it loads or if it fails.
+  const serverStats = useWaitlistDayStats(entries);
+  const localStats = useMemo(() => computeStats(entries, now), [entries, now]);
+  const stats = serverStats ?? localStats;
   const rows = useMemo(() => sortEntries(filterEntries(entries, filters), sort, now), [entries, filters, sort, now]);
   const dayStart = startOfDay(now);
   const hasQueue = entries.some((e) => isActive(e) || (e.status === "left" && (e.leftAt ?? 0) >= dayStart));
@@ -89,7 +106,7 @@ export function WaitlistPage() {
   const selectedActive = selectedEntries.filter(isActive);
 
   function notifyGuest(entry: WaitlistEntry) {
-    waitlist.notify(entry.id);
+    run(waitlist.notify(entry.id));
     const restaurant = activeBusiness?.businessName?.trim() || "Octopus";
     const message = fill(t("waitlist.message.tableReady"), { name: entry.firstName, restaurant });
     if (entry.channel === "whatsapp") openExternal(whatsappHref(entry.phone, message));
@@ -109,10 +126,16 @@ export function WaitlistPage() {
       setFormOpen(true);
     },
     onMoveUp: (entry) => {
-      waitlist.moveUp(entry.id);
+      run(waitlist.moveUp(entry.id));
       showToast(fill(t("waitlist.toast.movedUp"), { name: fullName(entry) }), "info");
     },
     onHistory: (entry) => setHistoryId(entry.id),
+    onRevertReady: (entry) => {
+      run(waitlist.revertReady(entry.id).then(() => showToast(fill(text.revertedToast, { name: fullName(entry) }), "info")));
+    },
+    onReinstate: (entry) => {
+      run(waitlist.reinstate(entry.id).then(() => showToast(fill(text.reinstatedToast, { name: fullName(entry) }), "info")));
+    },
   };
 
   function exportCsv() {
@@ -155,6 +178,16 @@ export function WaitlistPage() {
 
   return (
     <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-8">
+      {(waitlist.error || actionError) && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+          <span>{actionError ?? waitlist.error}</span>
+          {waitlist.error && !actionError && (
+            <button type="button" className="shrink-0 underline" onClick={waitlist.reload}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">{t("waitlist.title")}</h1>
@@ -173,6 +206,15 @@ export function WaitlistPage() {
             className="grid h-12 w-12 place-items-center rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
           >
             <RefreshCw size={22} strokeWidth={1.6} className={clsx(spinning && "animate-spin")} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label={text.settings}
+            title={text.settings}
+            className="grid h-12 w-12 place-items-center rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            <Settings size={22} strokeWidth={1.6} />
           </button>
           <button type="button" onClick={openAdd} className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-[#0D6EFD] px-4 text-[17px] font-semibold text-white transition-opacity hover:opacity-90">
             <Plus size={22} strokeWidth={2} />
@@ -217,7 +259,7 @@ export function WaitlistPage() {
                 type="button"
                 disabled={selectedActive.length === 0}
                 onClick={() => {
-                  selectedActive.forEach((entry) => waitlist.notify(entry.id));
+                  selectedActive.forEach((entry) => run(waitlist.notify(entry.id)));
                   showToast(fill(t("waitlist.toast.bulkNotified"), { n: selectedActive.length }));
                   setSelected(new Set());
                 }}
@@ -277,10 +319,10 @@ export function WaitlistPage() {
         onClose={() => setFormOpen(false)}
         onSubmit={(input) => {
           if (editing) {
-            waitlist.update(editing.id, input);
+            run(waitlist.update(editing.id, input));
             showToast(fill(t("waitlist.toast.updated"), { name: `${input.firstName} ${input.lastName}`.trim() }));
           } else {
-            waitlist.add(input);
+            run(waitlist.add(input));
             showToast(fill(t("waitlist.toast.added"), { name: `${input.firstName} ${input.lastName}`.trim() }));
           }
           setFormOpen(false);
@@ -289,6 +331,8 @@ export function WaitlistPage() {
 
       <HistoryModal entry={historyEntry} now={now} onClose={() => setHistoryId(null)} />
 
+      <WaitlistSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       {confirm && (
         <ConfirmModal
           open
@@ -296,14 +340,33 @@ export function WaitlistPage() {
           icon={<CircleX size={20} />}
           onClose={() => setConfirm(null)}
           title={confirm.entries.length === 1 ? fill(t("waitlist.confirmRemove.title"), { name: fullName(confirm.entries[0]) }) : fill(t("waitlist.confirmRemove.titleMany"), { n: confirm.entries.length })}
-          body={t("waitlist.confirmRemove.body")}
+          body={
+            <>
+              <p>{t("waitlist.confirmRemove.body")}</p>
+              <label className="mt-3 block text-[12px] font-medium text-[var(--octo-text-primary)]">
+                Manager approval PIN
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={removePin}
+                  onChange={(e) => setRemovePin(e.target.value)}
+                  className="mt-1 block h-10 w-full rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 text-[14px]"
+                />
+              </label>
+              {/* The backend answers "PIN not set" until the approver sets one —
+                  this is the only place in the console that can. */}
+              <ManageApprovalPinLink className="mt-2" />
+            </>
+          }
           actions={[
             { label: t("waitlist.form.cancel"), variant: "secondary", onClick: () => setConfirm(null) },
             {
               label: t("waitlist.confirmRemove.confirm"),
               variant: "danger",
               onClick: () => {
-                confirm.entries.forEach((entry) => waitlist.leave(entry.id));
+                confirm.entries.forEach((entry) => run(waitlist.leave(entry.id, removePin)));
+                setRemovePin("");
                 showToast(confirm.entries.length === 1 ? fill(t("waitlist.toast.removed"), { name: fullName(confirm.entries[0]) }) : fill(t("waitlist.toast.removedMany"), { n: confirm.entries.length }), "info");
                 setSelected(new Set());
                 setConfirm(null);

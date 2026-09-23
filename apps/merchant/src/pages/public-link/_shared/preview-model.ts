@@ -30,7 +30,7 @@ import type { StorefrontPreviewModel, PreviewDevice } from "@/widgets/storefront
 import { dnsLabel } from "@/pages/onboarding/steps/public-link-tag";
 import { PAGE_MODULES } from "./page-catalog";
 import { SITE_THEMES } from "./theme-catalog";
-import type { SiteDraft } from "./site-draft";
+import { toLegacyFontId, type SiteDraft } from "./site-draft";
 
 // The four product cards' prices, in card order — 45/50/55/60 with was-prices
 // 63/70/77/84 — the same ladder onboarding's adapter uses, so a merchant who
@@ -154,7 +154,8 @@ export function previewModelFromSite(
     url: `${hostLabelFromName(brand.businessName) || "restaurant"}.octopus.app`,
     primary: brand.colors.primary,
     secondary: brand.colors.accent,
-    font: brand.typography[locale === "ar" ? "ar" : "en"].titles,
+    // The widget resolves faces by brand-tokens FONTS id; catalogue codes map to the nearest one.
+    font: toLegacyFontId(brand.typography[locale === "ar" ? "ar" : "en"].titles),
     themeTemplate: activeTheme?.styleId ?? null,
     sections,
     sectionLabelKeys: SECTION_LABEL_KEYS,

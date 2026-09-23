@@ -6,6 +6,7 @@ import {
   BrickWall,
   Grid3x3,
   Hand,
+  LayoutGrid,
   LayoutTemplate,
   Lasso,
   Maximize2,
@@ -43,6 +44,7 @@ import {
   toggleLock,
   validateDoc,
   type FloorPlanDoc,
+  type FloorTable,
   type Rect,
   type WriteOutcome,
 } from "@/entities/floor-plan";
@@ -54,14 +56,17 @@ import { PageShell } from "../../_shared/page-header";
 import { FLOOR_PLAN_BUILDER_PATH, LIVE_FLOOR_PLAN_PATH } from "../../_shared/paths";
 import { SwitchField } from "../../_shared/switch";
 import { ToastBanner, useToast } from "../../_shared/toast";
-import { useFloorPlan } from "../../_shared/use-floor-plan";
+import { useAdminText } from "../../_shared/admin-text";
+import { useBuilderStep, useFloorPlan } from "../../_shared/use-floor-plan";
 import { BuilderActions } from "../_shared/builder-actions";
 import { DEFAULT_VIEW, ZoomControls, type ViewOptions } from "../_shared/canvas-toolbar";
+import { EditLockNotice, useEditLock } from "../_shared/edit-lock";
 import { FloatingToolbar } from "../_shared/floating-toolbar";
 import { PlanPreviewModal, PublishConfirmModal, PublishSuccessModal } from "../_shared/publish-flow";
 import { StatsBar } from "../_shared/stats-bar";
 import { useAutosave, usePlanEditor } from "../_shared/use-plan-editor";
 import { useBuilderTones } from "../quick";
+import { GridModal } from "./grid-modal";
 import { LayersPanel } from "./layers-panel";
 import { LibraryPanel, MAX_BACKGROUND_BYTES, type LibraryPayload } from "./library-panel";
 import { PropertiesPanel } from "./properties-panel";
@@ -118,6 +123,9 @@ export function BuildFromScratchPage() {
   const [params] = useSearchParams();
   const floorPlan = useFloorPlan();
   const { toast, notify } = useToast();
+  const at = useAdminText();
+  const lock = useEditLock();
+  const [gridOpen, setGridOpen] = useState(false);
 
   const [boot] = useState(() => {
     const { draft, published } = floorPlan;
@@ -153,6 +161,7 @@ export function BuildFromScratchPage() {
   const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
   const [modal, setModal] = useState<"preview" | "confirm" | null>(null);
   const [successDoc, setSuccessDoc] = useState<FloorPlanDoc | null>(null);
+  useBuilderStep(modal === null ? 1 : 3);
   const canvasRef = useRef<EditorCanvasHandle>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
@@ -269,13 +278,37 @@ export function BuildFromScratchPage() {
     notify(t("floorPlan.actions.draftSaved"));
   }
 
-  function confirmPublish() {
+  async function confirmPublish() {
     published.current = true;
     const current = editor.doc;
-    const outcome = floorPlan.publish(current);
+    const outcome = await floorPlan.publish(current);
     setModal(null);
     setSuccessDoc(current);
     if (outcome === "memoryOnly") notify(t("floorPlan.storage.memoryOnly"), "error");
+  }
+
+  function moveZone(id: string, direction: "up" | "down") {
+    const zones = [...doc.zones];
+    const from = zones.findIndex((z) => z.id === id);
+    const to = direction === "up" ? from + 1 : from - 1;
+    if (from < 0 || to < 0 || to >= zones.length) return;
+    [zones[from], zones[to]] = [zones[to], zones[from]];
+    editor.commit({ ...doc, zones });
+  }
+
+  function addGeneratedTables(tables: FloorTable[], grownTo: { width: number; height: number } | null) {
+    const current = docRef.current;
+    editor.commit(
+      {
+        ...current,
+        width: Math.max(current.width, grownTo?.width ?? 0),
+        height: Math.max(current.height, grownTo?.height ?? 0),
+        tables: [...current.tables, ...tables.filter((table) => !current.tables.some((t) => t.id === table.id))],
+      },
+      tables.map((table) => table.id)
+    );
+    setGridOpen(false);
+    notify(at("grid.done", { n: tables.length }));
   }
 
   function showItems(ids: string[]) {
@@ -306,6 +339,7 @@ export function BuildFromScratchPage() {
 
   return (
     <PageShell fill>
+      <EditLockNotice lock={lock} onTookOver={() => notify(at("lock.tookOver"))} />
       {/* No page header here — the app's own breadcrumb already names this
           screen, and every control that lived in it (title aside, Undo, Redo,
           Grid, Snap, Show Dimensions) moved into the Tools bar over the
@@ -388,6 +422,7 @@ export function BuildFromScratchPage() {
                 { id: "undo", label: t("floorPlan.toolbar.undo"), icon: <Undo2 size={18} />, shortcut: "Ctrl+Z", disabled: !editor.canUndo, onClick: editor.undo },
                 { id: "redo", label: t("floorPlan.toolbar.redo"), icon: <Redo2 size={18} />, shortcut: "Ctrl+Shift+Z", disabled: !editor.canRedo, onClick: editor.redo },
                 ...tools.map((item, index) => ({ ...item, active: tool === item.id, onClick: () => setTool(item.id), separator: index === 0 })),
+                { id: "grid-generate", label: at("grid.open"), icon: <LayoutGrid size={18} />, overflow: true, onClick: () => setGridOpen(true) },
                 {
                   id: "view-settings",
                   label: t("floorPlan.toolbar.grid"),
@@ -481,6 +516,7 @@ export function BuildFromScratchPage() {
                   })
                 }
                 onToggleLock={(id) => editor.commit(toggleLock(doc, [id]))}
+                onMoveZone={moveZone}
               />
             )}
             {tab === "properties" && (
@@ -562,6 +598,7 @@ export function BuildFromScratchPage() {
           onBackToBuilder={() => navigate(FLOOR_PLAN_BUILDER_PATH)}
         />
       )}
+      <GridModal open={gridOpen} onClose={() => setGridOpen(false)} doc={doc} onGenerated={addGeneratedTables} />
       <ToastBanner toast={toast} />
     </PageShell>
   );

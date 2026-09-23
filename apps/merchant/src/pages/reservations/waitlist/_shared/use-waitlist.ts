@@ -1,58 +1,140 @@
-import { useCallback, useMemo, useSyncExternalStore } from "react";
-import { useTenantConfig } from "@/app/providers/tenant-config-provider";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/app/providers/auth-provider";
 import { sampleLayout, type FloorPlanDoc } from "@/entities/floor-plan";
-import {
-  createEntry,
-  markCalled,
-  markLeft,
-  markNotified,
-  markSeated,
-  moveUp,
-  readWaitlist,
-  subscribeWaitlist,
-  updateEntry,
-  writeWaitlist,
-  type GuestInput,
-  type WaitlistEntry,
-} from "@/entities/waitlist-entry";
+import { type GuestInput, type WaitlistEntry, type WaitlistStats } from "@/entities/waitlist-entry";
 import { useFloorPlan } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
+import {
+  addEntry,
+  describeWaitlistError,
+  editEntry,
+  loadDayStats,
+  loadEntries,
+  moveEntryUp,
+  notifyEntry,
+  reinstateEntry,
+  removeEntry,
+  revertReadyEntry,
+  seatEntry,
+} from "./waitlist-api";
 
-const NONE: WaitlistEntry[] = [];
+// The waitlist, held above any one page (the Seat Guest screen is its own
+// route). Entries come from the WaitingList API; every write is one call and
+// the server's answer replaces the entry. The queue is polled while a page is
+// open because the API has no push channel.
+type LoadState = "idle" | "loading" | "ready" | "error";
+interface Snapshot {
+  entries: WaitlistEntry[];
+  state: LoadState;
+  error: string | null;
+  businessId: string | null;
+}
+
+let snap: Snapshot = { entries: [], state: "idle", error: null, businessId: null };
+const listeners = new Set<() => void>();
+function patch(next: Partial<Snapshot>) {
+  snap = { ...snap, ...next };
+  listeners.forEach((l) => l());
+}
+const subscribe = (l: () => void) => {
+  listeners.add(l);
+  return () => void listeners.delete(l);
+};
+const getSnapshot = () => snap;
+
+async function load(businessId: string, quiet = false) {
+  if (!quiet) patch({ businessId, state: "loading", error: null, entries: snap.businessId === businessId ? snap.entries : [] });
+  try {
+    patch({ entries: await loadEntries(businessId), state: "ready", error: null });
+  } catch (err) {
+    if (!quiet) patch({ state: "error", error: describeWaitlistError(err) });
+  }
+}
+
+const replace = (entry: WaitlistEntry) =>
+  patch({ entries: snap.entries.map((e) => (e.id === entry.id ? entry : e)) });
+
+/** The signed-in account's id: the `sub` claim of the access token. */
+function accountIdOf(token: string | undefined): string {
+  try {
+    const payload = JSON.parse(atob((token ?? "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return String(payload.sub ?? "");
+  } catch {
+    return "";
+  }
+}
 
 export function useWaitlist() {
-  const { activeTenantId } = useTenantConfig();
-  const tenantId = activeTenantId ?? "default";
-  const entries = useSyncExternalStore(subscribeWaitlist, () => readWaitlist(tenantId), () => NONE);
+  const { activeBusinessId, user } = useAuth();
+  const current = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-  const write = useCallback((next: WaitlistEntry[]) => writeWaitlist(tenantId, next), [tenantId]);
+  useEffect(() => {
+    if (!activeBusinessId) return;
+    if (snap.businessId !== activeBusinessId) void load(activeBusinessId);
+    const id = window.setInterval(() => void load(activeBusinessId, true), 20_000);
+    return () => window.clearInterval(id);
+  }, [activeBusinessId]);
 
-  const patch = useCallback(
-    (id: string, change: (entry: WaitlistEntry, now: number) => WaitlistEntry) => {
-      const now = Date.now();
-      write(readWaitlist(tenantId).map((e) => (e.id === id ? change(e, now) : e)));
-    },
-    [tenantId, write]
-  );
+  const need = useCallback(() => {
+    if (!activeBusinessId) throw new Error("No active business");
+    return activeBusinessId;
+  }, [activeBusinessId]);
 
   const actions = useMemo(
     () => ({
-      add: (input: GuestInput): WaitlistEntry => {
-        const current = readWaitlist(tenantId);
-        const entry = createEntry(current, input, Date.now());
-        write([...current, entry]);
+      add: async (input: GuestInput) => {
+        const entry = await addEntry(need(), input);
+        patch({ entries: [...snap.entries, entry] });
         return entry;
       },
-      update: (id: string, input: GuestInput) => patch(id, (e, now) => updateEntry(e, input, now)),
-      notify: (id: string) => patch(id, markNotified),
-      call: (id: string) => patch(id, markCalled),
-      leave: (id: string) => patch(id, markLeft),
-      seat: (id: string, table: string, area: string) => patch(id, (e, now) => markSeated(e, table, area, now)),
-      moveUp: (id: string) => write(moveUp(readWaitlist(tenantId), id, Date.now())),
+      update: async (id: string, input: GuestInput) => replace(await editEntry(need(), id, input)),
+      notify: async (id: string) => replace(await notifyEntry(need(), id)),
+      // The API has no "called" state; calling is just the phone dialer.
+      call: (_id: string) => undefined,
+      leave: async (id: string, pin: string) =>
+        replace(await removeEntry(need(), id, { approverAccountId: accountIdOf(user?.accessToken), pin })),
+      /** `resourceId` is the table's id on the floor plan. */
+      seat: async (id: string, _table: string, _area: string, resourceId?: string | null) =>
+        replace(await seatEntry(need(), id, resourceId ?? null)),
+      moveUp: async (id: string) => replace(await moveEntryUp(need(), snap.entries, id)),
+      revertReady: async (id: string) => replace(await revertReadyEntry(need(), id)),
+      reinstate: async (id: string) => replace(await reinstateEntry(need(), id)),
     }),
-    [tenantId, write, patch]
+    [need, user?.accessToken]
   );
 
-  return { entries, ...actions };
+  const reload = useCallback(() => {
+    if (activeBusinessId) void load(activeBusinessId);
+  }, [activeBusinessId]);
+
+  return { entries: current.entries, state: current.state, error: current.error, reload, ...actions };
+}
+
+/** The server's day counters (GET /summary), refetched whenever the queue
+ *  changes. `null` until it answers or when it fails — callers then fall back
+ *  to counters computed from the loaded entries. */
+export function useWaitlistDayStats(entries: readonly WaitlistEntry[]): WaitlistStats | null {
+  const { activeBusinessId } = useAuth();
+  const [stats, setStats] = useState<WaitlistStats | null>(null);
+
+  useEffect(() => {
+    if (!activeBusinessId) {
+      setStats(null);
+      return;
+    }
+    let cancelled = false;
+    loadDayStats(activeBusinessId)
+      .then((next) => {
+        if (!cancelled) setStats(next);
+      })
+      .catch(() => {
+        if (!cancelled) setStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBusinessId, entries]);
+
+  return stats;
 }
 
 /** The floor guests are seated on: the published plan, or the sample

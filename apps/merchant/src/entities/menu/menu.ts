@@ -92,6 +92,16 @@ export interface Item {
     fat: number | null;
   };
   allergies: { allergens: string[]; note: string };
+  /** The measured facts declared on the item, by the business's configured
+   *  fact codes (GET /facts). Optional so drafts made before facts were wired
+   *  still type-check; items read from the server always carry it. */
+  facts?: ItemFact[];
+}
+
+export interface ItemFact {
+  factCode: string;
+  amount: number;
+  unitCode: string;
 }
 
 export interface Offer {
@@ -159,6 +169,12 @@ export interface MenuTheme {
   itemDetails: "same-page" | "overlay" | "new-page";
   stickyAddToCart: boolean;
   showItemTags: boolean;
+  /** The platform preset / font codes (GET /theme-presets) sent with the
+   *  menu's theme. Set only when the pick is one the platform lists — it
+   *  refuses any other — and left undefined to keep what the server has. */
+  serverPresetCode?: string | null;
+  titleFontCode?: string | null;
+  bodyFontCode?: string | null;
 }
 
 export interface MenuSchedule {
@@ -170,6 +186,9 @@ export interface MenuSchedule {
   branchIds: string[];
   fallbackMenuId: string | null;
   allowPreorderOutsideSchedule: boolean;
+  /** The platform schedule preset (GET /schedule-presets) the window came
+   *  from, if the merchant picked one. The window itself is still sent. */
+  presetCode?: string | null;
 }
 
 export interface Menu {

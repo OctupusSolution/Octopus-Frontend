@@ -17,17 +17,22 @@ import {
   MessageCircle,
   MoreVertical,
   Phone,
+  RefreshCw,
+  RotateCcw,
   Vault,
 } from "lucide-react";
-import { Button, Modal } from "@ui/primitives";
+import { getReservationContactLink } from "@octopus/api-client";
+import { Button, Input, Modal } from "@ui/primitives";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
 import { GuestCard } from "../_shared/guest-card";
 import { MetaRow } from "../_shared/meta-row";
 import { channelLabel, DEPOSIT_STATE_LABEL_KEY, detailState, STATE_LABEL_KEY, type DetailState } from "../_shared/model";
 import { useDismiss } from "../_shared/use-dismiss";
-import { downloadFile, openExternal } from "../_shared/download";
+import { downloadFile } from "../_shared/download";
 import { buildReceiptHtml, paymentIssueMessage, whatsappHref } from "../_shared/guest-actions";
+import { useReservationsExtraText } from "../_shared/extra-text";
 
 export interface ReservationDetailModalProps {
   open: boolean;
@@ -37,6 +42,20 @@ export interface ReservationDetailModalProps {
   onCancel: () => void;
   onResendLink: () => void;
   onShareLink: () => void;
+  /** The guest paid the deposit in person. */
+  onRecordCash: () => void;
+  /** Waives the deposit this reservation would otherwise owe, for `reason`. */
+  onWaiveDeposit: (reason: string) => void;
+  /** Requests the refund a cancelled, paid reservation already has due. */
+  onIssueRefund: () => void;
+  /** Asks the payment provider directly whether a sent link has been paid,
+   *  instead of waiting on its own poll. */
+  onRecheckDeposit: () => void;
+  /** The server's own status is "Expired" (the view model shows it as
+   *  Pending) — offers Reinstate. */
+  expired?: boolean;
+  /** POST /{id}/reinstate — brings an expired reservation back. */
+  onReinstate?: () => void;
 }
 
 // Every tone reads off the `--octo-tone-*` tokens in index.css (fix round
@@ -84,6 +103,21 @@ const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
 // established (there are no frames for these two), so their banner text is
 // resolved from the reservation's own status via STATE_LABEL_KEY instead;
 // see the `banner` JSX below.
+// `confirmedMethod` is a stable code ("auto"/"staff") from the real API, but
+// stays free display text for the mock-fixture rows this module started
+// from ("AUTO (Deposit Paid)") — an unrecognized value is shown as-is rather
+// than dropped, so those fixtures still render.
+const CONFIRMED_METHOD_LABEL_KEY: Record<string, string> = {
+  auto: "reservations.detail.confirmedAuto",
+  staff: "reservations.detail.confirmedStaff",
+};
+
+function confirmedMethodLabel(t: (key: string) => string, method: string | undefined): string {
+  if (!method) return "—";
+  const key = CONFIRMED_METHOD_LABEL_KEY[method];
+  return key ? t(key) : method;
+}
+
 const BANNER_LABEL_KEY: Partial<Record<DetailState, string>> = {
   confirmed: "reservations.detail.state.confirmed",
   pending: "reservations.detail.state.pending",
@@ -256,6 +290,61 @@ function MoreMenuButton({ onCancel, t }: { onCancel: () => void; t: (key: string
   );
 }
 
+// The "pending"/"link-sent"/"failed"/"expired" panels' own action row: the
+// guest paid in cash instead of the link, or the deposit is waived outright.
+// Waiving needs a reason, so it opens an inline field rather than firing on
+// one click — the same self-contained-popover shape as SendMessageButton
+// above, just a text field instead of a menu.
+function DepositActions({
+  onRecordCash,
+  onWaiveDeposit,
+  t,
+}: {
+  onRecordCash: () => void;
+  onWaiveDeposit: (reason: string) => void;
+  t: (key: string) => string;
+}) {
+  const [waiving, setWaiving] = useState(false);
+  const [reason, setReason] = useState("");
+  const ref = useDismiss(waiving, () => setWaiving(false));
+
+  function confirmWaive() {
+    if (!reason.trim()) return;
+    onWaiveDeposit(reason.trim());
+    setWaiving(false);
+    setReason("");
+  }
+
+  if (waiving) {
+    return (
+      <div ref={ref} className="flex items-center gap-2">
+        <Input
+          autoFocus
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder={t("reservations.detail.waiveReasonPlaceholder")}
+          className="!h-9 !w-48 !text-[12px]"
+          onKeyDown={(e) => e.key === "Enter" && confirmWaive()}
+        />
+        <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" disabled={!reason.trim()} onClick={confirmWaive}>
+          {t("reservations.detail.waiveConfirm")}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" onClick={onRecordCash}>
+        {t("reservations.detail.recordCash")}
+      </Button>
+      <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" onClick={() => setWaiving(true)}>
+        {t("reservations.detail.waiveDeposit")}
+      </Button>
+    </div>
+  );
+}
+
 export function ReservationDetailModal({
   open,
   reservation,
@@ -264,8 +353,16 @@ export function ReservationDetailModal({
   onCancel,
   onResendLink,
   onShareLink,
+  onRecordCash,
+  onWaiveDeposit,
+  onIssueRefund,
+  onRecheckDeposit,
+  expired = false,
+  onReinstate,
 }: ReservationDetailModalProps) {
+  const extra = useReservationsExtraText();
   const { t, locale } = useI18n();
+  const { activeBusinessId } = useAuth();
   const [copied, setCopied] = useState(false);
   const copyTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -297,9 +394,22 @@ export function ReservationDetailModal({
     downloadFile("receipt-" + reservation.ref + ".html", buildReceiptHtml(t, reservation, locale), "text/html;charset=utf-8");
   }
 
+  // Opens the tab synchronously so the browser doesn't treat it as an
+  // unrequested popup; getReservationContactLink's server-templated message
+  // fills it in once it answers, falling back to the local wa.me text if it
+  // doesn't (see reservations/index.tsx's sendReminder for the same shape).
   function notifyGuest() {
     if (!reservation) return;
-    openExternal(whatsappHref(reservation.phone, paymentIssueMessage(t, reservation)));
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    const fallback = () => {
+      if (win) win.location.href = whatsappHref(reservation.phone, paymentIssueMessage(t, reservation));
+    };
+    if (!activeBusinessId) return fallback();
+    getReservationContactLink(activeBusinessId, reservation.id, locale)
+      .then((link) => {
+        if (win) win.location.href = link.url;
+      })
+      .catch(fallback);
   }
 
   async function copyLink() {
@@ -351,7 +461,7 @@ export function ReservationDetailModal({
           </PanelHeading>
           <div className="space-y-2.5">
             <DetailRow label={t("reservations.detail.confirmedOn")} value={reservation.confirmedOn ?? "—"} />
-            <DetailRow label={t("reservations.detail.confirmedMethod")} value={reservation.confirmedMethod ?? "—"} />
+            <DetailRow label={t("reservations.detail.confirmedMethod")} value={confirmedMethodLabel(t, reservation.confirmedMethod)} />
           </div>
         </Panel>
       );
@@ -396,6 +506,9 @@ export function ReservationDetailModal({
                 value={deposit?.dueBy ?? "—"}
               />
             </div>
+            <div className="mt-3 border-t border-[var(--octo-divider)] pt-3">
+              <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
+            </div>
           </Panel>
           <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-[var(--octo-tone-warning-bg)] px-3.5 py-2.5 text-[12px] text-[var(--octo-tone-warning-text)]">
             <AlertCircle size={14} className="shrink-0" />
@@ -437,6 +550,14 @@ export function ReservationDetailModal({
                 {copied ? t("reservations.detail.copied") : <Copy size={14} />}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={onRecheckDeposit}
+              className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:text-[var(--octo-text-primary)]"
+            >
+              <RefreshCw size={13} />
+              {t("reservations.detail.recheckStatus")}
+            </button>
             <div className="space-y-2.5">
               {/* sentVia translated (fix round 4, finding 6) — this used to
                   print the raw "WhatsApp"/"SMS"/"Email" value even on the
@@ -449,6 +570,9 @@ export function ReservationDetailModal({
               <DetailRow label={t("reservations.detail.sentOn")} value={link?.sentOn ?? "—"} />
               <DetailRow label={t("reservations.detail.expireOn")} value={link?.expiresOn ?? "—"} />
             </div>
+          </div>
+          <div className="mt-3 border-t border-[var(--octo-divider)] pt-3">
+            <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
           </div>
         </Panel>
       );
@@ -476,11 +600,25 @@ export function ReservationDetailModal({
     }
 
     case "failed":
-      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.noAmountCaptured")}</MessageBox>;
+      panel = (
+        <>
+          <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.noAmountCaptured")}</MessageBox>
+          <Panel>
+            <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
+          </Panel>
+        </>
+      );
       break;
 
     case "expired":
-      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.linkNoLongerValid")}</MessageBox>;
+      panel = (
+        <>
+          <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.linkNoLongerValid")}</MessageBox>
+          <Panel>
+            <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
+          </Panel>
+        </>
+      );
       break;
 
     case "payment-cancelled":
@@ -494,12 +632,32 @@ export function ReservationDetailModal({
     // never drew.
     case "cancelled":
       panel = (
-        <MessageBox tone="var(--octo-tone-danger-text)">
-          {t("reservations.list.row.cancelledOn").replace("{when}", reservation.cancelledAt ?? "—")}
-          {reservation.cancelReason && (
-            <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
+        <>
+          <MessageBox tone="var(--octo-tone-danger-text)">
+            {t("reservations.list.row.cancelledOn").replace("{when}", reservation.cancelledAt ?? "—")}
+            {reservation.cancelReason && (
+              <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
+            )}
+          </MessageBox>
+          {/* The deposit's own state doesn't move to "refunded" on cancel —
+              only a paid one that hasn't been refunded yet can still owe one,
+              so that's the one signal available to decide whether to offer
+              this. Attempting it when none is actually due surfaces the
+              server's own refusal in the error banner, same as any other
+              action here. */}
+          {reservation.deposit?.state === "paid" && (
+            <Panel>
+              <PanelHeading>
+                <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
+                  {t("reservations.detail.refundDue")}
+                </span>
+              </PanelHeading>
+              <Button variant="secondary" className="!h-9 w-full !text-[12px]" onClick={onIssueRefund}>
+                {t("reservations.detail.issueRefund")}
+              </Button>
+            </Panel>
           )}
-        </MessageBox>
+        </>
       );
       break;
 
@@ -659,6 +817,20 @@ export function ReservationDetailModal({
     >
       <div className="space-y-3">
         {banner}
+        {expired && onReinstate && (
+          <Panel>
+            <PanelHeading>
+              <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
+                <RotateCcw size={15} className="text-[var(--octo-text-muted)]" />
+                {extra.expiredTitle}
+              </span>
+            </PanelHeading>
+            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{extra.expiredBody}</p>
+            <Button variant="primary" className="mt-3 !h-9 w-full justify-center !text-[12px]" onClick={onReinstate}>
+              {extra.reinstate}
+            </Button>
+          </Panel>
+        )}
         {guestCard}
         {metaRow}
         {panel}

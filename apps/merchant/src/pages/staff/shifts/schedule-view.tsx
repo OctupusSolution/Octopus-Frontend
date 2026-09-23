@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CopyPlus,
+  Eraser,
   FileDown,
   MessageCircle,
   Printer,
@@ -13,6 +15,7 @@ import {
   Wallet,
 } from "lucide-react";
 import clsx from "clsx";
+import { clearScheduleWeek, copyScheduleWeek, type BulkAssignmentSkipResponse } from "@octopus/api-client";
 import { EmptyState } from "@ui/primitives";
 import { branches, TODAY, SHIFT_PILL_COLORS, type Branch } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -30,9 +33,13 @@ import {
   toISO,
 } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
+import { useCatalogNames } from "../_shared/catalog-names";
 import { RowMenu } from "../_shared/row-menu";
 import { useStaffStore } from "../_shared/staff-store";
 import { ToastBanner, useToast } from "../_shared/toast";
+import { ConfirmModal } from "../_shared/confirm-modal";
+import { serverMemberIdOrNull } from "../_shared/staff-sync";
+import { staffErrorText, useTx } from "../_shared/text";
 import { AssignShiftModal, type AssignPreset } from "./assign-shift-modal";
 import { EditShiftModal, type ShiftTarget } from "./edit-shift-modal";
 import { MonthGrid } from "./month-grid";
@@ -63,6 +70,7 @@ function SummaryTile({ icon, value, unit, label, tint, iconBg }: { icon: ReactNo
 export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialog; onDialogChange: (dialog: ScheduleDialog) => void }) {
   const { t, locale } = useI18n();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const store = useStaffStore();
   const { toast, notify } = useToast();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +81,9 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
   const [editing, setEditing] = useState<ShiftTarget | null>(null);
   const [assignPreset, setAssignPreset] = useState<AssignPreset>({});
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [weekBusy, setWeekBusy] = useState(false);
+  const tx = useTx();
 
   const weekStart = startOfWeek(anchor);
   const weekStartISO = toISO(weekStart);
@@ -109,31 +120,51 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
     setAssignPreset({});
   };
 
-  const copyWeekForward = (employeeId: string) =>
-    store.updateSchedule((prev) => {
-      const shifts = { ...prev.shifts };
-      const offDays = { ...prev.offDays };
-      for (const d of days) {
-        const from = shiftKey(employeeId, d);
-        const to = shiftKey(employeeId, addDays(d, 7));
-        delete shifts[to];
-        delete offDays[to];
-        if (prev.shifts[from]) shifts[to] = { ...prev.shifts[from] };
-        else if (prev.offDays[from]) offDays[to] = true;
-      }
-      return { shifts, offDays };
-    });
+  const skippedText = (skipped: readonly BulkAssignmentSkipResponse[]) =>
+    skipped.length ? tx(` ${skipped.length} day(s) already had a shift and were left unchanged.`, ` ${skipped.length} يوم/أيام بها وردية بالفعل وتُركت كما هي.`) : "";
 
-  const clearWeek = (employeeId: string) =>
-    store.updateSchedule((prev) => {
-      const shifts = { ...prev.shifts };
-      const offDays = { ...prev.offDays };
-      for (const d of days) {
-        delete shifts[shiftKey(employeeId, d)];
-        delete offDays[shiftKey(employeeId, d)];
-      }
-      return { shifts, offDays };
-    });
+  // POST /schedule/copy: the seven days from this week's start onto the next
+  // seven. Days that already hold a shift are skipped and reported, never
+  // overwritten. Without a member it copies everyone the caller can reach.
+  const copyWeekForward = async (employeeId: string | null, name?: string) => {
+    const staffMemberId = employeeId ? serverMemberIdOrNull(employeeId) : null;
+    if (employeeId && !staffMemberId) return notify(tx("This member is still being saved.", "ما زال هذا الموظف قيد الحفظ."), "error");
+    setWeekBusy(true);
+    try {
+      const res = await store.scheduleOp((b) =>
+        copyScheduleWeek(b, { staffMemberId, fromStart: weekStartISO, toStart: toISO(addDays(fromISO(weekStartISO), 7)) })
+      );
+      const done = name
+        ? t("staff.shiftsTab.toastCopyWeek").replace("{name}", name)
+        : tx(`Copied ${res.created} shift(s) to next week.`, `تم نسخ ${res.created} وردية إلى الأسبوع القادم.`);
+      notify(`${done}${skippedText(res.skipped)}`);
+    } catch (err) {
+      notify(staffErrorText(err, tx), "error");
+    } finally {
+      setWeekBusy(false);
+    }
+  };
+
+  // POST /schedule/clear over this week (inclusive). Clears within the caller's reach only.
+  const clearWeek = async (employeeId: string | null, name?: string) => {
+    const staffMemberId = employeeId ? serverMemberIdOrNull(employeeId) : null;
+    if (employeeId && !staffMemberId) return notify(tx("This member is still being saved.", "ما زال هذا الموظف قيد الحفظ."), "error");
+    setWeekBusy(true);
+    try {
+      const res = await store.scheduleOp((b) =>
+        clearScheduleWeek(b, { staffMemberId, from: weekStartISO, to: toISO(addDays(fromISO(weekStartISO), 6)) })
+      );
+      notify(
+        name
+          ? t("staff.shiftsTab.toastDeleteWeek").replace("{name}", name)
+          : tx(`Cleared ${res.removed} shift(s) this week.`, `تم مسح ${res.removed} وردية هذا الأسبوع.`)
+      );
+    } catch (err) {
+      notify(staffErrorText(err, tx), "error");
+    } finally {
+      setWeekBusy(false);
+    }
+  };
 
   const branchLabel = branchFilter === "all" ? t("staff.filter.allBranches") : branchFilter;
 
@@ -150,7 +181,7 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
       dayHeaders: days.map((d) => formatDayHeader(d, locale)),
       rows: staff.map((e) => ({
         name: e.name,
-        detail: `${labels.data("staff.jobTitle", store.profileOf(e.id)?.jobTitle ?? "")} · ${employeeHours(e.id, days, store.shifts)}h`,
+        detail: `${names.jobTitle(store.profileOf(e.id)?.jobTitle ?? "")} · ${employeeHours(e.id, days, store.shifts)}h`,
         cells: days.map((d) => shiftLabel(e.id, d)),
       })),
       footer: t("staff.shiftsTab.printFooter").replace("{hours}", String(summary.totalHours)).replace("{count}", String(summary.employeesScheduled)),
@@ -243,6 +274,14 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
               ))}
             </SelectInput>
           </div>
+          <button type="button" disabled={weekBusy} onClick={() => void copyWeekForward(null)} className={buttonClass("outline", "md")}>
+            <CopyPlus size={20} aria-hidden />
+            {tx("Copy to next week", "نسخ للأسبوع القادم")}
+          </button>
+          <button type="button" disabled={weekBusy} onClick={() => setConfirmClear(true)} className={buttonClass("dangerSoft", "md")}>
+            <Eraser size={20} aria-hidden />
+            {tx("Clear week", "مسح الأسبوع")}
+          </button>
           <button type="button" onClick={() => setWhatsAppOpen(true)} className={buttonClass("successOutline", "md")}>
             <MessageCircle size={20} aria-hidden />
             {t("staff.shiftsTab.sendViaWhatsApp")}
@@ -315,7 +354,7 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
                       <div className="flex items-start justify-between gap-1">
                         <div className="min-w-0">
                           <p className="truncate text-[15px] font-semibold text-[var(--octo-text-primary)]">{e.name}</p>
-                          <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{labels.data("staff.jobTitle", profile?.jobTitle ?? "")}</p>
+                          <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{names.jobTitle(profile?.jobTitle ?? "")}</p>
                           <p
                             className={clsx(
                               "text-[13px]",
@@ -334,10 +373,7 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
                             {
                               key: "copy",
                               label: t("staff.shiftsTab.rowMenu.copyWeek"),
-                              onSelect: () => {
-                                copyWeekForward(e.id);
-                                notify(t("staff.shiftsTab.toastCopyWeek").replace("{name}", e.name));
-                              },
+                              onSelect: () => void copyWeekForward(e.id, e.name),
                             },
                             {
                               key: "apply",
@@ -348,10 +384,7 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
                               key: "delete",
                               label: t("staff.shiftsTab.rowMenu.deleteWeek"),
                               tone: "danger",
-                              onSelect: () => {
-                                clearWeek(e.id);
-                                notify(t("staff.shiftsTab.toastDeleteWeek").replace("{name}", e.name));
-                              },
+                              onSelect: () => void clearWeek(e.id, e.name),
                             },
                           ]}
                         />
@@ -414,6 +447,19 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
         weekRange={weekRange}
         shiftLabel={shiftLabel}
         notify={notify}
+      />
+
+      <ConfirmModal
+        open={confirmClear}
+        title={tx("Clear this week?", "مسح هذا الأسبوع؟")}
+        body={tx(
+          `Every shift from ${weekRange} is removed for all members you manage. Time off is not affected.`,
+          `ستُحذف كل الورديات في ${weekRange} لكل الموظفين الذين تديرهم. لن تتأثر الإجازات.`
+        )}
+        confirmLabel={tx("Clear week", "مسح الأسبوع")}
+        cancelLabel={t("common.cancel")}
+        onClose={() => setConfirmClear(false)}
+        onConfirm={() => void clearWeek(null)}
       />
 
       <ToastBanner toast={toast} />

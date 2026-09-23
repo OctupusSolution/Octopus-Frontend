@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { createStaffRole, duplicateStaffRole } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { Field, SelectInput, TextArea, TextInput } from "./_shared/form";
 import { useStaffLabels } from "./_shared/labels";
-import { clonePermissions, uniformPermissions, useStaffStore } from "./_shared/staff-store";
+import { useStaffStore } from "./_shared/staff-store";
+import { rememberRole, serverRoleId } from "./_shared/staff-sync";
+import { newKey, staffErrorText, useTx, UUID_RE } from "./_shared/text";
 
 export type RoleFormState = { mode: "add" } | { mode: "edit"; roleId: string } | null;
 
@@ -18,8 +23,11 @@ export function RoleFormModal({
   onSaved: (roleId: string, message: string) => void;
 }) {
   const { t } = useI18n();
+  const tx = useTx();
   const labels = useStaffLabels();
   const store = useStaffStore();
+  const { activeBusinessId } = useAuth();
+  const [saving, setSaving] = useState(false);
   const editing = state?.mode === "edit" ? store.roles.find((r) => r.id === state.roleId) ?? null : null;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -32,11 +40,12 @@ export function RoleFormModal({
     setDescription(editing ? labels.roleDescription(editing) : "");
     setCopyFrom("blank");
     setError("");
+    setSaving(false);
     // Seed the fields each time the dialog opens for a (possibly different) role.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const save = () => {
+  const save = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
       setError(t("staff.validation.required"));
@@ -57,10 +66,25 @@ export function RoleFormModal({
       });
       onSaved(editing.id, t("staff.toast.roleUpdated").replace("{name}", trimmed));
     } else {
-      const id = `role-${Date.now().toString(36)}`;
-      const permissions = copyFrom === "blank" ? uniformPermissions(false) : clonePermissions(store.permissions[copyFrom]);
-      store.addRole({ id, name: trimmed, description: description.trim(), isSystemRole: false, active: true }, permissions);
-      onSaved(id, t("staff.toast.roleCreated").replace("{name}", trimmed));
+      if (!activeBusinessId) return;
+      // Created on the server straight away, so the permission matrix can open
+      // on it. "Copy from" is POST /roles/{id}/duplicate: the copy starts with
+      // the source role's permissions and no members.
+      setSaving(true);
+      try {
+        const body = { name: trimmed, description: description.trim() || null };
+        const res =
+          copyFrom === "blank"
+            ? await createStaffRole(activeBusinessId, body, newKey())
+            : await duplicateStaffRole(activeBusinessId, serverRoleId(copyFrom), body, newKey());
+        const role = rememberRole(res);
+        store.adoptRole(role);
+        onSaved(role.id, t("staff.toast.roleCreated").replace("{name}", trimmed));
+      } catch (err) {
+        setError(staffErrorText(err, tx));
+        setSaving(false);
+        return;
+      }
     }
     onClose();
   };
@@ -74,7 +98,8 @@ export function RoleFormModal({
       footer={
         <>
           <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={save} className={buttonClass("primary")}>
+          <button type="button" onClick={() => void save()} disabled={saving} className={buttonClass("primary")}>
+            {saving && <Loader2 size={16} className="animate-spin" aria-hidden />}
             {t(editing ? "staff.roles.saveRole" : "staff.roles.addRoleSave")}
           </button>
         </>
@@ -84,7 +109,7 @@ export function RoleFormModal({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          save();
+          void save();
         }}
         className="flex flex-col gap-4"
       >
@@ -114,9 +139,11 @@ export function RoleFormModal({
           <Field label={t("staff.roles.copyFrom")} htmlFor="role-copy" hint={t("staff.roles.copyFromHint")}>
             <SelectInput id="role-copy" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}>
               <option value="blank">{t("staff.roles.startBlank")}</option>
-              {store.roles.map((r) => (
-                <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
-              ))}
+              {store.roles
+                .filter((r) => UUID_RE.test(serverRoleId(r.id)))
+                .map((r) => (
+                  <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
+                ))}
             </SelectInput>
           </Field>
         )}

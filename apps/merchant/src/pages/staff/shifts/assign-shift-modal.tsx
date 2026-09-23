@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { bulkAssignShifts } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
 import type { Employee } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -6,8 +8,12 @@ import { buttonClass } from "../_shared/buttons";
 import { Field, SelectInput } from "../_shared/form";
 import { formatWeekdayDate, fromISO, toISO } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
+import { useCatalogNames } from "../_shared/catalog-names";
 import { MultiSelect } from "../_shared/multi-select";
 import { useStaffStore } from "../_shared/staff-store";
+import { serverShiftRoleId } from "../_shared/staff-shifts-sync";
+import { serverMemberIdOrNull } from "../_shared/staff-sync";
+import { staffErrorText, useTx, UUID_RE } from "../_shared/text";
 import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
 
 export interface AssignPreset {
@@ -41,12 +47,15 @@ export function AssignShiftModal({
 }) {
   const { t, locale } = useI18n();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const store = useStaffStore();
   const activeRoles = store.shiftRoles.filter((r) => r.active);
   const [employeeIds, setEmployeeIds] = useState<string[]>([]);
   const [roleId, setRoleId] = useState("");
   const [dates, setDates] = useState<string[]>([]);
   const [errors, setErrors] = useState<Errors>({});
+  const [saving, setSaving] = useState(false);
+  const tx = useTx();
 
   const dayOptions = useMemo(() => days.map((d) => ({ value: toISO(d), label: formatWeekdayDate(d, locale) })), [days, locale]);
 
@@ -62,6 +71,7 @@ export function AssignShiftModal({
         (mode === "bulk" && firstRole ? days.filter((d) => firstRole.days.includes(d.getDay())).map(toISO) : [])
     );
     setErrors({});
+    setSaving(false);
     // Seed each time the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -80,6 +90,10 @@ export function AssignShiftModal({
     }
 
     const role = store.shiftRoles.find((r) => r.id === roleId)!;
+    if (mode === "bulk") {
+      void submitBulk(role.id);
+      return;
+    }
     let assigned = 0;
     let skipped = 0;
     store.updateSchedule((prev) => {
@@ -113,10 +127,36 @@ export function AssignShiftModal({
     onClose();
   };
 
+  // Bulk: POST /assignments/bulk, one request for the whole grid. Pairs that
+  // already hold a shift are skipped (never overwritten) and reported back.
+  const submitBulk = async (localRoleId: string) => {
+    const shiftDefinitionId = serverShiftRoleId(localRoleId);
+    const staffMemberIds = employeeIds.map(serverMemberIdOrNull);
+    if (!UUID_RE.test(shiftDefinitionId) || staffMemberIds.some((id) => !id)) {
+      notify(tx("Some items are still being saved. Try again in a moment.", "بعض العناصر ما زالت قيد الحفظ. حاول بعد لحظات."), "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await store.scheduleOp((b) =>
+        bulkAssignShifts(b, { staffMemberIds: staffMemberIds as string[], dates: [...dates].sort(), shiftDefinitionId })
+      );
+      notify(
+        t(res.skipped.length ? "staff.assignShift.toastManySkipped" : "staff.assignShift.toastMany")
+          .replace("{count}", String(res.created))
+          .replace("{skipped}", String(res.skipped.length))
+      );
+      onClose();
+    } catch (err) {
+      notify(staffErrorText(err, tx), "error");
+      setSaving(false);
+    }
+  };
+
   const employeeOptions = staff.map((e) => ({
     value: e.id,
     label: e.name,
-    detail: labels.data("staff.jobTitle", store.profileOf(e.id)?.jobTitle ?? ""),
+    detail: names.jobTitle(store.profileOf(e.id)?.jobTitle ?? ""),
   }));
 
   return (
@@ -220,7 +260,8 @@ export function AssignShiftModal({
           )}
         </Field>
 
-        <button type="submit" className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
+        <button type="submit" disabled={saving} className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
+          {saving && <Loader2 size={18} className="animate-spin" aria-hidden />}
           {t("staff.assignShift.submit")}
         </button>
       </form>

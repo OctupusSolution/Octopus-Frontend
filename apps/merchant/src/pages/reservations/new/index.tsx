@@ -7,10 +7,14 @@ import clsx from "clsx";
 import { ArrowRight, Calendar, Send, User } from "lucide-react";
 import { createBooking } from "@/entities/floor-plan";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { useBookings } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
+import { useAuth } from "@/app/providers/auth-provider";
+import { useBookings, useFloorPlan } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
+import { FLOOR_PLAN_BUILDER_PATH } from "@/pages/reservations/floor-plan/_shared/paths";
 import { applyFormSubmit } from "../_shared/model";
 import { RESERVATIONS_PATH } from "../_shared/paths";
-import { useReservations } from "../_shared/reservations-store";
+import { useReservationActions } from "../_shared/reservations-store";
+import { describeReservationError, isSlotTakenError, verifyTableAvailable, type AlternativeSlot } from "../_shared/reservations-api";
+import { AlternativesPicker, type AlternativesState } from "../_shared/alternatives-picker";
 import {
   buildReservation,
   draftValidity,
@@ -28,8 +32,17 @@ type Step = 1 | 2 | 3;
 export function NewReservationPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [, setRows] = useReservations();
+  const { activeBusinessId } = useAuth();
+  const actions = useReservationActions();
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Set when the server refuses the chosen time on the chosen table; offers
+  // the nearest free times on that same table instead of a dead end.
+  const [alternatives, setAlternatives] = useState<AlternativesState | null>(null);
   const { addBooking } = useBookings();
+  const { published } = useFloorPlan();
+  // A sample layout only exists to preview the builder — a host must not be
+  // able to seat a real guest against tables that aren't actually on the floor.
+  const hasFloorPlan = published !== null;
 
   const [step, setStep] = useState<Step>(1);
   const [draft, setDraft] = useState<DraftState>(() => initDraft("add", null));
@@ -71,8 +84,9 @@ export function NewReservationPage() {
   const tableReady = selected !== null && picking.selectable(selected);
 
   // Guest first, then the reservation, then the table: each step opens once
-  // the one before it has what it needs.
-  const maxReachable: Step = !canSavePending ? 1 : !canConfirm ? 2 : 3;
+  // the one before it has what it needs. The table step also needs a real,
+  // published floor plan — without one there is nothing real to seat against.
+  const maxReachable: Step = !canSavePending ? 1 : !canConfirm ? 2 : hasFloorPlan ? 3 : 2;
 
   function goToStep(next: number) {
     if (next > maxReachable) return;
@@ -84,16 +98,80 @@ export function NewReservationPage() {
     const withTable: DraftState =
       tableReady && selected ? { ...draft, table: selected.table.number, area: selected.zoneName ?? draft.area } : draft;
     const reservation = buildReservation(withTable, "add", null, intent);
-    setRows((prev) => applyFormSubmit(prev, reservation, intent, "add", null));
-    // Book the table on the floor plan too, so Floor Plan shows it reserved.
-    if (tableReady && selected) addBooking(createBooking(selected.table.id, picking.at, draft.partySize, reservation.guest));
-    navigate(RESERVATIONS_PATH);
+    setSaveError(null);
+    setAlternatives(null);
+
+    function finish() {
+      actions
+        .create({ draft: reservation, intent, resourceId: tableReady && selected ? selected.table.id : null })
+        .then(() => {
+          // Book the table on the floor plan too, so Floor Plan shows it reserved.
+          if (tableReady && selected) addBooking(createBooking(selected.table.id, picking.at, draft.partySize, reservation.guest));
+          navigate(RESERVATIONS_PATH);
+        })
+        .catch((err) => {
+          if (isSlotTakenError(err)) offerAlternatives();
+          else setSaveError(describeReservationError(err));
+        });
+    }
+
+    function offerAlternatives() {
+      if (!selected) return;
+      setAlternatives({ kind: "loading" });
+      actions
+        .alternatives(
+          { date: draft.date, time: draft.time, partySize: draft.partySize, durationMinutes: draft.durationMinutes },
+          { resourceId: selected.table.id }
+        )
+        .then((slots) => setAlternatives({ kind: "ready", slots }))
+        .catch(() => setAlternatives({ kind: "error" }));
+    }
+
+    // The grid's own colours come from the floor plan's local snapshot of
+    // its bookings, which can be a beat behind another host's own session —
+    // this is the server's real answer, asked once, right before the
+    // booking that would actually double the table up.
+    if (tableReady && selected && activeBusinessId) {
+      verifyTableAvailable(activeBusinessId, selected.table.id, {
+        date: draft.date,
+        time: draft.time,
+        partySize: draft.partySize,
+        durationMinutes: draft.durationMinutes,
+      })
+        .then((free) => {
+          if (!free) {
+            // The table stays selected so the nearest free times on it can be
+            // offered; picking another table on the grid still works too.
+            offerAlternatives();
+            return;
+          }
+          finish();
+        })
+        .catch((err) => setSaveError(describeReservationError(err)));
+    } else {
+      finish();
+    }
   }
 
-  const nextEnabled = step === 1 ? canSavePending : canConfirm;
+  function pickAlternative(slot: AlternativeSlot) {
+    setDraft((prev) => ({ ...prev, date: slot.date, time: slot.minutes }));
+    setAlternatives(null);
+  }
+
+  const nextEnabled = step === 1 ? canSavePending : step === 2 ? canConfirm && hasFloorPlan : canConfirm;
 
   return (
     <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-7">
+      {saveError && (
+        <div role="alert" className="mb-4 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+          {saveError}
+        </div>
+      )}
+      {alternatives && (
+        <div className="mb-4">
+          <AlternativesPicker state={alternatives} onPick={pickAlternative} />
+        </div>
+      )}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[24px]">
@@ -128,6 +206,18 @@ export function NewReservationPage() {
             tableOptions={tableOptions}
           />
           {draft.depositEnabled && <LinkNotice />}
+          {!hasFloorPlan && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-warning/10 px-4 py-3 text-[12.5px] text-warning">
+              <span>{t("reservations.new.noFloorPlan")}</span>
+              <button
+                type="button"
+                onClick={() => navigate(FLOOR_PLAN_BUILDER_PATH)}
+                className="shrink-0 rounded-[9px] border border-warning/40 bg-[var(--octo-card)] px-3 py-1.5 font-medium text-warning transition-colors hover:bg-warning/10"
+              >
+                {t("reservations.new.buildFloorPlan")}
+              </button>
+            </div>
+          )}
         </section>
       ) : (
         <section className="mt-5">
@@ -152,7 +242,7 @@ export function NewReservationPage() {
           <FooterButton
             tone="primary"
             disabled={!nextEnabled}
-            title={nextEnabled ? undefined : t("reservations.new.nextNeeds")}
+            title={nextEnabled ? undefined : step === 2 && canConfirm && !hasFloorPlan ? t("reservations.new.noFloorPlan") : t("reservations.new.nextNeeds")}
             onClick={() => goToStep(step + 1)}
           >
             {t("reservations.new.next")}

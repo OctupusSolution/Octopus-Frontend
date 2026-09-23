@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CalendarPlus, Plus } from "lucide-react";
+import { BriefcaseBusiness, CalendarPlus, Plus, Settings } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PageTabs } from "./_shared/page-tabs";
 import { StaffStoreProvider, useStaffStore } from "./_shared/staff-store";
@@ -8,6 +8,9 @@ import { buttonClass } from "./_shared/buttons";
 import { StaffTab } from "./staff-tab";
 import { RolesPermissionsTab } from "./roles-permissions-tab";
 import { ShiftsTab, type ShiftsDialog, type ShiftsSubTab } from "./shifts-tab";
+import { StaffSettingsModal } from "./shifts/staff-settings-modal";
+import { CatalogsModal } from "./catalogs-modal";
+import { useTx } from "./_shared/text";
 
 type TabId = "staff" | "roles" | "shifts";
 const TAB_IDS: readonly TabId[] = ["staff", "roles", "shifts"];
@@ -29,7 +32,11 @@ function StaffPageContent() {
   const [memberId, setMemberId] = useState<string | null>(null);
   const [shiftsSub, setShiftsSub] = useState<ShiftsSubTab>("schedule");
   const [shiftsDialog, setShiftsDialog] = useState<ShiftsDialog>(null);
-  const hasShiftRoles = useStaffStore().shiftRoles.length > 0;
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [catalogsOpen, setCatalogsOpen] = useState(false);
+  const tx = useTx();
+  const store = useStaffStore();
+  const hasShiftRoles = store.shiftRoles.length > 0;
 
   const header: Record<TabId, { title: string; subtitle: string }> = {
     staff: { title: t("staff.header.title"), subtitle: t("staff.header.subtitle") },
@@ -49,19 +56,42 @@ function StaffPageContent() {
 
   return (
     <div className="px-4 pb-10 pt-5 sm:px-[26px]">
+      {store.syncError && (
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+          <span>{store.syncError}</span>
+          <button type="button" className="shrink-0 underline" onClick={store.dismissSyncError}>
+            OK
+          </button>
+        </div>
+      )}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[24px]">{header[tab].title}</h1>
           <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)]">{header[tab].subtitle}</p>
         </div>
         {tab === "staff" && (
-          <button type="button" onClick={() => setAddOpen(true)} className={buttonClass("primary", "lg")}>
-            <Plus size={20} strokeWidth={2.5} />
-            {t("staff.header.addNewMember")}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setCatalogsOpen(true)} className={buttonClass("outline", "lg")}>
+              <BriefcaseBusiness size={20} />
+              {tx("Job titles & departments", "المسميات والأقسام")}
+            </button>
+            <button type="button" onClick={() => setAddOpen(true)} className={buttonClass("primary", "lg")}>
+              <Plus size={20} strokeWidth={2.5} />
+              {t("staff.header.addNewMember")}
+            </button>
+          </div>
         )}
         {tab === "shifts" && shiftsSub === "schedule" && (
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label={t("staff.settings.title")}
+              title={t("staff.settings.title")}
+              className={buttonClass("outline", "lg")}
+            >
+              <Settings size={20} />
+            </button>
             <button type="button" onClick={() => setShiftsDialog("bulkAssign")} className={buttonClass("outline", "lg")}>
               <CalendarPlus size={20} />
               {t("staff.shiftsTab.bulkAssignShift")}
@@ -121,6 +151,9 @@ function StaffPageContent() {
           />
         )}
       </div>
+
+      <StaffSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <CatalogsModal open={catalogsOpen} onClose={() => setCatalogsOpen(false)} />
     </div>
   );
 }

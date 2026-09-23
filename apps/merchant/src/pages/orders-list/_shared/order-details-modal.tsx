@@ -2,7 +2,8 @@
 import type { ReactNode } from "react";
 import { ChefHat, QrCode, Users } from "lucide-react";
 import { Modal } from "@ui/primitives";
-import { formatSar } from "@octopus/api-client";
+import { formatSar, type DuplicateOrderTemplateResponse } from "@octopus/api-client";
+import { OrderWorkspacePanel } from "@/features/order/manage-order";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { OrderActionButtons, TableGlyph } from "./order-row";
 import { Stepper, STATE_LABEL_KEY } from "./stepper";
@@ -63,10 +64,16 @@ export function OrderDetailsModal({
   order,
   onClose,
   onAction,
+  onChanged,
+  onReorder,
 }: {
   order: OrderRecord | null;
   onClose: () => void;
   onAction: (action: OrderAction, order: OrderRecord) => void;
+  /** A real order (RealOrderRef) was written to from the workspace below. */
+  onChanged?: () => void;
+  /** "Re-order" read a template (GET /duplicate) to start a new order from. */
+  onReorder?: (template: DuplicateOrderTemplateResponse) => void;
 }) {
   const { t } = useI18n();
   if (!order) return null;
@@ -109,16 +116,18 @@ export function OrderDetailsModal({
         />
       </div>
 
-      <Section title={t("orders.details.summary")}>
-        <DetailRow
-          label={t("orders.details.items")}
-          value={t("orders.details.itemsValue").replace("{n}", String(itemCount))}
-        />
-        <DetailRow
-          label={t("orders.details.courses")}
-          value={t("orders.details.coursesValue").replace("{n}", String(order.courses))}
-        />
-      </Section>
+      {!order.real && (
+        <Section title={t("orders.details.summary")}>
+          <DetailRow
+            label={t("orders.details.items")}
+            value={t("orders.details.itemsValue").replace("{n}", String(itemCount))}
+          />
+          <DetailRow
+            label={t("orders.details.courses")}
+            value={t("orders.details.coursesValue").replace("{n}", String(order.courses))}
+          />
+        </Section>
+      )}
 
       <div className="mt-3 rounded-xl border border-[#0D6EFD] bg-[#0D6EFD]/[0.04] p-4">
         <div className="flex items-center justify-between gap-3 py-[3px] text-[13px]">
@@ -165,6 +174,12 @@ export function OrderDetailsModal({
       <Section title={t("orders.details.timeline")}>
         <Stepper order={order} variant="detail" className="pt-1" />
       </Section>
+
+      {/* Real orders get the full workspace: lifecycle, lines, discounts,
+          details, payment links, refunds, wastage, activity and receipt. */}
+      {order.real && (
+        <OrderWorkspacePanel orderId={order.real.orderId} onChanged={() => onChanged?.()} onReorder={onReorder} />
+      )}
 
       <OrderActionButtons order={order} onAction={onAction} variant="large" className="mt-4" />
     </Modal>

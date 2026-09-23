@@ -6,6 +6,7 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./_shared/avatar";
 import { formatDate, formatDateTime } from "./_shared/format";
 import { useStaffLabels } from "./_shared/labels";
+import { useCatalogNames } from "./_shared/catalog-names";
 import { StatusPill } from "./_shared/status-pill";
 
 export type MemberStatus = "active" | "inactive" | "locked";
@@ -39,6 +40,7 @@ export function MemberSummaryCard({
 }) {
   const { t, locale } = useI18n();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const e = profile.employee;
 
   return (
@@ -47,7 +49,7 @@ export function MemberSummaryCard({
         <Avatar name={e.name} size={56} />
         <div className="min-w-0 pt-0.5">
           <p className="truncate text-[16px] font-semibold leading-snug text-[var(--octo-text-primary)]">{e.name}</p>
-          <p className="truncate text-[13px] leading-snug text-[#0D6EFD]">{labels.data("staff.jobTitle", profile.jobTitle)}</p>
+          <p className="truncate text-[13px] leading-snug text-[#0D6EFD]">{names.jobTitle(profile.jobTitle)}</p>
           <StatusPill className="mt-1.5" tone={STATUS_TONE[status]} label={t(`staff.status.${status}`)} />
         </div>
       </div>

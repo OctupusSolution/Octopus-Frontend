@@ -45,7 +45,10 @@ export interface RefundPolicy {
 }
 
 /** The module's fixed "now", 14:30 — matches the calendar's mock clock. */
-export const NOW_MINUTES = 870;
+export let NOW_MINUTES = 870;
+export function setNowMinutes(minutes: number): void {
+  NOW_MINUTES = minutes;
+}
 
 export const EMPTY_FILTERS: ListFilters = {
   day: "today",
@@ -228,12 +231,18 @@ function sortRows(rows: Reservation[], sort: SortKey): Reservation[] {
   return sorted;
 }
 
+/** The one calendar date a day filter actually resolves to, shared by
+ *  `visibleRows`'s own day-matching and anything that needs to ask the server
+ *  about that same day (the day summary). */
+export function effectiveDate(f: Pick<ListFilters, "day" | "date">): string {
+  if (f.day === "today") return TODAY;
+  if (f.day === "tomorrow") return addDays(TODAY, 1);
+  return f.date;
+}
+
 export function visibleRows(rows: readonly Reservation[], f: ListFilters): Reservation[] {
-  const dayFiltered = rows.filter((r) => {
-    if (f.day === "today") return r.date === TODAY;
-    if (f.day === "tomorrow") return r.date === addDays(TODAY, 1);
-    return r.date === f.date;
-  });
+  const day = effectiveDate(f);
+  const dayFiltered = rows.filter((r) => r.date === day);
   // Filters on what the row's pill actually shows (fix round 4, finding
   // 20) — displayState(), not the raw r.status — so picking "Confirmed"
   // never returns a row whose pill reads "Link Sent", and so the four

@@ -29,7 +29,7 @@ export function TableDetailCard({
   entry: LiveEntry | null;
   zoneName?: string;
   now: number;
-  onEdit: () => void;
+  onEdit?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -61,14 +61,16 @@ export function TableDetailCard({
         <h2 className="text-[17px] font-semibold text-[var(--octo-text-primary)]">
           {t("floorPlan.live.detail.title").replace("{number}", table.number)}
         </h2>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[14px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-        >
-          <PenLine size={16} />
-          {t("floorPlan.live.detail.edit")}
-        </button>
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[14px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+          >
+            <PenLine size={16} />
+            {t("floorPlan.live.detail.edit")}
+          </button>
+        )}
       </div>
       <div className="mt-2 divide-y divide-transparent">
         <Row

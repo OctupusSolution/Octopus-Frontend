@@ -3,8 +3,6 @@ import { BriefcaseBusiness, ChevronDown, Eye, EyeOff, KeyRound, Lock, LockOpen, 
 import clsx from "clsx";
 import {
   ACCESS_LEVELS,
-  DEPARTMENTS,
-  JOB_TITLES,
   LANGUAGE_OPTIONS,
   TWO_FACTOR_METHODS,
   branches,
@@ -20,6 +18,9 @@ import { Field, SelectInput, TextInput } from "./_shared/form";
 import { EMAIL_RE, PHONE_RE, useStaffLabels } from "./_shared/labels";
 import { useStaffStore } from "./_shared/staff-store";
 import { Switch } from "./_shared/switch";
+import { useLocalName, useTx } from "./_shared/text";
+import { useAssignableRoles } from "./_shared/use-assignable-roles";
+import { InvitationPanel } from "./invitation-panel";
 import { ActivityAuditCard } from "./activity-audit-card";
 import { MemberSummaryCard } from "./member-summary-card";
 import { ModulesSelect } from "./modules-select";
@@ -158,6 +159,8 @@ export function MemberDetails({
   notify: (text: string, tone?: "success" | "error") => void;
 }) {
   const { t } = useI18n();
+  const tx = useTx();
+  const localName = useLocalName();
   const labels = useStaffLabels();
   const store = useStaffStore();
   const [baseline, setBaseline] = useState(() => draftFrom(profile, inactive));
@@ -221,9 +224,10 @@ export function MemberDetails({
   );
   const managerNames = managers.map((m) => m.name);
   if (draft.reportsTo && !managerNames.includes(draft.reportsTo)) managerNames.unshift(draft.reportsTo);
-  const roleOptions = store.roles.filter((r) => r.active || r.id === draft.assignedRole);
-  const jobTitles: string[] = [...JOB_TITLES];
-  if (!jobTitles.includes(draft.jobTitle)) jobTitles.unshift(draft.jobTitle);
+  const roleOptions = useAssignableRoles(draft.assignedRole);
+  // The business's own catalogs; a deactivated entry stays listed only for the member who holds it.
+  const jobTitles = store.jobTitles.filter((j) => j.isActive || j.id === draft.jobTitle);
+  const departments = store.departments.filter((d) => d.isActive || d.id === draft.department);
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[268px_minmax(0,1fr)_268px]">
@@ -277,8 +281,9 @@ export function MemberDetails({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label={t("staff.member.field.jobTitle")} htmlFor="m-title">
               <SelectInput id="m-title" value={draft.jobTitle} onChange={(e) => set("jobTitle", e.target.value)}>
+                <option value="">{tx("No job title", "بدون مسمى وظيفي")}</option>
                 {jobTitles.map((j) => (
-                  <option key={j} value={j}>{labels.data("staff.jobTitle", j)}</option>
+                  <option key={j.id} value={j.id}>{localName(j)}</option>
                 ))}
               </SelectInput>
             </Field>
@@ -291,8 +296,9 @@ export function MemberDetails({
             </Field>
             <Field label={t("staff.member.field.department")} htmlFor="m-dept">
               <SelectInput id="m-dept" value={draft.department} onChange={(e) => set("department", e.target.value)}>
-                {DEPARTMENTS.map((d) => (
-                  <option key={d} value={d}>{labels.data("staff.department", d)}</option>
+                <option value="">{tx("No department", "بدون قسم")}</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{localName(d)}</option>
                 ))}
               </SelectInput>
             </Field>
@@ -331,6 +337,7 @@ export function MemberDetails({
           <div className="flex flex-col gap-4">
             <Field label={t("staff.member.field.assignedRole")} htmlFor="m-role">
               <SelectInput id="m-role" value={draft.assignedRole} onChange={(e) => set("assignedRole", e.target.value)}>
+                {!draft.assignedRole && <option value="">{tx("No role", "بدون دور")}</option>}
                 {roleOptions.map((r) => (
                   <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
                 ))}
@@ -439,7 +446,16 @@ export function MemberDetails({
         <Section id="controls" icon={<Lock size={22} strokeWidth={1.7} />} title={t("staff.member.accessControls")} open={openSections.has("controls")} onToggle={() => toggleSection("controls")}>
           <div className="flex flex-col gap-4">
             <SwitchRow checked={draft.allowSystemLogin} onChange={(v) => set("allowSystemLogin", v)} label={t("staff.member.field.allowSystemLogin")} />
-            <SwitchRow checked={draft.allowAccessOutsideBranch} onChange={(v) => set("allowAccessOutsideBranch", v)} label={t("staff.member.field.allowAccessOutsideBranch")} />
+            <div className="flex flex-col gap-1">
+              <SwitchRow checked={draft.allowAccessOutsideBranch} onChange={(v) => set("allowAccessOutsideBranch", v)} label={t("staff.member.field.allowAccessOutsideBranch")} />
+              <span className="ps-[52px] text-[12px] text-[var(--octo-text-muted)]">
+                {tx(
+                  "Off: the member acts in their assigned branch only. On: across the whole business. You cannot grant wider reach than your own.",
+                  "إيقاف: يعمل الموظف في فرعه فقط. تشغيل: في كل فروع النشاط. لا يمكنك منح نطاق أوسع من نطاقك."
+                )}
+              </span>
+            </div>
+            <InvitationPanel employeeId={profile.employee.id} notify={notify} />
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[14px] text-[var(--octo-text-primary)]">
                 {t(profile.locked ? "staff.member.field.unlockAccountPrompt" : "staff.member.field.lockAccountPrompt")}

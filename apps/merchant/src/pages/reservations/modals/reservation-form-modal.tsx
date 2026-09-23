@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Calendar, FileText, Send, User } from "lucide-react";
 import { Button, Modal, Tabs, type TabItem } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { floorTables, type Reservation } from "@/shared/api/mock-reservations";
+import { useFloorPlan } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
+import type { FloorTable } from "@/entities/floor-plan";
+import { type Reservation } from "@/shared/api/mock-reservations";
 import {
   buildReservation,
   DEFAULT_AREAS,
@@ -19,6 +21,9 @@ import {
   type DraftState,
   type FormMode,
 } from "../_shared/reservation-form";
+import { useReservationActions } from "../_shared/reservations-store";
+import { isSlotTakenError, type AlternativeSlot } from "../_shared/reservations-api";
+import { AlternativesPicker, type AlternativesState } from "../_shared/alternatives-picker";
 
 export interface ReservationFormModalProps {
   open: boolean;
@@ -26,7 +31,15 @@ export interface ReservationFormModalProps {
   /** Required when `mode === "edit"` — the row being edited. */
   reservation: Reservation | null;
   onClose: () => void;
-  onSubmit: (draft: Reservation, intent: "pending" | "confirm") => void;
+  /** `resourceId` is the real floor-plan table backing whatever `draft.table`
+   *  reads, when the picked table matches one on the live plan — null means
+   *  either nothing changed or the picked value has no real table behind it
+   *  (an edit dialog with no live plan loaded, say), so the caller must not
+   *  reassign the reservation's table just because this is null.
+   *  In edit mode the caller may return a promise that rejects with the
+   *  server's "slot taken" error — the dialog then stays open and offers the
+   *  nearest free times (GET /availability/alternatives) instead. */
+  onSubmit: (draft: Reservation, intent: "pending" | "confirm", resourceId: string | null) => void | Promise<void>;
   /** Edit mode's red "Cancel Reservation" footer button. */
   onRequestCancel: () => void;
   /** Edit mode's "View Payment" — opens the reservation's payment details. */
@@ -35,11 +48,16 @@ export interface ReservationFormModalProps {
   initialTab?: "details" | "guest" | "notes";
 }
 
-// The floor plan's table numbers, plus whatever table the reservation is
+// The live floor plan's own tables, plus whatever table the reservation is
 // already on even if the floor doesn't list it — otherwise the controlled
 // <select> falls back to "Any Available" and touching it loses the table.
-function tableOptionsFor(reservation: Reservation | null): string[] {
-  const base = new Set(floorTables.map((table) => table.number));
+// Picking one of the plan's own tables is what makes `numberToId` resolve to
+// a real resourceId at submit time (see BACKEND_GAPS 4.7b — the old version
+// of this picked from a local mock list, so a changed table here never once
+// reached the server: `updateReservation` has no `resourceId` field at all,
+// only `assignReservationResource` does, and this dialog never called it).
+function tableOptionsFor(tables: readonly FloorTable[], reservation: Reservation | null): string[] {
+  const base = new Set(tables.filter((t) => t.reservable && !t.blocked).map((t) => t.number));
   if (reservation?.table) base.add(reservation.table);
   return Array.from(base).sort();
 }
@@ -55,8 +73,13 @@ export function ReservationFormModal({
   initialTab = "details",
 }: ReservationFormModalProps) {
   const { t } = useI18n();
+  const { published } = useFloorPlan();
+  const planTables = published?.doc.tables ?? [];
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [draft, setDraft] = useState<DraftState>(() => initDraft(mode, reservation));
+  const [alternatives, setAlternatives] = useState<AlternativesState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const actions = useReservationActions();
 
   // One draft holds every field whichever tab is showing, so switching tabs
   // never loses input. Re-seeded each time the dialog opens.
@@ -64,11 +87,17 @@ export function ReservationFormModal({
     if (open) {
       setDraft(initDraft(mode, reservation));
       setActiveTab(initialTab);
+      setAlternatives(null);
+      setSaving(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, mode, reservation?.id, initialTab]);
 
-  const tableOptions = useMemo(() => tableOptionsFor(reservation), [reservation]);
+  const tableOptions = useMemo(() => tableOptionsFor(planTables, reservation), [planTables, reservation]);
+  // The published plan's own spot id (a real resourceId once the plan has
+  // been pulled from the server — see use-floor-plan.ts's `publish`) for
+  // whichever table number is currently picked.
+  const numberToId = useMemo(() => new Map(planTables.map((t) => [t.number, t.id])), [planTables]);
   const { canSavePending, canConfirm } = draftValidity(draft);
 
   function update<K extends keyof DraftState>(key: K, value: DraftState[K]) {
@@ -76,7 +105,30 @@ export function ReservationFormModal({
   }
 
   function submit(intent: "pending" | "confirm") {
-    onSubmit(buildReservation(draft, mode, reservation, intent), intent);
+    const resourceId = draft.table ? numberToId.get(draft.table) ?? null : null;
+    const result = onSubmit(buildReservation(draft, mode, reservation, intent), intent, resourceId);
+    if (!result || !reservation) return;
+    setSaving(true);
+    setAlternatives(null);
+    const refused = { date: draft.date, time: draft.time, partySize: draft.partySize, durationMinutes: draft.durationMinutes };
+    result
+      .catch((err: unknown) => {
+        if (!isSlotTakenError(err)) return;
+        // The reschedule runs before any table change (see updateRow), so the
+        // refusal is about the table the reservation already holds.
+        setActiveTab("details");
+        setAlternatives({ kind: "loading" });
+        actions
+          .alternatives(refused, { reservationId: reservation.id })
+          .then((slots) => setAlternatives({ kind: "ready", slots }))
+          .catch(() => setAlternatives({ kind: "error" }));
+      })
+      .finally(() => setSaving(false));
+  }
+
+  function pickAlternative(slot: AlternativeSlot) {
+    setDraft((prev) => ({ ...prev, date: slot.date, time: slot.minutes }));
+    setAlternatives(null);
   }
 
   const tabItems: TabItem[] = [
@@ -108,7 +160,7 @@ export function ReservationFormModal({
           {t("reservations.form.cancelReservation")}
         </Button>
       )}
-      <Button variant="primary" icon={<Send size={14} />} disabled={!canConfirm} onClick={() => submit("confirm")}>
+      <Button variant="primary" icon={<Send size={14} />} disabled={!canConfirm || saving} onClick={() => submit("confirm")}>
         {t("reservations.form.createAndSend")}
       </Button>
     </>
@@ -122,6 +174,11 @@ export function ReservationFormModal({
       className="!max-w-[760px]"
       footer={footer}
     >
+      {alternatives && (
+        <div className="mb-4">
+          <AlternativesPicker state={alternatives} onPick={pickAlternative} />
+        </div>
+      )}
       <Tabs items={tabItems} value={activeTab} onChange={setActiveTab} />
 
       <div className="mt-4 max-h-[62vh] space-y-4 overflow-y-auto pe-1">

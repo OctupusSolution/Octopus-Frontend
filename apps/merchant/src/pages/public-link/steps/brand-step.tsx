@@ -15,8 +15,14 @@ import { Button, Input, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
-import { FONTS, fontStack } from "@/shared/lib/brand-tokens";
-import { EMPTY_SITE_DRAFT, type SiteDraft } from "../_shared/site-draft";
+import type { FontResponse } from "@octopus/api-client";
+import {
+  EMPTY_SITE_DRAFT,
+  ensureFontLoaded,
+  siteFontFamily,
+  toFontCode,
+  type SiteDraft,
+} from "../_shared/site-draft";
 import { previewModelFromSite } from "../_shared/preview-model";
 import { DeviceFrame } from "../ui/device-frame";
 import type { StepProps } from "../_shared/steps";
@@ -63,12 +69,14 @@ function ColorField({
 }
 
 /** Module scope for the same reason as `ColorField`. The example is set in the
- *  chosen face itself — via `fontStack` — rather than naming the font, so the
- *  merchant sees what the typeface looks like. */
+ *  chosen face itself rather than naming the font, so the merchant sees what
+ *  the typeface looks like. Options come from the API font catalogue
+ *  (`GET /public-link/fonts`, via publicLinkSync.fonts). */
 function TypographyField({
   label,
   exampleLabel,
   value,
+  fonts,
   sample,
   locale,
   variant,
@@ -76,26 +84,34 @@ function TypographyField({
 }: {
   label: string;
   exampleLabel: string;
+  /** Stored draft value: a catalogue code, or a legacy FONTS id from an older draft. */
   value: string;
+  fonts: readonly FontResponse[];
   sample: string;
   locale: "en" | "ar";
   variant: "title" | "body";
-  onChange: (id: string) => void;
+  onChange: (code: string) => void;
 }) {
+  const code = toFontCode(value);
+  const selected = fonts.find((font) => font.code === code);
+  useEffect(() => {
+    if (selected) ensureFontLoaded(selected.displayName);
+  }, [selected]);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <span className={FIELD_LABEL}>{label}</span>
-      <Select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
-        {FONTS.map((font) => (
-          <option key={font.id} value={font.id}>
-            {font.label}
+      <Select aria-label={label} value={selected ? code : ""} onChange={(e) => onChange(e.target.value)}>
+        {!selected && <option value="" disabled>—</option>}
+        {fonts.map((font) => (
+          <option key={font.code} value={font.code}>
+            {font.displayName}
           </option>
         ))}
       </Select>
       <span className="mt-2 text-[12.5px] text-[var(--octo-text-muted)]">{exampleLabel}</span>
       <p
         dir={locale === "ar" ? "rtl" : "ltr"}
-        style={{ fontFamily: fontStack(value, locale) }}
+        style={{ fontFamily: siteFontFamily(selected?.displayName, locale) }}
         className={clsx(
           "text-[var(--octo-text-primary)]",
           variant === "title" ? "text-[22px] font-bold leading-tight" : "text-[12.5px] leading-relaxed"
@@ -368,6 +384,7 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 label={t("publicLink.brand.titles")}
                 exampleLabel={t("publicLink.brand.titlesExample")}
                 value={brand.typography.en.titles}
+                fonts={publicLinkSync.fonts}
                 sample={t("publicLink.brand.titlesSample")}
                 locale="en"
                 variant="title"
@@ -377,6 +394,7 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 label={t("publicLink.brand.body")}
                 exampleLabel={t("publicLink.brand.bodyExample")}
                 value={brand.typography.en.body}
+                fonts={publicLinkSync.fonts}
                 sample={t("publicLink.brand.bodySample")}
                 locale="en"
                 variant="body"
@@ -394,6 +412,7 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 label={t("publicLink.brand.titles")}
                 exampleLabel={t("publicLink.brand.titlesExample")}
                 value={brand.typography.ar.titles}
+                fonts={publicLinkSync.fonts}
                 sample={t("publicLink.brand.titlesSampleAr")}
                 locale="ar"
                 variant="title"
@@ -403,6 +422,7 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 label={t("publicLink.brand.body")}
                 exampleLabel={t("publicLink.brand.bodyExample")}
                 value={brand.typography.ar.body}
+                fonts={publicLinkSync.fonts}
                 sample={t("publicLink.brand.bodySampleAr")}
                 locale="ar"
                 variant="body"

@@ -26,7 +26,7 @@ import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { FONTS } from "@/shared/lib/brand-tokens";
 import { storefrontAsset } from "@/shared/lib/storefront-assets";
 import { useSiteDraft } from "@/entities/site-draft";
-import type { MenuTheme } from "@/entities/menu";
+import { useThemeChoices, type MenuTheme } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { useDraft } from "../use-draft";
@@ -252,6 +252,17 @@ function Switch({ checked, onChange, label }: { checked: boolean; onChange: () =
   );
 }
 
+/** A platform preset the builder has no palette for: drawn in neutral greys
+ *  and labelled by its code until the builder learns it. */
+function unknownPreset(code: string): MenuPreset {
+  return {
+    id: code,
+    labelKey: code,
+    styleId: "modern",
+    colors: { primary: "#6b6b74", light: "#f4f4f5", accent: "#a9a9b2", dark: "#16161d" },
+  };
+}
+
 export function ThemeStep() {
   const { t } = useI18n();
   const { draft, setDraft } = useDraft();
@@ -269,11 +280,28 @@ export function ThemeStep() {
     setDraft({ ...draft, theme: { ...theme, ...patch } });
   }
 
-  const activePreset = presetFor(theme.presetId);
+  // The platform's preset and font codes (GET /theme-presets). When it lists
+  // any, they are the choices — the API refuses a code it does not list — with
+  // the builder's palettes drawn for the codes it knows. Without them (not
+  // loaded, failed, none configured) the builder's own catalogue stands in.
+  const choices = useThemeChoices();
+  const serverPresets = choices.data?.presets ?? [];
+  const serverFonts = choices.data?.fonts ?? [];
+  const isServerPreset = (id: string) => serverPresets.some((code) => code.toLowerCase() === id.toLowerCase());
+  const isServerFont = (id: string) => serverFonts.some((code) => code.toLowerCase() === id.toLowerCase());
+  const presets: readonly MenuPreset[] =
+    serverPresets.length > 0 ? serverPresets.map((code) => presetFor(code) ?? unknownPreset(code)) : MENU_PRESETS;
+  const fontOptions = (current: string) => {
+    const base: { id: string; label: string }[] =
+      serverFonts.length > 0 ? serverFonts.map((code) => FONTS.find((f) => f.id === code.toLowerCase()) ?? { id: code, label: code }) : [...FONTS];
+    return base.some((f) => f.id === current) ? base : [...base, FONTS.find((f) => f.id === current) ?? { id: current, label: current }];
+  };
+
+  const activePreset = presets.find((p) => p.id === (presetFor(theme.presetId)?.id ?? theme.presetId)) ?? null;
   /** A preset is a palette: picking one sets all four brand colours, which
    *  the merchant can still fine-tune below. */
   function selectPreset(preset: MenuPreset) {
-    patchTheme({ presetId: preset.id });
+    patchTheme({ presetId: preset.id, serverPresetCode: isServerPreset(preset.id) ? preset.id : undefined });
     dispatch({ type: "patchColors", patch: preset.colors });
   }
 
@@ -293,7 +321,7 @@ export function ThemeStep() {
       <div className={card}>
         <h2 className={heading}>{t("menuTheme.presets")}</h2>
         <div className="mt-2.5 grid grid-cols-3 gap-x-2.5 gap-y-3">
-          {MENU_PRESETS.map((preset) => (
+          {presets.slice(0, 6).map((preset) => (
             <PresetTile
               key={preset.id}
               preset={preset}
@@ -406,9 +434,12 @@ export function ThemeStep() {
           <Select
             className="mt-1.5"
             value={site.brand.typography.en.titles}
-            onChange={(e) => dispatch({ type: "patchTypography", locale: "en", patch: { titles: e.target.value } })}
+            onChange={(e) => {
+              dispatch({ type: "patchTypography", locale: "en", patch: { titles: e.target.value } });
+              patchTheme({ titleFontCode: isServerFont(e.target.value) ? e.target.value : undefined });
+            }}
           >
-            {FONTS.map((f) => (
+            {fontOptions(site.brand.typography.en.titles).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </Select>
@@ -418,9 +449,12 @@ export function ThemeStep() {
           <Select
             className="mt-1.5"
             value={site.brand.typography.en.body}
-            onChange={(e) => dispatch({ type: "patchTypography", locale: "en", patch: { body: e.target.value } })}
+            onChange={(e) => {
+              dispatch({ type: "patchTypography", locale: "en", patch: { body: e.target.value } });
+              patchTheme({ bodyFontCode: isServerFont(e.target.value) ? e.target.value : undefined });
+            }}
           >
-            {FONTS.map((f) => (
+            {fontOptions(site.brand.typography.en.body).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </Select>
@@ -534,7 +568,7 @@ export function ThemeStep() {
         className="max-w-2xl"
       >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {MENU_PRESETS.map((preset) => (
+          {presets.map((preset) => (
             <PresetTile
               key={preset.id}
               preset={preset}

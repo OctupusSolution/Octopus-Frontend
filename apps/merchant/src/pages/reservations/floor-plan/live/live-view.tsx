@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPo
 import { useNavigate } from "react-router-dom";
 import { Boxes, CalendarCheck, ClipboardList, FilePen, Maximize2, MessageCircle, MoveHorizontal, PencilRuler, Search, SearchX, X } from "lucide-react";
 import clsx from "clsx";
+import { Modal } from "@ui/primitives";
 import {
   availabilitySummary,
   createBooking,
@@ -31,9 +32,7 @@ import { ToastBanner, useToast } from "../_shared/toast";
 import { useBookings, useFloorPlan, useLiveTables } from "../_shared/use-floor-plan";
 import { BookTableModal } from "./book-table-modal";
 import { BookingBar, BookingTablePanel, type SlotQuery } from "./booking-bar";
-import { KpiStrip } from "./kpi-strip";
-import { SendMessageModal, UpdateTableModal, ViewOrderModal } from "./live-modals";
-import { LiveSummaryPanel } from "./live-summary-panel";
+import { SendMessageModal, UpdateTableForm, ViewOrderModal } from "./live-modals";
 import { TableDetailCard } from "./table-detail-card";
 
 const TABLES_ONLY: ReadonlySet<ItemKind> = new Set(["table"]);
@@ -51,6 +50,7 @@ export function LiveFloorPlan({ published }: { published: PublishedFloorPlan }) 
   const { toast, notify } = useToast();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [zoneId, setZoneId] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<LiveStatus | null>(null);
@@ -89,7 +89,10 @@ export function LiveFloorPlan({ published }: { published: PublishedFloorPlan }) 
 
   // A search that narrows the floor to a single table opens that table.
   useEffect(() => {
-    if (q && matches.length === 1) setSelectedId(matches[0].table.id);
+    if (q && matches.length === 1) {
+      setSelectedId(matches[0].table.id);
+      setDetailOpen(true);
+    }
   }, [q, matches]);
 
   const availability = useMemo(() => {
@@ -267,100 +270,103 @@ export function LiveFloorPlan({ published }: { published: PublishedFloorPlan }) 
         </Dropdown>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <div className="relative overflow-hidden rounded-[22px] border-[3px] border-[#1F2937] bg-white">
-            <PlanViewport
-              doc={doc}
-              zoom={zoom}
-              onScaleChange={setPercent}
-              className="h-[clamp(440px,66vh,780px)]"
-              toneFor={toneFor}
-              showSeats={bookingMode}
-              showBackground={false}
-              selectedIds={selectedIds}
-              dimmedIds={dimmedIds}
-              interactive={TABLES_ONLY}
-              onItemPointerDown={(_event: ReactPointerEvent<SVGGElement>, item: FloorItem) => setSelectedId(item.id)}
-              onBackgroundPointerDown={() => setSelectedId(null)}
-            />
-            {filtering && matches.length === 0 && (
-              <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
-                <span className="flex items-center gap-2 rounded-full bg-[#111827]/85 px-4 py-2 text-[13px] font-medium text-white shadow-lg">
-                  <SearchX size={15} />
-                  {t("floorPlan.live.noMatches")}
-                </span>
-              </div>
-            )}
-            {live.entries.length === 0 && (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                <span className="rounded-full bg-[#111827]/80 px-4 py-2 text-[13px] font-medium text-white">{t("floorPlan.live.noTables")}</span>
-              </div>
-            )}
-          </div>
-          <KpiStrip doc={doc} />
-        </div>
-
-        <aside className="flex flex-col gap-4">
-          <LiveSummaryPanel counts={live.counts} total={live.entries.length} walkIn={live.walkIn} now={live.now} />
-          {bookingMode ? (
-            <BookingTablePanel
-              entry={selected}
-              availability={selected ? availability.get(selected.table.id) ?? "booked" : null}
-              bookings={bookings}
-              query={slotQuery}
-              onBook={() => setModal("book")}
-              onCancelBooking={(booking) => {
-                removeBooking(booking.id);
-                notify(t("floorPlan.booking.cancelled").replace("{number}", selected?.table.number ?? ""), "info");
-              }}
-            />
-          ) : (
-            <>
-          <TableDetailCard entry={selected} zoneName={selectedZone?.name} now={live.now} onEdit={() => setModal("update")} />
-          <button
-            type="button"
-            disabled={!selected || !(selected.state.status === "occupied" || selected.state.status === "reserved")}
-            onClick={() => setModal("message")}
-            className="flex h-14 items-center justify-center gap-2.5 rounded-[14px] bg-[#DCFCE7] text-[17px] font-semibold text-[#15803D] transition-colors hover:bg-[#CBF5D8] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <MessageCircle size={22} />
-            {t("floorPlan.live.detail.sendMessage")}
-          </button>
-          <button
-            type="button"
-            disabled={!selected?.state.orderId || selected.state.status !== "occupied"}
-            onClick={() => setModal("order")}
-            className={clsx(
-              "flex h-14 items-center justify-center gap-2.5 rounded-[14px] bg-[var(--octo-seg-bg)] text-[17px] font-semibold text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-track)] disabled:cursor-not-allowed disabled:opacity-50"
-            )}
-          >
-            <ClipboardList size={22} />
-            {t("floorPlan.live.detail.viewOrder")}
-          </button>
-            </>
+      <div className="mt-5 flex flex-col gap-5">
+        <div className="relative overflow-hidden rounded-[22px] border-[3px] border-[#1F2937] bg-white">
+          <PlanViewport
+            doc={doc}
+            zoom={zoom}
+            onScaleChange={setPercent}
+            className="h-[clamp(520px,calc(100vh-220px),1100px)]"
+            toneFor={toneFor}
+            showSeats={bookingMode}
+            showBackground={false}
+            selectedIds={selectedIds}
+            dimmedIds={dimmedIds}
+            interactive={TABLES_ONLY}
+            onItemPointerDown={(_event: ReactPointerEvent<SVGGElement>, item: FloorItem) => {
+              setSelectedId(item.id);
+              setDetailOpen(true);
+            }}
+            onBackgroundPointerDown={() => {
+              setSelectedId(null);
+              setDetailOpen(false);
+            }}
+          />
+          {filtering && matches.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
+              <span className="flex items-center gap-2 rounded-full bg-[#111827]/85 px-4 py-2 text-[13px] font-medium text-white shadow-lg">
+                <SearchX size={15} />
+                {t("floorPlan.live.noMatches")}
+              </span>
+            </div>
           )}
-        </aside>
+          {live.entries.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 grid place-items-center">
+              <span className="rounded-full bg-[#111827]/80 px-4 py-2 text-[13px] font-medium text-white">{t("floorPlan.live.noTables")}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <UpdateTableModal
-        open={modal === "update"}
-        entry={selected}
-        now={live.now}
-        onClose={() => setModal(null)}
-        onSave={(state) => {
-          if (!selected) return;
-          live.setTableState(selected.table.id, state);
-          setModal(null);
-          notify(t("floorPlan.live.update.saved").replace("{number}", selected.table.number));
-        }}
-        onReset={() => {
-          if (!selected) return;
-          live.clearTableState(selected.table.id);
-          setModal(null);
-          notify(t("floorPlan.live.update.resetDone").replace("{number}", selected.table.number), "info");
-        }}
-      />
+      <Modal
+        open={detailOpen && selected !== null}
+        onClose={() => setDetailOpen(false)}
+        title={bookingMode ? selected?.table.number : undefined}
+        className="max-w-md"
+      >
+        {bookingMode ? (
+          <BookingTablePanel
+            entry={selected}
+            availability={selected ? availability.get(selected.table.id) ?? "booked" : null}
+            bookings={bookings}
+            query={slotQuery}
+            onBook={() => setModal("book")}
+            onCancelBooking={(booking) => {
+              removeBooking(booking.id);
+              notify(t("floorPlan.booking.cancelled").replace("{number}", selected?.table.number ?? ""), "info");
+            }}
+          />
+        ) : (
+          selected && (
+            <div className="flex flex-col gap-4">
+              <TableDetailCard entry={selected} zoneName={selectedZone?.name} now={live.now} />
+              <UpdateTableForm
+                entry={selected}
+                now={live.now}
+                embedded
+                onSave={(state) => {
+                  live.setTableState(selected.table.id, state);
+                  notify(t("floorPlan.live.update.saved").replace("{number}", selected.table.number));
+                }}
+                onReset={() => {
+                  live.clearTableState(selected.table.id);
+                  notify(t("floorPlan.live.update.resetDone").replace("{number}", selected.table.number), "info");
+                }}
+              />
+              <button
+                type="button"
+                disabled={!(selected.state.status === "occupied" || selected.state.status === "reserved")}
+                onClick={() => setModal("message")}
+                className="flex h-14 items-center justify-center gap-2.5 rounded-[14px] bg-[#DCFCE7] text-[17px] font-semibold text-[#15803D] transition-colors hover:bg-[#CBF5D8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <MessageCircle size={22} />
+                {t("floorPlan.live.detail.sendMessage")}
+              </button>
+              <button
+                type="button"
+                disabled={!selected.state.orderId || selected.state.status !== "occupied"}
+                onClick={() => setModal("order")}
+                className={clsx(
+                  "flex h-14 items-center justify-center gap-2.5 rounded-[14px] bg-[var(--octo-seg-bg)] text-[17px] font-semibold text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-track)] disabled:cursor-not-allowed disabled:opacity-50"
+                )}
+              >
+                <ClipboardList size={22} />
+                {t("floorPlan.live.detail.viewOrder")}
+              </button>
+            </div>
+          )
+        )}
+      </Modal>
       <SendMessageModal
         open={modal === "message"}
         entry={selected}

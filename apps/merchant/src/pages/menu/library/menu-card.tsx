@@ -7,7 +7,7 @@ import { entryCount, sectionCount, type ChannelState, type Menu, type MenuStatus
 import { useI18n } from "@/app/providers/i18n-provider";
 
 export type CardAction =
-  | "edit" | "schedule" | "hold" | "resume" | "duplicate" | "archive" | "delete";
+  | "edit" | "schedule" | "hold" | "resume" | "duplicate" | "archive" | "delete" | "versions" | "accessCode" | "bulkPrice" | "unpublish";
 
 export const STATUS_TONE: Record<MenuStatus, "success" | "warning" | "error" | "info" | "neutral"> = {
   active: "success",

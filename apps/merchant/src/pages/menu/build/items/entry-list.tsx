@@ -5,13 +5,14 @@
 // near-identical rows loses which row you were on.
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { MoreVertical, Plus } from "lucide-react";
+import { Library, MoreVertical, Plus } from "lucide-react";
 import { Select } from "@ui/primitives";
 import { MediaTile } from "@/shared/ui/media-tile";
 import { OFFERS_SECTION_ID, type Item, type Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useMenuCopy } from "../../copy";
 
-export type EntryAction = "duplicate" | "multiSection" | "delete";
+export type EntryAction = "duplicate" | "multiSection" | "move" | "delete";
 
 const MENU_WIDTH = 220;
 const GAP = 6;
@@ -28,6 +29,8 @@ export function EntryList({
   onAction,
   priceOf,
   addLabelKey,
+  onAddExisting,
+  addExistingLabel,
 }: {
   sections: Section[];
   sectionId: string;
@@ -41,8 +44,12 @@ export function EntryList({
    *  to show rather than this list reaching into a shape it may not have. */
   priceOf: (entry: Item) => number;
   addLabelKey: string;
+  /** Picks from the business's catalog (items or offers) instead of a blank entry. */
+  onAddExisting?: () => void;
+  addExistingLabel?: string;
 }) {
   const { t, dir } = useI18n();
+  const c = useMenuCopy();
   const [menuFor, setMenuFor] = useState<{ item: Item; anchor: DOMRect } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -69,10 +76,11 @@ export function EntryList({
   const isOffers = sectionId === OFFERS_SECTION_ID;
   const actions: EntryAction[] = isOffers
     ? ["duplicate", "delete"]
-    : ["duplicate", "multiSection", "delete"];
+    : ["duplicate", "multiSection", "move", "delete"];
 
   function actionLabel(action: EntryAction): string {
     if (isOffers) return t(action === "duplicate" ? "menuOffer.duplicate" : "menuOffer.delete");
+    if (action === "move") return c("items.moveTo");
     return t(`menuWiz.item.action.${action}`);
   }
 
@@ -146,6 +154,16 @@ export function EntryList({
         <Plus size={18} aria-hidden />
         {t(addLabelKey)}
       </button>
+      {onAddExisting && (
+        <button
+          type="button"
+          onClick={onAddExisting}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] px-3 py-2 text-[14px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-selected)]"
+        >
+          <Library size={16} aria-hidden />
+          {addExistingLabel}
+        </button>
+      )}
 
       {menuFor && (
         <div

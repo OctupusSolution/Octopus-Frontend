@@ -1,17 +1,43 @@
 // apps/merchant/src/pages/orders-list/_shared/wastage-order-flow.tsx
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { recordWastageForOrder, toWastageReasonCode } from "@/entities/order";
 import { WastageForm, type WastagePayload } from "./wastage-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
 import { ResultModal } from "./result-modal";
 import { useActionFlow } from "./action-flow";
+import { useOrderActionConfirm } from "./use-order-action-confirm";
 import { ACTION_THEME } from "./theme";
 import type { OrderRecord } from "./types";
 
-export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null; onClose: () => void }) {
+export function WastageOrderFlow({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: OrderRecord | null;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
   const { t } = useI18n();
   const flow = useActionFlow<WastagePayload>(["form", "pin", "result"], order !== null);
   const accent = ACTION_THEME.wastage.accent;
+  const { confirm, submitting, errorText } = useOrderActionConfirm(
+    order,
+    (businessId, orderId, version, approval) => {
+      // Matched by name against the same order's own items — real items
+      // always carry a lineId (order-record-bridge.ts), so this only
+      // fails to find one if the form somehow named an item the order
+      // doesn't have, which the picker itself prevents.
+      const items = (flow.payload?.items ?? []).flatMap((picked) => {
+        const lineId = order?.items.find((item) => item.name === picked.name)?.lineId;
+        return lineId ? [{ lineId, quantity: picked.qty }] : [];
+      });
+      return recordWastageForOrder(businessId, orderId, items, toWastageReasonCode(flow.payload?.reason ?? "other"), approval);
+    },
+    flow.advance,
+    onSuccess
+  );
 
   if (!order) return null;
 
@@ -47,10 +73,12 @@ export function WastageOrderFlow({ order, onClose }: { order: OrderRecord | null
       <PinConfirmModal
         open
         onClose={onClose}
-        onConfirm={flow.advance}
+        onConfirm={confirm}
         accent={accent}
         promptKey="orders.managerAuth.prompt.wastage"
         confirmLabelKey="orders.managerAuth.confirm.wastage"
+        errorText={errorText}
+        submitting={submitting}
       />
     );
   }

@@ -16,13 +16,23 @@ export function PinConfirmModal({
   accent,
   promptKey,
   confirmLabelKey,
+  errorText,
+  submitting,
 }: {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  /** Called with the entered PIN. For a mock order this ignores it and
+   *  always proceeds; for a real order (RealOrderRef present) the caller
+   *  sends it on as the step-up approval and may reject via `errorText`. */
+  onConfirm: (pin: string) => void;
   accent: string;
   promptKey: string;
   confirmLabelKey: string;
+  /** Set after a real approval call comes back wrong (bad PIN, no PIN set,
+   *  locked out, ...) — shown under the PIN boxes; absent for the mock flow. */
+  errorText?: string | null;
+  /** Disables the confirm button while a real approval call is in flight. */
+  submitting?: boolean;
 }) {
   const { t } = useI18n();
   const [pin, setPin] = useState<string[]>(Array.from({ length: PIN_LENGTH }, () => ""));
@@ -58,10 +68,12 @@ export function PinConfirmModal({
         <PinInput value={pin} onChange={setPin} />
       </div>
 
+      {errorText && <p className="mt-3 text-center text-[12.5px] text-[#EF4444]">{errorText}</p>}
+
       <button
         type="button"
-        disabled={!complete}
-        onClick={onConfirm}
+        disabled={!complete || submitting}
+        onClick={() => onConfirm(pin.join(""))}
         className="mt-6 w-full rounded-[10px] py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         style={{ backgroundColor: accent }}
       >

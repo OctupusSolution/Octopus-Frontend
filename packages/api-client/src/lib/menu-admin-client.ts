@@ -15,8 +15,12 @@
 // executeTextReplacement. Every other write is a plain PUT/POST/DELETE with
 // no idempotency requirement — see menu-admin.ts's per-request doc comments.
 import type {
+  AccessCodeImageFormat,
   AccessCodeResponse,
   AvailabilityTimelineResponse,
+  CatalogItemSummaryResponse,
+  LabelKind,
+  MenuPreviewResponse,
   BranchProfileResponse,
   CatalogItemResponse,
   CatalogSettingsResponse,
@@ -193,13 +197,13 @@ export function saveBuilderProgress(
   return apiRequest(`${base(businessId)}/menus/${menuId}/builder-progress`, { method: "PUT", body: request });
 }
 
-/** Returns the same shape as the customer-facing public menu read — typed as
- *  `unknown` here since that contract lives outside this admin surface. */
+/** The same shape the customer-facing public read serves, rendered from the
+ *  draft. `branchId`/`channel`/`at` are accepted but filter nothing yet. */
 export function previewMenuDraft(
   businessId: string,
   menuId: string,
   params: { branchId?: string; channel?: string; at?: string; lang?: string } = {}
-): Promise<unknown> {
+): Promise<MenuPreviewResponse> {
   return apiRequest(`${base(businessId)}/menus/${menuId}/preview`, { query: params });
 }
 
@@ -217,6 +221,7 @@ export function setMenuAvailability(
   return apiRequest(`${base(businessId)}/menus/${menuId}/availability`, { method: "PUT", body: request });
 }
 
+/** `from`/`to` are REQUIRED DateOnly strings (`yyyy-MM-dd`, to >= from). */
 export function previewAvailabilityTimeline(
   businessId: string,
   menuId: string,
@@ -322,6 +327,7 @@ export function reorderPlacements(
   return apiRequest(`${base(businessId)}/menus/${menuId}/sections/${sectionId}/placements/order`, { method: "PUT", body: request });
 }
 
+/** `menuId` is path shape only — the server never binds it. */
 export function movePlacement(businessId: string, menuId: string, request: MovePlacementRequest): Promise<void> {
   return apiRequest(`${base(businessId)}/menus/${menuId}/placements/move`, { method: "POST", body: request });
 }
@@ -330,8 +336,8 @@ export function movePlacement(businessId: string, menuId: string, request: MoveP
 
 export function listCatalogItems(
   businessId: string,
-  params: { search?: string; status?: string; tag?: string; unplaced?: boolean; page?: number; pageSize?: number } = {}
-): Promise<ListEnvelope<CatalogItemResponse>> {
+  params: { search?: string; status?: "Draft" | "Active"; tag?: string; unplaced?: boolean; page?: number; pageSize?: number } = {}
+): Promise<ListEnvelope<CatalogItemSummaryResponse>> {
   return apiRequest(`${base(businessId)}/items`, {
     query: {
       search: params.search,
@@ -390,6 +396,8 @@ export function duplicateCatalogItem(
   return apiRequest(`${base(businessId)}/items/${itemId}/duplicate`, { method: "POST", body: request, idempotencyKey });
 }
 
+/** 409 `menu.item.placed-in-sections` unless `removeFromSections`; 409
+ *  `menu.item.in-use-by-offer` regardless. 200, empty body. */
 export function deleteCatalogItem(
   businessId: string,
   itemId: string,
@@ -403,7 +411,7 @@ export function deleteCatalogItem(
 
 export function listLabels(
   businessId: string,
-  params: { kind?: string; page?: number; pageSize?: number } = {}
+  params: { kind?: LabelKind; page?: number; pageSize?: number } = {}
 ): Promise<ListEnvelope<LabelResponse>> {
   return apiRequest(`${base(businessId)}/labels`, {
     query: { kind: params.kind, page: params.page?.toString(), pageSize: params.pageSize?.toString() },
@@ -453,6 +461,8 @@ export function updateModifierGroup(
   return apiRequest(`${base(businessId)}/modifier-groups/${groupId}`, { method: "PUT", body: request });
 }
 
+/** `expectedVersion` is compared against the group's `contentVersion`. 409
+ *  `menu.modifier.in-use` unless `detachFromItems`. 200, empty body. */
 export function deleteModifierGroup(
   businessId: string,
   groupId: string,
@@ -516,6 +526,8 @@ export function setOptionAvailability(
 
 // ---- Offers -------------------------------------------------------------------
 
+/** Unpaged. 409 `menu.settings.not-initialized` before catalog settings exist
+ *  (as does quoteOfferPrice). */
 export function listOffers(businessId: string): Promise<ListEnvelope<OfferSummaryResponse>> {
   return apiRequest(`${base(businessId)}/offers`);
 }
@@ -654,16 +666,20 @@ export function revokeAccessCode(businessId: string, codeId: string): Promise<Ac
   return apiRequest(`${base(businessId)}/access-codes/${codeId}/revoke`, { method: "POST" });
 }
 
-/** Returns raw bytes (PNG/SVG) with an ETag, not JSON — build the <img src>
- *  URL directly (e.g. `${basePath}${base(businessId)}/access-codes/${codeId}/image?format=png`)
- *  rather than calling this through apiRequest's JSON parsing. */
+/** Path (WITHOUT the configured basePath) of the QR image: raw PNG/SVG bytes
+ *  with an ETag, not JSON. The route is NOT anonymous — the permission and
+ *  `menu:access-codes` feature checks run in the pipeline, so a bare
+ *  <img src> 403s; fetch it with the bearer token and use a blob URL.
+ *  `format` is required (missing = 400), `size` is pixels per QR module
+ *  (4–40, default 20), `label` an optional printed location note. Rate
+ *  limited (429). */
 export function accessCodeImageUrl(
   businessId: string,
   codeId: string,
-  params: { format?: string; size?: number; label?: string } = {}
+  params: { format: AccessCodeImageFormat; size?: number; label?: string }
 ): string {
   const q = new URLSearchParams();
-  if (params.format) q.set("format", params.format);
+  q.set("format", params.format);
   if (params.size) q.set("size", String(params.size));
   if (params.label) q.set("label", params.label);
   const qs = q.toString();
@@ -722,6 +738,12 @@ export function executeTextReplacement(
   return apiRequest(`${base(businessId)}/text-replacements`, { method: "POST", body: request, idempotencyKey });
 }
 
-export function listBulkOperations(businessId: string): Promise<ListEnvelope<BulkOperationSummaryResponse>> {
-  return apiRequest(`${base(businessId)}/bulk-operations`);
+export function listBulkOperations(
+  businessId: string,
+  page?: number,
+  pageSize?: number
+): Promise<ListEnvelope<BulkOperationSummaryResponse>> {
+  return apiRequest(`${base(businessId)}/bulk-operations`, {
+    query: { page: page?.toString(), pageSize: pageSize?.toString() },
+  });
 }

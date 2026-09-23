@@ -12,7 +12,9 @@ import {
   applyScheduleType,
   channelStateFor,
   fallbackCandidates,
+  isServerId,
   setScheduleTime,
+  useSchedulePresets,
   type Menu,
   type MenuSchedule,
   type Weekday,
@@ -20,6 +22,8 @@ import {
 import { useI18n } from "@/app/providers/i18n-provider";
 import { MenuCover, STATUS_TONE } from "./menu-card";
 import { Badge } from "@ui/primitives";
+import { ScheduleTimeline } from "./schedule-timeline";
+import { useMenuCopy } from "../copy";
 
 const TYPES: MenuSchedule["type"][] = ["all-day", "breakfast", "lunch", "dinner", "custom"];
 
@@ -53,6 +57,10 @@ export function ScheduleModal({
   onSave: (schedule: MenuSchedule, channels: Menu["channels"]) => void;
 }) {
   const { t } = useI18n();
+  const c = useMenuCopy();
+  // The platform's preset codes; they carry no windows, so a known code also
+  // applies the builder's window for it and an unknown one only tags the save.
+  const presets = useSchedulePresets(menu !== null);
   const [draft, setDraft] = useState<MenuSchedule | null>(null);
   const [channels, setChannels] = useState<Menu["channels"] | null>(null);
 
@@ -116,7 +124,12 @@ export function ScheduleModal({
                 key={type}
                 type="button"
                 aria-pressed={draft.type === type}
-                onClick={() => setDraft(applyScheduleType(draft, type))}
+                onClick={() =>
+                  setDraft({
+                    ...applyScheduleType(draft, type),
+                    presetCode: presets.data?.some((p) => p.code === type) ? type : null,
+                  })
+                }
                 className={`rounded-[10px] border px-3 py-2.5 text-[15px] ${
                   draft.type === type
                     ? "border-[var(--octo-accent)] bg-[var(--octo-selected)] text-[var(--octo-accent)]"
@@ -127,6 +140,31 @@ export function ScheduleModal({
               </button>
             ))}
           </div>
+          {presets.data && presets.data.some((p) => !TYPES.includes(p.code as MenuSchedule["type"])) && (
+            <>
+              <p className="mt-3 text-[13px] text-[var(--octo-text-secondary)]">{c("schedule.presets")}</p>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {presets.data
+                  .filter((p) => !TYPES.includes(p.code as MenuSchedule["type"]))
+                  .map((p) => (
+                    <button
+                      key={p.code}
+                      type="button"
+                      aria-pressed={draft.presetCode === p.code}
+                      onClick={() => patch({ presetCode: draft.presetCode === p.code ? null : p.code })}
+                      className={`rounded-[10px] border px-3 py-2 text-[14px] ${
+                        draft.presetCode === p.code
+                          ? "border-[var(--octo-accent)] bg-[var(--octo-selected)] text-[var(--octo-accent)]"
+                          : "border-[var(--octo-border-card)] text-[var(--octo-text-primary)]"
+                      }`}
+                    >
+                      {t(`menuLib.scheduleType.${p.code}`) === `menuLib.scheduleType.${p.code}` ? p.code : t(`menuLib.scheduleType.${p.code}`)}
+                    </button>
+                  ))}
+              </div>
+            </>
+          )}
+          {isServerId(menu.id) && <ScheduleTimeline menuId={menu.id} />}
         </Block>
 
         <Block title={t("menuLib.sched.window")}>
@@ -137,7 +175,7 @@ export function ScheduleModal({
                 <input
                   type="time"
                   value={draft[field]}
-                  onChange={(e) => setDraft(setScheduleTime(draft, field, e.target.value))}
+                  onChange={(e) => setDraft({ ...setScheduleTime(draft, field, e.target.value), presetCode: null })}
                   className={FIELD}
                 />
               </label>

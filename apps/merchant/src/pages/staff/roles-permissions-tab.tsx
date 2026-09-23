@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { Plus, UserRound } from "lucide-react";
 import clsx from "clsx";
+import { duplicateStaffRole } from "@octopus/api-client";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { ConfirmModal } from "./_shared/confirm-modal";
 import { useStaffLabels } from "./_shared/labels";
 import { RowMenu, type RowMenuItem } from "./_shared/row-menu";
-import { clonePermissions, useStaffStore, type RoleRecord } from "./_shared/staff-store";
+import { useStaffStore, type RoleRecord } from "./_shared/staff-store";
+import { rememberRole, serverRoleId } from "./_shared/staff-sync";
+import { newKey, staffErrorText, useTx } from "./_shared/text";
 import { StatusPill } from "./_shared/status-pill";
 import { ToastBanner, useToast } from "./_shared/toast";
 import { AssignUsersModal } from "./assign-users-modal";
@@ -18,6 +22,8 @@ export function RolesPermissionsTab() {
   const { t } = useI18n();
   const labels = useStaffLabels();
   const store = useStaffStore();
+  const tx = useTx();
+  const { activeBusinessId } = useAuth();
   const { toast, notify } = useToast();
   const [selectedId, setSelectedId] = useState(store.roles[0]?.id ?? "");
   const [menuId, setMenuId] = useState<string | null>(null);
@@ -36,14 +42,17 @@ export function RolesPermissionsTab() {
         key: "duplicate",
         label: t("staff.roles.menu.duplicate"),
         onSelect: () => {
-          const id = `role-${Date.now().toString(36)}`;
+          if (!activeBusinessId) return;
+          // POST /roles/{id}/duplicate: same permissions, no members, a new name.
           const copyName = t("staff.roles.copyName").replace("{name}", name);
-          store.addRole(
-            { id, name: copyName, description: labels.roleDescription(role), isSystemRole: false, active: true },
-            clonePermissions(store.permissions[role.id])
-          );
-          setSelectedId(id);
-          notify(t("staff.toast.roleDuplicated").replace("{name}", copyName));
+          duplicateStaffRole(activeBusinessId, serverRoleId(role.id), { name: copyName, description: role.description || null }, newKey())
+            .then((res) => {
+              const copy = rememberRole(res);
+              store.adoptRole(copy);
+              setSelectedId(copy.id);
+              notify(t("staff.toast.roleDuplicated").replace("{name}", copyName));
+            })
+            .catch((err) => notify(staffErrorText(err, tx), "error"));
         },
       },
       { key: "assign", label: t("staff.roles.menu.assignUsers"), onSelect: () => setAssignRoleId(role.id) },
@@ -126,11 +135,10 @@ export function RolesPermissionsTab() {
                     <span className="sr-only">{t("staff.roles.memberCount").replace("{count}", String(count))}</span>
                     <span aria-hidden>{count}</span>
                   </span>
-                  {role.isSystemRole ? (
-                    <span className="w-7 shrink-0" aria-hidden />
-                  ) : (
+                  {/* The Owner role offers only "duplicate" — that is how a business starts from full access. */}
+                  {(
                     <RowMenu
-                      items={menuItemsFor(role)}
+                      items={role.isSystemRole ? menuItemsFor(role).filter((i) => i.key === "duplicate") : menuItemsFor(role)}
                       open={menuId === role.id}
                       onOpenChange={(open) => setMenuId(open ? role.id : null)}
                       ariaLabel={t("staff.roles.moreActions").replace("{name}", labels.roleName(role))}

@@ -19,7 +19,7 @@ export interface DraftContextValue {
    *  sets state and saves in the same tick would otherwise save the value from
    *  before its own setDraft — which is exactly how Publish came to write a
    *  menu still marked pending. Omit the argument to save what is in state. */
-  save: (next?: Menu) => void;
+  save: (next?: Menu) => void | Promise<void>;
   /** What the footer's "Save & Add another item" does. The items step owns
    *  "add an item" and points this at it while it is mounted. */
   addAnother: MutableRefObject<(() => void) | null>;

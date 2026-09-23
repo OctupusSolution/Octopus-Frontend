@@ -1,10 +1,11 @@
 // The Layers tab: every item on the plan, grouped, with visibility (for this
 // editing session only — hiding a layer never hides it from guests) and lock.
 import { useState, type ElementType } from "react";
-import { Armchair, ChevronDown, DoorOpen, Eye, EyeOff, Lock, LockOpen, Minus, Search, Sprout, Square, SquareDashedBottom, Store, TreePine, Type } from "lucide-react";
+import { Armchair, ChevronDown, ChevronUp, DoorOpen, Eye, EyeOff, Lock, LockOpen, Minus, Search, Sprout, Square, SquareDashedBottom, Store, TreePine, Type } from "lucide-react";
 import clsx from "clsx";
 import type { FloorItem, FloorPlanDoc, ObjectType } from "@/entities/floor-plan";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useAdminText } from "../../_shared/admin-text";
 import { TableIcon } from "../../_shared/icons";
 
 const OBJECT_ICON: Record<ObjectType, ElementType> = {
@@ -47,6 +48,7 @@ export function LayersPanel({
   onSelect,
   onToggleHidden,
   onToggleLock,
+  onMoveZone,
 }: {
   doc: FloorPlanDoc;
   selection: readonly string[];
@@ -54,8 +56,11 @@ export function LayersPanel({
   onSelect: (ids: string[]) => void;
   onToggleHidden: (id: string) => void;
   onToggleLock: (id: string) => void;
+  /** Zones are listed top-first; "up" moves one above its neighbour. */
+  onMoveZone?: (id: string, direction: "up" | "down") => void;
 }) {
   const { t } = useI18n();
+  const at = useAdminText();
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const q = query.trim().toLowerCase();
@@ -133,6 +138,30 @@ export function LayersPanel({
                         <Icon size={16} className="shrink-0" />
                         <span className="truncate">{itemName(item, t)}</span>
                       </button>
+                      {item.kind === "zone" && onMoveZone && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onMoveZone(item.id, "up")}
+                            disabled={doc.zones[doc.zones.length - 1]?.id === item.id}
+                            aria-label={at("zones.moveUp")}
+                            title={at("zones.moveUp")}
+                            className="grid h-7 w-7 place-items-center rounded-md text-[var(--octo-text-muted)] opacity-0 hover:text-[var(--octo-text-primary)] focus-visible:opacity-100 group-hover:opacity-100 disabled:!opacity-0"
+                          >
+                            <ChevronUp size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onMoveZone(item.id, "down")}
+                            disabled={doc.zones[0]?.id === item.id}
+                            aria-label={at("zones.moveDown")}
+                            title={at("zones.moveDown")}
+                            className="grid h-7 w-7 place-items-center rounded-md text-[var(--octo-text-muted)] opacity-0 hover:text-[var(--octo-text-primary)] focus-visible:opacity-100 group-hover:opacity-100 disabled:!opacity-0"
+                          >
+                            <ChevronDown size={15} />
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => onToggleHidden(item.id)}

@@ -1,13 +1,16 @@
 // apps/merchant/src/pages/orders-list/_shared/refund-order-flow.tsx
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Banknote, Check, Clock, FileText, Info, Stamp, X } from "lucide-react";
 import { Modal } from "@ui/primitives";
 import { formatSar } from "@octopus/api-client";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { fetchOrderPayments, issueRealRefund, toRefundReasonCode } from "@/entities/order";
 import { RefundForm, type RefundPayload } from "./refund-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
 import { ResultModal } from "./result-modal";
 import { useActionFlow } from "./action-flow";
+import { useOrderActionConfirm } from "./use-order-action-confirm";
 import { ACTION_THEME } from "./theme";
 import { maxRefundableSar } from "./refund-amount";
 import type { FlowStepKind } from "./action-flow-state";
@@ -163,13 +166,52 @@ export function RefundFailedPreview({ amountSar, onRetry }: { amountSar: number;
   );
 }
 
-export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null; onClose: () => void }) {
+export function RefundOrderFlow({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: OrderRecord | null;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
   const { t } = useI18n();
-  const isCash = order?.payment === "Paid Cash";
   const isUnpaid = order?.payment === "Unpaid";
+  // A real order's refund is one synchronous API call — always the 3-step
+  // cash path, never the animated processing/pending steps that only make
+  // sense for a mock online-gateway round trip.
+  const isCash = order?.real ? true : order?.payment === "Paid Cash";
   const steps = isCash ? CASH_STEPS : ONLINE_STEPS;
   const flow = useActionFlow<RefundPayload>(steps, order !== null && !isUnpaid);
   const accent = ACTION_THEME.refund.accent;
+  const { activeBusinessId } = useAuth();
+  const [realPaymentId, setRealPaymentId] = useState<string | null>(null);
+
+  // A real order's refund needs a paymentId, which only GET /{id}/payments
+  // carries — fetched once the flow opens, not eagerly for every row.
+  useEffect(() => {
+    if (!order?.real || !activeBusinessId) {
+      setRealPaymentId(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchOrderPayments(activeBusinessId, order.real.orderId).then((payments) => {
+      if (!cancelled) setRealPaymentId(payments.find((p) => p.state === "Captured")?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.real, activeBusinessId]);
+
+  const { confirm, submitting, errorText } = useOrderActionConfirm(
+    order,
+    (businessId, orderId, _version, approval) =>
+      realPaymentId
+        ? issueRealRefund(businessId, orderId, realPaymentId, flow.payload?.amountSar ?? null, toRefundReasonCode(flow.payload?.reason ?? "other"), approval)
+        : Promise.resolve({ ok: false as const, message: "orders.error.actionFailed" }),
+    flow.advance,
+    onSuccess
+  );
 
   // Deterministic per order (from its numeric suffix), so reopening the
   // same order's refund always shows the same id instead of a new random
@@ -238,10 +280,12 @@ export function RefundOrderFlow({ order, onClose }: { order: OrderRecord | null;
       <PinConfirmModal
         open
         onClose={onClose}
-        onConfirm={flow.advance}
+        onConfirm={confirm}
         accent={accent}
         promptKey="orders.managerAuth.prompt.refund"
         confirmLabelKey="orders.managerAuth.confirm.refund"
+        errorText={errorText}
+        submitting={submitting}
       />
     );
   }

@@ -4,16 +4,16 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./app";
 import { I18nProvider } from "./app/providers/i18n-provider";
 import { applyStoredTheme } from "./app/providers/theme-provider";
-import { initDevBackendSession } from "./shared/api/dev-backend-session";
+import { initApiClient } from "./shared/api/session-bridge";
 import "./index.css";
 
 // Apply the persisted/system theme before first paint so there is no light
 // flash when the user prefers dark mode.
 applyStoredTheme();
 
-// Points @octopus/api-client at the dev proxy and the temporary dev session
-// token — see shared/api/dev-backend-session.ts for why this exists.
-initDevBackendSession();
+// Points @octopus/api-client at the dev proxy and at the session held by
+// AuthProvider (token to send + renewal on 401) — see shared/api/session-bridge.ts.
+initApiClient();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

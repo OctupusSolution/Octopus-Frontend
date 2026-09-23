@@ -8,6 +8,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { Info } from "lucide-react";
+import type { ReservationCancellationPreviewResponse } from "@octopus/api-client";
 import { Button, Modal, Select, Textarea } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
@@ -18,9 +19,19 @@ import { hoursMinutesParts, NOW_MINUTES, refundPolicy, type RefundPolicy } from 
 export interface CancelReservationModalProps {
   open: boolean;
   reservation: Reservation | null;
+  /** The business's real refund bands applied to this reservation right now
+   *  — null while it's still loading (or failed), in which case the preview
+   *  falls back to its own local re-derivation of the policy. */
+  preview: ReservationCancellationPreviewResponse | null;
   onClose: () => void;
   onConfirm: (payload: { actionType: ActionType; reason: string; note: string }) => void;
 }
+
+const OUTCOME_TIER: Record<ReservationCancellationPreviewResponse["outcome"], Tier> = {
+  Full: "full",
+  Partial: "partial",
+  None: "none",
+};
 
 type Tier = RefundPolicy["tier"];
 
@@ -110,7 +121,7 @@ function PolicyRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-export function CancelReservationModal({ open, reservation, onClose, onConfirm }: CancelReservationModalProps) {
+export function CancelReservationModal({ open, reservation, preview, onClose, onConfirm }: CancelReservationModalProps) {
   const { t } = useI18n();
   const [actionType, setActionType] = useState<ActionType>(ACTION_TYPE_OPTIONS[0].value);
   const [reason, setReason] = useState("");
@@ -129,12 +140,18 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
 
   if (!reservation) return null;
 
+  // The countdown to the event is genuinely local (today's own clock against
+  // the reservation's own time) — only the refund tier and its wording need
+  // the server's real bands, so `refundPolicy` still supplies the former and
+  // is the fallback for the latter until `preview` loads.
   const policy = refundPolicy(reservation, NOW_MINUTES);
   const { h, m } = hoursMinutesParts(policy.minutesToEvent);
   const timeToEventText = t("reservations.cancel.hoursMinutes").replace("{h}", String(h)).replace("{m}", String(m));
   const depositText = reservation.deposit
     ? `${reservation.deposit.currency} ${reservation.deposit.amount} ${t("reservations.cancel.perReservation")}`
     : "—";
+  const tier: Tier = preview ? (OUTCOME_TIER[preview.outcome] ?? policy.tier) : policy.tier;
+  const policySentence = preview ? preview.bandDescription : t(POLICY_SENTENCE_KEY[tier]);
 
   function handleConfirm() {
     if (!reason) return;
@@ -221,7 +238,7 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
             </div>
             <div className="space-y-2">
               <PolicyRow label={t("reservations.cancel.timeToEvent")} value={timeToEventText} />
-              <PolicyRow label={t("reservations.cancel.policy")} value={t(POLICY_SENTENCE_KEY[policy.tier])} />
+              <PolicyRow label={t("reservations.cancel.policy")} value={policySentence} />
               <PolicyRow label={t("reservations.cancel.deposit")} value={depositText} />
               <PolicyRow
                 label={t("reservations.cancel.result")}
@@ -235,10 +252,10 @@ export function CancelReservationModal({ open, reservation, onClose, onConfirm }
                     <span
                       className={clsx(
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                        RESULT_CHIP_CLASS[policy.tier]
+                        RESULT_CHIP_CLASS[tier]
                       )}
                     >
-                      {t(RESULT_LABEL_KEY[policy.tier])}
+                      {t(RESULT_LABEL_KEY[tier])}
                     </span>
                   ) : (
                     <span

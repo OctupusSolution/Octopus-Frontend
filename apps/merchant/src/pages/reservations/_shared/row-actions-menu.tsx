@@ -13,6 +13,9 @@ export interface RowActionsMenuProps {
   onExportCalendar: () => void;
   onSharePaymentLink: () => void;
   onCancel: () => void;
+  /** Toggles `isHidden` — keeps the record but drops it out of the general list. */
+  onToggleHidden: () => void;
+  hidden: boolean;
   canShareLink: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +32,8 @@ export function RowActionsMenu({
   onExportCalendar,
   onSharePaymentLink,
   onCancel,
+  onToggleHidden,
+  hidden,
   canShareLink,
   open,
   onOpenChange,
@@ -96,6 +101,9 @@ export function RowActionsMenu({
             className={clsx(ITEM, canShareLink ? ITEM_ENABLED : ITEM_DISABLED)}
           >
             {t("reservations.list.actions.sharePaymentLink")}
+          </button>
+          <button type="button" role="menuitem" onClick={run(onToggleHidden)} className={clsx(ITEM, ITEM_ENABLED)}>
+            {t(hidden ? "reservations.list.actions.unhide" : "reservations.list.actions.hide")}
           </button>
           <button
             type="button"

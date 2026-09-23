@@ -8,11 +8,14 @@
 // The draft lives in memory (see the spec's Persistence section), so a step
 // reached by refresh or by a pasted link finds no menu and redirects to /menu
 // rather than rendering an empty wizard over a menu that is not there.
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import clsx from "clsx";
-import { SEED_BRANCHES, blankMenu, useMenuLibrary, type Menu } from "@/entities/menu";
+import { SEED_BRANCHES, blankMenu, saveBuilderStep, useMenuLibrary, type Menu } from "@/entities/menu";
+import { useAuth } from "@/app/providers/auth-provider";
+import { pullSections } from "@/entities/menu/menu-sync";
+import { applyIds, pushMenu, type IdMap } from "@/entities/menu/menu-sync";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { DraftProvider } from "./use-draft";
 import { Stepper, WIZARD_STEPS, type WizardStep } from "./stepper";
@@ -33,17 +36,22 @@ const TITLES: Record<WizardStep, { title: string; subtitle: string }> = {
  *  page's "build by hand" button both point at. It has no UI of its own: it
  *  creates the draft and hands over to the wizard. */
 export function NewMenuRedirect() {
-  const { menus, setMenus } = useMenuLibrary();
-  const [id] = useState(() => `m-${Date.now().toString(36)}`);
-  const [created] = useState(() => blankMenu(id, SEED_BRANCHES[0].id, new Date().toISOString()));
+  const { create } = useMenuLibrary();
+  const [target, setTarget] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const started = useRef(false);
 
-  // Append once, on first render, so a re-render does not stack duplicates.
-  const [seeded] = useState(() => {
-    setMenus([...menus, created]);
-    return true;
-  });
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    create("New Menu")
+      .then((m) => setTarget(m.id))
+      .catch((err) => setFailed(err instanceof Error ? err.message : "error"));
+  }, [create]);
 
-  return seeded ? <Navigate to={`/menu/${id}/build/sections`} replace state={{ created: true }} /> : null;
+  if (target) return <Navigate to={`/menu/${target}/build/sections`} replace state={{ created: true }} />;
+  if (failed) return <p role="alert" className="p-6 text-error">{failed}</p>;
+  return null;
 }
 
 /** The three footer weights the frames use: a grey quiet action, a tinted
@@ -81,7 +89,12 @@ export function MenuBuilderPage() {
   const navigate = useNavigate();
   const { pathname, state } = useLocation();
   const { menuId } = useParams();
-  const { menus, setMenus } = useMenuLibrary();
+  const { menus, setMenus, replace } = useMenuLibrary();
+  const { activeBusinessId } = useAuth();
+  const pending = useRef<Promise<unknown>>(Promise.resolve());
+  const syncedRef = useRef<Menu | null>(null);
+  const idsRef = useRef<IdMap>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const stored = useMemo(() => menus.find((m) => m.id === menuId) ?? null, [menus, menuId]);
   const [draft, setDraft] = useState<Menu | null>(stored);
@@ -105,6 +118,29 @@ export function MenuBuilderPage() {
     [step]
   );
 
+  // Pull the server's sections once per opened menu, so a reload shows what
+  // was saved rather than the empty local shell.
+  const pulled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeBusinessId || !stored || pulled.current === stored.id) return;
+    pulled.current = stored.id;
+    pullSections(activeBusinessId, stored)
+      .then((m) => {
+        syncedRef.current = m;
+        setDraft((d) => (d && d.id === m.id ? m : d));
+        replace(m);
+      })
+      .catch((err) => setSaveError(err instanceof Error ? err.message : "error"));
+  }, [activeBusinessId, stored, replace]);
+
+  // Where the owner is in the builder, recorded server-side (PUT
+  // builder-progress) each time a step opens. Losing it costs nothing the
+  // merchant can see, so a failure is not worth an error banner.
+  useEffect(() => {
+    if (!activeBusinessId || !stored) return;
+    saveBuilderStep(activeBusinessId, stored.id, step).catch(() => undefined);
+  }, [activeBusinessId, stored?.id, step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // No draft under this id — a refresh, or a link someone kept. Sending them to
   // the library is truer than an empty wizard claiming to edit something.
   if (!stored || !draft) return <Navigate to="/menu" replace />;
@@ -116,6 +152,7 @@ export function MenuBuilderPage() {
     const next = WIZARD_STEPS[n - 1];
     if (!next) return;
     setFurthest((f) => Math.max(f, n));
+    void save();
     navigate(`/menu/${menuId}/build/${next}`);
   }
 
@@ -124,15 +161,31 @@ export function MenuBuilderPage() {
     // library's Recently Updated sort both tell the truth.
     const menu = { ...(next ?? draft!), updatedAt: new Date().toISOString() };
     setDraft(menu);
-    setMenus(
-      menus.some((m) => m.id === menu.id)
-        ? menus.map((m) => (m.id === menu.id ? menu : m))
-        : [...menus, menu]
-    );
+    setSaveError(null);
+    setMenus(menus.map((m) => (m.id === menu.id ? menu : m)));
+    if (!activeBusinessId) return Promise.resolve();
+    syncedRef.current ??= stored!;
+    // Runs strictly one after another, and reads the baseline and id map at
+    // run time, so a second save queued behind the first sees what it created.
+    const run = pending.current.then(async () => {
+      const res = await pushMenu(activeBusinessId, syncedRef.current!, applyIds(menu, idsRef.current));
+      Object.assign(idsRef.current, res.ids);
+      syncedRef.current = res.menu;
+      return res;
+    });
+    pending.current = run.then(() => undefined, () => undefined);
+    return run
+      .then((res) => {
+        // Fold ids and version into whatever the merchant has typed meanwhile,
+        // rather than replacing the draft with the saved snapshot.
+        setDraft((d) => (d ? { ...applyIds(d, res.ids, res.media), version: res.version } : d));
+        replace({ ...applyIds(stored!, res.ids, res.media), version: res.version });
+      })
+      .catch((err) => setSaveError(err instanceof Error ? err.message : "error"));
   }
 
-  function saveAndLeave() {
-    save();
+  async function saveAndLeave() {
+    await save();
     navigate("/menu");
   }
 
@@ -154,6 +207,12 @@ export function MenuBuilderPage() {
           branchLabel={branchLabel}
           onChangeBranch={() => navigate("/settings/branches")}
         />
+
+        {saveError && (
+          <div role="alert" className="mt-3 rounded-[10px] bg-error/10 px-4 py-3 text-[14px] text-error">
+            {saveError}
+          </div>
+        )}
 
         <Stepper current={stepIndex} furthest={furthest} onJump={goTo} />
 

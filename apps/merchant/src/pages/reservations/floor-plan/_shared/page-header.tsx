@@ -1,3 +1,4 @@
+import { setSyncError, useSyncError } from "@/entities/floor-plan";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 
@@ -20,7 +21,21 @@ export function PageShell({
         className
       )}
     >
+      <SyncErrorBar />
       {children}
+    </div>
+  );
+}
+
+function SyncErrorBar() {
+  const error = useSyncError();
+  if (!error) return null;
+  return (
+    <div role="alert" className="mb-3 flex items-center justify-between gap-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+      <span>{error}</span>
+      <button type="button" className="shrink-0 underline" onClick={() => setSyncError(null)}>
+        OK
+      </button>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { ConfirmModal } from "./_shared/confirm-modal";
 import { SelectInput, TextInput } from "./_shared/form";
 import { formatDateTime } from "./_shared/format";
 import { useStaffLabels } from "./_shared/labels";
+import { useCatalogNames } from "./_shared/catalog-names";
 import { RowMenu, type RowMenuItem } from "./_shared/row-menu";
 import { useStaffStore } from "./_shared/staff-store";
 import { StatusPill } from "./_shared/status-pill";
@@ -33,6 +34,7 @@ export function StaffTab({
   const { t, locale } = useI18n();
   const store = useStaffStore();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const { toast, notify } = useToast();
   const [query, setQuery] = useState("");
   const [branchFilter, setBranchFilter] = useState<"all" | Branch>("all");
@@ -47,7 +49,7 @@ export function StaffTab({
       const profile = store.profileOf(e.id);
       if (!profile) return false;
       if (q) {
-        const haystack = [e.name, e.phone.replace(/\s/g, ""), profile.email, profile.jobTitle, labels.data("staff.jobTitle", profile.jobTitle)]
+        const haystack = [e.name, e.phone.replace(/\s/g, ""), profile.email, profile.jobTitle, names.jobTitle(profile.jobTitle)]
           .join(" ")
           .toLowerCase();
         if (!haystack.includes(q.replace(/\s/g, "")) && !haystack.includes(q)) return false;
@@ -57,7 +59,7 @@ export function StaffTab({
       if (statusFilter === "inactive" && !store.isInactive(e.id)) return false;
       return true;
     });
-  }, [store, query, branchFilter, statusFilter, labels]);
+  }, [store, query, branchFilter, statusFilter, names]);
 
   const selected = selectedId ? store.profileOf(selectedId) : null;
   const deleteTarget = deleteTargetId ? store.profileOf(deleteTargetId) : null;
@@ -157,7 +159,9 @@ export function StaffTab({
     <>
       {selected ? (
         <MemberDetails
-          key={selected.employee.id}
+          // Remounts when the server changes the member's sign-in state (invitation
+          // resent/withdrawn), so the form never re-sends a stale "allow login".
+          key={`${selected.employee.id}:${store.metaOf(selected.employee.id)?.accountAccess ?? ""}`}
           profile={selected}
           inactive={store.isInactive(selected.employee.id)}
           onSave={(draft) => saveMember(selected.employee.id, draft)}
@@ -240,7 +244,7 @@ export function StaffTab({
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="truncate text-[15px] font-semibold leading-snug text-[var(--octo-text-primary)]">{e.name}</p>
-                            <p className="truncate text-[13px] leading-snug text-[#0D6EFD]">{labels.data("staff.jobTitle", profile.jobTitle)}</p>
+                            <p className="truncate text-[13px] leading-snug text-[#0D6EFD]">{names.jobTitle(profile.jobTitle)}</p>
                           </div>
                           <RowMenu
                             items={menuItemsFor(e.id, e.name)}

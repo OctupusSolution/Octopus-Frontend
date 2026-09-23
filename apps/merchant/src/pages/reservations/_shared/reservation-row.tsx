@@ -61,6 +61,7 @@ export interface ReservationRowProps {
   onExportCalendar: () => void;
   onSharePaymentLink: () => void;
   onCancel: () => void;
+  onToggleHidden: () => void;
 }
 
 // The buttons and menus nested in cells 7-10 need their clicks to never
@@ -143,6 +144,7 @@ export function ReservationRow({
   onExportCalendar,
   onSharePaymentLink,
   onCancel,
+  onToggleHidden,
 }: ReservationRowProps) {
   const { t, locale } = useI18n();
 
@@ -248,7 +250,7 @@ export function ReservationRow({
       </Cell>
 
       {/* 6. Payment */}
-      <Cell className="flex flex-col items-start gap-1">
+      <Cell className="flex flex-col items-start justify-center gap-1">
         <StatusPill reservation={reservation} />
         {isCancelled
           ? reservation.cancelledAt && (
@@ -338,6 +340,8 @@ export function ReservationRow({
           onExportCalendar={onExportCalendar}
           onSharePaymentLink={onSharePaymentLink}
           onCancel={onCancel}
+          onToggleHidden={onToggleHidden}
+          hidden={Boolean(reservation.hidden)}
           // Enabled whenever there's a deposit to share a link for (fix
           // round 4, finding 8) — not `Boolean(reservation.paymentLink)`,
           // which only let a *second* link ever be shared and greyed out

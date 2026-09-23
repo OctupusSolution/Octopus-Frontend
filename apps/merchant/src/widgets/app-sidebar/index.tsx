@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed, Package,
-  Users, Megaphone, Truck, Wallet, UserCog, BarChart3, Settings, HelpCircle,
-  ChevronDown, Search, PanelLeft, LogOut, Building2, Check,
-  Clock3, Armchair, Ticket, CreditCard, Link2,
+  LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed,
+  Users, UserCog, Settings, HelpCircle,
+  ChevronDown, Search, PanelLeft, LogOut,
+  Clock3, Armchair, CreditCard, Link2, KeyRound,
 } from "lucide-react";
 import clsx from "clsx";
+import { ApprovalPinDialog, useApprovalPinTitle } from "@/features/session/approval-pin";
 import { routes } from "@/app/routes/registry";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useAuth } from "@/app/providers/auth-provider";
-import { useTenantConfig, type TenantConfig } from "@/app/providers/tenant-config-provider";
-import { getRestaurantType, type ModuleId } from "@/shared/catalog";
+import { useTenantConfig } from "@/app/providers/tenant-config-provider";
+import type { ModuleId } from "@/shared/catalog";
 import { labelKey } from "@/shared/lib/labels";
 
 // Navigation content is the OCTOPUS Restaurants SRS, Section 18.1
@@ -64,9 +65,6 @@ const SECTIONS: NavSection[] = [
       // of them, so the entry navigates straight there rather than opening a
       // dropdown onto six sibling tables. Same shape as Reservations above.
       { id: "menu", label: "Menu", icon: UtensilsCrossed },
-      { id: "inventory", label: "Inventory", icon: Package,
-        items: ["Ingredients & Suppliers", "Recipes & Costing", "Purchase Orders & Receipts", "Stock Counts & Variance", "Waste", "Transfers", "Production"] },
-      { id: "delivery-aggregators", label: "Delivery", icon: Truck },
     ],
   },
   {
@@ -76,25 +74,18 @@ const SECTIONS: NavSection[] = [
       // entry navigates straight to it rather than opening a dropdown. Same
       // shape as Orders/Reservations/Menu/Staff above.
       { id: "customers", label: "Customer CRM", icon: Users },
-      { id: "marketing", label: "Marketing", icon: Megaphone,
-        items: ["Loyalty Program", "Gift Cards", "Subscriptions & Memberships", "Campaigns"] },
-      { id: "promotions", label: "Promotions", icon: Ticket, path: "/marketing/promotions" },
-      { id: "finance", label: "Finance", icon: Wallet,
-        items: ["Tax Invoices (ZATCA)", "Settlements & Reconciliation", "Accounting Sync", "House Accounts"] },
       { id: "payments", label: "Payments", icon: CreditCard, path: "/finance/payments" },
       // No sub-items: Staff is now a single tabbed page (Staff / Roles &
       // Permissions / Shifts), so the entry navigates straight there rather
       // than opening a dropdown. Same shape as Reservations and Menu above.
       { id: "staff", label: "Staff", icon: UserCog },
-      { id: "reports", label: "Reports", icon: BarChart3,
-        items: ["Sales", "Costs & Margin", "Channels", "Customers", "Compliance", "Scheduled Reports"] },
     ],
   },
 ];
 
 const FOOTER_GROUPS: NavGroup[] = [
   { id: "settings", label: "Settings", icon: Settings,
-    items: ["My Businesses", "Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
+    items: ["Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
 ];
 
 // Which module owns each nav group. A group whose module the tenant did not
@@ -107,24 +98,15 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   reservations: "bookings",
   waitlist: "bookings",
   "floor-plan": "bookings",
-  inventory: "inventory",
-  "delivery-aggregators": "delivery",
   customers: "customers",
-  marketing: "loyalty",
-  promotions: "loyalty",
-  finance: "payments",
   payments: "payments",
   staff: "hr",
-  reports: "reports",
   settings: "core",
 };
 
-// A handful of sub-pages belong to a different module than their parent, so
-// they come and go on their own — Accounting Sync disappears from Finance
-// without taking the rest of Finance with it.
-const ITEM_MODULE: Record<string, ModuleId> = {
-  "Accounting Sync": "accounting",
-};
+// Sub-pages that belong to a different module than their parent, so they come
+// and go on their own without taking the rest of the group with them.
+const ITEM_MODULE: Record<string, ModuleId> = {};
 
 // Derived from the route registry so every routed page automatically gets
 // sidebar navigation without an edit here.
@@ -135,28 +117,6 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 const ITEM_PATHS: Record<string, string> = {
   "Live Floor Plan": "/reservations/floor-plan",
   "Floor Plan Builder": "/reservations/floor-plan/builder",
-  "Loyalty Program": "/marketing/loyalty",
-  "Gift Cards": "/marketing/gift-cards",
-  "Subscriptions & Memberships": "/marketing/subscriptions",
-  "Campaigns": "/marketing/campaigns",
-  "Tax Invoices (ZATCA)": "/finance/tax-invoices",
-  "Settlements & Reconciliation": "/finance/settlements",
-  "Accounting Sync": "/finance/accounting",
-  "House Accounts": "/finance/house-accounts",
-  "Ingredients & Suppliers": "/inventory/ingredients",
-  "Recipes & Costing": "/inventory/recipes",
-  "Purchase Orders & Receipts": "/inventory/purchasing",
-  "Stock Counts & Variance": "/inventory/counts",
-  "Waste": "/inventory/waste",
-  "Transfers": "/inventory/transfers",
-  "Production": "/inventory/production",
-  "Sales": "/reports/sales",
-  "Costs & Margin": "/reports/margin",
-  "Channels": "/reports/channels",
-  "Customers": "/reports/customers",
-  "Compliance": "/reports/compliance",
-  "Scheduled Reports": "/reports/scheduled",
-  "My Businesses": "/settings/businesses",
   "Business & Legal Entities": "/settings/business",
   "Branches & Sections": "/settings/branches",
   "Devices & Printers": "/settings/devices",
@@ -198,13 +158,6 @@ function filterGroups(
       });
       return { ...group, items };
     });
-}
-
-// The business card in the footer shows the photo of the restaurant type the
-// merchant picked at onboarding — the only picture of their business the app
-// actually holds. Same `apps/assets` root OctopusMark resolves against.
-function typeThumb(file: string): string {
-  return new URL(`../../../../assets/onboarding-Type/${file}`, import.meta.url).href;
 }
 
 function initialsOf(name: string): string {
@@ -432,7 +385,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
   const [activeGroup, setActiveGroup] = useState("dashboard");
   const [flyout, setFlyout] = useState<{ group: NavGroup; top: number; left: number } | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [businessOpen, setBusinessOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const pinTitle = useApprovalPinTitle();
   const itemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const footerRef = useRef<HTMLDivElement | null>(null);
   const userToggled = useRef(false);
@@ -441,14 +395,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
   const location = useLocation();
   const { t, dir } = useI18n();
   const { user, signOut } = useAuth();
-  const { isModuleEnabled, activeBusiness, businesses, activeTenantId, switchBusiness } = useTenantConfig();
+  const { isModuleEnabled } = useTenantConfig();
 
-  // The merchant typed their business name on step 4 of onboarding and their
-  // email in the account modal. Greeting them as somebody else's company —
-  // this used to read "Al Bahri Group / owner@albahri.sa" — is the last thing
-  // the signup flow shows. Fall back to the generic label only when there is
-  // genuinely no business yet (a deep link into an unprovisioned session).
-  const accountName = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
   const accountEmail = user?.email?.trim() || t("sidebar.emailFallback");
   const userName = user?.name?.trim() || t("sidebar.userFallback");
   const userInitials = initialsOf(userName);
@@ -458,12 +406,6 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
   // and fall back to the raw string rather than printing a bare key.
   const roleKey = `staff.role.${user?.role ?? ""}`;
   const roleLabel = user?.role ? (t(roleKey) === roleKey ? user.role : t(roleKey)) : t("sidebar.emailFallback");
-
-  // The restaurant type picked at onboarding is the only picture and the only
-  // one-line description of the business the app holds, so it stands in for
-  // the photo-and-location line the frame shows.
-  const businessType = activeBusiness ? getRestaurantType(activeBusiness.businessType) : undefined;
-  const businessSubtitle = businessType ? t(businessType.nameKey) : t("sidebar.noBusiness");
 
   // Navigation is filtered to what this tenant actually bought, at both
   // levels: whole groups, and individual sub-items that belong to a
@@ -493,12 +435,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
     return () => window.removeEventListener("resize", onResize);
   }, [onToggleCollapsed]);
 
-  // Close whichever footer menu is open on any outside click or Escape.
+  // Close the account menu on any outside click or Escape.
   useEffect(() => {
-    if (!accountOpen && !businessOpen) return;
+    if (!accountOpen) return;
     function closeAll() {
       setAccountOpen(false);
-      setBusinessOpen(false);
     }
     function onPointerDown(e: MouseEvent) {
       if (footerRef.current && !footerRef.current.contains(e.target as Node)) closeAll();
@@ -512,7 +453,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [accountOpen, businessOpen]);
+  }, [accountOpen]);
 
   // Keep the highlighted group in sync with the URL — covers direct nav,
   // browser back/forward, not just clicks inside this component. Sub-paths
@@ -648,54 +589,9 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
       <div ref={footerRef} className={clsx("flex flex-col gap-1.5 pb-3 pt-1", collapsed ? "px-2" : "px-2.5")}>
         <FooterCard
           collapsed={collapsed}
-          ariaLabel={t("sidebar.businessMenu")}
-          open={businessOpen}
-          onToggle={() => { setBusinessOpen((o) => !o); setAccountOpen(false); }}
-          title={accountName}
-          subtitle={businessSubtitle}
-          thumb={
-            businessType ? (
-              <img
-                src={typeThumb(businessType.image)}
-                alt=""
-                className="h-[34px] w-[34px] shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-white/15 text-white">
-                <Building2 size={16} />
-              </div>
-            )
-          }
-        >
-          {businesses.map((business: TenantConfig) => (
-            <button
-              key={business.id}
-              type="button"
-              onClick={() => { switchBusiness(business.id); setBusinessOpen(false); }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] text-white/85 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <span className="min-w-0 flex-1 truncate">{business.businessName}</span>
-              {business.id === activeTenantId && <Check size={14} className="shrink-0 text-ocean-blue" />}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => { setBusinessOpen(false); navigate("/settings/businesses"); }}
-            className={clsx(
-              "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white",
-              businesses.length > 0 && "mt-1 border-t border-white/10 pt-2.5"
-            )}
-          >
-            <Building2 size={14} />
-            {t("sidebar.manageBusinesses")}
-          </button>
-        </FooterCard>
-
-        <FooterCard
-          collapsed={collapsed}
           ariaLabel={t("sidebar.accountMenu")}
           open={accountOpen}
-          onToggle={() => { setAccountOpen((o) => !o); setBusinessOpen(false); }}
+          onToggle={() => setAccountOpen((o) => !o)}
           title={userName}
           subtitle={roleLabel}
           thumb={
@@ -718,6 +614,14 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
           </button>
           <button
             type="button"
+            onClick={() => { setAccountOpen(false); setPinOpen(true); }}
+            className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <KeyRound size={14} />
+            {pinTitle}
+          </button>
+          <button
+            type="button"
             onClick={() => { setAccountOpen(false); signOut(); }}
             className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start text-[12.5px] font-medium text-[#FF8A8A] transition-colors hover:bg-white/10"
           >
@@ -726,6 +630,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
           </button>
         </FooterCard>
       </div>
+      <ApprovalPinDialog open={pinOpen} onClose={() => setPinOpen(false)} />
 
       {collapsed && flyout && (
         <div

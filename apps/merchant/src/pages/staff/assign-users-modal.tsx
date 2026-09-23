@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { assignRoleToStaffMembers } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./_shared/avatar";
 import { buttonClass } from "./_shared/buttons";
 import { TextInput } from "./_shared/form";
 import { useStaffLabels } from "./_shared/labels";
 import { useStaffStore } from "./_shared/staff-store";
+import { serverMemberIdOrNull, serverRoleId } from "./_shared/staff-sync";
+import { staffErrorText, useTx } from "./_shared/text";
 
 export function AssignUsersModal({
   roleId,
@@ -23,10 +27,16 @@ export function AssignUsersModal({
   const role = roleId ? store.roles.find((r) => r.id === roleId) ?? null : null;
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tx = useTx();
+  const { activeBusinessId } = useAuth();
 
   useEffect(() => {
     setQuery("");
     setPicked(new Set());
+    setError(null);
+    setSaving(false);
   }, [roleId]);
 
   const rows = useMemo(() => {
@@ -36,11 +46,29 @@ export function AssignUsersModal({
       .filter((p) => !q || p.employee.name.toLowerCase().includes(q));
   }, [store, query]);
 
-  const save = () => {
-    if (!role) return;
-    picked.forEach((id) => store.patchProfile(id, { assignedRole: role.id }));
-    onSaved(picked.size, labels.roleName(role));
-    onClose();
+  // POST /roles/{roleId}/members — all or nothing on the server, then each
+  // member is re-read so the next profile save carries its new version.
+  const save = async () => {
+    if (!role || !activeBusinessId) return;
+    const ids = [...picked];
+    const serverIds = ids.map(serverMemberIdOrNull);
+    if (serverIds.some((id) => !id)) {
+      setError(tx("Some members are still being saved. Try again in a moment.", "بعض الموظفين ما زالوا قيد الحفظ. حاول بعد لحظات."));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await assignRoleToStaffMembers(activeBusinessId, serverRoleId(role.id), serverIds as string[]);
+      await store.refreshMembers(ids);
+      ids.forEach((id) => store.logAudit(id, "roleUpdated"));
+      onSaved(res.assignedCount, labels.roleName(role));
+      onClose();
+    } catch (err) {
+      setError(staffErrorText(err, tx));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -55,13 +83,15 @@ export function AssignUsersModal({
             {t("staff.assignUsers.selected").replace("{count}", String(picked.size))}
           </span>
           <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={save} disabled={picked.size === 0} className={buttonClass("primary")}>
+          <button type="button" onClick={() => void save()} disabled={picked.size === 0 || saving} className={buttonClass("primary")}>
+            {saving && <Loader2 size={16} className="animate-spin" aria-hidden />}
             {t("staff.assignUsers.save")}
           </button>
         </>
       }
     >
       <p className="-mt-1 mb-3 text-[13px] text-[var(--octo-text-secondary)]">{t("staff.assignUsers.body")}</p>
+      {error && <p role="alert" className="mb-3 rounded-[9px] bg-[var(--octo-tone-danger-bg)] px-3 py-2 text-[13px] text-[var(--octo-tone-danger-text)]">{error}</p>}
       <TextInput
         type="search"
         value={query}

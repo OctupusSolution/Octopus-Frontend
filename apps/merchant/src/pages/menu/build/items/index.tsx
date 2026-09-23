@@ -6,10 +6,10 @@
 // The Modifiers tab is the exception to that layout: its frames drop the entry
 // list and the Item Information card and give the whole width to Modifiers
 // Group | Edit Group | the customer preview, with the tab bar straight above.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { AlertCircle } from "lucide-react";
-import { Button, Checkbox, EmptyState, Modal } from "@ui/primitives";
+import { Button, Checkbox, EmptyState, Modal, Select } from "@ui/primitives";
 import {
   OFFERS_SECTION_ID,
   addItem,
@@ -34,6 +34,16 @@ import {
   updateModifierGroup,
   updateModifierOption,
   updateOffer,
+  deleteItemEverywhere,
+  describeApiError,
+  duplicateItemOnServer,
+  duplicateOfferOnServer,
+  isServerId,
+  loadGroup,
+  loadItem,
+  loadOffer,
+  moveItemBetweenSections,
+  placeItemInMoreSections,
   type Item,
   type Menu,
   type ModifierGroup,
@@ -41,6 +51,11 @@ import {
   type Offer,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useAuth } from "@/app/providers/auth-provider";
+import { useMenuCopy } from "../../copy";
+import { CatalogPicker } from "./catalog-picker";
+import { GroupPicker } from "./group-picker";
+import { OfferPicker } from "../offers/offer-picker";
 import { useDraft } from "../use-draft";
 import { PreviewRail } from "../preview-rail";
 import { ModifierPreview } from "./modifier-preview";
@@ -81,12 +96,46 @@ function applyGroupRules(group: ModifierGroup, patch: Partial<ModifierGroup>): M
   return next;
 }
 
+/** Every section holding `itemId` — the same catalog item can be placed in
+ *  several, and an edit to it is an edit to all of them. */
+function sectionsHolding(menu: Menu, itemId: string): string[] {
+  return menu.sections.filter((s) => s.entries.some((e) => e.id === itemId)).map((s) => s.id);
+}
+
 export function ItemsStep() {
   const { t } = useI18n();
+  const c = useMenuCopy();
+  const { activeBusinessId } = useAuth();
   const { draft, setDraft, addAnother, setNextBlocked } = useDraft();
+  // Server calls resolve after the render that started them; they fold their
+  // result into the latest draft, not the one their closure saw.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const [opBusy, setOpBusy] = useState(false);
+  const [opError, setOpError] = useState<string | null>(null);
+  const [pickItems, setPickItems] = useState(false);
+  const [pickGroup, setPickGroup] = useState(false);
+  const [pickOffer, setPickOffer] = useState(false);
+  const [moveFor, setMoveFor] = useState<Item | null>(null);
+  const [moveTarget, setMoveTarget] = useState("");
+  const [deleteEverywhere, setDeleteEverywhere] = useState(false);
+
+  /** Runs one direct server call with a shared busy flag and error banner. */
+  async function serverOp(fn: (businessId: string) => Promise<void>) {
+    if (!activeBusinessId) return;
+    setOpBusy(true);
+    setOpError(null);
+    try {
+      await fn(activeBusinessId);
+    } catch (err) {
+      setOpError(describeApiError(err));
+    } finally {
+      setOpBusy(false);
+    }
+  }
 
   const firstItems = draft.sections.find((s) => s.id !== OFFERS_SECTION_ID);
-  const [sectionId, setSectionId] = useState(firstItems?.id ?? OFFERS_SECTION_ID);
+  const [sectionId, setSectionId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<ItemTabId>("general");
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -96,10 +145,14 @@ export function ItemsStep() {
   const [multiTargets, setMultiTargets] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<Item | null>(null);
 
-  const section = draft.sections.find((s) => s.id === sectionId) ?? null;
+  // A save swaps local ids for server ids, so a remembered id can go stale;
+  // fall back to the first real section rather than showing nothing.
+  const section =
+    draft.sections.find((s) => s.id === sectionId) ??
+    (sectionId === OFFERS_SECTION_ID ? null : (firstItems ?? draft.sections[0] ?? null));
   const entries = (section?.entries ?? []) as Item[];
   const selected = entries.find((e) => e.id === selectedId) ?? entries[0] ?? null;
-  const isOffers = sectionId === OFFERS_SECTION_ID;
+  const isOffers = section?.id === OFFERS_SECTION_ID;
 
   const offers = (section?.entries ?? []) as unknown as Offer[];
   const offer = isOffers ? (offers.find((o) => o.id === offerId) ?? offers[0] ?? null) : null;
@@ -118,7 +171,9 @@ export function ItemsStep() {
 
   function patchItem(patch: Partial<Item>) {
     if (!selected || !section) return;
-    setDraft(updateItem(draft, section.id, selected.id, patch));
+    let next = draft;
+    for (const sid of sectionsHolding(draft, selected.id)) next = updateItem(next, sid, selected.id, patch);
+    setDraft(next);
   }
 
   function addNewItem() {
@@ -149,6 +204,17 @@ export function ItemsStep() {
     if (!section) return;
     if (isOffers) {
       if (action === "duplicate") {
+        const source = item as unknown as Offer;
+        if (activeBusinessId && isServerId(source.id)) {
+          // A saved offer is copied on the server (inactive, new slug).
+          void serverOp(async (b) => {
+            const copy = await duplicateOfferOnServer(b, source);
+            setDraft(addOffer(draftRef.current, copy));
+            setOfferId(copy.id);
+            setOfferTab("info");
+          });
+          return;
+        }
         const id = `${item.id}-copy-${Date.now().toString(36)}`;
         setDraft(duplicateOffer(draft, item.id, id));
         setOfferId(id);
@@ -161,6 +227,18 @@ export function ItemsStep() {
       return;
     }
     if (action === "duplicate") {
+      if (activeBusinessId && isServerId(item.id)) {
+        // A saved item is copied on the server (a Draft, SKU cleared) and the
+        // copy read back, rather than re-created from the local fields.
+        const sid = section.id;
+        void serverOp(async (b) => {
+          const copy = await duplicateItemOnServer(b, item);
+          const next = duplicateItem(draftRef.current, sid, item.id, copy.id);
+          setDraft(updateItem(next, sid, copy.id, copy));
+          setSelectedId(copy.id);
+        });
+        return;
+      }
       const id = `${item.id}-copy-${Date.now().toString(36)}`;
       setDraft(duplicateItem(draft, section.id, item.id, id));
       setSelectedId(id);
@@ -169,7 +247,13 @@ export function ItemsStep() {
     if (action === "delete") {
       // An item carries its modifiers and pricing with it; a kebab slip should
       // not cost all that, so it asks first — as section delete does.
+      setDeleteEverywhere(false);
       setConfirmDelete(item);
+      return;
+    }
+    if (action === "move") {
+      setMoveTarget("");
+      setMoveFor(item);
       return;
     }
     setMultiTargets([]);
@@ -257,7 +341,108 @@ export function ItemsStep() {
   };
 
   // Only item sections can receive a copy — never the offers section.
-  const otherSections = draft.sections.filter((s) => s.id !== sectionId && s.kind === "items");
+  const otherSections = draft.sections.filter((s) => s.id !== section?.id && s.kind === "items");
+
+  /** "Add to Multiple Sections": the same saved item is placed server-side
+   *  (POST /items/{id}/placements); an unsaved one is copied locally as before. */
+  function addToSections(item: Item, targets: string[]) {
+    if (!section) return;
+    if (activeBusinessId && isServerId(item.id) && targets.every(isServerId)) {
+      void serverOp(async (b) => {
+        await placeItemInMoreSections(b, item.id, targets);
+        let next = draftRef.current;
+        for (const sid of targets) {
+          const holds = next.sections.find((s) => s.id === sid)?.entries.some((e) => e.id === item.id);
+          if (!holds) next = addItem(next, sid, item);
+        }
+        setDraft(next);
+      });
+      return;
+    }
+    setDraft(addItemToSections(draft, item.id, section.id, targets, (i) => `${item.id}-in-${targets[i]}`));
+  }
+
+  /** Moves an entry to another section: one server call for a saved placement
+   *  (POST /placements/move), a local remove + add for anything unsaved. */
+  function moveItem(item: Item, to: string) {
+    if (!section || !to) return;
+    const from = section.id;
+    const apply = (menu: Menu) => {
+      const next = removeItem(menu, from, item.id);
+      const holds = next.sections.find((s) => s.id === to)?.entries.some((e) => e.id === item.id);
+      return holds ? next : addItem(next, to, item);
+    };
+    if (activeBusinessId && isServerId(item.id) && isServerId(from) && isServerId(to) && isServerId(draft.id)) {
+      void serverOp(async (b) => {
+        await moveItemBetweenSections(b, draft.id, from, to, item.id);
+        setDraft(apply(draftRef.current));
+      });
+    } else {
+      setDraft(apply(draft));
+    }
+    if (selectedId === item.id) setSelectedId(null);
+  }
+
+  function addExistingItems(ids: string[]) {
+    if (!section) return;
+    const sid = section.id;
+    void serverOp(async (b) => {
+      const known = new Map(
+        draftRef.current.sections.flatMap((s) => s.entries).map((e) => [e.id, e as Item] as const)
+      );
+      const items = await Promise.all(ids.map((id) => loadItem(b, id, known.get(id))));
+      let next = draftRef.current;
+      for (const item of items) {
+        const holds = next.sections.find((s) => s.id === sid)?.entries.some((e) => e.id === item.id);
+        if (!holds) next = addItem(next, sid, item);
+      }
+      setDraft(next);
+      setPickItems(false);
+      if (items[0]) setSelectedId(items[0].id);
+    });
+  }
+
+  function attachGroup(groupId: string) {
+    if (!section || !selected) return;
+    const sid = section.id;
+    const itemId = selected.id;
+    void serverOp(async (b) => {
+      const group = await loadGroup(b, groupId);
+      const current = draftRef.current.sections
+        .find((s) => s.id === sid)
+        ?.entries.find((e) => e.id === itemId) as Item | undefined;
+      if (!current || current.modifierGroups.some((g) => g.id === group.id)) return;
+      setDraft(addModifierGroup(draftRef.current, sid, itemId, group));
+      setGroupId(group.id);
+    });
+  }
+
+  /** A group deleted for good is gone from every item that had it. */
+  function forgetGroup(deletedId: string) {
+    let next = draftRef.current;
+    for (const s of next.sections) {
+      for (const e of s.entries) {
+        if ("modifierGroups" in e && e.modifierGroups.some((g) => g.id === deletedId)) {
+          next = removeModifierGroup(next, s.id, e.id, deletedId);
+        }
+      }
+    }
+    setDraft(next);
+    if (groupId === deletedId) setGroupId(null);
+  }
+
+  function addExistingOffer(offerId: string) {
+    void serverOp(async (b) => {
+      const offer = await loadOffer(b, offerId);
+      const present = (draftRef.current.sections.find((s) => s.id === OFFERS_SECTION_ID)?.entries ?? []).some(
+        (e) => e.id === offer.id
+      );
+      if (!present) setDraft(addOffer(draftRef.current, offer));
+      setOfferId(offer.id);
+      setOfferTab("info");
+      setPickOffer(false);
+    });
+  }
 
   return (
     <>
@@ -290,7 +475,7 @@ export function ItemsStep() {
           </div>
 
           <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,370fr)_minmax(0,720fr)_minmax(0,430fr)]">
-            <TabModifiers item={selected} {...modifiers} />
+            <TabModifiers item={selected} {...modifiers} onReuseGroup={activeBusinessId ? () => setPickGroup(true) : undefined} />
             <ModifierPreview item={selected} />
           </div>
         </>
@@ -298,7 +483,7 @@ export function ItemsStep() {
         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,1fr)]">
           <EntryList
             sections={draft.sections}
-            sectionId={sectionId}
+            sectionId={section?.id ?? OFFERS_SECTION_ID}
             onSectionChange={(id) => {
               setSectionId(id);
               setSelectedId(null);
@@ -314,6 +499,10 @@ export function ItemsStep() {
                 : entry.pricing.price
             }
             addLabelKey={isOffers ? "menuOffer.addNew" : "menuWiz.item.addNew"}
+            onAddExisting={
+              activeBusinessId ? () => (isOffers ? setPickOffer(true) : setPickItems(true)) : undefined
+            }
+            addExistingLabel={isOffers ? c("offers.addExisting") : c("items.addExisting")}
           />
 
           {isOffers ? (
@@ -359,6 +548,15 @@ export function ItemsStep() {
         </div>
       )}
 
+      {opError && (
+        <p role="alert" className="mt-4 flex items-center justify-between gap-2 rounded-[10px] bg-error/10 px-3.5 py-3 text-[14px] text-error">
+          <span>{opError}</span>
+          <button type="button" className="underline" onClick={() => setOpError(null)}>
+            {c("close")}
+          </button>
+        </p>
+      )}
+
       {blocked && offer && (
         <p
           role="alert"
@@ -396,17 +594,7 @@ export function ItemsStep() {
             <Button
               disabled={multiTargets.length === 0}
               onClick={() => {
-                if (multiFor && section) {
-                  setDraft(
-                    addItemToSections(
-                      draft,
-                      multiFor.id,
-                      section.id,
-                      multiTargets,
-                      (i) => `${multiFor.id}-in-${multiTargets[i]}`
-                    )
-                  );
-                }
+                if (multiFor) addToSections(multiFor, multiTargets);
                 setMultiFor(null);
               }}
             >
@@ -443,12 +631,24 @@ export function ItemsStep() {
             </Button>
             <Button
               variant="danger"
+              disabled={opBusy}
               onClick={() => {
-                if (confirmDelete && section) {
-                  setDraft(removeItem(draft, section.id, confirmDelete.id));
-                  if (selectedId === confirmDelete.id) setSelectedId(null);
-                }
+                const target = confirmDelete;
                 setConfirmDelete(null);
+                if (!target || !section) return;
+                if (deleteEverywhere && activeBusinessId && isServerId(target.id)) {
+                  // Gone from the catalog, so from every section that held it.
+                  void serverOp(async (b) => {
+                    await deleteItemEverywhere(b, target.id);
+                    let next = draftRef.current;
+                    for (const sid of sectionsHolding(next, target.id)) next = removeItem(next, sid, target.id);
+                    setDraft(next);
+                    if (selectedId === target.id) setSelectedId(null);
+                  });
+                  return;
+                }
+                setDraft(removeItem(draft, section.id, target.id));
+                if (selectedId === target.id) setSelectedId(null);
               }}
             >
               {t("menuWiz.item.action.delete")}
@@ -459,7 +659,71 @@ export function ItemsStep() {
         <p className="text-[14px] text-[var(--octo-text-secondary)]">
           {t("menuWiz.item.deleteBody").replace("{name}", confirmDelete?.name ?? "")}
         </p>
+        {confirmDelete && activeBusinessId && isServerId(confirmDelete.id) && (
+          <Checkbox
+            className="mt-3"
+            checked={deleteEverywhere}
+            onChange={(e) => setDeleteEverywhere(e.target.checked)}
+            label={c("items.deleteEverywhere")}
+          />
+        )}
       </Modal>
+
+      <Modal
+        open={moveFor !== null}
+        onClose={() => setMoveFor(null)}
+        title={c("items.moveTitle", { name: moveFor?.name ?? "" })}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setMoveFor(null)}>
+              {t("menuWiz.cancel")}
+            </Button>
+            <Button
+              disabled={!moveTarget || opBusy}
+              onClick={() => {
+                if (moveFor) moveItem(moveFor, moveTarget);
+                setMoveFor(null);
+              }}
+            >
+              {c("items.move")}
+            </Button>
+          </div>
+        }
+      >
+        <Select value={moveTarget} onChange={(e) => setMoveTarget(e.target.value)}>
+          <option value="">—</option>
+          {otherSections.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+      </Modal>
+
+      <CatalogPicker
+        open={pickItems}
+        excludeIds={entries.map((e) => e.id)}
+        busy={opBusy}
+        onClose={() => setPickItems(false)}
+        onPick={addExistingItems}
+      />
+
+      <GroupPicker
+        open={pickGroup}
+        attachedIds={selected?.modifierGroups.map((g) => g.id) ?? []}
+        busy={opBusy}
+        onClose={() => setPickGroup(false)}
+        onAttach={attachGroup}
+        onDeleted={forgetGroup}
+      />
+
+      <OfferPicker
+        open={pickOffer}
+        excludeIds={offers.map((o) => o.id)}
+        busy={opBusy}
+        onClose={() => setPickOffer(false)}
+        onPick={addExistingOffer}
+      />
     </>
   );
 }

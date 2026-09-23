@@ -15,6 +15,7 @@ import {
   type Offer,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { OfferPriceQuote } from "./price-quote";
 
 const ROLES: { id: Offer["pricing"]["role"]; titleKey: string; hintKey: string }[] = [
   { id: "fixed", titleKey: "menuOffer.role.fixed", hintKey: "menuOffer.role.fixedHint" },
@@ -288,6 +289,8 @@ export function TabPricing({
           <span className="text-[var(--octo-text-secondary)]">{t("menuOffer.excludePromos")}</span>
         </label>
       </section>
+
+      <OfferPriceQuote offer={offer} />
     </div>
   );
 }

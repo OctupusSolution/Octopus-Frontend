@@ -1,10 +1,23 @@
+import { useEffect, useState } from "react";
 import { type LucideIcon, ArrowUp, Armchair, CircleX, History, Pencil, Phone, Send, UserPlus, X } from "lucide-react";
+import type { WaitingActivityResponse } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
 import { fullName, waitedMinutes, type HistoryType, type WaitlistEntry } from "@/entities/waitlist-entry";
+import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { ChannelGlyph } from "./_shared/glyphs";
 import { CHANNEL_KEY, HISTORY_KEY, SOURCE_KEY, fill } from "./_shared/labels";
+import { loadActivity } from "./_shared/waitlist-api";
 import { StatusPill } from "./waitlist-table";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The API's own action vocabulary isn't documented, so it's shown as-is
+ *  (spaced out) rather than forced into the five local HistoryType icons,
+ *  which were named for the seed fixture's events, not the server's. */
+function humanizeAction(action: string): string {
+  return action.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ");
+}
 
 const ICON: Record<HistoryType, { icon: LucideIcon; color: string }> = {
   joined: { icon: UserPlus, color: "#0D6EFD" },
@@ -18,6 +31,25 @@ const ICON: Record<HistoryType, { icon: LucideIcon; color: string }> = {
 
 export function HistoryModal({ entry, now, onClose }: { entry: WaitlistEntry | null; now: number; onClose: () => void }) {
   const { t, locale } = useI18n();
+  const { activeBusinessId } = useAuth();
+  const [serverActivity, setServerActivity] = useState<WaitingActivityResponse[] | null>(null);
+
+  useEffect(() => {
+    setServerActivity(null);
+    if (!entry || !activeBusinessId || !UUID.test(entry.id)) return;
+    let cancelled = false;
+    loadActivity(activeBusinessId, entry.id)
+      .then((rows) => {
+        if (!cancelled) setServerActivity(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setServerActivity([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry, activeBusinessId]);
+
   if (!entry) return null;
 
   const time = (at: number) =>
@@ -75,27 +107,47 @@ export function HistoryModal({ entry, now, onClose }: { entry: WaitlistEntry | n
         )}
       </dl>
 
-      <ol className="octo-scroll mt-5 max-h-[320px] overflow-y-auto">
-        {[...entry.history].reverse().map((event, index, list) => {
-          const { icon: Icon, color } = ICON[event.type];
-          const extra = detail(event.type, event.detail);
-          return (
+      {serverActivity && serverActivity.length > 0 ? (
+        <ol className="octo-scroll mt-5 max-h-[320px] overflow-y-auto">
+          {serverActivity.map((event, index, list) => (
             <li key={event.id} className="relative flex gap-3 pb-4 last:pb-0">
               {index < list.length - 1 && <span className="absolute start-[15px] top-8 h-[calc(100%-32px)] w-px bg-[var(--octo-border-card)]" />}
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ color, backgroundColor: `color-mix(in srgb, ${color} 12%, var(--octo-card))` }}>
-                <Icon size={15} />
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ color: "#64748B", backgroundColor: "color-mix(in srgb, #64748B 12%, var(--octo-card))" }}>
+                <History size={15} />
               </span>
               <div className="min-w-0 pt-1">
-                <p className="text-[13.5px] font-medium text-[var(--octo-text-primary)]">
-                  {t(HISTORY_KEY[event.type])}
-                  {extra && <span className="font-normal text-[var(--octo-text-secondary)]"> · {extra}</span>}
+                <p className="text-[13.5px] font-medium capitalize text-[var(--octo-text-primary)]">
+                  {humanizeAction(event.action)}
+                  {event.actorDisplay && <span className="font-normal text-[var(--octo-text-secondary)]"> · {event.actorDisplay}</span>}
                 </p>
-                <p className="text-[12px] text-[var(--octo-text-muted)]">{time(event.at)}</p>
+                <p className="text-[12px] text-[var(--octo-text-muted)]">{time(Date.parse(event.occurredAtUtc))}</p>
               </div>
             </li>
-          );
-        })}
-      </ol>
+          ))}
+        </ol>
+      ) : (
+        <ol className="octo-scroll mt-5 max-h-[320px] overflow-y-auto">
+          {[...entry.history].reverse().map((event, index, list) => {
+            const { icon: Icon, color } = ICON[event.type];
+            const extra = detail(event.type, event.detail);
+            return (
+              <li key={event.id} className="relative flex gap-3 pb-4 last:pb-0">
+                {index < list.length - 1 && <span className="absolute start-[15px] top-8 h-[calc(100%-32px)] w-px bg-[var(--octo-border-card)]" />}
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full" style={{ color, backgroundColor: `color-mix(in srgb, ${color} 12%, var(--octo-card))` }}>
+                  <Icon size={15} />
+                </span>
+                <div className="min-w-0 pt-1">
+                  <p className="text-[13.5px] font-medium text-[var(--octo-text-primary)]">
+                    {t(HISTORY_KEY[event.type])}
+                    {extra && <span className="font-normal text-[var(--octo-text-secondary)]"> · {extra}</span>}
+                  </p>
+                  <p className="text-[12px] text-[var(--octo-text-muted)]">{time(event.at)}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </Modal>
   );
 }

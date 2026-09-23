@@ -1,17 +1,39 @@
 // apps/merchant/src/pages/orders-list/_shared/cancel-order-flow.tsx
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { cancelRealOrder, toCancelReasonCode } from "@/entities/order";
 import { ScopeReasonForm, type ScopeReasonPayload } from "./scope-reason-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
 import { ResultModal } from "./result-modal";
 import { useActionFlow } from "./action-flow";
+import { useOrderActionConfirm } from "./use-order-action-confirm";
 import { ACTION_THEME } from "./theme";
 import type { OrderRecord } from "./types";
 
-export function CancelOrderFlow({ order, onClose }: { order: OrderRecord | null; onClose: () => void }) {
+export function CancelOrderFlow({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: OrderRecord | null;
+  onClose: () => void;
+  /** Called after a real order's cancel succeeds, so the caller can refresh
+   *  its list — no-op for a mock order. */
+  onSuccess?: () => void;
+}) {
   const { t } = useI18n();
   const flow = useActionFlow<ScopeReasonPayload>(["form", "pin", "result"], order !== null);
   const accent = ACTION_THEME.cancel.accent;
+  // Real cancel is always order-level: the scope form's "specific" option has
+  // no line-selection UI behind it, so there is nothing to target lines with
+  // yet — see BACKEND_GAPS.md 6b.
+  const { confirm, submitting, errorText } = useOrderActionConfirm(
+    order,
+    (businessId, orderId, version, approval) =>
+      cancelRealOrder(businessId, orderId, version, toCancelReasonCode(flow.payload?.reason ?? "other"), approval),
+    flow.advance,
+    onSuccess
+  );
 
   if (!order) return null;
 
@@ -47,10 +69,12 @@ export function CancelOrderFlow({ order, onClose }: { order: OrderRecord | null;
       <PinConfirmModal
         open
         onClose={onClose}
-        onConfirm={flow.advance}
+        onConfirm={confirm}
         accent={accent}
         promptKey="orders.managerAuth.prompt.cancel"
         confirmLabelKey="orders.managerAuth.confirm.cancel"
+        errorText={errorText}
+        submitting={submitting}
       />
     );
   }

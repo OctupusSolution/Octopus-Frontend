@@ -6,6 +6,7 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { useStaffLabels } from "./_shared/labels";
 import { useStaffStore } from "./_shared/staff-store";
+import { useAssignableRoles } from "./_shared/use-assignable-roles";
 import { RoleIcon } from "./role-icon";
 
 export function AssignRoleModal({
@@ -29,11 +30,11 @@ export function AssignRoleModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId]);
 
-  const selectable = store.roles.filter((r) => r.active || r.id === profile?.assignedRole);
+  const selectable = useAssignableRoles(profile?.assignedRole);
 
   const save = () => {
     if (!profile) return;
-    const role = store.roles.find((r) => r.id === roleId);
+    const role = selectable.find((r) => r.id === roleId);
     if (!role) return;
     store.patchProfile(profile.employee.id, { assignedRole: role.id });
     store.logAudit(profile.employee.id, "roleUpdated");

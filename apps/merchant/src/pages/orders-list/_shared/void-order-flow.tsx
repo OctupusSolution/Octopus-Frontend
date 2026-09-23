@@ -1,17 +1,34 @@
 // apps/merchant/src/pages/orders-list/_shared/void-order-flow.tsx
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { toVoidReasonCode, voidRealOrder } from "@/entities/order";
 import { ScopeReasonForm, type ScopeReasonPayload } from "./scope-reason-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
 import { ResultModal } from "./result-modal";
 import { useActionFlow } from "./action-flow";
+import { useOrderActionConfirm } from "./use-order-action-confirm";
 import { ACTION_THEME } from "./theme";
 import type { OrderRecord } from "./types";
 
-export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; onClose: () => void }) {
+export function VoidOrderFlow({
+  order,
+  onClose,
+  onSuccess,
+}: {
+  order: OrderRecord | null;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
   const { t } = useI18n();
   const flow = useActionFlow<ScopeReasonPayload>(["form", "pin", "result"], order !== null);
   const accent = ACTION_THEME.void.accent;
+  const { confirm, submitting, errorText } = useOrderActionConfirm(
+    order,
+    (businessId, orderId, version, approval) =>
+      voidRealOrder(businessId, orderId, version, toVoidReasonCode(flow.payload?.reason ?? "other"), approval),
+    flow.advance,
+    onSuccess
+  );
 
   if (!order) return null;
 
@@ -50,10 +67,12 @@ export function VoidOrderFlow({ order, onClose }: { order: OrderRecord | null; o
       <PinConfirmModal
         open
         onClose={onClose}
-        onConfirm={flow.advance}
+        onConfirm={confirm}
         accent={accent}
         promptKey="orders.managerAuth.prompt.void"
         confirmLabelKey="orders.managerAuth.confirm.void"
+        errorText={errorText}
+        submitting={submitting}
       />
     );
   }

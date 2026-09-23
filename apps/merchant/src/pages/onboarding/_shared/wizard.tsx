@@ -2,9 +2,7 @@
 // use it: the ten-step signup flow (pages/onboarding/index.tsx), rendered
 // outside the app shell with its own header passed in as `chrome`; and the
 // nine-step "add another business" flow
-// (pages/settings/businesses/create.tsx), rendered inside the app shell with
-// the existing back-link and page title standing in for a header, so it
-// passes no `chrome` at all. Which steps run and what happens on finish are
+// (pages/select-business/new.tsx), full-screen under the same header. Which steps run and what happens on finish are
 // entirely the host's decision — this component only knows how to walk
 // whatever list it is given, over whatever draft config it is given.
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";

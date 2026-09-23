@@ -9,7 +9,7 @@ import { ApiError } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthDialog, VERIFY_ART_URL, STAMP_ART_URL } from "../_shared/auth-dialog";
 import { AuthField, AuthButton } from "../_shared/auth-field";
-import { OtpInput, OTP_LENGTH } from "../_shared/otp-input";
+import { OtpInput, OTP_LENGTH_EMAIL_VERIFICATION, OTP_LENGTH_PASSWORD_RESET } from "../_shared/otp-input";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_SECONDS = 30;
@@ -91,7 +91,11 @@ export function OtpDialog({
   onResend: () => Promise<void>;
 }) {
   const { t } = useI18n();
-  const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
+  // verifyAccount (signup) codes are 6 digits from EmailVerificationOtpGenerator;
+  // enterCode (password reset) codes are 4 from the separate OtpGenerator —
+  // see otp-input.tsx's note.
+  const length = variant === "verifyAccount" ? OTP_LENGTH_EMAIL_VERIFICATION : OTP_LENGTH_PASSWORD_RESET;
+  const [digits, setDigits] = useState<string[]>(Array(length).fill(""));
   const [invalid, setInvalid] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -101,7 +105,7 @@ export function OtpDialog({
   // — reopening it after a back-step should not show a dead "Resend" link.
   useEffect(() => {
     if (!open) return;
-    setDigits(Array(OTP_LENGTH).fill(""));
+    setDigits(Array(length).fill(""));
     setInvalid(false);
     setErrorText(null);
     setSecondsLeft(RESEND_SECONDS);
@@ -149,10 +153,10 @@ export function OtpDialog({
       onClose={onClose}
       title={t(variant === "verifyAccount" ? "auth.otp.verifyTitle" : "auth.otp.codeTitle")}
       art={VERIFY_ART_URL}
-      body={t("auth.otp.body")}
+      body={t("auth.otp.body").replace("{length}", String(length))}
     >
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        <OtpInput value={digits} onChange={(next) => { setDigits(next); setInvalid(false); }} invalid={invalid} />
+        <OtpInput value={digits} onChange={(next) => { setDigits(next); setInvalid(false); }} invalid={invalid} length={length} />
 
         {invalid && (
           <p className="text-center text-[12.5px] text-[#EF4444]">

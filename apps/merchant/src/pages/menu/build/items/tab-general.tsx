@@ -1,20 +1,34 @@
 // The General tab: two columns, as the frame lays them out. Text and media on
 // the start side, image, tags, status and id on the end side.
 import { useState } from "react";
-import { Copy, Play, Plus, Trash2, Upload, X } from "lucide-react";
+import { Copy, Play, Plus, Tags, Trash2, Upload, X } from "lucide-react";
+import { Modal } from "@ui/primitives";
 import { useFilePicker, type FilePicker } from "@/shared/ui/use-file-picker";
 import { MediaTile } from "@/shared/ui/media-tile";
 import clsx from "clsx";
-import type { Item, ItemTag, KnownItemTag } from "@/entities/menu";
+import {
+  createNamedLabel,
+  describeApiError,
+  errorCodeOf,
+  invalidateMenuResource,
+  labelCodeFor,
+  useMenuLabels,
+  type Item,
+  type ItemTag,
+  type KnownItemTag,
+} from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { LabelsManager, useLabelName } from "../../labels-manager";
+import { useMenuCopy } from "../../copy";
 
+// The frame's four tags — shown only when the business's ItemTag labels
+// (GET /menu/labels) cannot be read; otherwise the chips are those labels.
 const TAGS: { id: KnownItemTag; key: string }[] = [
   { id: "chef-recommended", key: "menuWiz.item.tag.chef" },
   { id: "top-selling", key: "menuWiz.item.tag.top" },
   { id: "most-ordered", key: "menuWiz.item.tag.most" },
   { id: "healthy-choice", key: "menuWiz.item.tag.healthy" },
 ];
-const KNOWN_TAG_IDS: readonly string[] = TAGS.map((tag) => tag.id);
 
 const STATUSES: Item["status"][] = ["active", "draft", "unavailable"];
 
@@ -68,8 +82,20 @@ export function TabGeneral({
   const image = useFilePicker((url) => onPatch({ image: url }));
   const video = useFilePicker((url) => onPatch({ video: url }), "video");
 
+  const c = useMenuCopy();
+  const labelName = useLabelName();
+  const labels = useMenuLabels();
   const [tagDraft, setTagDraft] = useState<string | null>(null);
-  const customTags = item.tags.filter((tag) => !KNOWN_TAG_IDS.includes(tag));
+  const [tagError, setTagError] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  // Server labels when there are any; the frame's presets otherwise.
+  const serverTags = (labels.data ?? []).filter((l) => l.kind === "ItemTag");
+  const chips =
+    serverTags.length > 0
+      ? serverTags.map((l) => ({ id: l.code, text: labelName(l) }))
+      : TAGS.map((tag) => ({ id: tag.id as string, text: t(tag.key) }));
+  const chipIds = chips.map((chip) => chip.id);
+  const customTags = item.tags.filter((tag) => !chipIds.includes(tag));
 
   function toggleTag(tag: ItemTag) {
     onPatch({
@@ -77,13 +103,31 @@ export function TabGeneral({
     });
   }
 
-  function commitTag() {
+  async function commitTag() {
     const name = (tagDraft ?? "").trim();
     setTagDraft(null);
+    setTagError(null);
     if (!name) return;
     // Case-insensitive, so "Spicy" and "spicy" do not become two chips.
     if (item.tags.some((tag) => tag.toLowerCase() === name.toLowerCase())) return;
-    onPatch({ tags: [...item.tags, name] });
+    if (!labels.businessId) {
+      onPatch({ tags: [...item.tags, name] });
+      return;
+    }
+    // A typed tag becomes a business label (so every item can pick it), and
+    // the item stores its code — the API references tags by code.
+    const code = labelCodeFor(name);
+    if (item.tags.includes(code)) return;
+    try {
+      await createNamedLabel(labels.businessId, "ItemTag", { en: name, ar: name }, code);
+      invalidateMenuResource("labels");
+    } catch (err) {
+      if (errorCodeOf(err) !== "menu.label.code-taken") {
+        setTagError(describeApiError(err));
+        return;
+      }
+    }
+    onPatch({ tags: [...item.tags, code] });
   }
 
   return (
@@ -198,7 +242,7 @@ export function TabGeneral({
             {t("menuWiz.item.tags")}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-2">
-            {TAGS.map(({ id, key }) => (
+            {chips.map(({ id, text }) => (
               <button
                 key={id}
                 type="button"
@@ -211,7 +255,7 @@ export function TabGeneral({
                     : "bg-[var(--octo-selected)] text-[var(--octo-accent)]"
                 )}
               >
-                {t(key)}
+                {text}
               </button>
             ))}
             {/* A custom tag only exists because the merchant typed it, so it is
@@ -221,7 +265,7 @@ export function TabGeneral({
                 key={tag}
                 className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--octo-accent)] py-1.5 pe-1.5 ps-2.5 text-[13px] text-white"
               >
-                {tag}
+                {labelName({ code: tag, label: {} })}
                 <button
                   type="button"
                   aria-label={t("menuWiz.item.removeTag").replace("{name}", tag)}
@@ -234,15 +278,32 @@ export function TabGeneral({
             ))}
           </div>
 
+          {tagError && (
+            <p role="alert" className="mt-1.5 text-[12px] text-error">
+              {tagError}
+            </p>
+          )}
           {tagDraft === null ? (
-            <button
-              type="button"
-              onClick={() => setTagDraft("")}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-card)] px-2.5 py-1.5 text-[13px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-            >
-              <Plus size={15} aria-hidden />
-              {t("menuWiz.item.addTag")}
-            </button>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTagDraft("")}
+                className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-card)] px-2.5 py-1.5 text-[13px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+              >
+                <Plus size={15} aria-hidden />
+                {t("menuWiz.item.addTag")}
+              </button>
+              {labels.businessId && (
+                <button
+                  type="button"
+                  onClick={() => setManageOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
+                >
+                  <Tags size={15} aria-hidden />
+                  {c("labels.manage")}
+                </button>
+              )}
+            </div>
           ) : (
             <div className="mt-2 flex items-center gap-2">
               <input
@@ -254,7 +315,7 @@ export function TabGeneral({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    commitTag();
+                    void commitTag();
                   }
                   if (e.key === "Escape") setTagDraft(null);
                 }}
@@ -262,7 +323,7 @@ export function TabGeneral({
               />
               <button
                 type="button"
-                onClick={commitTag}
+                onClick={() => void commitTag()}
                 className="h-9 rounded-[8px] bg-[var(--octo-accent)] px-3 text-[13px] font-medium text-white"
               >
                 {t("menuWiz.item.tagSave")}
@@ -278,6 +339,10 @@ export function TabGeneral({
             </div>
           )}
         </div>
+
+        <Modal open={manageOpen} onClose={() => setManageOpen(false)} title={c("labels.manage")} className="max-w-[600px]">
+          <LabelsManager initialKind="ItemTag" />
+        </Modal>
 
         <fieldset>
           <legend className="text-[14px] font-medium text-[var(--octo-text-primary)]">

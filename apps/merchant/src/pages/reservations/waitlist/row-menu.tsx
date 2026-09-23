@@ -7,6 +7,7 @@ const ITEM =
   "flex w-full items-center rounded-md bg-[color-mix(in_srgb,#0D6EFD_4%,var(--octo-card))] px-2.5 py-2 text-start text-[14px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-tone-info-bg)] disabled:cursor-not-allowed disabled:opacity-45";
 const MENU_W = 150;
 const MENU_H = 150;
+const ITEM_H = 45;
 
 export function WaitlistRowMenu({
   open,
@@ -16,6 +17,7 @@ export function WaitlistRowMenu({
   onViewHistory,
   canEdit,
   canMoveUp,
+  extraItems = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,8 +26,11 @@ export function WaitlistRowMenu({
   onViewHistory: () => void;
   canEdit: boolean;
   canMoveUp: boolean;
+  /** Status-dependent actions (revert ready, reinstate), shown only when given. */
+  extraItems?: readonly { label: string; onSelect: () => void }[];
 }) {
   const { t, dir } = useI18n();
+  const menuH = MENU_H + extraItems.length * ITEM_H;
   const ref = useDismiss(open, () => onOpenChange(false));
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -40,7 +45,7 @@ export function WaitlistRowMenu({
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect) return;
       const below = rect.bottom + 8;
-      const top = below + MENU_H > window.innerHeight ? rect.top - 8 - MENU_H : below;
+      const top = below + menuH > window.innerHeight ? rect.top - 8 - menuH : below;
       const left = dir === "rtl" ? rect.left : rect.right - MENU_W;
       setPos({ top, left: Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8)) });
     };
@@ -52,7 +57,7 @@ export function WaitlistRowMenu({
       window.removeEventListener("resize", close);
       window.removeEventListener("scroll", close, true);
     };
-  }, [open, dir]);
+  }, [open, dir, menuH]);
 
   const run = (action: () => void) => () => {
     onOpenChange(false);
@@ -85,6 +90,11 @@ export function WaitlistRowMenu({
           <button type="button" role="menuitem" disabled={!canMoveUp} onClick={run(onMoveUp)} className={ITEM}>
             {t("waitlist.action.moveUp")}
           </button>
+          {extraItems.map((item) => (
+            <button key={item.label} type="button" role="menuitem" onClick={run(item.onSelect)} className={ITEM}>
+              {item.label}
+            </button>
+          ))}
           <button type="button" role="menuitem" onClick={run(onViewHistory)} className={ITEM}>
             {t("waitlist.action.viewHistory")}
           </button>

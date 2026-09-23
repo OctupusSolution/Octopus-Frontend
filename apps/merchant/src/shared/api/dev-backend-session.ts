@@ -1,48 +1,18 @@
-// TEMPORARY bridge to a real backend session, until Identity is wired for
-// real (see FRONTEND_INTEGRATION_GAPS.md — Identity is next in the
-// integration order). auth-provider.tsx and tenant-config-provider.tsx are
-// both mock today and hold no bearer token or real (GUID) business id, so
-// there is nothing yet to feed a real endpoint's Authorization header or
-// {businessId} path segment.
+// DISABLED. This used to hand-feed a pasted business token + id to the old
+// Public Link sync while auth was still mock. The real session now lives in
+// auth-provider (business token minted by /auth/business-session) and reaches
+// the api-client through session-bridge.ts.
 //
-// This module fills that one gap just enough to wire and test Public Link
-// now: a business-session JWT (from POST /v1/auth/business-session) and the
-// real business GUID it was issued for, pasted in by hand for local testing
-// via `setDevSession`. DELETE THIS FILE once auth-provider carries a real
-// token and tenant-config-provider carries real business ids end to end —
-// every call site here should switch to reading those instead.
-import { configureHttp } from "@octopus/api-client";
-
-const TOKEN_KEY = "octopus.dev.accessToken";
-const BUSINESS_ID_KEY = "octopus.dev.businessId";
-
-export function getDevAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(TOKEN_KEY);
-}
+// The old Public Link API this fed (single ConnectedContentKey, PUT /brand,
+// POST /content, ...) was retired by the backend's US-014 rebuild, so
+// public-link-sync.ts must not talk to it any more: it stays inert here
+// (`hasDevSession()` is false) until Public Link is re-wired against the new
+// sections/versions API, at which point this file and that hook go away.
 
 export function getDevBusinessId(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(BUSINESS_ID_KEY);
-}
-
-export function setDevSession(accessToken: string, businessId: string): void {
-  window.localStorage.setItem(TOKEN_KEY, accessToken);
-  window.localStorage.setItem(BUSINESS_ID_KEY, businessId);
-}
-
-export function clearDevSession(): void {
-  window.localStorage.removeItem(TOKEN_KEY);
-  window.localStorage.removeItem(BUSINESS_ID_KEY);
+  return null;
 }
 
 export function hasDevSession(): boolean {
-  return getDevAccessToken() !== null && getDevBusinessId() !== null;
-}
-
-// Called once at app bootstrap (main.tsx) so every @octopus/api-client call
-// picks up whatever token is currently stored, without each call site having
-// to thread it through by hand.
-export function initDevBackendSession(): void {
-  configureHttp({ basePath: "/api", getAccessToken: getDevAccessToken });
+  return false;
 }

@@ -5,7 +5,13 @@
 // fixed at 2026-08-08 (a Saturday — the Saudi week runs Sat -> Fri).
 import type { KpiCard } from "./mock-dashboard";
 
-export const TODAY = "2026-08-08";
+// A live binding: the fixture below is dated around 2026-08-08, but once the
+// module runs on the Reservation API the pages call `setToday` so "today" is
+// the real day. Fixture-only tests never call it.
+export let TODAY = "2026-08-08";
+export function setToday(date: string): void {
+  TODAY = date;
+}
 
 export const branches = [
   "Riyadh - Olaya",
@@ -96,6 +102,8 @@ export interface Reservation {
   sendLinkChannels?: readonly ("WhatsApp" | "SMS" | "Email")[];
   /** Whether the guest should be told about an edit — the form's "Notify guest about changes". */
   notifyGuestOnChange?: boolean;
+  /** Kept out of the general reservations list without deleting the record. */
+  hidden?: boolean;
 }
 
 // hour < 10 means "after midnight", stored as the next-day offset (24 + hour).

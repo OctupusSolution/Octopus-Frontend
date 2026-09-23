@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import clsx from "clsx";
-import { type LucideIcon, Armchair, CircleDashed, Clock, Lightbulb, Star, UsersRound, UserX } from "lucide-react";
+import { type LucideIcon, Armchair, CircleDashed, Clock, Lightbulb, MapPinned, Star, UsersRound, UserX } from "lucide-react";
 import { boundsOf, itemRect, zoneForTable, type FloorItem, type FloorPlanDoc, type FloorTable, type LiveStatus } from "@/entities/floor-plan";
 import { estimatedSeatingMinutes, fullName, isActive, waitedMinutes, type WaitlistEntry } from "@/entities/waitlist-entry";
 import { PlanViewport, TABLE_TONES, type ItemKind } from "@/widgets/floor-plan-canvas";
@@ -9,9 +9,11 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { Dropdown, MenuItem } from "@/pages/reservations/floor-plan/_shared/dropdown";
 import { areaLabel } from "@/pages/reservations/floor-plan/_shared/labels";
 import { useLiveTables } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
+import { FLOOR_PLAN_BUILDER_PATH } from "@/pages/reservations/floor-plan/_shared/paths";
 import { SOURCE_KEY, fill } from "../_shared/labels";
 import { WAITLIST_PATH } from "../_shared/paths";
 import { useSeatingFloor, useWaitlist } from "../_shared/use-waitlist";
+import { describeWaitlistError } from "../_shared/waitlist-api";
 
 const TABLES_ONLY: ReadonlySet<ItemKind> = new Set(["table"]);
 const NO_ZONE = "all";
@@ -78,10 +80,36 @@ export function SeatGuestPage() {
   return <SeatGuest entry={entry} entries={waitlist.entries} onSeat={waitlist.seat} />;
 }
 
-function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: readonly WaitlistEntry[]; onSeat: (id: string, table: string, area: string) => void }) {
+/** Blocks seating until a real, published floor plan exists — the sample
+ *  layout is only a builder preview, not a real room to seat guests in. */
+function NoFloorPlanNotice() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { doc: floor } = useSeatingFloor();
+  return (
+    <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-8">
+      <div className="mx-auto mt-16 flex max-w-md flex-col items-center rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-6 py-10 text-center">
+        <span className="grid h-12 w-12 place-items-center rounded-full bg-warning/10 text-warning">
+          <MapPinned size={22} />
+        </span>
+        <h1 className="mt-3 text-[17px] font-semibold text-[var(--octo-text-primary)]">{t("waitlist.seat.noFloorPlanTitle")}</h1>
+        <p className="mt-1 text-[13.5px] text-[var(--octo-text-muted)]">{t("waitlist.seat.noFloorPlanBody")}</p>
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={() => navigate(WAITLIST_PATH)} className="h-10 rounded-[10px] bg-[var(--octo-track)] px-5 text-[14px] font-semibold text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]">
+            {t("waitlist.seat.back")}
+          </button>
+          <button type="button" onClick={() => navigate(FLOOR_PLAN_BUILDER_PATH)} className="h-10 rounded-[10px] bg-[#0D6EFD] px-5 text-[14px] font-semibold text-white hover:opacity-90">
+            {t("reservations.new.buildFloorPlan")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: readonly WaitlistEntry[]; onSeat: (id: string, table: string, area: string, resourceId?: string | null) => Promise<void> }) {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { doc: floor, isSample } = useSeatingFloor();
   const doc = useMemo(() => croppedToContent(floor), [floor]);
   const live = useLiveTables(doc);
   const boxLayout = doc.zones.length === 0 && doc.objects.length === 0;
@@ -130,27 +158,32 @@ function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: 
   const name = fullName(entry);
   const initials = initialsOf(entry);
 
+  const [seatError, setSeatError] = useState<string | null>(null);
+
+  if (isSample) return <NoFloorPlanNotice />;
+
   function confirm() {
     if (!selected || !selectable(selected.table)) return;
     const table = selected.table;
     const area = zoneOf(table)?.name ?? areaLabel(table.area, t);
-    live.setTableState(table.id, {
-      status: "occupied",
-      guests: entry.partySize,
-      guestName: name,
-      orderId: "",
-      server: "",
-      note: entry.note,
-      since: Date.now(),
-    });
-    navigate(WAITLIST_PATH, { state: { toast: fill(t("waitlist.toast.seated"), { name, table: table.number }) } });
-    onSeat(entry.id, table.number, area);
+    setSeatError(null);
+    // The API seats the party and marks the table occupied on the floor plan
+    // itself, so the table is not also set by hand.
+    onSeat(entry.id, table.number, area, table.id).then(
+      () => navigate(WAITLIST_PATH, { state: { toast: fill(t("waitlist.toast.seated"), { name, table: table.number }) } }),
+      (err) => setSeatError(describeWaitlistError(err))
+    );
   }
 
   const zoneLabel = zoneId === NO_ZONE ? t("waitlist.seat.allAreas") : doc.zones.find((z) => z.id === zoneId)?.name ?? t("waitlist.seat.allAreas");
 
   return (
     <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-8">
+      {seatError && (
+        <div role="alert" className="mb-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+          {seatError}
+        </div>
+      )}
       <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">{t("waitlist.seat.title")}</h1>
       <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)] sm:text-[15px]">{t("waitlist.subtitle")}</p>
 

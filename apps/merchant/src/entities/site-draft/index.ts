@@ -17,3 +17,4 @@ export * from "./site-draft-storage";
 export * from "./use-site-draft";
 export * from "./theme-catalog";
 export * from "./public-link-sync";
+export * from "./site-fonts";

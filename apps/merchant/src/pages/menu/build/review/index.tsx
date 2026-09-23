@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Modal } from "@ui/primitives";
+import { ApiError, getMenu, getValidationReport, publishMenu } from "@octopus/api-client";
 import {
   OFFERS_SECTION_ID,
   channelStateFor,
@@ -37,10 +38,14 @@ import {
 } from "@/entities/menu";
 import { MediaTile } from "@/shared/ui/media-tile";
 import { useAuth } from "@/app/providers/auth-provider";
+import { fromServer } from "@/entities/menu/menu-api";
+import { useMenuLibrary } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useDraft } from "../use-draft";
 import { resolveImage } from "../preview-model";
 import { ValidationSummary } from "./validation-summary";
+import { CustomerPreview } from "./customer-preview";
+import { isServerId } from "@/entities/menu";
 
 /** Solid icon colours for the stat tiles, as the frame draws them. Tone
  *  tokens where the app has one; magenta has none, so it carries a fallback. */
@@ -149,7 +154,7 @@ function StatusPill({ tone, children }: { tone: "success" | "warning" | "danger"
 export function ReviewStep() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, activeBusinessId } = useAuth();
   const { draft, setDraft, save } = useDraft();
 
   // Bumped by the summary's refresh icon. validate() is pure, so re-running it
@@ -161,6 +166,9 @@ export function ReviewStep() {
   const [filter, setFilter] = useState<string>("all");
   const [fullMenu, setFullMenu] = useState(false);
   const [published, setPublished] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const { replace } = useMenuLibrary();
 
   const itemSections = draft.sections.filter((s) => s.id !== OFFERS_SECTION_ID);
   // Archived sections stay listed in the overview (as Draft) but are not part
@@ -211,21 +219,36 @@ export function ReviewStep() {
 
   /** Going live: the menu and every channel it serves flip together, because a
    *  published menu that is live nowhere would be a lie the library card told. */
-  function publish() {
-    if (blocked) return;
-    const now = new Date().toISOString();
-    const live = channelStateFor("active");
-    const next = {
-      ...draft,
-      status: "active" as const,
-      channels: { pos: live, publicLink: live, tableQr: live },
-      publishedAt: now,
-      updatedAt: now,
-      version: draft.version + 1,
-    };
-    setDraft(next);
-    save(next);
-    setPublished(true);
+  async function publish() {
+    if (blocked || publishing) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      // The server publishes what it holds, so what is on screen goes first.
+      await save(draft);
+      if (!activeBusinessId) throw new Error("No active business");
+      const report = await getValidationReport(activeBusinessId, draft.id);
+      if (!report.canPublish) {
+        const first = report.errors[0];
+        throw new Error(first ? `${first.code}${first.subjectKind ? ` (${first.subjectKind})` : ""}` : "The menu cannot be published yet.");
+      }
+      await publishMenu(
+        activeBusinessId,
+        draft.id,
+        { businessId: activeBusinessId, menuId: draft.id, reviewToken: report.reviewToken },
+        `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+      );
+      // Status and channels come from the server's own answer.
+      const fresh = fromServer(await getMenu(activeBusinessId, draft.id), draft);
+      const next = { ...draft, status: fresh.status, channels: fresh.channels, version: fresh.version, publishedAt: fresh.publishedAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() };
+      setDraft(next);
+      replace(next);
+      setPublished(true);
+    } catch (err) {
+      setPublishError(err instanceof ApiError ? (err.problem?.detail ?? err.problem?.errorCode ?? err.message) : err instanceof Error ? err.message : "Publish failed");
+    } finally {
+      setPublishing(false);
+    }
   }
 
   // The confirmation stays long enough to read, then hands back to the
@@ -286,14 +309,17 @@ export function ReviewStep() {
                 {t("menuReview.previewTitle")}{" "}
                 <span className="font-normal">({t("menuReview.previewComplete")})</span>
               </h2>
-              <button
-                type="button"
-                onClick={() => setFullMenu(true)}
-                className="inline-flex items-center gap-1.5 text-[15px] font-medium text-[var(--octo-accent)] hover:underline"
-              >
-                <ExternalLink size={18} aria-hidden />
-                {t("menuReview.viewFull")}
-              </button>
+              <div className="flex flex-wrap items-center gap-4">
+                {isServerId(draft.id) && <CustomerPreview menuId={draft.id} onBeforeOpen={() => save()} />}
+                <button
+                  type="button"
+                  onClick={() => setFullMenu(true)}
+                  className="inline-flex items-center gap-1.5 text-[15px] font-medium text-[var(--octo-accent)] hover:underline"
+                >
+                  <ExternalLink size={18} aria-hidden />
+                  {t("menuReview.viewFull")}
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -458,11 +484,16 @@ export function ReviewStep() {
               </p>
             </div>
           </div>
+          {publishError && (
+            <p role="alert" className="mt-3 rounded-[10px] bg-error/10 px-3 py-2 text-[13px] text-error">
+              {publishError}
+            </p>
+          )}
           {/* Disabled with the reason above it, never a silently dead button. */}
           <button
             type="button"
-            disabled={blocked}
-            onClick={publish}
+            disabled={blocked || publishing}
+            onClick={() => void publish()}
             className="mt-4 inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-[10px] bg-[var(--octo-accent)] text-[18px] font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("menuReview.publish")}

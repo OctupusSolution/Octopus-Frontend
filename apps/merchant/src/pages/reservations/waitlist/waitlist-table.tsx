@@ -10,7 +10,9 @@ import {
   type WaitlistEntry,
 } from "@/entities/waitlist-entry";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { useWaitlistExtraText } from "./_shared/extra-text";
 import { ChannelGlyph } from "./_shared/glyphs";
+import { apiStatusOf } from "./_shared/waitlist-api";
 import { STATUS_KEY, STATUS_TONE } from "./_shared/labels";
 import { WaitlistRowMenu } from "./row-menu";
 
@@ -22,6 +24,8 @@ export interface RowHandlers {
   onEdit: (entry: WaitlistEntry) => void;
   onMoveUp: (entry: WaitlistEntry) => void;
   onHistory: (entry: WaitlistEntry) => void;
+  onRevertReady: (entry: WaitlistEntry) => void;
+  onReinstate: (entry: WaitlistEntry) => void;
 }
 
 const TH = "whitespace-nowrap px-2 py-3 2xl:px-2.5 text-center text-[13.5px] font-medium text-[var(--octo-text-primary)]";
@@ -77,6 +81,7 @@ export function WaitlistTable({
   handlers: RowHandlers;
 }) {
   const { t, locale } = useI18n();
+  const text = useWaitlistExtraText();
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
   const someSelected = !allSelected && rows.some((r) => selected.has(r.id));
   const minutes = (n: number) => `${n} ${t("waitlist.min")}`;
@@ -195,6 +200,14 @@ export function WaitlistTable({
                       onEdit={() => handlers.onEdit(entry)}
                       onMoveUp={() => handlers.onMoveUp(entry)}
                       onViewHistory={() => handlers.onHistory(entry)}
+                      extraItems={[
+                        ...(apiStatusOf(entry.id) === "Ready"
+                          ? [{ label: text.revertReady, onSelect: () => handlers.onRevertReady(entry) }]
+                          : []),
+                        ...(apiStatusOf(entry.id) === "NoShow"
+                          ? [{ label: text.reinstate, onSelect: () => handlers.onReinstate(entry) }]
+                          : []),
+                      ]}
                     />
                   </div>
                 </td>

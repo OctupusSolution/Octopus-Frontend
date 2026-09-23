@@ -8,6 +8,9 @@ import { LoginPage } from "@/pages/login";
 import { SignUpPage } from "@/pages/signup";
 import { OnboardingPage } from "@/pages/onboarding";
 import { SetPasswordPage } from "@/pages/set-password";
+import { SelectBusinessPage } from "@/pages/select-business";
+import { NewBusinessPage } from "@/pages/select-business/new";
+import { AcceptInvitationPage, hasPendingInvitation } from "@/pages/accept-invitation";
 import { AuthProvider, useAuth } from "@/app/providers/auth-provider";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { TenantConfigProvider } from "@/app/providers/tenant-config-provider";
@@ -30,7 +33,7 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, needsPassword } = useAuth();
+  const { isAuthenticated, needsPassword, activeBusinessId } = useAuth();
   const { pathname } = useLocation();
   const { t } = useI18n();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
@@ -43,6 +46,9 @@ function AppShell() {
     return <OnboardingPage />;
   }
 
+  // Needs no business, and handles the signed-out case itself.
+  if (pathname === "/accept-invitation") return <AcceptInvitationPage />;
+
   // Route guard: unauthenticated users land on /login with no sidebar or top
   // bar. /signup is the one other door in — without this exception the
   // "Create Account" link would bounce straight back to sign-in.
@@ -52,9 +58,9 @@ function AppShell() {
     return <Navigate to="/login" replace />;
   }
 
-  // An authenticated user has no business on the sign-in or signup screens.
+  // Every sign-in lands on the business picker, even with a single business.
   if (pathname === "/login" || pathname === "/signup") {
-    return <Navigate to="/" replace />;
+    return <Navigate to={hasPendingInvitation() ? "/accept-invitation" : "/select-business"} replace />;
   }
 
   // Skipped the password at signup — block the shell until one is set,
@@ -62,6 +68,13 @@ function AppShell() {
   if (needsPassword) {
     return <SetPasswordPage />;
   }
+
+  if (pathname === "/select-business") return <SelectBusinessPage />;
+  if (pathname === "/select-business/new") return <NewBusinessPage />;
+
+  // Every tenant-scoped request needs the business token minted when a business
+  // is picked, so the console itself is unreachable until one is.
+  if (!activeBusinessId) return <Navigate to="/select-business" replace />;
 
   return (
     // The shell paints the page surface every routed page sits on. It has to

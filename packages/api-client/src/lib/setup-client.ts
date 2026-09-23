@@ -19,8 +19,10 @@ import type {
   UpdateIntegrationAddOnsRequest,
   UpdateModulesRequest,
   VariantOfferingsResponse,
+  SetupProblemExtensions,
 } from "../contracts/setup";
-import { apiRequest } from "./http";
+import { OPEN_SETUP_STATUS_FILTER } from "../contracts/setup";
+import { ApiError, apiRequest, type ProblemDetails } from "./http";
 
 // ---- Onboarding catalog (read-only) ---------------------------------------
 
@@ -48,8 +50,20 @@ export function startBusinessSetup(): Promise<BusinessSetupResponse> {
   return apiRequest<BusinessSetupResponse>("/v1/business-setups", { method: "POST" });
 }
 
-export function listBusinessSetups(status?: string): Promise<BusinessSetupListResponse> {
+/** The caller's unfinished (Draft / AwaitingPayment) setup — zero or one item.
+ *  The backend requires `status=open` and 422s any other filter or none. */
+export function listBusinessSetups(
+  status: typeof OPEN_SETUP_STATUS_FILTER = OPEN_SETUP_STATUS_FILTER
+): Promise<BusinessSetupListResponse> {
   return apiRequest<BusinessSetupListResponse>("/v1/business-setups", { query: { status } });
+}
+
+/** Reads the Onboarding problem+json extension members (`issues`, `quote`,
+ *  `setupStatus`, ...) off an ApiError's problem body; the shared
+ *  ProblemDetails type does not model per-module extensions. */
+export function readSetupProblem(err: unknown): SetupProblemExtensions {
+  if (!(err instanceof ApiError) || !err.problem) return {};
+  return err.problem as ProblemDetails & SetupProblemExtensions;
 }
 
 export function getBusinessSetup(setupId: string): Promise<BusinessSetupResponse> {
@@ -76,6 +90,9 @@ export function setIntegrationAddOns(setupId: string, request: UpdateIntegration
   return apiRequest<BusinessSetupResponse>(`${setupBase(setupId)}/integration-add-ons`, { method: "PUT", body: request });
 }
 
+/** Allowed while Draft, or AwaitingPayment with a spent/under-review attempt
+ *  (see `allowedActions`). Does NOT cancel a live provider checkout — that is
+ *  cancelCheckout's job. Repeating is an unchanged 200. */
 export function cancelBusinessSetup(setupId: string): Promise<BusinessSetupResponse> {
   return apiRequest<BusinessSetupResponse>(`${setupBase(setupId)}/cancel`, { method: "POST" });
 }
@@ -91,12 +108,17 @@ export function confirmCheckout(setupId: string): Promise<BusinessSetupResponse>
   return apiRequest<BusinessSetupResponse>(`${setupBase(setupId)}/checkout/confirm`, { method: "POST" });
 }
 
+/** AwaitingPayment -> Draft. 409 onboarding.checkout.already-paid when the
+ *  provider reports the attempt paid (the setup is then Paid — reload it);
+ *  409 onboarding.checkout.not-in-progress when nothing is in flight. */
 export function cancelCheckout(setupId: string): Promise<BusinessSetupResponse> {
   return apiRequest<BusinessSetupResponse>(`${setupBase(setupId)}/checkout/cancel`, { method: "POST" });
 }
 
 // ---- Businesses (read-only from here — creation happens via setup+checkout) ----
 
+/** Works with either token (verified: a business token is accepted here), so
+ *  the shared auto-refresh applies as for any other call. */
 export function listBusinesses(): Promise<BusinessListResponse> {
   return apiRequest<BusinessListResponse>("/v1/businesses");
 }

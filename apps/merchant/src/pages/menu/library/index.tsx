@@ -3,7 +3,7 @@
 // is threaded through now so the card's contract does not change later.
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, FolderDown, Info, Search, Sparkles, Plus } from "lucide-react";
+import { CalendarDays, FolderDown, Info, Search, Settings2, Sparkles, Plus } from "lucide-react";
 import { Button, Input, Modal, Select } from "@ui/primitives";
 import {
   DEFAULT_FILTERS,
@@ -22,9 +22,16 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { MenuCard, type CardAction } from "./menu-card";
 import { ActionsMenu } from "./actions-menu";
 import { ScheduleModal } from "./schedule-modal";
+import { VersionsModal } from "./versions-modal";
+import { AccessCodesModal } from "./access-codes-modal";
+import { BulkPriceModal } from "./bulk-price-modal";
+import { BulkTextModal } from "./bulk-text-modal";
+import { MenuSettingsModal } from "./menu-settings-modal";
+import { useMenuCopy } from "../copy";
 
 export function MenuLibraryPage() {
   const { t, locale } = useI18n();
+  const c = useMenuCopy();
   const today = new Date().toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
     weekday: "short",
     month: "short",
@@ -32,11 +39,19 @@ export function MenuLibraryPage() {
     year: "numeric",
   });
   const navigate = useNavigate();
-  const { menus, setMenus } = useMenuLibrary();
+  const lib = useMenuLibrary();
+  const { menus, setMenus } = lib;
+  const [actionError, setActionError] = useState<string | null>(null);
   const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
   const [actionsFor, setActionsFor] = useState<{ menu: Menu; anchor: DOMRect } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Menu | null>(null);
+  const [confirmUnpublish, setConfirmUnpublish] = useState<Menu | null>(null);
   const [scheduleFor, setScheduleFor] = useState<Menu | null>(null);
+  const [versionsFor, setVersionsFor] = useState<Menu | null>(null);
+  const [accessCodeFor, setAccessCodeFor] = useState<Menu | null>(null);
+  const [bulkPriceFor, setBulkPriceFor] = useState<Menu | null>(null);
+  const [bulkTextOpen, setBulkTextOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const visible = useMemo(() => filterMenus(menus, filters), [menus, filters]);
   const branchLabel =
@@ -44,6 +59,15 @@ export function MenuLibraryPage() {
 
   function patch(next: Partial<LibraryFilters>) {
     setFilters((current) => ({ ...current, ...next }));
+  }
+
+  async function guard(p: Promise<unknown>) {
+    setActionError(null);
+    try {
+      await p;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "error");
+    }
   }
 
   // Every kebab choice routes through here rather than each menu item owning
@@ -61,17 +85,31 @@ export function MenuLibraryPage() {
       case "schedule":
         setScheduleFor(menu);
         return;
+      case "versions":
+        setVersionsFor(menu);
+        return;
+      case "accessCode":
+        setAccessCodeFor(menu);
+        return;
+      case "bulkPrice":
+        setBulkPriceFor(menu);
+        return;
       case "hold":
-        setMenus(setMenuStatus(menus, menu.id, "on-hold", now));
+        void guard(lib.hold(menu));
         return;
       case "resume":
-        setMenus(setMenuStatus(menus, menu.id, "active", now));
+        void guard(lib.release(menu));
         return;
       case "duplicate":
-        setMenus(duplicateMenu(menus, menu.id, `${menu.id}-copy-${Date.now()}`, now));
+        void guard(lib.duplicate(menu));
+        return;
+      case "unpublish":
+        // Takes the menu offline everywhere it's live — confirm before doing it,
+        // same as delete.
+        setConfirmUnpublish(menu);
         return;
       case "archive":
-        setMenus(setMenuStatus(menus, menu.id, "archived", now));
+        void guard(menu.status === "archived" ? lib.restore(menu) : lib.archive(menu));
         return;
       case "delete":
         // Never deletes straight from the kebab — the confirm owns that.
@@ -95,6 +133,22 @@ export function MenuLibraryPage() {
             <CalendarDays size={15} className="text-[var(--octo-text-muted)]" aria-hidden />
             {today}
           </span>
+          <Button
+            variant="secondary"
+            onClick={() => setSettingsOpen(true)}
+            icon={<Settings2 size={18} aria-hidden />}
+            className="h-11 px-4 text-[15px] font-semibold"
+          >
+            {c("settings.open")}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setBulkTextOpen(true)}
+            icon={<Search size={18} aria-hidden />}
+            className="h-11 px-4 text-[15px] font-semibold"
+          >
+            {t("bulkText.openButton")}
+          </Button>
           <Button
             variant="secondary"
             onClick={() => navigate("/menu/import")}
@@ -161,6 +215,17 @@ export function MenuLibraryPage() {
         </Select>
       </div>
 
+      {(lib.error || actionError) && (
+        <div role="alert" className="mt-4 flex items-center justify-between rounded-[10px] bg-error/10 px-4 py-3 text-[14px] text-error">
+          <span>{actionError ?? lib.error}</span>
+          {lib.error && (
+            <button type="button" className="underline" onClick={lib.reload}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
+
       {visible.length === 0 ? (
         menus.length === 0 ? (
           // A first-run merchant, or one who deleted everything. The spec asks
@@ -215,16 +280,20 @@ export function MenuLibraryPage() {
         menus={menus}
         onClose={() => setScheduleFor(null)}
         onSave={(schedule: MenuSchedule, channels: Menu["channels"]) => {
-          if (scheduleFor) {
-            const now = new Date().toISOString();
-            const rescheduled = setMenuSchedule(menus, scheduleFor.id, schedule, now);
-            setMenus(
-              rescheduled.map((m) => (m.id === scheduleFor.id ? { ...m, channels } : m))
-            );
-          }
+          if (scheduleFor) void guard(lib.setSchedule(scheduleFor, schedule, channels));
           setScheduleFor(null);
         }}
       />
+
+      <VersionsModal menu={versionsFor} onClose={() => setVersionsFor(null)} onRepublished={lib.reload} />
+
+      <AccessCodesModal menu={accessCodeFor} onClose={() => setAccessCodeFor(null)} />
+
+      <BulkPriceModal menu={bulkPriceFor} onClose={() => setBulkPriceFor(null)} />
+
+      <BulkTextModal open={bulkTextOpen} onClose={() => setBulkTextOpen(false)} />
+
+      <MenuSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <Modal
         open={confirmDelete !== null}
@@ -238,7 +307,7 @@ export function MenuLibraryPage() {
             <Button
               variant="danger"
               onClick={() => {
-                if (confirmDelete) setMenus(deleteMenu(menus, confirmDelete.id));
+                if (confirmDelete) void guard(lib.remove(confirmDelete));
                 setConfirmDelete(null);
               }}
             >
@@ -249,6 +318,32 @@ export function MenuLibraryPage() {
       >
         <p className="text-[14px] text-[var(--octo-text-secondary)]">
           {t("menuLib.confirmDelete.body").replace("{name}", confirmDelete?.name ?? "")}
+        </p>
+      </Modal>
+
+      <Modal
+        open={confirmUnpublish !== null}
+        onClose={() => setConfirmUnpublish(null)}
+        title={t("menuLib.confirmUnpublish.title")}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmUnpublish(null)}>
+              {t("menuLib.confirmUnpublish.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirmUnpublish) void guard(lib.unpublish(confirmUnpublish));
+                setConfirmUnpublish(null);
+              }}
+            >
+              {t("menuLib.confirmUnpublish.confirm")}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-[14px] text-[var(--octo-text-secondary)]">
+          {t("menuLib.confirmUnpublish.body").replace("{name}", confirmUnpublish?.name ?? "")}
         </p>
       </Modal>
     </div>

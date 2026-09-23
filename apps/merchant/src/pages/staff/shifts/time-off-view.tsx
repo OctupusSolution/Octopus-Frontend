@@ -1,16 +1,47 @@
 import { useEffect, useState } from "react";
-import { CalendarOff, SquarePen } from "lucide-react";
+import { CalendarOff, ListChecks, SquarePen } from "lucide-react";
 import clsx from "clsx";
+import { createTimeOffType, deleteTimeOffType, updateTimeOffType } from "@octopus/api-client";
 import { EmptyState, Modal } from "@ui/primitives";
-import { LEAVE_TYPES, TODAY, type LeaveType } from "@/shared/api/mock-staff";
+import { TODAY } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "../_shared/avatar";
 import { buttonClass } from "../_shared/buttons";
 import { Field, SelectInput, TextInput } from "../_shared/form";
 import { formatShortDate } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
-import { useStaffStore, type LeaveStatus } from "../_shared/staff-store";
+import { useCatalogNames } from "../_shared/catalog-names";
+import { useStaffStore, type LeaveRequest, type LeaveStatus } from "../_shared/staff-store";
 import { ToastBanner, useToast } from "../_shared/toast";
+import { CatalogEditor, type CatalogApi } from "../_shared/catalog-editor";
+import { StatusPill } from "../_shared/status-pill";
+import { Switch } from "../_shared/switch";
+import { useLocalName, useTx } from "../_shared/text";
+
+const TIME_OFF_TYPES_API: CatalogApi = { create: createTimeOffType, update: updateTimeOffType, remove: deleteTimeOffType };
+
+/** Kinds of time off: PUT / DELETE /time-off/types/{id} (and create). */
+function TimeOffTypesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const tx = useTx();
+  const store = useStaffStore();
+  return (
+    <Modal open={open} onClose={onClose} title={tx("Leave types", "أنواع الإجازات")} className="max-w-2xl">
+      <p className="-mt-1 mb-4 text-[13px] text-[var(--octo-text-secondary)]">
+        {tx(
+          "Deactivating a type stops new requests of that kind and keeps every absence already recorded against it.",
+          "تعطيل النوع يمنع الطلبات الجديدة منه ويحافظ على كل الإجازات المسجلة به."
+        )}
+      </p>
+      <CatalogEditor
+        rows={store.timeOffTypes}
+        api={TIME_OFF_TYPES_API}
+        onChanged={store.reloadTimeOffTypes}
+        addLabel={tx("Add type", "إضافة نوع")}
+        emptyText={tx("No leave types yet. Add Annual, Sick or whatever your business offers.", "لا توجد أنواع إجازات بعد. أضف سنوية أو مرضية أو ما يقدمه نشاطك.")}
+      />
+    </Modal>
+  );
+}
 
 const STATUS_TEXT: Record<LeaveStatus, string> = {
   pending: "text-[var(--octo-text-primary)]",
@@ -18,41 +49,63 @@ const STATUS_TEXT: Record<LeaveStatus, string> = {
   rejected: "text-[var(--octo-tone-danger-text)]",
 };
 
-type Errors = { employee?: string; start?: string; end?: string };
+type Errors = { employee?: string; type?: string; start?: string; end?: string };
 
 function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (name: string) => void }) {
   const { t } = useI18n();
+  const tx = useTx();
+  const localName = useLocalName();
   const store = useStaffStore();
+  const activeTypes = store.timeOffTypes.filter((ty) => ty.isActive);
   const [employeeId, setEmployeeId] = useState("");
-  const [type, setType] = useState<LeaveType>("Annual");
+  const [typeId, setTypeId] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [grant, setGrant] = useState(false);
+  const [note, setNote] = useState("");
   const [errors, setErrors] = useState<Errors>({});
 
   useEffect(() => {
     if (!open) return;
     setEmployeeId("");
-    setType("Annual");
+    setTypeId(activeTypes[0]?.id ?? "");
     setStart("");
     setEnd("");
+    setGrant(false);
+    setNote("");
     setErrors({});
+    // Seed each time the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const submit = () => {
     const next: Errors = {};
     if (!employeeId) next.employee = t("staff.validation.required");
+    const type = activeTypes.find((ty) => ty.id === typeId);
+    if (!type) next.type = activeTypes.length ? t("staff.validation.required") : tx("Add a leave type first.", "أضف نوع إجازة أولًا.");
     if (!start) next.start = t("staff.validation.required");
     if (!end) next.end = t("staff.validation.required");
     else if (start && end < start) next.end = t("staff.validation.dateRange");
-    if (Object.keys(next).length) {
+    if (Object.keys(next).length || !type) {
       setErrors(next);
       return;
     }
     const employee = store.employees.find((e) => e.id === employeeId)!;
-    store.setLeaveRequests((prev) => [
-      { id: `LR-${Date.now().toString(36)}`, employeeId, employeeName: employee.name, type, start, end, status: "pending" },
-      ...prev,
-    ]);
+    const request: LeaveRequest = {
+      id: `LR-${Date.now().toString(36)}`,
+      employeeId,
+      employeeName: employee.name,
+      typeId: type.id,
+      type: type.nameEn,
+      typeAr: type.nameAr,
+      start,
+      end,
+      // A grant (POST /time-off/grants) is approved on creation and stays marked as given.
+      status: grant ? "approved" : "pending",
+      origin: grant ? "DirectGrant" : "RaisedOnBehalf",
+      note: grant ? note : undefined,
+    };
+    store.setLeaveRequests((prev) => [request, ...prev]);
     onAdded(employee.name);
     onClose();
   };
@@ -75,10 +128,11 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
             ))}
           </SelectInput>
         </Field>
-        <Field label={t("staff.timeOff.type")} htmlFor="to-type" required>
-          <SelectInput id="to-type" value={type} onChange={(e) => setType(e.target.value as LeaveType)}>
-            {LEAVE_TYPES.map((lt) => (
-              <option key={lt} value={lt}>{t(`staff.timeOffType.${lt.toLowerCase()}`)}</option>
+        <Field label={t("staff.timeOff.type")} htmlFor="to-type" required error={errors.type}>
+          <SelectInput id="to-type" value={typeId} invalid={!!errors.type} onChange={(e) => { setTypeId(e.target.value); setErrors((p) => ({ ...p, type: undefined })); }}>
+            {activeTypes.length === 0 && <option value="">{tx("No leave types yet", "لا توجد أنواع إجازات")}</option>}
+            {activeTypes.map((ty) => (
+              <option key={ty.id} value={ty.id}>{localName(ty)}</option>
             ))}
           </SelectInput>
         </Field>
@@ -88,8 +142,22 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
         <Field label={t("staff.timeOff.endDate")} htmlFor="to-end" required error={errors.end}>
           <TextInput id="to-end" type="date" value={end} min={start || TODAY} invalid={!!errors.end} onChange={(e) => { setEnd(e.target.value); setErrors((p) => ({ ...p, end: undefined })); }} />
         </Field>
+        <div className="flex flex-col gap-2 rounded-[10px] bg-[var(--octo-hover)] px-3 py-3">
+          <label className="flex cursor-pointer items-center gap-3">
+            <Switch checked={grant} onChange={setGrant} label={tx("Grant directly", "منح مباشر")} />
+            <span className="min-w-0">
+              <span className="block text-[14px] font-medium text-[var(--octo-text-primary)]">{tx("Grant directly (approved now)", "منح مباشر (معتمد فورًا)")}</span>
+              <span className="block text-[12px] text-[var(--octo-text-secondary)]">
+                {tx("Recorded as given by you rather than requested. Shifts it covers are not cancelled.", "يُسجَّل كمنحة منك وليس كطلب. لا تُلغى الورديات التي يغطيها.")}
+              </span>
+            </span>
+          </label>
+          {grant && (
+            <TextInput value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder={tx("Note (optional)", "ملاحظة (اختياري)")} aria-label={tx("Note", "ملاحظة")} />
+          )}
+        </div>
         <button type="submit" className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
-          {t("staff.timeOff.add")}
+          {grant ? tx("Grant time off", "منح الإجازة") : t("staff.timeOff.add")}
         </button>
       </form>
     </Modal>
@@ -99,10 +167,13 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
 export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenChange: (open: boolean) => void }) {
   const { t, locale } = useI18n();
   const labels = useStaffLabels();
+  const names = useCatalogNames();
   const store = useStaffStore();
   const { toast, notify } = useToast();
+  const tx = useTx();
+  const [typesOpen, setTypesOpen] = useState(false);
 
-  const typeLabel = (value: LeaveType) => t(`staff.timeOffType.${value.toLowerCase()}`);
+  const typeLabel = (r: LeaveRequest) => (locale === "ar" ? r.typeAr || r.type : r.type || r.typeAr);
 
   const decide = (id: string, status: Exclude<LeaveStatus, "pending">) => {
     const request = store.leaveRequests.find((r) => r.id === id);
@@ -111,7 +182,7 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
     notify(
       t(status === "approved" ? "staff.timeOff.toastApproved" : "staff.timeOff.toastRejected")
         .replace("{employee}", request.employeeName)
-        .replace("{type}", typeLabel(request.type))
+        .replace("{type}", typeLabel(request))
     );
   };
 
@@ -119,6 +190,12 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
 
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <button type="button" onClick={() => setTypesOpen(true)} className={buttonClass("outline", "md")}>
+          <ListChecks size={18} aria-hidden />
+          {tx("Leave types", "أنواع الإجازات")} ({store.timeOffTypes.length})
+        </button>
+      </div>
       {store.leaveRequests.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
           <EmptyState icon={<CalendarOff size={18} />} title={t("staff.timeOff.emptyTitle")} description={t("staff.timeOff.emptyDescription")} />
@@ -153,11 +230,14 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
                         <Avatar name={r.employeeName} size={44} />
                         <span className="min-w-0">
                           <span className="block truncate font-medium text-[var(--octo-text-primary)]">{r.employeeName}</span>
-                          {profile && <span className="block truncate text-[13px] text-[#0D6EFD]">{labels.data("staff.jobTitle", profile.jobTitle)}</span>}
+                          {profile && <span className="block truncate text-[13px] text-[#0D6EFD]">{names.jobTitle(profile.jobTitle)}</span>}
                         </span>
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{typeLabel(r.type)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">
+                      {typeLabel(r)}
+                      {r.origin === "DirectGrant" && <StatusPill className="ms-2" tone="info" label={tx("Granted", "ممنوحة")} />}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{formatShortDate(r.start, locale)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{formatShortDate(r.end, locale)}</td>
                     <td className={clsx("whitespace-nowrap px-3 py-3 text-center font-medium", STATUS_TEXT[r.status])}>
@@ -200,6 +280,8 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
         onClose={() => onAddOpenChange(false)}
         onAdded={(name) => notify(t("staff.timeOff.toastAdded").replace("{employee}", name))}
       />
+
+      <TimeOffTypesModal open={typesOpen} onClose={() => setTypesOpen(false)} />
 
       <ToastBanner toast={toast} />
     </div>

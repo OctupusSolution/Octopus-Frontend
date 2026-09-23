@@ -1,10 +1,11 @@
 // apps/merchant/src/pages/orders-list/index.tsx
 import { useMemo, useState } from "react";
-import { CalendarDays, Download, Search } from "lucide-react";
-import { useLiveOrders } from "@/shared/api/live-orders";
+import { CalendarDays, Download, Plus, Search, Settings } from "lucide-react";
+import type { DuplicateOrderTemplateResponse } from "@octopus/api-client";
+import { mapRealOrderToRecord, mapRealOrdersToRecords, OrderErrorNote, useOrderText, useRealOrders } from "@/entities/order";
+import { NewOrderModal } from "@/features/order/take-order";
+import { OrderSettingsModal } from "@/features/order/order-settings";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { orderRecords } from "./_shared/mock-data";
-import { mapLiveOrdersToRecords } from "./_shared/live-orders-bridge";
 import { computeOrderStats, pillCount } from "./_shared/stats";
 import { OrdersStatCards } from "./_shared/stat-cards";
 import { OrderFilterPills } from "./_shared/filter-pills";
@@ -18,6 +19,7 @@ import { CancelOrderFlow } from "./_shared/cancel-order-flow";
 import { VoidOrderFlow } from "./_shared/void-order-flow";
 import { WastageOrderFlow } from "./_shared/wastage-order-flow";
 import { RefundOrderFlow } from "./_shared/refund-order-flow";
+import { RecordPaymentFlow } from "./_shared/record-payment-flow";
 import type { OrderAction } from "./_shared/theme";
 import type { OrderRecord, OrderSource, OrderState } from "./_shared/types";
 
@@ -41,7 +43,17 @@ const PAGE_SIZE = 10;
 
 export function OrdersListPage() {
   const { t } = useI18n();
-  const { orders: liveOrders } = useLiveOrders();
+  const { tx } = useOrderText();
+  const {
+    orders: realOrders,
+    refresh: refreshRealOrders,
+    loading: ordersLoading,
+    error: ordersError,
+    unavailable: ordersUnavailable,
+  } = useRealOrders();
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  const [reorderTemplate, setReorderTemplate] = useState<DuplicateOrderTemplateResponse | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedState, setSelectedState] = useState<OrderState | null>(null);
   const [selectedSources, setSelectedSources] = useState<readonly OrderSource[]>([]);
@@ -50,9 +62,16 @@ export function OrdersListPage() {
   const [detailsOrder, setDetailsOrder] = useState<OrderRecord | null>(null);
   const [pendingAction, setPendingAction] = useState<{ action: OrderAction; order: OrderRecord } | null>(null);
 
-  // Live customer orders lead, seeded rows follow — same precedence the
-  // page used before this rebuild.
-  const allRecords = useMemo(() => [...mapLiveOrdersToRecords(liveOrders), ...orderRecords], [liveOrders]);
+  // Real orders only (US-018, AdminApi): today's plus every one still open.
+  // The seeded demo rows and the mock-api "live" customer orders are gone
+  // now that the real module feeds this page.
+  const allRecords = useMemo(() => mapRealOrdersToRecords(realOrders), [realOrders]);
+  // The detail modal follows the polled list, so it never shows a stale version.
+  const openDetails = useMemo(() => {
+    const realId = detailsOrder?.real?.orderId;
+    if (!realId) return detailsOrder;
+    return allRecords.find((record) => record.real?.orderId === realId) ?? detailsOrder;
+  }, [detailsOrder, allRecords]);
 
   const visibleRows = useMemo(() => {
     return allRecords.filter((order) => {
@@ -99,17 +118,47 @@ export function OrdersListPage() {
             </h1>
             <p className="mt-1 text-[12.5px] text-[var(--octo-text-muted)] sm:text-[13px]">{t("orders.subtitle")}</p>
           </div>
-          <span className="flex items-center gap-2 rounded-[9px] bg-[var(--octo-hover)] px-3 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-secondary)]">
-            <CalendarDays size={15} className="text-[var(--octo-text-muted)]" />
-            {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-2 rounded-[9px] bg-[var(--octo-hover)] px-3 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-secondary)]">
+              <CalendarDays size={15} className="text-[var(--octo-text-muted)]" />
+              {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+            >
+              <Settings size={15} className="text-[var(--octo-text-muted)]" />
+              {tx("page.settings")}
+            </button>
+            <button
+              type="button"
+              disabled={ordersUnavailable}
+              onClick={() => {
+                setReorderTemplate(null);
+                setNewOrderOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-[9px] bg-[#0D6EFD] px-3.5 py-[8px] text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus size={15} />
+              {tx("page.newOrder")}
+            </button>
+          </div>
         </header>
+
+        {ordersUnavailable ? (
+          <OrderErrorNote message={tx("page.unavailable")} />
+        ) : (
+          ordersError && <OrderErrorNote message={tx("page.loadFailed").replace("{message}", ordersError)} />
+        )}
 
         <div className="mt-4">
           <OrdersStatCards stats={stats} />
         </div>
 
-        {hasNoOrdersAtAll ? (
+        {ordersLoading && hasNoOrdersAtAll ? (
+          <p className="py-16 text-center text-[13px] text-[var(--octo-text-muted)]">{tx("common.loading")}</p>
+        ) : hasNoOrdersAtAll ? (
           <div className="flex flex-col items-center px-4 py-16 text-center">
             <EmptyOrdersArt className="h-[168px] w-[196px] text-[var(--octo-crumb)]" />
             <h2 className="mt-6 text-[17px] font-bold text-[var(--octo-text-primary)]">{t("orders.empty.title")}</h2>
@@ -220,29 +269,57 @@ export function OrdersListPage() {
       </div>
 
       <OrderDetailsModal
-        order={detailsOrder}
+        order={openDetails}
         onClose={() => setDetailsOrder(null)}
         onAction={(action, order) => {
           setDetailsOrder(null);
           setPendingAction({ action, order });
         }}
+        onChanged={refreshRealOrders}
+        onReorder={(template) => {
+          setDetailsOrder(null);
+          setReorderTemplate(template);
+          setNewOrderOpen(true);
+        }}
       />
+
+      <NewOrderModal
+        open={newOrderOpen}
+        template={reorderTemplate}
+        onClose={() => setNewOrderOpen(false)}
+        onCreated={(order) => {
+          setNewOrderOpen(false);
+          setReorderTemplate(null);
+          refreshRealOrders();
+          setDetailsOrder(mapRealOrderToRecord(order));
+        }}
+      />
+      <OrderSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <CancelOrderFlow
         order={pendingAction?.action === "cancel" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
+        onSuccess={refreshRealOrders}
       />
       <VoidOrderFlow
         order={pendingAction?.action === "void" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
+        onSuccess={refreshRealOrders}
       />
       <WastageOrderFlow
         order={pendingAction?.action === "wastage" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
+        onSuccess={refreshRealOrders}
       />
       <RefundOrderFlow
         order={pendingAction?.action === "refund" ? pendingAction.order : null}
         onClose={() => setPendingAction(null)}
+        onSuccess={refreshRealOrders}
+      />
+      <RecordPaymentFlow
+        order={pendingAction?.action === "payment" ? pendingAction.order : null}
+        onClose={() => setPendingAction(null)}
+        onSuccess={refreshRealOrders}
       />
     </>
   );

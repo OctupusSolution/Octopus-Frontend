@@ -13,6 +13,7 @@ import { Checkbox, Select } from "@ui/primitives";
 import type { Item, ModifierGroup, ModifierOption } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { ModifierGroupModal, ModifierOptionModal, Switch } from "./modifier-modals";
+import { useMenuCopy } from "../../copy";
 
 const inputClass =
   "mt-2 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14.5px] text-[var(--octo-text-primary)]";
@@ -171,6 +172,7 @@ export function TabModifiers({
   onUpdateOption,
   onMoveGroup,
   onMoveOption,
+  onReuseGroup,
 }: {
   item: Item;
   selectedGroupId: string | null;
@@ -185,8 +187,11 @@ export function TabModifiers({
   onUpdateOption?: (groupId: string, optionId: string, patch: Partial<ModifierOption>) => void;
   onMoveGroup?: (from: number, to: number) => void;
   onMoveOption?: (groupId: string, from: number, to: number) => void;
+  /** Opens the picker of the business's existing groups (shared, not copied). */
+  onReuseGroup?: () => void;
 }) {
   const { t } = useI18n();
+  const reuseLabel = useMenuCopy()("groups.reuse");
   const [groupModal, setGroupModal] = useState(false);
   // null = closed, "new" = adding, otherwise the option being edited.
   const [optionModal, setOptionModal] = useState<"new" | ModifierOption | null>(null);
@@ -276,6 +281,16 @@ export function TabModifiers({
           <Plus size={18} aria-hidden />
           {t("menuWiz.mod.addGroup")}
         </button>
+        {onReuseGroup && (
+          <button
+            type="button"
+            onClick={onReuseGroup}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-[8px] px-4 py-2 text-[14px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-selected)]"
+          >
+            <Layers size={16} aria-hidden />
+            {reuseLabel}
+          </button>
+        )}
       </section>
 
       <div className="space-y-4">

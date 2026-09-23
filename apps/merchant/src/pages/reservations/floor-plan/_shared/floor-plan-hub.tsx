@@ -4,17 +4,22 @@
 // away.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FilePen, LayoutTemplate, Pencil, SquareDashedBottom } from "lucide-react";
+import { FilePen, History, LayoutTemplate, Pencil, Settings2, SquareDashedBottom } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { FLOOR_PLAN_ASSETS } from "@/shared/lib/floor-plan-assets";
+import { useAdminText } from "./admin-text";
 import { ConfirmModal } from "./confirm-modal";
 import { DraftBanner } from "./draft-banner";
 import { MethodCards, type BuildMethod } from "./method-cards";
 import { PageHeader, PageShell } from "./page-header";
 import { QUICK_BOX_PATH, SCRATCH_PATH, scratchPath, type ScratchSource } from "./paths";
 import { PlanSummaryCard } from "./plan-summary-card";
+import { PlansPanel } from "./plans-panel";
+import { FloorPlanSettingsModal } from "./settings-modal";
+import { ToastBanner, useToast } from "./toast";
 import { WatchTutorialButton } from "./tutorial";
 import { useFloorPlan } from "./use-floor-plan";
+import { FloorPlanVersionsModal } from "./versions-modal";
 
 type Pending =
   | { kind: "replaceDraft"; method: Exclude<BuildMethod, "ai">; source?: ScratchSource }
@@ -24,8 +29,12 @@ type Pending =
 export function FloorPlanHub() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { draft, published, discardDraft } = useFloorPlan();
+  const at = useAdminText();
+  const { draft, published, discardDraft, listVersions, restoreVersion, getVersion, rollbackVersion, activePlanId, switchPlan, reload } = useFloorPlan();
   const [pending, setPending] = useState<Pending | null>(null);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { toast, notify } = useToast();
 
   function openEditor(method: Exclude<BuildMethod, "ai">, source?: ScratchSource) {
     navigate(method === "quick" ? QUICK_BOX_PATH : scratchPath(source ?? "blank"));
@@ -61,7 +70,25 @@ export function FloorPlanHub() {
 
   return (
     <PageShell>
-      <PageHeader title={t("floorPlan.hub.title")} subtitle={t("floorPlan.hub.subtitle")} aside={<WatchTutorialButton />} />
+      <PageHeader
+        title={t("floorPlan.hub.title")}
+        subtitle={t("floorPlan.hub.subtitle")}
+        aside={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              aria-label={at("settings.open")}
+              title={at("settings.open")}
+              className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3.5 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+            >
+              <Settings2 size={16} />
+              <span className="hidden sm:inline">{at("settings.open")}</span>
+            </button>
+            <WatchTutorialButton />
+          </div>
+        }
+      />
 
       {draft && <DraftBanner className="mt-6" draft={draft} onContinue={continueDraft} onDiscard={() => setPending({ kind: "discard" })} />}
 
@@ -73,14 +100,24 @@ export function FloorPlanHub() {
             draft={draft}
             action={
               published ? (
-                <button
-                  type="button"
-                  onClick={editLive}
-                  className="flex h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-[#0D6EFD] px-5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
-                >
-                  <Pencil size={16} />
-                  {t("floorPlan.live.edit")}
-                </button>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => setVersionsOpen(true)}
+                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-4 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                  >
+                    <History size={16} />
+                    {t("floorPlan.versions.open")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={editLive}
+                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#0D6EFD] px-5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
+                  >
+                    <Pencil size={16} />
+                    {t("floorPlan.live.edit")}
+                  </button>
+                </div>
               ) : undefined
             }
           />
@@ -98,6 +135,14 @@ export function FloorPlanHub() {
           <MethodCards className="mt-10" onStart={start} />
         </>
       )}
+
+      <PlansPanel
+        className="mt-9"
+        activePlanId={activePlanId}
+        onSwitch={switchPlan}
+        onActiveChanged={(removed) => (removed ? switchPlan(null) : reload())}
+        notify={notify}
+      />
 
       <ConfirmModal
         open={pending?.kind === "replaceDraft"}
@@ -178,6 +223,17 @@ export function FloorPlanHub() {
           },
         ]}
       />
+
+      <FloorPlanVersionsModal
+        open={versionsOpen}
+        onClose={() => setVersionsOpen(false)}
+        listVersions={listVersions}
+        onRestore={restoreVersion}
+        getVersion={getVersion}
+        onRollback={rollbackVersion}
+      />
+      <FloorPlanSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={(message) => notify(message)} />
+      <ToastBanner toast={toast} />
     </PageShell>
   );
 }

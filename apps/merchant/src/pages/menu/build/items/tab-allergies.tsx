@@ -1,13 +1,16 @@
 // The Allergies tab: which allergens this dish carries, plus free text for the
 // things a checkbox cannot say ("fried in the same oil as shellfish").
 import { useState } from "react";
-import { Check, Plus } from "lucide-react";
+import { Check, Plus, Tags } from "lucide-react";
 import { Button, Modal } from "@ui/primitives";
-import type { Item } from "@/entities/menu";
+import { useMenuLabels, type Item } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { LabelsManager, useLabelName } from "../../labels-manager";
+import { useMenuCopy } from "../../copy";
 
 // The three the frame shows are listed by default; `Add Allergens` offers the
-// rest. Anything already on the item is rendered whether or not it appears
+// rest — the business's Advisory labels (GET /menu/labels, seeded + its own)
+// when they can be read, this fixed list only as the fallback. Anything already on the item is rendered whether or not it appears
 // here, so an allergen set elsewhere is never silently dropped.
 const DEFAULT_ROWS = ["gluten", "eggs", "dairy"] as const;
 const KNOWN = [
@@ -44,17 +47,25 @@ export function TabAllergies({
   onPatch: (patch: Partial<Item>) => void;
 }) {
   const { t } = useI18n();
+  const c = useMenuCopy();
+  const labelName = useLabelName();
+  const labels = useMenuLabels();
+  const [manageOpen, setManageOpen] = useState(false);
+  const advisories = (labels.data ?? []).filter((l) => l.kind === "Advisory");
+  const known: readonly string[] = advisories.length > 0 ? advisories.map((l) => l.code) : KNOWN;
   const selected = item.allergies.allergens;
   // Rows the merchant pulled in from the picker but has not ticked yet stay
   // listed for this visit, so unticking one does not make it vanish mid-click.
   const [extraRows, setExtraRows] = useState<string[]>([]);
   const rows = Array.from(new Set<string>([...DEFAULT_ROWS, ...extraRows, ...selected]));
-  const available = KNOWN.filter((id) => !rows.includes(id));
+  const available = known.filter((id) => !rows.includes(id));
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
 
   function label(id: string) {
+    const server = advisories.find((l) => l.code === id);
+    if (server) return labelName(server);
     const key = `menuWiz.item.allergen.${id}`;
     const text = t(key);
     // Unknown ids (set by an import, say) have no key; show the raw id.
@@ -100,6 +111,20 @@ export function TabAllergies({
         <Plus size={20} aria-hidden />
         {t("menuWiz.item.addAllergens")}
       </button>
+      {labels.businessId && (
+        <button
+          type="button"
+          onClick={() => setManageOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
+        >
+          <Tags size={15} aria-hidden />
+          {c("labels.manage")}
+        </button>
+      )}
+
+      <Modal open={manageOpen} onClose={() => setManageOpen(false)} title={c("labels.manage")} className="max-w-[600px]">
+        <LabelsManager initialKind="Advisory" />
+      </Modal>
 
       <label className="block pt-1">
         <span className="text-[16px] font-medium text-[var(--octo-text-primary)]">

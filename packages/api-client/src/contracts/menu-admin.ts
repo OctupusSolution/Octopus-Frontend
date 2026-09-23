@@ -21,13 +21,14 @@ export interface LocalizedMap {
 }
 
 export interface MoneyDto {
-  amountMinor: number;
+  /** Major units (e.g. 25.5 SAR), a decimal — NOT minor units. */
+  amount: number;
   currency: string;
 }
 
 export interface MediaReferenceDto {
   assetId: string;
-  deliveryUrl: string;
+  kind: string;
 }
 
 export interface ChannelSelectionDto {
@@ -181,8 +182,13 @@ export interface DuplicateMenuRequest {
   name: LocalizedMap;
 }
 
+/** Serialized PascalCase (`MenuBuilderStep.ToString()`); parsed case-insensitively. */
+export type MenuBuilderStep = "Sections" | "Items" | "Theme" | "Review";
+
+/** No expectedVersion, no Idempotency-Key. 422 `menu.menu.builder-step-invalid`
+ *  for anything outside MenuBuilderStep. */
 export interface SaveBuilderProgressRequest {
-  step: string;
+  step: MenuBuilderStep;
 }
 
 // ---- Availability -----------------------------------------------------------
@@ -211,6 +217,10 @@ export interface AvailabilityTimelineResponse {
   entries: AvailabilityTimelineEntry[];
 }
 
+/** Configuration (`Menu:SchedulePresets`), not business rows — a code only.
+ *  A preset carries no windows of its own: `AvailabilityScheduleDto.presetCode`
+ *  just records which shortcut produced the windows, which stay required.
+ *  Needs the `menu:scheduling` feature (as do the timeline and item schedule). */
 export interface SchedulePresetResponse {
   code: string;
 }
@@ -220,7 +230,7 @@ export interface SchedulePresetResponse {
 export type SectionKind = "Items" | "Offers";
 
 export interface SectionPlacementDto {
-  placementId: string;
+  id: string;
   targetKind: string;
   targetId: string;
   position: number;
@@ -287,6 +297,8 @@ export interface PlaceEntriesRequest {
   expectedVersion: number | null;
 }
 
+/** At most 50 ids. Sections already holding the item are skipped. 200 with an
+ *  empty body; 422 `menu.section.kind-mismatch` for an Offers section. */
 export interface PlaceItemInSectionsRequest {
   sectionIds: string[];
 }
@@ -296,6 +308,8 @@ export interface ReorderPlacementsRequest {
   expectedVersion: number | null;
 }
 
+/** The route's `menuId` is never bound or checked server-side — the two
+ *  section ids locate the placement. 200 with an empty body. */
 export interface MovePlacementRequest {
   fromSectionId: string;
   placementId: string;
@@ -306,14 +320,16 @@ export interface MovePlacementRequest {
 
 export interface MeasuredFactDto {
   factCode: string;
-  value: string;
+  amount: number;
+  unitCode: string;
 }
 
 export interface AdvisoryDto {
-  allergenCodes: string[];
-  dietaryCodes: string[];
+  labelCodes: string[];
+  additionalInfo: Record<string, string>;
 }
 
+/** The row `GET /items` returns — NOT the full CatalogItemResponse. */
 export interface CatalogItemSummaryResponse {
   id: string;
   name: LocalizedMap;
@@ -389,36 +405,56 @@ export interface SetItemModifierGroupsRequest {
   expectedVersion: number | null;
 }
 
-/** Idempotency-Key REQUIRED. */
+/** Idempotency-Key REQUIRED. Declared 201 but answers 200 with the copy,
+ *  which starts as a Draft with its SKU cleared. `name` needs at least one
+ *  entry. */
 export interface DuplicateCatalogItemRequest {
   businessId: string;
   itemId: string;
   name: LocalizedMap;
 }
 
+/** `ItemTag` labels are referenced from an item's `tagCodes`; `Advisory`
+ *  labels (allergens and the like) from `advisories.labelCodes`. */
+export type LabelKind = "ItemTag" | "Advisory";
+
+/** List quirks (ListLabelsQuery): seeded labels come first with `id: null`,
+ *  `kind: "Advisory"` and an EMPTY `label` map — and are included even when
+ *  filtering `kind=ItemTag`. `usageCount` is always 0 in the list; only the
+ *  PUT response carries a real count. */
 export interface LabelResponse {
   /** null for platform-seeded labels — cannot be renamed/deleted. */
   id: string | null;
-  kind: string;
+  kind: LabelKind | string;
   code: string;
   label: LocalizedMap;
   isSeeded: boolean;
   usageCount: number;
 }
 
-/** Idempotency-Key REQUIRED. */
+/** Idempotency-Key REQUIRED. 201. `code` must match ^[a-z][a-z0-9-]{1,40}$
+ *  after trim+lowercase — a bad one comes back as the misleadingly named 422
+ *  `menu.item.advisory-invalid`; a duplicate is 409 `menu.label.code-taken`.
+ *  `label` needs the business's default-language value, max 60 chars. */
 export interface CreateLabelRequest {
   businessId: string;
-  kind: string;
+  kind: LabelKind;
   code: string;
   label: LocalizedMap;
 }
 
+/** No expectedVersion. Seeded labels 404 `menu.label.not-found`. DELETE of a
+ *  label still on an item is 409 `menu.label.in-use`. */
 export interface UpdateLabelRequest {
   /** Code is immutable — only display text can change. */
   label: LocalizedMap;
 }
 
+/** Configuration (`Menu:FactCodes`) — a code only, no unit or label. A
+ *  declared MeasuredFactDto's `factCode` and `unitCode` must each match
+ *  ^[a-z][a-z0-9-]{0,30}$, and `amount` is >= 0 with at most 3 decimals
+ *  (422 `menu.item.fact-invalid`). UpdateCatalogItemRequest replaces facts
+ *  and advisories wholesale: `null` clears them. */
 export interface FactTypeResponse {
   factCode: string;
 }
@@ -647,6 +683,8 @@ export interface UpdateMenuThemeRequest {
   expectedVersion: number | null;
 }
 
+/** One object, not a list. Both are configuration codes (`Menu:ThemePresets`,
+ *  `Menu:ThemeFonts`) — no palettes or font metadata come with them. */
 export interface ThemePresetsResponse {
   presets: string[];
   fonts: string[];
@@ -867,7 +905,123 @@ export interface TextReplacementResultResponse {
 
 export interface BulkOperationSummaryResponse {
   operationId: string;
-  kind: string;
+  kind: "PriceAdjustment" | "TextReplacement" | string;
   executedAtUtc: string;
   executedBy: string | null;
 }
+
+// ---- Draft preview (customer-facing shape) ----------------------------------------
+// `GET /menus/{menuId}/preview` answers with the same PublicMenuResponse the
+// public read serves (Contracts/Dtos/PublicRead/PublicMenuResponse.cs), built
+// from the draft; `MenuVersionResponse.document` is the published form of it.
+// Every string is already resolved to one language. Prefixed `MenuPreview`
+// so nothing here collides with a future public-read contract file.
+
+export interface MenuPreviewMoney {
+  amount: number;
+  currency: string;
+}
+
+export interface MenuPreviewMedia {
+  assetId: string;
+  kind: string;
+}
+
+export interface MenuPreviewTheme {
+  presetCode: string | null;
+  logo: MenuPreviewMedia | null;
+  hero: MenuPreviewMedia | null;
+  heroText: string | null;
+  heroSubtext: string | null;
+  titleFontCode: string | null;
+  bodyFontCode: string | null;
+  primaryColor: string | null;
+  lightColor: string | null;
+  accentColor: string | null;
+  darkColor: string | null;
+  navigationStyle: string;
+  sectionNavStyle: string;
+  cardStyle: string;
+  itemDetailsBehavior: string;
+  stickyPrimaryAction: boolean;
+  showItemTags: boolean;
+}
+
+export interface MenuPreviewSection {
+  name: string;
+  description: string | null;
+  image: MenuPreviewMedia | null;
+  displayStyle: string;
+  color: string | null;
+  /** `ref` keys into `items` or `offers`, depending on `kind`. */
+  entries: { ref: string; kind: string }[];
+}
+
+export interface MenuPreviewItem {
+  name: string;
+  description: string | null;
+  image: MenuPreviewMedia | null;
+  video: MenuPreviewMedia | null;
+  tags: string[];
+  price: MenuPreviewMoney | null;
+  facts: MeasuredFactDto[];
+  advisories: { labels: string[]; additionalInfo: string | null };
+  isAvailable: boolean;
+  modifierGroupRefs: string[];
+}
+
+export interface MenuPreviewModifierGroup {
+  promptLabel: string;
+  helpText: string | null;
+  selectionMode: string;
+  minSelected: number;
+  maxSelected: number | null;
+  options: {
+    name: string;
+    effect: { kind: string; amount: MenuPreviewMoney | null };
+    isDefault: boolean;
+    isAvailable: boolean;
+  }[];
+}
+
+export interface MenuPreviewOffer {
+  name: string;
+  image: MenuPreviewMedia | null;
+  badge: string | null;
+  showSavingBadge: boolean;
+  components: { itemRef: string; quantity: number }[];
+  pricingRule: {
+    kind: string;
+    fixedPrice: MenuPreviewMoney | null;
+    discountPercent: number | null;
+    discountAmount: MenuPreviewMoney | null;
+    dynamicBasePrice: MenuPreviewMoney | null;
+  };
+  price: {
+    referenceTotal: MenuPreviewMoney;
+    price: MenuPreviewMoney;
+    saving: MenuPreviewMoney;
+    savingPercent: number;
+  };
+  isAvailable: boolean;
+}
+
+export interface MenuPreviewResponse {
+  /** Always "Available" on the draft preview. */
+  availability: "Available" | "PreOrder" | "NotAvailableNow" | string;
+  nextAvailableAtUtc: string | null;
+  servedAsFallback: boolean;
+  locationLabel: string | null;
+  language: string;
+  availableLanguages: string[];
+  menu: { name: string; theme: MenuPreviewTheme };
+  sections: MenuPreviewSection[];
+  items: Record<string, MenuPreviewItem>;
+  modifierGroups: Record<string, MenuPreviewModifierGroup>;
+  offers: Record<string, MenuPreviewOffer>;
+  currency: { code: string; minorUnits: number } | null;
+  tax: { configured: boolean; pricesIncludeTax: boolean | null };
+}
+
+/** `GET /access-codes/{codeId}/image` — `format` is REQUIRED (missing = 400). */
+export type AccessCodeImageFormat = "png" | "svg";

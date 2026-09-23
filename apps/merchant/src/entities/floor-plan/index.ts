@@ -7,3 +7,22 @@ export * from "./booking";
 export * from "./storage";
 export * from "./store";
 export { sampleLayout } from "./sample-layout";
+export {
+  pushDraft,
+  publishDraft,
+  pullRecord,
+  fetchLiveStates,
+  writeLiveState,
+  clearLiveState,
+  floorPlanIdOf,
+  activePlanIdOf,
+  setActivePlan,
+  saveBuilderStep,
+  previewGrid,
+  generateGrid,
+  isServerId,
+  type GridOptions,
+  type GridPlacement,
+  type GridPreview,
+} from "./floor-plan-sync";
+export { setSyncError, useSyncError } from "./sync-status";

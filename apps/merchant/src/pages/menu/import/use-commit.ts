@@ -12,30 +12,29 @@ import { menuNameFromFile, toMenu } from "@/entities/menu/ai-import";
 import { resetImport, useImportSession } from "./session-store";
 
 export function useCommitImport() {
-  const { menus, setMenus } = useMenuLibrary();
+  const { create, replace } = useMenuLibrary();
   const navigate = useNavigate();
   const session = useImportSession();
   const ready = session.phase === "done" && session.result !== null && session.file !== null;
 
   const commit = useCallback(
-    (destination: "draft" | "publish") => {
+    async (destination: "draft" | "publish") => {
       if (!ready || !session.result || !session.file) return;
-      const id = `m-${Date.now().toString(36)}`;
+      // The server issues the id; the imported sections ride along locally.
+      const created = await create(menuNameFromFile(session.file.name));
       let n = 0;
       const menu = toMenu(session.result, {
-        id,
+        id: created.id,
         branchId: SEED_BRANCHES[0].id,
         now: new Date().toISOString(),
-        newId: () => `${id}-${(n += 1)}`,
-        name: menuNameFromFile(session.file.name),
+        newId: () => `${created.id}-${(n += 1)}`,
+        name: created.name,
       });
-      setMenus([...menus, menu]);
-      navigate(destination === "draft" ? "/menu" : `/menu/${id}/build/theme`);
-      // After navigation has unmounted the import: clearing first would make
-      // the current screen's guard redirect to upload before we leave.
+      replace({ ...menu, version: created.version, status: created.status, channels: created.channels });
+      navigate(destination === "draft" ? "/menu" : `/menu/${created.id}/build/theme`);
       setTimeout(resetImport, 0);
     },
-    [ready, session.result, session.file, menus, setMenus, navigate]
+    [ready, session.result, session.file, create, replace, navigate]
   );
 
   return { ready, commit };

@@ -59,6 +59,14 @@ export function ActionsMenu({
     "schedule",
     held ? "resume" : "hold",
     "duplicate",
+    "accessCode",
+    "bulkPrice",
+    // Only a menu that has actually been published at least once has a
+    // version history worth opening.
+    ...(menu.publishedAt ? (["versions"] as CardAction[]) : []),
+    // Unpublishing only means something for a menu currently live somewhere;
+    // archived menus already read as offline.
+    ...(menu.publishedAt && menu.status !== "archived" ? (["unpublish"] as CardAction[]) : []),
     "archive",
     "delete",
   ];

@@ -41,10 +41,26 @@ export interface OrderItem {
   name: string;
   qty: number;
   priceSar: number;
+  /** The real Order module's line id, present only when this item came from
+   *  a real backend order (order-record-bridge.ts) — needed to target
+   *  wastage/discount calls at the right line. Absent for seeded/live rows. */
+  lineId?: string;
+}
+
+/** Present only on a record that came from the real Order module (US-018),
+ *  never on a seeded or customer-storefront-live row — see
+ *  order-record-bridge.ts. Carries what an action call needs: the real id
+ *  (order.id is the human-readable code, e.g. "O-000001", not this), and the
+ *  optimistic-concurrency version every mutator must send back. */
+export interface RealOrderRef {
+  orderId: string;
+  version: number;
 }
 
 export interface OrderRecord {
   id: string;
+  /** See RealOrderRef's own doc. */
+  real?: RealOrderRef;
   date: string;
   table: string | null;
   guests: number | null;

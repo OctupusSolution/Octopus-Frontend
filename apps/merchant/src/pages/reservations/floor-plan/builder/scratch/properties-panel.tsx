@@ -29,6 +29,7 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { Field, TextField } from "../../_shared/fields";
 import { TableSettings } from "../_shared/table-settings";
 import { itemIcon, itemName } from "./layers-panel";
+import { SpotServerCard } from "./spot-server-card";
 
 function MeterField({ label, units, onChange, min = 0, max }: { label: string; units: number; onChange: (units: number) => void; min?: number; max: number }) {
   const [text, setText] = useState<string | null>(null);
@@ -206,20 +207,23 @@ export function PropertiesPanel({
   const tables = items.filter((item): item is FloorTable => item.kind === "table");
   if (tables.length === items.length) {
     return (
-      <TableSettings
-        doc={doc}
-        tables={tables}
-        toneFor={toneFor}
-        onPatch={(patch) => {
-          let next = doc;
-          for (const table of tables) next = updateTable(next, table.id, patch);
-          onDoc(next);
-        }}
-        onDuplicate={onDuplicate}
-        onDelete={onDelete}
-        onRotate={onRotate}
-        onToggleLock={onToggleLock}
-      />
+      <div className="flex flex-col gap-4">
+        <TableSettings
+          doc={doc}
+          tables={tables}
+          toneFor={toneFor}
+          onPatch={(patch) => {
+            let next = doc;
+            for (const table of tables) next = updateTable(next, table.id, patch);
+            onDoc(next);
+          }}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onRotate={onRotate}
+          onToggleLock={onToggleLock}
+        />
+        {tables.length === 1 && <SpotServerCard table={tables[0]} doc={doc} />}
+      </div>
     );
   }
 

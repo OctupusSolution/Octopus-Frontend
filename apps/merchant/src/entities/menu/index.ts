@@ -7,3 +7,5 @@ export * from "./pricing";
 export * from "./validation";
 export * from "./seed";
 export * from "./use-menu-library";
+export * from "./catalog-api";
+export * from "./use-menu-resource";

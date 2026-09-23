@@ -38,6 +38,13 @@ const ACTION_BUTTONS: readonly {
   icon: typeof Ban;
 }[] = [
   {
+    action: "payment",
+    labelKey: "orders.action.recordPayment",
+    className: "border-[#16A34A]/30 bg-[#16A34A]/10 text-[#16A34A]",
+    largeClassName: "border-[#16A34A]/30 bg-[#16A34A]/10 text-[#16A34A]",
+    icon: CreditCard,
+  },
+  {
     action: "void",
     labelKey: "orders.action.void",
     className: "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)]",
@@ -105,7 +112,7 @@ export function OrderActionButtons({
 
   if (variant === "large") {
     return (
-      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-4 ${className ?? ""}`}>
+      <div className={`grid grid-cols-2 gap-2 sm:grid-cols-5 ${className ?? ""}`}>
         {ACTION_BUTTONS.map(({ action, labelKey, largeClassName, icon: Icon }) => (
           <button
             key={action}

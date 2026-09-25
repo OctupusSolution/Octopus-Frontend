@@ -250,10 +250,23 @@ const STEP: Record<string, MenuBuilderStep> = {
 
 /** Records where the owner is in the builder (the step only — completeness is
  *  derived server-side from the content). */
+// Concurrent writes to the same menu row 409/500 on the backend's row version,
+// so progress saves are chained per menu and a repeat of the last step is skipped.
+const builderSteps = new Map<string, { step: string; job: Promise<unknown> }>();
+
 export function saveBuilderStep(businessId: string, menuId: string, step: string): Promise<unknown> {
   const s = STEP[step];
   if (!s || !isServerId(menuId)) return Promise.resolve();
-  return saveBuilderProgress(businessId, menuId, { step: s });
+  const last = builderSteps.get(menuId);
+  if (last?.step === s) return last.job;
+  const job = (last?.job ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() => saveBuilderProgress(businessId, menuId, { step: s }));
+  builderSteps.set(menuId, { step: s, job });
+  job.catch(() => {
+    if (builderSteps.get(menuId)?.job === job) builderSteps.delete(menuId);
+  });
+  return job;
 }
 
 export function previewDraft(businessId: string, menuId: string, lang?: string) {

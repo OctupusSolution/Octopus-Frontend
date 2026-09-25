@@ -44,6 +44,7 @@ import {
   type VersionSummaryResponse,
 } from "@octopus/api-client";
 import { useAuth } from "@/app/providers/auth-provider";
+import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { isLocalMedia, knownMedia, mediaUrl, uploadMedia } from "@/shared/api/media";
 import type { SiteAction, SiteDraft } from "./site-draft";
 import { FALLBACK_SITE_FONTS, toFontCode } from "./site-fonts";
@@ -169,6 +170,11 @@ function applyRemote(dispatch: (action: SiteAction) => void, site: PublicSiteRes
 
 export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteAction) => void): PublicLinkSync {
   const { activeBusinessId: businessId } = useAuth();
+  // The API refuses to publish without a display name; the business's own name
+  // stands in until the merchant types one in the Brand step.
+  const { activeBusiness } = useTenantConfig();
+  const fallbackName = useRef<string | null>(null);
+  fallbackName.current = activeBusiness?.businessName ?? null;
   const [status, setStatus] = useState<RemoteSyncStatus>(businessId ? "loading" : "disconnected");
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<ContentSourceResponse[]>([]);
@@ -229,11 +235,14 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [businessId]);
 
-  /** Sends the brand and the sections in one pass; a no-op until a site exists. */
-  const push = useCallback(async () => {
-    if (!businessId || !site.current) return;
+  /** Sends the brand and the sections in one pass; a no-op until a site exists.
+   *  Resolves to the first image-upload failure (if any): a failed image keeps
+   *  the previously saved one so the rest of the brand and the sections still save. */
+  const push = useCallback(async (): Promise<unknown> => {
+    if (!businessId || !site.current) return null;
     const d = draftRef.current;
     let current = site.current;
+    let uploadError: unknown = null;
 
     // Brand: a full replace, so keep whatever colours the server already has.
     const colors = { ...current.brand.colors };
@@ -241,11 +250,16 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
       if (d.brand.colors[k]) colors[COLOR_TOKENS[k]] = d.brand.colors[k];
     });
     const media = async (src: string | null, purpose: "Logo" | "Favicon" | "HeroBackground", existing: { assetId: string; kind: string } | null) => {
+      let known = knownMedia(src);
       if (isLocalMedia(src)) {
-        const up = await uploadMedia(businessId, src, purpose, `${purpose}.png`, "site");
-        return { assetId: up.ref.assetId, kind: (up.ref.kind === "Video" ? "Video" : "Image") as "Image" | "Video" };
+        try {
+          const up = await uploadMedia(businessId, src, purpose, `${purpose}.png`, "site");
+          return { assetId: up.ref.assetId, kind: (up.ref.kind === "Video" ? "Video" : "Image") as "Image" | "Video" };
+        } catch (err) {
+          uploadError ??= err;
+          known = null;
+        }
       }
-      const known = knownMedia(src);
       const ref = known ?? existing;
       return ref ? { assetId: ref.assetId, kind: (ref.kind === "Video" ? "Video" : "Image") as "Image" | "Video" } : null;
     };
@@ -256,7 +270,7 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
       return fontsRef.current.some((f) => f.code === code) ? code : null;
     };
     current = await updateDraftBrand(businessId, current.contentVersion, {
-      displayName: d.brand.businessName || null,
+      displayName: d.brand.businessName || fallbackName.current || null,
       colors,
       typography: {
         titleEnglish: font(d.brand.typography.en.titles),
@@ -319,6 +333,7 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
       current = await reorderDraftSections(businessId, current.contentVersion, target);
     }
     site.current = current;
+    return uploadError;
   }, [businessId]);
 
   // Debounced sync of everything the API stores.
@@ -329,7 +344,7 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       setStatus("saving");
-      run(push).then(() => setStatus("synced"), fail);
+      run(push).then((uploadError) => (uploadError ? fail(uploadError) : setStatus("synced")), fail);
     }, SYNC_DEBOUNCE_MS);
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
@@ -343,14 +358,16 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     }
     setStatus("saving");
     try {
-      await run(async () => {
-        await push();
+      const uploadError = await run(async () => {
+        const failed = await push();
         if (!site.current) throw new Error("Choose a public link (slug) before publishing.");
         const res = await publishSite(businessId, site.current.contentVersion, key());
         site.current = res.site;
         applyRemote(dispatch, res.site);
+        return failed;
       });
-      setStatus("synced");
+      if (uploadError) fail(uploadError);
+      else setStatus("synced");
     } catch (err) {
       fail(err);
       throw err;
@@ -463,7 +480,7 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
         });
         setStatus("synced");
         // The site exists now, so the brand and sections chosen so far can go up.
-        void run(push).catch(fail);
+        void run(push).then((uploadError) => uploadError && fail(uploadError), fail);
       } catch (err) {
         fail(err);
         throw err;

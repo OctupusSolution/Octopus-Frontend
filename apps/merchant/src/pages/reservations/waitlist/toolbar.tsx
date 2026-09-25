@@ -90,7 +90,7 @@ export function WaitlistToolbar({
         label={
           <span className="text-[var(--octo-text-secondary)]">
             {t("waitlist.toolbar.sortedBy")}
-            <span className="text-[var(--octo-text-muted)]">_</span>
+            <span className="me-1 text-[var(--octo-text-muted)]">:</span>
             <span className="text-[13px]">{t(SORT_KEY[sort])}</span>
           </span>
         }

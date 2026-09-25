@@ -33,18 +33,8 @@ export function KpiCards({ kpis, totalLabel }: KpiCardsProps) {
       icon: Users,
       value: kpis.total,
       label: totalLabel,
-      percent: (
-        <span className="inline-flex items-center gap-1 text-[12px] font-medium">
-          {/* Frame glyph is bars-plus-trend-line, not a bare arrow (fix round 1). */}
-          <ChartNoAxesCombined className="h-3 w-3 text-[#16A34A]" />
-          {/* Placeholder: no yesterday-comparison data exists in the fixture
-              yet, so this hardcodes the frame's figure rather than fabricate one. */}
-          <span className="text-[#16A34A]">3.46%</span>
-          <span className="font-normal text-[var(--octo-text-muted)]">
-            {t("reservations.list.kpi.vsYesterday")}
-          </span>
-        </span>
-      ),
+      // No yesterday comparison comes from the API, so no trend is shown.
+      percent: null,
     },
     {
       key: "confirmed",

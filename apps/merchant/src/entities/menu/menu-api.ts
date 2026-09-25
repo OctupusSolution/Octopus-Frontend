@@ -11,6 +11,7 @@ import {
   updateCatalogSettings,
   updateMenuDetails,
   type AvailabilityScheduleDto,
+  type CatalogSettingsResponse,
   type ChannelSelectionDto,
   type MenuAvailabilityResponse,
   type MenuResponse,
@@ -20,6 +21,10 @@ import { blankMenu } from "./draft";
 import { channelStateFor, WEEKDAYS, type ChannelState, type Menu, type MenuSchedule, type MenuStatus, type Weekday } from "./menu";
 import { SCHEDULE_PRESETS } from "./library";
 import { SEED_BRANCHES } from "./seed";
+
+const BUSINESS_CURRENCY = "SAR";
+// Matches the backend's tenant provisioning default (Tenancy:Provisioning:Defaults:TimeZone).
+const BUSINESS_TIME_ZONE = "Asia/Riyadh";
 
 const BADGE_TO_STATUS: Record<string, MenuStatus> = {
   archived: "archived",
@@ -48,7 +53,9 @@ export function fromServer(row: MenuSummaryResponse | MenuResponse, local?: Menu
     id: row.id,
     name: pickName(row.name),
     status,
-    channels: local && status === "active" ? base.channels : { pos: channel, publicLink: channel, tableQr: channel },
+    // Per-channel toggles are kept only for a menu that was already live locally;
+    // one that just went live takes the server's state, not the pending draft's.
+    channels: local && status === "active" && local.status === "active" ? base.channels : { pos: channel, publicLink: channel, tableQr: channel },
     publishedAt: row.lastPublishedAtUtc,
     version: row.version,
   };
@@ -59,8 +66,9 @@ export function fromServer(row: MenuSummaryResponse | MenuResponse, local?: Menu
  *  code, not the 404 this used to check for — a fresh business always hit
  *  this catch block and rethrew instead of ever initializing. */
 export async function ensureMenuSettings(businessId: string): Promise<void> {
+  let current: CatalogSettingsResponse;
   try {
-    await getCatalogSettings(businessId);
+    current = await getCatalogSettings(businessId);
   } catch (err) {
     const notInitialized =
       err instanceof ApiError && (err.status === 404 || err.problem?.errorCode === "menu.settings.not-initialized");
@@ -70,11 +78,27 @@ export async function ensureMenuSettings(businessId: string): Promise<void> {
       enabledLanguages: ["en", "ar"],
       salesChannels: { all: true, codes: [] },
       fulfillmentModes: { all: true, codes: [] },
-      currency: null,
-      defaultTimeZoneId: null,
+      currency: BUSINESS_CURRENCY,
+      defaultTimeZoneId: BUSINESS_TIME_ZONE,
       requiredFactCodes: null,
       factRequirementSeverity: null,
       expectedVersion: null,
+    });
+    return;
+  }
+  // Settings created before these were sent have neither: the API then refuses
+  // every priced item ("not initialized") and blocks publishing (time-zone-missing).
+  if (!current.currency || !current.defaultTimeZoneId) {
+    await updateCatalogSettings(businessId, {
+      defaultLanguage: current.defaultLanguage,
+      enabledLanguages: current.enabledLanguages,
+      salesChannels: current.salesChannels,
+      fulfillmentModes: current.fulfillmentModes,
+      currency: current.currency ?? BUSINESS_CURRENCY,
+      defaultTimeZoneId: current.defaultTimeZoneId ?? BUSINESS_TIME_ZONE,
+      requiredFactCodes: current.requiredFactCodes,
+      factRequirementSeverity: current.factRequirementSeverity,
+      expectedVersion: current.version,
     });
   }
 }

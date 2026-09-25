@@ -32,8 +32,12 @@ export function PublicLinkBuilderPage() {
     // Goes through the real backend when a dev session is configured
     // (see shared/api/dev-backend-session.ts); otherwise falls back to the
     // old local-only toggle, same as before this was wired up.
-    await publicLinkSync.publish();
-    setSuccessOpen(true);
+    try {
+      await publicLinkSync.publish();
+      setSuccessOpen(true);
+    } catch {
+      // The sync hook already surfaces the failure in the builder's status.
+    }
   }
 
   return (

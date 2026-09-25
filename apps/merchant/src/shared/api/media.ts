@@ -80,7 +80,12 @@ async function doUpload(businessId: string, src: string, purpose: string, fileNa
 
   const shim = import.meta.env.VITE_MEDIA_UPLOAD_SHIM as string | undefined;
   const target = shim ? `${shim}/upload/${type}` : `https://api.cloudinary.com/v1_1/${ticket.cloudName}/${type}/upload`;
-  const res = await fetch(target, { method: "POST", body: form });
+  let res: Response;
+  try {
+    res = await fetch(target, { method: "POST", body: form });
+  } catch {
+    throw new Error(`Image upload failed: could not reach ${shim ? `the local upload shim (${shim})` : "Cloudinary"}.`);
+  }
   if (!res.ok) throw new Error(`Image upload failed (${res.status})`);
   return remember(
     library === "site"

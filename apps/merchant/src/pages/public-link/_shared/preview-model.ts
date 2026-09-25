@@ -151,7 +151,9 @@ export function previewModelFromSite(
   return {
     businessName: brand.businessName || t("publicLink.defaultBusinessName"),
     logoDataUrl: brand.logoDataUrl,
-    url: `${hostLabelFromName(brand.businessName) || "restaurant"}.octopus.app`,
+    // The claimed slug is the real address; the name-derived label is only a
+    // stand-in before one is claimed.
+    url: `${hostLabelFromName(draft.slug) || hostLabelFromName(brand.businessName) || "restaurant"}.octopus.app`,
     primary: brand.colors.primary,
     secondary: brand.colors.accent,
     // The widget resolves faces by brand-tokens FONTS id; catalogue codes map to the nearest one.

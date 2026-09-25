@@ -1,6 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/stat-cards.tsx
 import type { ComponentType } from "react";
-import { BarChart3, CheckCircle2, LineChart, RotateCw, UtensilsCrossed, XCircle } from "lucide-react";
+import { CheckCircle2, LineChart, RotateCw, UtensilsCrossed, XCircle } from "lucide-react";
 import { formatSar } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { OrdersStats } from "./stats";
@@ -22,12 +22,9 @@ const CARDS: readonly {
 
 export function OrdersStatCards({ stats }: { stats: OrdersStats }) {
   const { t } = useI18n();
-  // No day-over-day history exists in this mock fixture, so — like
-  // pages/reservations/_shared/kpi-cards.tsx — the figure is lifted from the
-  // frames rather than computed. orders.png pairs an empty book with 0%, so
-  // an empty book reports no movement here too.
-  const deltaLabel = stats.totalOrders > 0 ? "3.46%" : "0%";
 
+  // No day-over-day comparison comes from the API, so no trend line is drawn
+  // rather than showing an invented figure.
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {CARDS.map(({ key, icon: Icon, tile, cardBg, labelKey, money }) => (
@@ -39,11 +36,6 @@ export function OrdersStatCards({ stats }: { stats: OrdersStats }) {
             {money ? formatSar(stats[key]) : stats[key]}
           </div>
           <div className="mt-1.5 text-[13px] text-[var(--octo-text-muted)]">{t(labelKey)}</div>
-          <div className="mt-2 flex items-center gap-1.5 text-[12px]">
-            <BarChart3 size={14} className="text-[#16A34A]" strokeWidth={2.5} />
-            <span className="font-semibold text-[#16A34A]">{deltaLabel}</span>
-            <span className="text-[var(--octo-text-faint)]">{t("orders.stat.deltaVsYesterday")}</span>
-          </div>
         </div>
       ))}
     </div>

@@ -280,7 +280,10 @@ export async function pushMember(businessId: string, localId: string, state: Mem
     const res = inactive ? await deactivateStaffMember(businessId, sid, base.version) : await reactivateStaffMember(businessId, sid, base.version);
     base = { ...base, inactive, version: res.version };
   }
-  if (profile.allowSystemLogin !== base.login) {
+  // Enabling sign-in sends an invitation, which the API refuses without an
+  // email; a member added without one stays sign-in-less until it is set.
+  const canSignIn = !profile.allowSystemLogin || body.email !== null;
+  if (profile.allowSystemLogin !== base.login && canSignIn) {
     if (profile.allowSystemLogin) await enableStaffMemberLogin(businessId, sid, base.version);
     else await disableStaffMemberLogin(businessId, sid, base.version);
     // These answer with something other than the member, so re-read its version.

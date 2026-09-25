@@ -235,7 +235,14 @@ export function NewReservationPage() {
         <FooterButton tone="grey" onClick={() => navigate(RESERVATIONS_PATH)}>
           {t("common.cancel")}
         </FooterButton>
-        <FooterButton tone="soft" disabled={!canSavePending} onClick={() => save("pending")}>
+        {/* The API books every reservation on a table (or table group), pending
+            ones included, so saving waits for the table step. */}
+        <FooterButton
+          tone="soft"
+          disabled={!canSavePending || !tableReady}
+          title={tableReady ? undefined : t(hasFloorPlan ? "reservations.table.needsTable" : "reservations.new.noFloorPlan")}
+          onClick={() => save("pending")}
+        >
           {t("reservations.form.saveAsPending")}
         </FooterButton>
         {step < 3 ? (

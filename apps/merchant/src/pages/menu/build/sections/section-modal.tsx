@@ -2,7 +2,8 @@
 // frames differ only in their title, their dropzone copy and their button.
 //
 // Saving is refused by disabling the button rather than by erroring after the
-// fact: the frame stars both the name and the image, so both are needed.
+// fact. Only the name is required: the API stores a section without an image,
+// and requiring one would block the whole builder whenever uploads are down.
 import { useEffect, useState } from "react";
 import { Upload } from "lucide-react";
 import { Button, Modal } from "@ui/primitives";
@@ -41,7 +42,7 @@ export function SectionModal({
 
   if (!open) return null;
 
-  const canSave = name.trim() !== "" && image !== null;
+  const canSave = name.trim() !== "";
 
   return (
     <Modal
@@ -69,7 +70,7 @@ export function SectionModal({
 
       <div className="mt-5">
         <p className="px-2 text-[16px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuWiz.sec.modal.image")} <span className="text-error">*</span>
+          {t("menuWiz.sec.modal.image")}
         </p>
         <button
           type="button"

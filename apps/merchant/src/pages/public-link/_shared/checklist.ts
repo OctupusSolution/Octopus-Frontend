@@ -30,6 +30,10 @@ export interface GoLiveItem {
   labelKey: string;
   noteKey: string;
   done: (draft: SiteDraft) => boolean;
+  /** Only required items block "Publish Now". Menu, reservations, waitlist and
+   *  SEO are optional per business (the backend publishes without them), so
+   *  they are shown as recommendations instead of gates. */
+  required?: boolean;
 }
 
 export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
@@ -38,12 +42,14 @@ export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
     labelKey: "publicLink.checklist.pages.label",
     noteKey: "publicLink.checklist.pages.note",
     done: (draft) => draft.pages.some((page) => page.onHome),
+    required: true,
   },
   {
     id: "navigation",
     labelKey: "publicLink.checklist.navigation.label",
     noteKey: "publicLink.checklist.navigation.note",
     done: (draft) => draft.pages.some((page) => page.inNav && !draft.navigation.hidden.includes(page.id)),
+    required: true,
   },
   {
     id: "menu",
@@ -95,5 +101,5 @@ export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
 ];
 
 export function goLiveReady(draft: SiteDraft): boolean {
-  return GO_LIVE_ITEMS.every((item) => item.done(draft));
+  return GO_LIVE_ITEMS.every((item) => !item.required || item.done(draft));
 }

@@ -41,6 +41,7 @@ import { useAuth } from "@/app/providers/auth-provider";
 import { fromServer } from "@/entities/menu/menu-api";
 import { useMenuLibrary } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { findingText } from "./finding-text";
 import { useDraft } from "../use-draft";
 import { resolveImage } from "../preview-model";
 import { ValidationSummary } from "./validation-summary";
@@ -230,7 +231,7 @@ export function ReviewStep() {
       const report = await getValidationReport(activeBusinessId, draft.id);
       if (!report.canPublish) {
         const first = report.errors[0];
-        throw new Error(first ? `${first.code}${first.subjectKind ? ` (${first.subjectKind})` : ""}` : "The menu cannot be published yet.");
+        throw new Error(findingText(first?.code ?? "", locale));
       }
       await publishMenu(
         activeBusinessId,

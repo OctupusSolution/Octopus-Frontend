@@ -25,8 +25,13 @@ describe("go-live checklist", () => {
     expect(GO_LIVE_ITEMS).toHaveLength(9);
   });
 
-  it("is not ready on a fresh draft", () => {
-    expect(goLiveReady(EMPTY_SITE_DRAFT)).toBe(false);
+  it("does not block publishing on optional items (menu, reservations, waitlist, SEO)", () => {
+    expect(goLiveReady({ ...complete(), sectionSettings: EMPTY_SITE_DRAFT.sectionSettings, publish: EMPTY_SITE_DRAFT.publish })).toBe(true);
+  });
+
+  it("blocks publishing when no page is reachable from the navigation", () => {
+    const draft = complete();
+    expect(goLiveReady({ ...draft, pages: draft.pages.map((p) => ({ ...p, inNav: false })) })).toBe(false);
   });
 
   it("is ready once the draft actually carries what each item checks", () => {

@@ -17,6 +17,8 @@ import { DeviceFrame } from "../ui/device-frame";
 import { QrCode } from "../ui/qr-code";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
+import { usePlText } from "../_shared/texts";
+import { PreviewLinksCard } from "./connected/preview-links-card";
 
 const COPY_RESET_MS = 2000;
 
@@ -70,12 +72,16 @@ function TestModeSettingsModal({
   onClose,
   settings,
   dispatch,
+  connected = false,
 }: {
   open: boolean;
   onClose: () => void;
   settings: StepProps["draft"]["preview"]["testModeSettings"];
   dispatch: (action: SiteAction) => void;
+  /** Real preview links have no password; only expiry applies. */
+  connected?: boolean;
 }) {
+  const tx = usePlText();
   const { t } = useI18n();
   const [local, setLocal] = useState(settings);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -85,7 +91,7 @@ function TestModeSettingsModal({
   }, [open, settings]);
 
   function save() {
-    if (local.requirePassword && local.password.trim().length < 4) {
+    if (!connected && local.requirePassword && local.password.trim().length < 4) {
       passwordRef.current?.focus();
       return;
     }
@@ -124,6 +130,9 @@ function TestModeSettingsModal({
           </Select>
           <span className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.preview.settings.expiresNote")}</span>
         </label>
+        {connected ? (
+          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.preview.noPassword")}</p>
+        ) : (<>
         <div className="flex items-start justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <span className="text-[12px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.preview.settings.requirePassword")}</span>
@@ -150,12 +159,13 @@ function TestModeSettingsModal({
             )}
           </div>
         )}
+        </>)}
       </div>
     </Modal>
   );
 }
 
-export function PreviewStep({ draft, dispatch }: StepProps) {
+export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
   const { user } = useAuth();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -365,6 +375,9 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
 
         {/* End: device preview and the share QR/link */}
         <div className="flex flex-col gap-3">
+          {publicLinkSync.connected ? (
+            <PreviewLinksCard sync={publicLinkSync} expiresInDays={Number(preview.testModeSettings.expiresInDays) || 7} />
+          ) : (
           <div className="flex flex-col gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
               {t("publicLink.preview.previewUrl")}
@@ -380,6 +393,7 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
               <QrCode value={previewUrl} size={88} />
             </div>
           </div>
+          )}
 
           <DeviceFrame model={model} device={device} onDevice={setDevice} />
         </div>
@@ -426,6 +440,7 @@ export function PreviewStep({ draft, dispatch }: StepProps) {
         onClose={() => setSettingsOpen(false)}
         settings={preview.testModeSettings}
         dispatch={dispatch}
+        connected={publicLinkSync.connected}
       />
     </div>
   );

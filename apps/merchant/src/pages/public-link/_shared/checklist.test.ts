@@ -21,8 +21,21 @@ function complete(): SiteDraft {
 }
 
 describe("go-live checklist", () => {
-  it("lists the nine items the frame shows", () => {
-    expect(GO_LIVE_ITEMS).toHaveLength(9);
+  it("lists the frame's nine items plus the public address", () => {
+    expect(GO_LIVE_ITEMS).toHaveLength(10);
+  });
+
+  it("requires a claimed address only while connected to the backend", () => {
+    const remote = { host: null, status: "Draft", navItems: [{ label: "Home", visible: true }], visiblePages: 1, homeSections: [], hero: null, logoUrl: null };
+    expect(goLiveReady({ ...complete(), remote })).toBe(false);
+    expect(goLiveReady({ ...complete(), remote, slug: "ocean" })).toBe(true);
+    expect(goLiveReady({ ...complete(), remote: { ...remote, host: "ocean.octopus.app" } })).toBe(true);
+  });
+
+  it("reads pages and navigation from the server projection while connected", () => {
+    const remote = { host: "ocean.octopus.app", status: "Draft", navItems: [{ label: "Home", visible: false }], visiblePages: 1, homeSections: [], hero: null, logoUrl: null };
+    expect(goLiveReady({ ...complete(), remote })).toBe(false);
+    expect(goLiveReady({ ...complete(), remote: { ...remote, navItems: [{ label: "Home", visible: true }] } })).toBe(true);
   });
 
   it("does not block publishing on optional items (menu, reservations, waitlist, SEO)", () => {

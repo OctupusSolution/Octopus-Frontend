@@ -5,7 +5,7 @@
 // never a button, and the purely decorative chrome is aria-hidden; the
 // pages-enabled count beneath `DrawerNavPreview` is the one piece of real
 // information, so it alone stays outside the aria-hidden block.
-import { ExternalLink, type LucideIcon } from "lucide-react";
+import { ExternalLink, FileText, type LucideIcon } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PAGE_MODULES, type PageModule } from "../_shared/page-catalog";
 import type { SiteDraft } from "../_shared/site-draft";
@@ -27,13 +27,32 @@ function modulesInRenderedNav(draft: SiteDraft): readonly PageModule[] {
   return modulesInNav(draft).filter((module) => !hidden.has(module.id));
 }
 
+interface NavEntry {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+/** What each preview lists: the server's menu while connected (`draft.remote`,
+ *  literal labels), else the local page modules. `where` picks the rendered
+ *  header, the rendered drawer, or every entry (the Pages step's mock). */
+function navEntries(draft: SiteDraft, t: (key: string) => string, where: "all" | "header" | "drawer"): NavEntry[] {
+  if (draft.remote) {
+    return draft.remote.navItems
+      .filter((item) => where === "all" || (where === "header" ? item.visible : item.drawer ?? item.visible))
+      .map((item, index) => ({ id: `${index}:${item.label}`, label: item.label, icon: FileText }));
+  }
+  const modules = where === "all" ? modulesInNav(draft) : modulesInRenderedNav(draft);
+  return modules.map((module) => ({ id: module.id, label: t(module.labelKey), icon: module.icon }));
+}
+
 /** The dark sidebar mock from the Pages step: the drawer a customer opens on
  *  the storefront, showing only the pages the merchant has switched into
  *  navigation. */
 export function DrawerNavPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
-  const modules = modulesInNav(draft);
-  const total = draft.pages.length;
+  const modules = navEntries(draft, t, "all");
+  const total = draft.remote ? draft.remote.visiblePages : draft.pages.length;
 
   return (
     <div className="flex flex-col gap-2">
@@ -49,7 +68,7 @@ export function DrawerNavPreview({ draft }: { draft: SiteDraft }) {
             return (
               <li key={module.id} className="flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12.5px] text-white/80">
                 <Icon size={14} />
-                {t(module.labelKey)}
+                {module.label}
               </li>
             );
           })}
@@ -90,7 +109,7 @@ export function WebNavPreview({ draft }: { draft: SiteDraft }) {
     );
   }
 
-  const modules = modulesInRenderedNav(draft);
+  const modules = navEntries(draft, t, "header");
 
   return (
     <div
@@ -100,7 +119,7 @@ export function WebNavPreview({ draft }: { draft: SiteDraft }) {
       <img src={octopusLogoUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
       {modules.map((module) => (
         <span key={module.id} className="shrink-0 text-[11.5px] font-medium text-[var(--octo-text-secondary)]">
-          {t(module.labelKey)}
+          {module.label}
         </span>
       ))}
     </div>
@@ -126,7 +145,7 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
     );
   }
 
-  const modules = modulesInRenderedNav(draft);
+  const modules = navEntries(draft, t, "drawer");
   const showIcons = draft.navigation.showIcons;
   const primary = draft.brand.colors.primary;
 
@@ -157,7 +176,7 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
               }
             >
               {showIcons && <Icon size={11} className={active ? undefined : "text-[var(--octo-text-faint)]"} />}
-              <span className="min-w-0 flex-1 truncate">{t(module.labelKey)}</span>
+              <span className="min-w-0 flex-1 truncate">{module.label}</span>
               {!draft.navigation.sameTab && <ExternalLink size={8} className="shrink-0 opacity-60" />}
             </li>
           );

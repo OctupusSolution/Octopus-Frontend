@@ -148,4 +148,14 @@ describe("previewModelFromSite", () => {
     expect(previewModelFromSite(draft, "desktop", t, "en").showHeaderNav).toBe(false);
     expect(previewModelFromSite(EMPTY_SITE_DRAFT, "desktop", t, "en").showHeaderNav).toBe(true);
   });
+
+  it("prefers the server's hostname for the address, and never the business name once connected", () => {
+    const remote = { host: "ocean.octopus.app", status: "Draft", navItems: [{ label: "Menu", visible: true }], visiblePages: 1, homeSections: ["hero"], hero: { headline: "Hi" }, logoUrl: null };
+    const draft = { ...EMPTY_SITE_DRAFT, brand: { ...EMPTY_SITE_DRAFT.brand, businessName: "Something Else" }, remote };
+    const model = previewModelFromSite(draft, "desktop", t, "en");
+    expect(model.url).toBe("ocean.octopus.app");
+    expect(model.navItems).toEqual([{ labelKey: "Menu", visible: true }]);
+    expect(model.sections).toEqual(["hero"]);
+    expect(model.hero.headline).toBe("Hi");
+  });
 });

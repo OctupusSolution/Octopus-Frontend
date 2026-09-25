@@ -5,7 +5,7 @@
 // straight away as a new version and so asks for confirmation first.
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, History, RotateCcw, Undo2, X } from "lucide-react";
-import { ApiError, type PublicSitePublicationResponse, type VersionSummaryResponse } from "@octopus/api-client";
+import { ApiError, type VersionDocumentResponse, type VersionSummaryResponse } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -30,8 +30,8 @@ const FALLBACK: Record<"en" | "ar", Record<string, string>> = {
     "publicLink.versions.displayName": "Name",
     "publicLink.versions.colors": "Colours",
     "publicLink.versions.fonts": "Fonts",
-    "publicLink.versions.sections": "Sections",
-    "publicLink.versions.noSections": "No sections",
+    "publicLink.versions.sections": "Pages",
+    "publicLink.versions.noSections": "No pages",
     "publicLink.versions.hidden": "hidden",
   },
   ar: {
@@ -53,8 +53,8 @@ const FALLBACK: Record<"en" | "ar", Record<string, string>> = {
     "publicLink.versions.displayName": "الاسم",
     "publicLink.versions.colors": "الألوان",
     "publicLink.versions.fonts": "الخطوط",
-    "publicLink.versions.sections": "الأقسام",
-    "publicLink.versions.noSections": "لا توجد أقسام",
+    "publicLink.versions.sections": "الصفحات",
+    "publicLink.versions.noSections": "لا توجد صفحات",
     "publicLink.versions.hidden": "مخفي",
   },
 };
@@ -69,7 +69,7 @@ function rollbackError(err: unknown, tx: (key: string) => string): string {
   return tx("publicLink.versions.rollbackFailed");
 }
 
-type Details = { status: "loading" } | { status: "error" } | { status: "ready"; data: PublicSitePublicationResponse };
+type Details = { status: "loading" } | { status: "error" } | { status: "ready"; data: VersionDocumentResponse };
 
 function VersionDetails({ details, tx }: { details: Details; tx: (key: string) => string }) {
   if (details.status === "loading") {
@@ -78,29 +78,34 @@ function VersionDetails({ details, tx }: { details: Details; tx: (key: string) =
   if (details.status === "error") {
     return <p className="py-2 text-[12px] text-error">{tx("publicLink.versions.detailsFailed")}</p>;
   }
-  const { brand, sections, sourceVersion, label } = details.data;
-  const fonts = [brand.typography.titleEnglish, brand.typography.bodyEnglish, brand.typography.titleArabic, brand.typography.bodyArabic]
+  const { document, label } = details.data;
+  const settings = document?.site?.settings;
+  const defaultLang = settings?.languages?.default ?? "en";
+  const names = settings?.identity?.displayName ?? {};
+  const displayName = names[defaultLang] ?? Object.values(names)[0] ?? null;
+  const colors = settings?.theme?.colorOverrides ?? {};
+  const themeKey = settings?.theme?.themeKey ?? null;
+  const fonts = Object.values(settings?.theme?.fontOverrides ?? {})
+    .flatMap((pair) => [pair?.heading, pair?.body])
     .filter((f): f is string => Boolean(f))
     .filter((f, i, all) => all.indexOf(f) === i);
+  const pages = document?.pages ?? [];
   const row = "grid grid-cols-[88px_minmax(0,1fr)] gap-2 text-[12px]";
   const key = "text-[var(--octo-text-muted)]";
   return (
     <div className="mt-2 flex flex-col gap-1.5 border-t border-[var(--octo-divider)] pt-2">
-      {(label || sourceVersion !== null) && (
-        <p className="text-[12px] text-[var(--octo-text-secondary)]">
-          {label ?? tx("publicLink.versions.copiedFrom").replace("{n}", String(sourceVersion))}
-        </p>
-      )}
+      {label && <p className="text-[12px] text-[var(--octo-text-secondary)]">{label}</p>}
       <div className={row}>
         <span className={key}>{tx("publicLink.versions.displayName")}</span>
-        <span className="truncate text-[var(--octo-text-primary)]">{brand.displayName ?? "—"}</span>
+        <span className="truncate text-[var(--octo-text-primary)]">{displayName ?? "—"}</span>
       </div>
       <div className={row}>
         <span className={key}>{tx("publicLink.versions.colors")}</span>
         <span className="flex flex-wrap gap-1">
-          {Object.entries(brand.colors).length === 0
-            ? "—"
-            : Object.entries(brand.colors).map(([token, value]) => (
+          {themeKey && <span className="me-1 text-[var(--octo-text-primary)]">{themeKey}</span>}
+          {Object.entries(colors).length === 0
+            ? themeKey ? null : "—"
+            : Object.entries(colors).map(([token, value]) => (
                 <span
                   key={token}
                   title={`${token}: ${value}`}
@@ -119,17 +124,21 @@ function VersionDetails({ details, tx }: { details: Details; tx: (key: string) =
       <div className={row}>
         <span className={key}>{tx("publicLink.versions.sections")}</span>
         <span className="flex flex-wrap gap-1">
-          {sections.length === 0
+          {pages.length === 0
             ? tx("publicLink.versions.noSections")
-            : sections.map((s) => (
-                <span
-                  key={s.sectionId}
-                  className="rounded-full bg-[var(--octo-hover)] px-2 py-0.5 text-[11px] text-[var(--octo-text-secondary)]"
-                >
-                  {s.type}
-                  {!s.enabled && ` · ${tx("publicLink.versions.hidden")}`}
-                </span>
-              ))}
+            : pages.map((p, i) => {
+                const title = p.title?.[defaultLang] ?? Object.values(p.title ?? {})[0] ?? p.path ?? "—";
+                const count = p.sections?.filter((sec) => sec.enabled !== false).length ?? 0;
+                return (
+                  <span
+                    key={p.id ?? i}
+                    className="rounded-full bg-[var(--octo-hover)] px-2 py-0.5 text-[11px] text-[var(--octo-text-secondary)]"
+                  >
+                    {title} · {count}
+                    {p.visibility === "hidden" && ` · ${tx("publicLink.versions.hidden")}`}
+                  </span>
+                );
+              })}
         </span>
       </div>
     </div>
@@ -147,7 +156,7 @@ export function PublicLinkVersionsModal({
   open: boolean;
   onClose: () => void;
   listVersions: () => Promise<VersionSummaryResponse[]>;
-  getVersion: (version: number) => Promise<PublicSitePublicationResponse>;
+  getVersion: (version: number) => Promise<VersionDocumentResponse>;
   onRestore: (version: number) => Promise<void>;
   onRollback: (version: number) => Promise<void>;
 }) {

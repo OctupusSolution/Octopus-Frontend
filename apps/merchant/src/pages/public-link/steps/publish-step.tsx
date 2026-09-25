@@ -34,6 +34,9 @@ import { SitePreviewModal } from "../ui/site-preview-modal";
 import { PublicLinkVersionsModal } from "../ui/versions-modal";
 import type { SiteAction } from "../_shared/site-draft";
 import type { StepProps } from "../_shared/steps";
+import { usePlText } from "../_shared/texts";
+import { Switch } from "../ui/switch";
+import { ReviewCard } from "./connected/review-card";
 
 const COPY_RESET_MS = 2000;
 
@@ -85,6 +88,8 @@ function ChecklistItemRow({
  *  setting of their own (payments, responsive, analytics) have no entry. */
 function fixActionFor(id: string, dispatch: (action: SiteAction) => void, focusSeo: () => void): (() => void) | undefined {
   switch (id) {
+    case "address":
+      return () => dispatch({ type: "goTo", step: 2 });
     case "pages":
       return () => dispatch({ type: "goTo", step: 3 });
     case "navigation":
@@ -133,8 +138,11 @@ function ShareTile({
 
 export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
+  const tx = usePlText();
   const model = previewModelFromSite(draft, "desktop", t, locale);
+  // The claimed address (server hostname / slug), never the business name — see preview-model.ts.
   const liveUrl = `https://${model.url}`;
+  const connected = publicLinkSync.connected;
 
   const [copiedLive, setCopiedLive] = useState(false);
   const [copiedSocial, setCopiedSocial] = useState(false);
@@ -213,7 +221,8 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => publicLinkSync.unpublish()}
+            // The sync hook reports a failure in the builder's banner; never leave the rejection unhandled.
+            onClick={() => void publicLinkSync.unpublish().catch(() => undefined)}
             className="!text-[#DC2626] hover:bg-[#DC2626]/10"
           >
             {t("publicLink.unpublish")}
@@ -239,8 +248,8 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
             {GO_LIVE_ITEMS.map((item) => (
               <ChecklistItemRow
                 key={item.id}
-                label={t(item.labelKey)}
-                note={t(item.noteKey)}
+                label={tx(item.labelKey)}
+                note={tx(item.noteKey)}
                 done={item.done(draft)}
                 fixLabel={t("publicLink.fix")}
                 onFix={fixActionFor(item.id, dispatch, focusSeo)}
@@ -316,6 +325,9 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
         <div ref={seoCardRef} className={CARD}>
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.seoSocial")}</p>
           <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.seoNote")}</p>
+          {connected && seo.title.trim() && (
+            <p className="-mt-1 text-[11px] text-[var(--octo-text-muted)]">{tx("pl.seo.titleFormat", { title: seo.title.trim() })}</p>
+          )}
           <Input
             ref={seoTitleRef}
             label={t("publicLink.siteTitle")}
@@ -360,8 +372,20 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
               </div>
             </div>
           </div>
+          {connected && (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[12px] text-[var(--octo-text-primary)]">{tx("pl.seo.hideFromSearch")}</span>
+              <Switch
+                checked={seo.hideFromSearch ?? false}
+                onChange={() => dispatch({ type: "patchPublish", patch: { seo: { ...seo, hideFromSearch: !(seo.hideFromSearch ?? false) } } })}
+                label={tx("pl.seo.hideFromSearch")}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {connected && <ReviewCard sync={publicLinkSync} />}
 
       {/* Share row */}
       <div className={CARD}>

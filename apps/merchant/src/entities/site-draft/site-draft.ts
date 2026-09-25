@@ -135,6 +135,25 @@ export interface Tester {
   tested: boolean;
 }
 
+/** What the server holds, projected into the shape the preview and the
+ *  checklist read. Written only by public-link-sync.ts (`setRemote`) while a
+ *  business session is connected; null when the builder runs local-only. */
+export interface SiteRemote {
+  /** The claimed address's hostname (e.g. "ocean.octopus.app"); null before a slug is claimed. */
+  host: string | null;
+  /** "Draft" | "Live". */
+  status: string;
+  /** Header navigation, resolved to literal labels, in order. */
+  navItems: readonly { label: string; visible: boolean; drawer?: boolean }[];
+  /** How many pages are visible (Home always is). */
+  visiblePages: number;
+  /** The home page's enabled sections, as preview widget ids (hero/menu/offers). */
+  homeSections: readonly string[];
+  /** The home page hero's copy and image, when it has one. */
+  hero: { headline?: string; sub?: string; primaryCta?: string; imageUrl?: string } | null;
+  logoUrl: string | null;
+}
+
 export interface SiteDraft {
   step: number;
   /** The backend's public-link slug (`PublicSiteResponse.slug`) — the ONE
@@ -165,6 +184,8 @@ export interface SiteDraft {
   };
   sections: readonly SectionEntry[];
   selectedSection: string;
+  /** Connected builds: the server page the Customize step edits (null = Home). */
+  selectedPageId?: string | null;
   sectionSettings: {
     hero: HeroSettings;
     reservations: ReservationSettings;
@@ -182,13 +203,15 @@ export interface SiteDraft {
     testModeSettings: { expiresInDays: "1" | "7" | "30"; requirePassword: boolean; password: string };
   };
   publish: {
-    seo: { title: string; description: string; socialImageDataUrl: string | null };
+    seo: { title: string; description: string; socialImageDataUrl: string | null; /** Site-wide no-index (server SEO). */ hideFromSearch?: boolean };
     customDomain: { host: string; connected: boolean; ssl: boolean };
     published: boolean;
     /** Timestamp of the last successful publish; null until the first one. */
     publishedAt: number | null;
   };
   savedAt: number | null;
+  /** Server projection; see `SiteRemote`. */
+  remote: SiteRemote | null;
 }
 
 // Task 5 owns PAGE_IDS and SECTION_IDS; these literal lists must match that
@@ -340,6 +363,7 @@ export const EMPTY_SITE_DRAFT: SiteDraft = {
     publishedAt: null,
   },
   savedAt: null,
+  remote: null,
 };
 
 export type SiteAction =
@@ -358,6 +382,7 @@ export type SiteAction =
   | { type: "setSections"; sections: readonly SectionEntry[] }
   | { type: "toggleSection"; id: string }
   | { type: "selectSection"; id: string }
+  | { type: "selectPage"; pageId: string | null }
   | { type: "patchSection"; section: "hero"; patch: Partial<HeroSettings> }
   | { type: "patchSection"; section: "reservations"; patch: Partial<ReservationSettings> }
   | { type: "patchSection"; section: "waitlist"; patch: Partial<WaitlistSettings> }
@@ -370,7 +395,8 @@ export type SiteAction =
   // (e.g. toggling requirePassword) would have to spread the nested object by
   // hand every time. A dedicated action merges one level deeper instead.
   | { type: "patchTestMode"; patch: Partial<SiteDraft["preview"]["testModeSettings"]> }
-  | { type: "patchPublish"; patch: Partial<SiteDraft["publish"]> };
+  | { type: "patchPublish"; patch: Partial<SiteDraft["publish"]> }
+  | { type: "setRemote"; remote: SiteRemote | null };
 
 function clampStep(step: number): number {
   return Math.min(STEP_COUNT, Math.max(1, step));
@@ -431,6 +457,8 @@ export function siteDraftReducer(state: SiteDraft, action: SiteAction): SiteDraf
       };
     case "selectSection":
       return { ...state, selectedSection: action.id };
+    case "selectPage":
+      return { ...state, selectedPageId: action.pageId };
     case "patchSection":
       switch (action.section) {
         case "hero":
@@ -474,6 +502,8 @@ export function siteDraftReducer(state: SiteDraft, action: SiteAction): SiteDraf
       };
     case "patchPublish":
       return { ...state, publish: { ...state.publish, ...action.patch } };
+    case "setRemote":
+      return { ...state, remote: action.remote };
   }
   return state;
 }

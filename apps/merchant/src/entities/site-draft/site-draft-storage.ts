@@ -102,6 +102,7 @@ export function parseDraft(raw: string | null): SiteDraft | null {
       ...EMPTY_SITE_DRAFT,
       ...stored,
       step,
+      remote: isRecord(stored.remote) && Array.isArray(stored.remote.navItems) && Array.isArray(stored.remote.homeSections) ? stored.remote : null,
       brand: {
         ...EMPTY_SITE_DRAFT.brand,
         ...stored.brand,

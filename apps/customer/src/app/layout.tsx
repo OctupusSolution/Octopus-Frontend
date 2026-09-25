@@ -1,14 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo, IBM_Plex_Sans_Arabic, Inter, Playfair_Display, Poppins, Tajawal } from "next/font/google";
-import { headers } from "next/headers";
-import { getDirection } from "@i18n/index";
-import { readLocaleCookie } from "@/shared/lib/locale-cookie";
 import { OrderingSessionProvider } from "@/entities/order";
-import { TENANT_SLUG_HEADER } from "@/entities/tenant";
-import { loadSite, loadTenant } from "@/entities/tenant/load";
+import { getStorefront, loadTenant } from "@/entities/tenant/load";
 import { StoreI18nProvider } from "@/app/providers";
 import { themeStyle } from "@/shared/api/brand-theme";
-import { SiteHeader } from "@/widgets/site-header";
+import type { PublicNavItem, PublishedShell } from "@/shared/api/public-api";
+import { createTranslator } from "@/shared/i18n/translate";
+import { SiteHeader, type SiteNavLink } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
 import "./globals.css";
 
@@ -31,31 +29,117 @@ const plexArabic = IBM_Plex_Sans_Arabic({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "OCTOPUS",
-  description: "Order online",
-};
+/** Site-wide metadata: the published site's defaults (a page's own metadata overrides them). */
+export async function generateMetadata(): Promise<Metadata> {
+  const { sample, shell } = await getStorefront();
+  if (sample || !shell) return { title: sample ? "OCTOPUS" : "Not found", description: sample ? "Order online" : undefined };
+  const name = shell.brand.displayName;
+  const template = shell.seo.titleTemplate?.includes("{page}")
+    ? shell.seo.titleTemplate.replaceAll("{page}", "%s").replaceAll("{site}", name)
+    : `%s | ${name}`;
+  let metadataBase: URL | undefined;
+  try {
+    metadataBase = new URL(shell.canonicalBaseUrl);
+  } catch {
+    metadataBase = undefined;
+  }
+  return {
+    metadataBase,
+    title: { default: shell.seo.defaultTitle || name, template },
+    description: shell.seo.defaultDescription ?? undefined,
+    applicationName: name,
+    icons: shell.brand.favicon ? { icon: shell.brand.favicon.url } : undefined,
+    robots: shell.seo.noIndex || shell.isPreview ? { index: false, follow: false } : undefined,
+    openGraph: {
+      siteName: name,
+      locale: shell.language,
+      images: shell.seo.socialImageUrl ? [shell.seo.socialImageUrl] : undefined,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
 };
 
+/** The published navigation, flattened for the header (children follow their parent). */
+function navLinks(shell: PublishedShell, homeLabel: string): SiteNavLink[] {
+  const titleOf = (href: string) => shell.pages.find((p) => p.path === href)?.title;
+  const out: SiteNavLink[] = [];
+  const walk = (items: PublicNavItem[]) => {
+    for (const item of items) {
+      if (item.href) {
+        const label = item.label || titleOf(item.href) || (item.href === "/" ? homeLabel : "");
+        if (label) {
+          out.push({
+            label,
+            href: item.href,
+            openInNewTab: item.openInNewTab && !shell.navigation.options.openLinksInSameTab,
+            inHeader: item.showInHeader,
+            inDrawer: item.showInDrawer,
+          });
+        }
+      }
+      walk(item.children);
+    }
+  };
+  walk(shell.navigation.items);
+  return out;
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const locale = readLocaleCookie();
-  const slug = headers().get(TENANT_SLUG_HEADER) ?? "burger-house";
-  const [tenant, site] = await Promise.all([loadTenant(slug), loadSite(slug)]);
+  const storefront = await getStorefront();
+  const { sample, shell, locale, language, direction } = storefront;
+  const fonts = `${inter.variable} ${interAlias.variable} ${plexArabic.variable} ${cairo.variable} ${tajawal.variable} ${poppins.variable} ${playfair.variable}`;
+
+  // A real subdomain with no published site: no chrome, just the 404 the page renders.
+  if (!sample && !shell) {
+    return (
+      <html lang={language} dir={direction} className={fonts}>
+        <body>
+          <StoreI18nProvider locale={locale}>
+            <main>{children}</main>
+          </StoreI18nProvider>
+        </body>
+      </html>
+    );
+  }
+
+  const tenant = await loadTenant();
+  const t = createTranslator(locale);
 
   return (
-    <html lang={locale} dir={getDirection(locale)} className={`${inter.variable} ${interAlias.variable} ${plexArabic.variable} ${cairo.variable} ${tajawal.variable} ${poppins.variable} ${playfair.variable}`}
-      style={themeStyle(site)}
-    >
+    <html lang={language} dir={direction} className={fonts} style={themeStyle(shell)}>
       <body>
         <StoreI18nProvider locale={locale}>
           <OrderingSessionProvider>
-            <SiteHeader locale={locale} logoUrl={site?.brand.logo?.url ?? null} brandName={tenant.name} />
+            {shell ? (
+              <SiteHeader
+                locale={locale}
+                logoUrl={shell.brand.logo?.url ?? null}
+                brandName={shell.brand.displayName}
+                nav={navLinks(shell, t("store.nav.home"))}
+                languages={shell.languages.map((l) => l.code)}
+              />
+            ) : (
+              <SiteHeader locale={locale} brandName={tenant.name} />
+            )}
             <main>{children}</main>
-            <SiteFooter tenant={tenant} />
+            <SiteFooter
+              tenant={tenant}
+              site={
+                shell
+                  ? {
+                      brandName: shell.brand.displayName,
+                      logoUrl: shell.brand.logo?.url ?? null,
+                      groups: shell.footer.groups,
+                      socialLinks: shell.footer.socialLinks,
+                      contact: shell.footer.contact,
+                    }
+                  : undefined
+              }
+            />
           </OrderingSessionProvider>
         </StoreI18nProvider>
       </body>

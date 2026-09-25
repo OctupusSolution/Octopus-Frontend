@@ -23,6 +23,7 @@ import { OffersInspector } from "./customize/offers-inspector";
 import { ReservationsInspector } from "./customize/reservations-inspector";
 import { WaitlistInspector } from "./customize/waitlist-inspector";
 import type { StepProps } from "../_shared/steps";
+import { ServerSectionInspector, ServerSectionsList } from "./connected/sections-panel";
 
 /** Module scope, not nested inside `CustomizeStep`: a component redefined on
  *  every render would remount every row on every keystroke elsewhere on the
@@ -75,10 +76,27 @@ function sectionLabel(section: SectionEntry, t: (key: string) => string): string
   return meta ? t(meta.labelKey) : section.id;
 }
 
-export function CustomizeStep({ draft, dispatch }: StepProps) {
+export function CustomizeStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [addOpen, setAddOpen] = useState(false);
+  const [serverSection, setServerSection] = useState<string | null>(null);
+
+  // Connected: the server's pages and their typed sections.
+  if (publicLinkSync.connected) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-4 xl:grid-cols-[280px_340px_minmax(0,1fr)]">
+          <ServerSectionsList sync={publicLinkSync} draft={draft} dispatch={dispatch} selected={serverSection} onSelect={setServerSection} />
+          <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
+            <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.customize.settingForSelected")}</p>
+            <ServerSectionInspector sync={publicLinkSync} draft={draft} sectionId={serverSection} onDeleted={() => setServerSection(null)} />
+          </div>
+          <DeviceFrame model={previewModelFromSite(draft, device, t, locale)} device={device} onDevice={setDevice} devices={["desktop"]} />
+        </div>
+      </div>
+    );
+  }
 
   const model = previewModelFromSite(draft, device, t, locale);
   const selectedMeta = SITE_SECTIONS.find((s) => s.id === draft.selectedSection);

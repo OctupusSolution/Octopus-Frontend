@@ -14,16 +14,30 @@ export interface SiteHeaderProps {
   /** The business's own logo; the platform mark until it uploads one. */
   logoUrl?: string | null;
   brandName?: string;
+  /** A published site's own navigation (already resolved for the language);
+   *  omitted for the sample storefront, which uses its built-in entries. */
+  nav?: SiteNavLink[];
+  /** The languages the published site offers. */
+  languages?: string[];
+}
+
+export interface SiteNavLink {
+  label: string;
+  href: string;
+  openInNewTab: boolean;
+  inHeader: boolean;
+  inDrawer: boolean;
 }
 
 interface NavEntry {
   href: string;
-  key: string;
+  label: string;
+  newTab?: boolean;
 }
 
 // The three middle entries are in-page anchors, not routes — the design's nav
 // mixes both, and only the real routes can ever be "active".
-const NAV: readonly NavEntry[] = [
+const NAV: readonly { href: string; key: string }[] = [
   { href: "/", key: "store.nav.home" },
   { href: "/menu", key: "store.nav.menu" },
   { href: "/menu#products", key: "store.nav.products" },
@@ -33,8 +47,15 @@ const NAV: readonly NavEntry[] = [
   { href: "/orders", key: "store.nav.trackOrder" },
 ];
 
-export function SiteHeader({ locale, logoUrl, brandName }: SiteHeaderProps) {
+export function SiteHeader({ locale, logoUrl, brandName, nav, languages }: SiteHeaderProps) {
   const { t } = useI18n();
+  const sampleNav: NavEntry[] = NAV.map((e) => ({ href: e.href, label: t(e.key) }));
+  const headerNav: NavEntry[] = nav
+    ? nav.filter((e) => e.inHeader).map((e) => ({ href: e.href, label: e.label, newTab: e.openInNewTab }))
+    : sampleNav;
+  const drawerNav: NavEntry[] = nav
+    ? nav.filter((e) => e.inDrawer).map((e) => ({ href: e.href, label: e.label, newTab: e.openInNewTab }))
+    : sampleNav;
   const pathname = usePathname();
   const { state } = useOrderingSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -46,16 +67,22 @@ export function SiteHeader({ locale, logoUrl, brandName }: SiteHeaderProps) {
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-6 px-4 sm:px-6">
         <Link href="/" aria-label={brandName ?? "OCTOPUS"} className="flex shrink-0 items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoUrl ?? "/octopus-logo.svg"} alt="" className="h-[30px] w-auto max-w-[120px] object-contain" />
+          {logoUrl || !nav ? (
+            <img src={logoUrl ?? "/octopus-logo.svg"} alt="" className="h-[30px] w-auto max-w-[120px] object-contain" />
+          ) : (
+            <span className="text-[16px] font-bold text-[var(--octo-text-primary)]">{brandName}</span>
+          )}
         </Link>
 
         <nav className="hidden items-center gap-[26px] md:flex">
-          {NAV.map((entry) => {
+          {headerNav.map((entry) => {
             const active = pathname === entry.href;
             return (
               <Link
                 key={entry.href}
                 href={entry.href}
+                target={entry.newTab ? "_blank" : undefined}
+                rel={entry.newTab ? "noopener noreferrer" : undefined}
                 aria-current={active ? "page" : undefined}
                 className={`relative text-[13.5px] transition-colors ${
                   active
@@ -63,14 +90,14 @@ export function SiteHeader({ locale, logoUrl, brandName }: SiteHeaderProps) {
                     : "text-[var(--octo-text-primary)] hover:text-[var(--octo-brand)]"
                 }`}
               >
-                {t(entry.key)}
+                {entry.label}
               </Link>
             );
           })}
         </nav>
 
         <div className="flex shrink-0 items-center gap-2.5">
-          <SwitchLocale locale={locale} />
+          <SwitchLocale locale={locale} languages={languages} />
 
           <Link
             href="/cart"
@@ -100,14 +127,16 @@ export function SiteHeader({ locale, logoUrl, brandName }: SiteHeaderProps) {
       {drawerOpen && (
         <nav className="border-t border-[var(--octo-divider)] bg-[var(--octo-card)] px-4 py-3 md:hidden">
           <ul className="flex flex-col">
-            {NAV.map((entry) => (
+            {drawerNav.map((entry) => (
               <li key={entry.href}>
                 <Link
                   href={entry.href}
+                  target={entry.newTab ? "_blank" : undefined}
+                  rel={entry.newTab ? "noopener noreferrer" : undefined}
                   onClick={() => setDrawerOpen(false)}
                   className="block py-2.5 text-[13.5px] text-[var(--octo-text-primary)]"
                 >
-                  {t(entry.key)}
+                  {entry.label}
                 </Link>
               </li>
             ))}

@@ -6,7 +6,18 @@ import { useI18n } from "@/app/providers";
 
 export interface StoreHeroProps {
   /** The business's own hero copy and image; empty fields keep the defaults. */
-  copy?: { heading: string; subheading: string; primaryCta: string; secondaryCta: string; imageUrl: string | null };
+  copy?: {
+    heading: string;
+    subheading: string;
+    primaryCta: string;
+    secondaryCta: string;
+    imageUrl: string | null;
+    /** Where the primary action goes (a published hero's own link); default /menu. */
+    primaryHref?: string | null;
+    /** A published hero has exactly the actions it was given: no built-in fallbacks. */
+    published?: boolean;
+    showOverlay?: boolean;
+  };
 }
 
 export function StoreHero({ copy }: StoreHeroProps) {
@@ -21,26 +32,33 @@ export function StoreHero({ copy }: StoreHeroProps) {
         className="h-[440px] w-full object-cover sm:h-[600px]"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" aria-hidden="true" />
+      {copy?.showOverlay !== false && (
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/30" aria-hidden="true" />
+      )}
 
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6 text-center">
         <h1 className="max-w-[860px] text-[26px] font-bold leading-[1.4] text-white sm:text-[44px]">
           {copy?.heading || t("store.hero.title")}
         </h1>
 
-        <p className="max-w-[720px] text-[13px] leading-[1.9] text-white/85 sm:text-[15px]">
-          {copy?.subheading || t("store.hero.subtitle")}
-        </p>
+        {(copy?.subheading || !copy?.published) && (
+          <p className="max-w-[720px] text-[13px] leading-[1.9] text-white/85 sm:text-[15px]">
+            {copy?.subheading || t("store.hero.subtitle")}
+          </p>
+        )}
 
         <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          {(!copy?.published || copy.primaryHref) && (
           <Link
-            href="/menu"
+            href={copy?.primaryHref || "/menu"}
             className="inline-flex items-center gap-2 rounded-full border border-white/70 px-6 py-3 text-[13.5px] text-white transition-colors hover:bg-white/10"
           >
             <ClipboardList size={16} aria-hidden="true" />
             {copy?.primaryCta || t("store.hero.viewMenu")}
           </Link>
+          )}
 
+          {!copy?.published && (
           <Link
             href="/booking"
             className="inline-flex items-center gap-2 rounded-full border border-white/70 px-6 py-3 text-[13.5px] text-white transition-colors hover:bg-white/10"
@@ -48,6 +66,7 @@ export function StoreHero({ copy }: StoreHeroProps) {
             <ClipboardList size={16} aria-hidden="true" />
             {copy?.secondaryCta || t("store.hero.bookTable")}
           </Link>
+          )}
         </div>
       </div>
     </section>

@@ -18,6 +18,7 @@ import { DrawerNavPreview } from "../ui/nav-preview";
 import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
+import { ServerPagesPanel } from "./connected/pages-panel";
 
 const HEADER_CELL = "py-2 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]";
 
@@ -91,7 +92,7 @@ function pageLabel(page: PageEntry, t: (key: string) => string): string {
   return module ? t(module.labelKey) : page.id;
 }
 
-export function PagesStep({ draft, dispatch }: StepProps) {
+export function PagesStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
 
@@ -105,51 +106,55 @@ export function PagesStep({ draft, dispatch }: StepProps) {
           and 1400px the table takes the full row and the two previews share
           the row beneath it. */}
       <div className="grid gap-4 xl:grid-cols-[210px_minmax(0,1fr)] min-[1400px]:grid-cols-[minmax(0,1fr)_210px_400px]">
-        <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px] xl:col-span-2 min-[1400px]:col-span-1">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] table-fixed border-collapse text-start">
-              <colgroup>
-                <col className="w-8" />
-                <col />
-                <col className="w-[76px]" />
-                <col className="w-[76px]" />
-                <col className="w-[84px]" />
-              </colgroup>
-              <thead>
-                <tr className="border-b border-[var(--octo-border-card)]">
-                  <th scope="col" className="w-8 py-2">
-                    <span className="sr-only">{t("publicLink.reorder.hint")}</span>
-                  </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-start")}>
-                    {t("publicLink.pages.pageModule")}
-                  </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
-                    {t("publicLink.pages.showInNav")}
-                  </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
-                    {t("publicLink.pages.showOnHome")}
-                  </th>
-                  <th scope="col" className={clsx(HEADER_CELL, "text-end leading-tight")}>
-                    {t("publicLink.pages.customize")}
-                  </th>
-                </tr>
-              </thead>
-              <ReorderList
-                as="table"
-                items={draft.pages}
-                getId={(page) => page.id}
-                getLabel={(page) => pageLabel(page, t)}
-                onReorder={(pages) => dispatch({ type: "setPages", pages })}
-                renderRow={(page, _index, grip) => <PagesRow page={page} grip={grip} dispatch={dispatch} />}
-              />
-            </table>
-          </div>
+        {publicLinkSync.connected ? (
+          <ServerPagesPanel sync={publicLinkSync} dispatch={dispatch} />
+        ) : (
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px] xl:col-span-2 min-[1400px]:col-span-1">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] table-fixed border-collapse text-start">
+                <colgroup>
+                  <col className="w-8" />
+                  <col />
+                  <col className="w-[76px]" />
+                  <col className="w-[76px]" />
+                  <col className="w-[84px]" />
+                </colgroup>
+                <thead>
+                  <tr className="border-b border-[var(--octo-border-card)]">
+                    <th scope="col" className="w-8 py-2">
+                      <span className="sr-only">{t("publicLink.reorder.hint")}</span>
+                    </th>
+                    <th scope="col" className={clsx(HEADER_CELL, "text-start")}>
+                      {t("publicLink.pages.pageModule")}
+                    </th>
+                    <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
+                      {t("publicLink.pages.showInNav")}
+                    </th>
+                    <th scope="col" className={clsx(HEADER_CELL, "text-center leading-tight")}>
+                      {t("publicLink.pages.showOnHome")}
+                    </th>
+                    <th scope="col" className={clsx(HEADER_CELL, "text-end leading-tight")}>
+                      {t("publicLink.pages.customize")}
+                    </th>
+                  </tr>
+                </thead>
+                <ReorderList
+                  as="table"
+                  items={draft.pages}
+                  getId={(page) => page.id}
+                  getLabel={(page) => pageLabel(page, t)}
+                  onReorder={(pages) => dispatch({ type: "setPages", pages })}
+                  renderRow={(page, _index, grip) => <PagesRow page={page} grip={grip} dispatch={dispatch} />}
+                />
+              </table>
+            </div>
 
-          <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[11.5px] text-[#0D6EFD]">
-            <Info size={13} className="shrink-0" />
-            {t("publicLink.pages.tip")}
-          </p>
-        </div>
+            <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[11.5px] text-[#0D6EFD]">
+              <Info size={13} className="shrink-0" />
+              {t("publicLink.pages.tip")}
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.pages.navigationPreview")}</p>

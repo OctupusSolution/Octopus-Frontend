@@ -17,6 +17,7 @@ import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
 import type { FontResponse } from "@octopus/api-client";
 import {
+  describePublicLinkError,
   EMPTY_SITE_DRAFT,
   ensureFontLoaded,
   siteFontFamily,
@@ -26,6 +27,8 @@ import {
 import { previewModelFromSite } from "../_shared/preview-model";
 import { DeviceFrame } from "../ui/device-frame";
 import type { StepProps } from "../_shared/steps";
+import { usePlText } from "../_shared/texts";
+import { LanguagesCard } from "./connected/languages-card";
 
 const HEX_PATTERN = /^#[0-9a-f]{6}$/i;
 const SECTION_TITLE = "text-[16px] font-semibold text-[var(--octo-text-primary)]";
@@ -228,7 +231,7 @@ function SlugField({
   checkSlug: (slug: string) => Promise<{ isAvailable: boolean; reason: string | null }>;
   claimSlug: (slug: string) => Promise<void>;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<{ isAvailable: boolean; reason: string | null } | null>(null);
   const [claiming, setClaiming] = useState(false);
@@ -238,6 +241,8 @@ function SlugField({
     setChecking(true);
     try {
       setResult(await checkSlug(draftSlug));
+    } catch (err) {
+      setResult({ isAvailable: false, reason: describePublicLinkError(err, locale) });
     } finally {
       setChecking(false);
     }
@@ -248,6 +253,8 @@ function SlugField({
     try {
       await claimSlug(draftSlug);
       setResult(null);
+    } catch (err) {
+      setResult({ isAvailable: false, reason: describePublicLinkError(err, locale) });
     } finally {
       setClaiming(false);
     }
@@ -301,7 +308,21 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
 
   const model = previewModelFromSite(draft, device, t, locale);
 
+  const tx = usePlText();
+  const [resetting, setResetting] = useState(false);
+  const connected = publicLinkSync.connected;
+
   const resetToThemeDefaults = () => {
+    if (connected) {
+      // POST /draft/theme/reset clears the colour/font overrides (and section
+      // styles); the sync hook then mirrors the theme's own values back here.
+      setResetting(true);
+      publicLinkSync
+        .resetTheme()
+        .catch(() => undefined)
+        .finally(() => setResetting(false));
+      return;
+    }
     const defaults: SiteDraft["brand"] = EMPTY_SITE_DRAFT.brand;
     dispatch({ type: "patchColors", patch: defaults.colors });
     dispatch({ type: "patchTypography", locale: "en", patch: defaults.typography.en });
@@ -442,23 +463,30 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 fit="contain"
                 onPick={(faviconDataUrl) => dispatch({ type: "patchBrand", patch: { faviconDataUrl } })}
               />
-              <AssetPicker
-                label={t("publicLink.brand.heroPattern")}
-                src={brand.heroPatternDataUrl}
-                fit="cover"
-                onPick={(heroPatternDataUrl) => dispatch({ type: "patchBrand", patch: { heroPatternDataUrl } })}
-              />
+              {connected ? (
+                <p className="self-end text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.brand.heroMoved")}</p>
+              ) : (
+                <AssetPicker
+                  label={t("publicLink.brand.heroPattern")}
+                  src={brand.heroPatternDataUrl}
+                  fit="cover"
+                  onPick={(heroPatternDataUrl) => dispatch({ type: "patchBrand", patch: { heroPatternDataUrl } })}
+                />
+              )}
             </div>
           </section>
 
           <button
             type="button"
             onClick={resetToThemeDefaults}
+            disabled={resetting}
             className="flex w-fit items-center gap-2 rounded text-[14px] font-semibold text-[#0D6EFD] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40"
           >
             <RotateCcw size={16} className="rtl:-scale-x-100" />
-            {t("publicLink.brand.resetDefaults")}
+            {resetting ? tx("pl.brand.resetting") : t("publicLink.brand.resetDefaults")}
           </button>
+
+          {connected && <LanguagesCard sync={publicLinkSync} />}
         </div>
 
         <DeviceFrame

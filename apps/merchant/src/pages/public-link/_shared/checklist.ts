@@ -36,19 +36,34 @@ export interface GoLiveItem {
   required?: boolean;
 }
 
+// While connected (`draft.remote` set by public-link-sync.ts) the structural
+// rows read the server's projection — its pages and navigation — instead of
+// the local page modules, and the claimed address becomes a required row:
+// the backend refuses to publish without one (publiclink.publish.slug-missing).
 export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
+  {
+    id: "address",
+    labelKey: "publicLink.checklist.address.label",
+    noteKey: "publicLink.checklist.address.note",
+    // Local-only builds publish a local toggle and need no address.
+    done: (draft) => draft.remote === null || draft.remote === undefined || Boolean(draft.remote.host || draft.slug.trim()),
+    required: true,
+  },
   {
     id: "pages",
     labelKey: "publicLink.checklist.pages.label",
     noteKey: "publicLink.checklist.pages.note",
-    done: (draft) => draft.pages.some((page) => page.onHome),
+    done: (draft) => (draft.remote ? draft.remote.visiblePages > 0 : draft.pages.some((page) => page.onHome)),
     required: true,
   },
   {
     id: "navigation",
     labelKey: "publicLink.checklist.navigation.label",
     noteKey: "publicLink.checklist.navigation.note",
-    done: (draft) => draft.pages.some((page) => page.inNav && !draft.navigation.hidden.includes(page.id)),
+    done: (draft) =>
+      draft.remote
+        ? draft.remote.navItems.some((item) => item.visible)
+        : draft.pages.some((page) => page.inNav && !draft.navigation.hidden.includes(page.id)),
     required: true,
   },
   {

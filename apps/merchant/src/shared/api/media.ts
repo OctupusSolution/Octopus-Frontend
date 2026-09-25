@@ -19,8 +19,8 @@ import {
 } from "@octopus/api-client";
 
 export type MediaPurpose = "SectionImage" | "ItemImage" | "OfferImage" | "ThemeLogo" | "ThemeHeroImage";
-/** The Public Link module has its own library and its own purposes. */
-export type SiteMediaPurpose = "Logo" | "Favicon" | "HeroBackground" | "SectionImage";
+/** The Public Link module has its own library and its own purposes (US-019 adds SocialImage, SectionVideo). */
+export type SiteMediaPurpose = "Logo" | "Favicon" | "HeroBackground" | "SectionImage" | "SocialImage" | "SectionVideo";
 
 export interface UploadedMedia {
   ref: MediaReferenceDto;
@@ -92,6 +92,12 @@ async function doUpload(businessId: string, src: string, purpose: string, fileNa
       ? await completeSiteMediaUpload(businessId, ticket.uploadId)
       : await completeMediaUpload(businessId, ticket.uploadId, { businessId })
   );
+}
+
+/** Remembers an asset the caller already holds (e.g. from the site media library) so
+ *  `knownMedia(url)` recognises its delivery URL on the next save. */
+export function rememberMedia(asset: Pick<MediaAssetResponse, "assetId" | "kind" | "deliveryUrl">): UploadedMedia {
+  return remember(asset);
 }
 
 /** The delivery URL for a stored reference (one call per new asset). */

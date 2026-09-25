@@ -16,6 +16,7 @@ import { MobileDrawerPreview } from "../ui/nav-preview";
 import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
+import { FooterCard, NavigationDisplayCard, NavigationItemsCard } from "./connected/navigation-panel";
 
 /** Module scope, not nested inside `NavigationStep`: a component redefined on
  *  every render would remount every row on every keystroke elsewhere on the
@@ -148,7 +149,7 @@ function pageLabel(page: PageEntry, t: (key: string) => string): string {
   return module ? t(module.labelKey) : page.id;
 }
 
-export function NavigationStep({ draft, dispatch }: StepProps) {
+export function NavigationStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t } = useI18n();
   const { navigation } = draft;
 
@@ -158,6 +159,7 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)_540px]">
+        {publicLinkSync.connected ? <NavigationDisplayCard sync={publicLinkSync} /> : (<>
         {/* Start: Navigation Display + Global Options */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
@@ -199,7 +201,9 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
               onChange={() => patchNav({ sameTab: !navigation.sameTab })}            />
           </div>
         </div>
+        </>)}
 
+        {publicLinkSync.connected ? <NavigationItemsCard sync={publicLinkSync} /> : (<>
         {/* Middle: Page Order */}
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.navigation.pageOrder")}</p>
@@ -219,6 +223,7 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
           />
           <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.navigation.pageOrderHint")}</p>
         </div>
+        </>)}
 
         {/* End: the frame's Live Preview card — the site as it reads on the
             web, beside the phone drawer. */}
@@ -244,6 +249,7 @@ export function NavigationStep({ draft, dispatch }: StepProps) {
           </p>
         </div>
       </div>
+      {publicLinkSync.connected && <FooterCard sync={publicLinkSync} />}
     </div>
   );
 }

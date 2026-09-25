@@ -64,6 +64,13 @@ const CATEGORY_IMAGES: readonly string[] = [
 // Only the block kinds the widget actually draws. Everything else in
 // SECTION_IDS (reservations, reservationsCta, events, testimonials,
 // instagram, waitlist) has no entry and is dropped in `previewModelFromSite`.
+/** Server catalogue theme keys -> the three looks `styleTokens` renders. */
+const SERVER_THEME_STYLES: Readonly<Record<string, "elegant" | "modern" | "warm">> = {
+  default: "modern",
+  warm: "warm",
+  midnight: "elegant",
+};
+
 const SECTION_WIDGET_MAP: Record<string, string> = {
   hero: "hero",
   menu: "menu",
@@ -124,13 +131,17 @@ export function previewModelFromSite(
   // failure mode every comparable lookup in this feature already guards
   // against). Skip the unknown id instead of crashing the whole app on
   // mount.
-  const navItems = draft.pages
+  const remote = draft.remote ?? null;
+  const localNavItems = draft.pages
     .filter((page) => page.inNav)
     .flatMap((page) => {
       const module = PAGE_MODULES.find((m) => m.id === page.id);
       if (!module) return [];
       return [{ labelKey: module.labelKey, visible: !draft.navigation.hidden.includes(page.id) }];
     });
+  // Connected: the server's pages/navigation, already resolved to literal
+  // labels (the widget's `t()` hands an unknown key back verbatim).
+  const navItems = remote ? remote.navItems.map((item) => ({ labelKey: item.label, visible: item.visible })) : localNavItems;
 
   // Named, not positional: whichever page is first in nav order AND not
   // eye-toggled hidden is "home" for this preview, however the merchant has
@@ -142,23 +153,27 @@ export function previewModelFromSite(
   // The hero's Advanced tab can hide it per device; tablet reads as desktop.
   const heroVisible = device === "mobile" ? hero.showOnMobile : hero.showOnDesktop;
 
-  const sections = draft.sections
-    .filter((section) => section.enabled)
-    .filter((section) => section.id !== "hero" || heroVisible)
-    .map((section) => SECTION_WIDGET_MAP[section.id])
-    .filter((id): id is string => id !== undefined);
+  const sections = remote
+    ? remote.homeSections.filter((id) => id in SECTION_WIDGET_MAP)
+    : draft.sections
+        .filter((section) => section.enabled)
+        .filter((section) => section.id !== "hero" || heroVisible)
+        .map((section) => SECTION_WIDGET_MAP[section.id])
+        .filter((id): id is string => id !== undefined);
+  const remoteHero = remote?.hero ?? null;
 
   return {
     businessName: brand.businessName || t("publicLink.defaultBusinessName"),
     logoDataUrl: brand.logoDataUrl,
-    // The claimed slug is the real address; the name-derived label is only a
-    // stand-in before one is claimed.
-    url: `${hostLabelFromName(draft.slug) || hostLabelFromName(brand.businessName) || "restaurant"}.octopus.app`,
+    // The server's hostname (from the claimed slug) is the real address; the
+    // slug-derived host covers the moment between claim and reload, and the
+    // name-derived label is only a stand-in before any address is claimed.
+    url: remote?.host || `${hostLabelFromName(draft.slug) || hostLabelFromName(brand.businessName) || "restaurant"}.octopus.app`,
     primary: brand.colors.primary,
     secondary: brand.colors.accent,
     // The widget resolves faces by brand-tokens FONTS id; catalogue codes map to the nearest one.
     font: toLegacyFontId(brand.typography[locale === "ar" ? "ar" : "en"].titles),
-    themeTemplate: activeTheme?.styleId ?? null,
+    themeTemplate: activeTheme?.styleId ?? SERVER_THEME_STYLES[theme.id] ?? null,
     sections,
     sectionLabelKeys: SECTION_LABEL_KEYS,
     navItems,
@@ -180,7 +195,14 @@ export function previewModelFromSite(
     hoursSummary: "",
     samplePrices: PRICE_LADDER.map((p) => formatSitePrice(p, locale)),
     sampleWasPrices: PRICE_LADDER.map((p) => formatSitePrice(Math.round(p * 1.4), locale)),
-    hero: {
+    hero: remote
+      ? {
+          headline: remoteHero?.headline || t("publicLink.hero.defaultHeadline"),
+          sub: remoteHero?.sub,
+          primaryCta: remoteHero?.primaryCta,
+          imageUrl: remoteHero?.imageUrl,
+        }
+      : {
       headline: hero.heading || t("publicLink.hero.defaultHeadline"),
       sub: hero.subheading || undefined,
       primaryCta: hero.primaryCta || undefined,

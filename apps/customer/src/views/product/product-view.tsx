@@ -192,7 +192,7 @@ export function ProductView({ item, category, categories, items }: ProductViewPr
                   type="button"
                   disabled={soldOut}
                   onClick={handleSubmit}
-                  className="flex-1 rounded-[10px] bg-[#0D6EFD] px-6 py-3 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-[10px] bg-[var(--octo-brand)] px-6 py-3 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {soldOut
                     ? t("store.product.outOfStock")

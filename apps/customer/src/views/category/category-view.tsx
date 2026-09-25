@@ -53,7 +53,7 @@ export function CategoryView({ category, items, groups }: CategoryViewProps) {
           onClick={() => setFiltersOpen((v) => !v)}
           className={`inline-flex items-center gap-2 rounded-[10px] px-4 py-2 text-[12.5px] transition-colors ${
             filtersOpen
-              ? "bg-[#0D6EFD] text-white"
+              ? "bg-[var(--octo-brand)] text-white"
               : "border border-[var(--octo-border-input)] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
           }`}
         >
@@ -74,7 +74,7 @@ export function CategoryView({ category, items, groups }: CategoryViewProps) {
           <button
             type="button"
             onClick={clear}
-            className="text-[12.5px] font-medium text-[#0D6EFD] hover:underline"
+            className="text-[12.5px] font-medium text-[var(--octo-brand)] hover:underline"
           >
             {t("store.filter.clear")}
           </button>

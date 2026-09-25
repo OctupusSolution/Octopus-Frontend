@@ -71,7 +71,7 @@ export function SiteFooter({ tenant }: SiteFooterProps) {
                 <a
                   href="#"
                   aria-label={label}
-                  className="grid h-8 w-8 place-items-center rounded-full border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:text-[#0D6EFD]"
+                  className="grid h-8 w-8 place-items-center rounded-full border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:text-[var(--octo-brand)]"
                 >
                   <Icon size={14} />
                 </a>

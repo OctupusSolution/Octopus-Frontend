@@ -30,7 +30,7 @@ export function ProductGallery({ images, alt }: ProductGalleryProps) {
                 aria-pressed={index === active}
                 onClick={() => setActive(index)}
                 className={`grid h-[92px] w-[92px] place-items-center rounded-[20px] bg-[var(--octo-store-soft)] p-3 transition-shadow sm:h-[140px] sm:w-[140px] ${
-                  index === active ? "ring-2 ring-[#0D6EFD]" : "ring-1 ring-transparent"
+                  index === active ? "ring-2 ring-[var(--octo-brand)]" : "ring-1 ring-transparent"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,14 +1,15 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getMenuForTenant } from "@/entities/menu-item";
-import { getTenantBySlug, TENANT_SLUG_HEADER } from "@/entities/tenant";
+import { loadMenu } from "@/entities/menu-item/load";
+import { TENANT_SLUG_HEADER } from "@/entities/tenant";
+import { loadTenant } from "@/entities/tenant/load";
 import { ProductView } from "@/views/product";
 
-export default function ProductPage({ params }: { params: { category: string; item: string } }) {
+export default async function ProductPage({ params }: { params: { category: string; item: string } }) {
   const slug = headers().get(TENANT_SLUG_HEADER) ?? "burger-house";
-  const tenant = getTenantBySlug(slug);
-  const { categories, items } = getMenuForTenant(tenant.id);
+  const tenant = await loadTenant(slug);
+  const { categories, items } = await loadMenu(slug);
 
   const category = categories.find((c) => c.slug === params.category);
   const item = items.find((i) => i.id === params.item);

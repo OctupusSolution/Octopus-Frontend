@@ -43,7 +43,7 @@ export function CartTotals({ pricing, discountSar, onContinue }: CartTotalsProps
           <dt className="text-[15px] font-bold text-[var(--octo-text-primary)]">
             {t("store.cart.total")}
           </dt>
-          <dd className="text-[17px] font-bold text-[#0D6EFD]">
+          <dd className="text-[17px] font-bold text-[var(--octo-brand)]">
             {money(pricing.totalSar - discountSar)}
           </dd>
         </div>
@@ -58,7 +58,7 @@ export function CartTotals({ pricing, discountSar, onContinue }: CartTotalsProps
       <button
         type="button"
         onClick={onContinue}
-        className="rounded-[10px] bg-[#0D6EFD] px-6 py-3 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90"
+        className="rounded-[10px] bg-[var(--octo-brand)] px-6 py-3 text-[13.5px] font-semibold text-white transition-opacity hover:opacity-90"
       >
         {t("store.cart.continue")}
       </button>

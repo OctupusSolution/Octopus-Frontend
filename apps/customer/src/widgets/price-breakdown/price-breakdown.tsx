@@ -21,9 +21,9 @@ export function PriceBreakdown({ rows, totalSar }: PriceBreakdownProps) {
   const currency = t("store.currency");
 
   return (
-    <section className="rounded-xl border-2 border-dashed border-[#0D6EFD] bg-[var(--octo-selected)] p-5">
+    <section className="rounded-xl border-2 border-dashed border-[var(--octo-brand)] bg-[var(--octo-selected)] p-5">
       <h2 className="flex items-center gap-2 text-[12.5px] font-semibold text-[var(--octo-text-secondary)]">
-        <ReceiptText size={15} className="shrink-0 text-[#0D6EFD]" aria-hidden="true" />
+        <ReceiptText size={15} className="shrink-0 text-[var(--octo-brand)]" aria-hidden="true" />
         {t("store.product.totalTitle")}
       </h2>
 
@@ -37,11 +37,11 @@ export function PriceBreakdown({ rows, totalSar }: PriceBreakdownProps) {
           </div>
         ))}
 
-        <div className="mt-2 flex items-center justify-between gap-3 border-t border-[#0D6EFD]/25 pt-2.5">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-[var(--octo-brand)]/25 pt-2.5">
           <dt className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
             {t("store.product.totalLine")}
           </dt>
-          <dd className="shrink-0 text-[17px] font-bold text-[#0D6EFD]">
+          <dd className="shrink-0 text-[17px] font-bold text-[var(--octo-brand)]">
             {formatAmount(totalSar)} <span className="text-[11px]">{currency}</span>
           </dd>
         </div>

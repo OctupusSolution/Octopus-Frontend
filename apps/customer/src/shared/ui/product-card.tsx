@@ -40,7 +40,7 @@ export function ProductCard({ item, href, onAdd }: ProductCardProps) {
 
         {item.badges?.includes("best_seller") && (
           <span className="inline-flex items-center gap-1 rounded-full bg-[var(--octo-selected)] py-0.5 pe-2 ps-0.5 text-[9px] font-semibold text-[var(--octo-text-secondary)]">
-            <span className="grid h-[15px] w-[15px] shrink-0 place-items-center rounded-full bg-[#0D6EFD]">
+            <span className="grid h-[15px] w-[15px] shrink-0 place-items-center rounded-full bg-[var(--octo-brand)]">
               <Flame size={9} className="text-white" />
             </span>
             {t("store.card.bestSeller")}
@@ -74,7 +74,7 @@ export function ProductCard({ item, href, onAdd }: ProductCardProps) {
           type="button"
           aria-label={t("store.card.addToCart")}
           onClick={() => onAdd(item)}
-          className="relative z-10 grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-white transition-opacity hover:opacity-90"
+          className="relative z-10 grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-[var(--octo-brand)] text-white transition-opacity hover:opacity-90"
         >
           <ShoppingBag size={16} />
         </button>

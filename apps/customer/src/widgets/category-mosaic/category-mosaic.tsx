@@ -18,6 +18,34 @@ const LAYOUT: readonly { slug: string; className: string }[] = [
 ];
 
 export function CategoryMosaic({ categories }: CategoryMosaicProps) {
+  // The magazine layout is drawn for five specific sections. A merchant names
+  // their own, so when none of those five exist every section gets an even tile.
+  if (!categories.some((c) => LAYOUT.some((slot) => slot.slug === c.slug))) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {categories.map((category) => (
+          <Link
+            key={category.id}
+            href={`/menu/${category.slug}`}
+            className="group relative flex min-h-[190px] items-center gap-3 overflow-hidden rounded-[20px] bg-[var(--octo-store-soft)] p-5 transition-shadow hover:shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
+          >
+            <DoodlePattern className="absolute inset-0 h-full w-full text-[#dfe3e8] opacity-50" />
+            <span className="relative z-10 flex-1 text-[18px] font-bold text-[var(--octo-text-primary)] sm:text-[20px]">
+              {category.name}
+            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={category.imageUrl}
+              alt=""
+              loading="lazy"
+              className="relative z-10 h-full max-h-[150px] w-1/2 object-contain transition-transform duration-300 group-hover:scale-105"
+            />
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:grid-rows-[210px_210px]">
       {LAYOUT.map((slot, index) => {

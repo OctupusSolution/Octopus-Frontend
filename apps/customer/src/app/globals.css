@@ -7,6 +7,9 @@
 :root {
   color-scheme: light;
 
+  /* The business's brand colour; layout.tsx overrides it from the public site. */
+  --octo-brand: #0D6EFD;
+
   --octo-page-bg: #e9eaec;
   --octo-shell: #f4f4f5;
   --octo-card: #ffffff;

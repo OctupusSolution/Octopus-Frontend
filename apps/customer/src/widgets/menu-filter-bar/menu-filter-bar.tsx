@@ -43,7 +43,7 @@ function CheckLabel({
         type="checkbox"
         checked={checked}
         onChange={onChange}
-        className="h-[14px] w-[14px] shrink-0 accent-[#0D6EFD]"
+        className="h-[14px] w-[14px] shrink-0 accent-[var(--octo-brand)]"
       />
       {label}
     </label>
@@ -97,7 +97,7 @@ export function MenuFilterBar({ filters, setParam, toggleInList }: MenuFilterBar
     <div className="flex flex-wrap items-stretch rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
       <div
         className={`${CELL} ${EDGE} min-w-[150px] ${
-          filters.bestSellersOnly ? "bg-[var(--octo-selected)] ring-1 ring-inset ring-[#0D6EFD]" : ""
+          filters.bestSellersOnly ? "bg-[var(--octo-selected)] ring-1 ring-inset ring-[var(--octo-brand)]" : ""
         }`}
       >
         <CheckLabel
@@ -122,7 +122,7 @@ export function MenuFilterBar({ filters, setParam, toggleInList }: MenuFilterBar
               name="price"
               checked={currentPrice === range.value}
               onChange={() => setParam("price", range.value)}
-              className="h-[14px] w-[14px] shrink-0 accent-[#0D6EFD]"
+              className="h-[14px] w-[14px] shrink-0 accent-[var(--octo-brand)]"
             />
             {t(range.labelKey, range.vars)}
           </label>
@@ -130,7 +130,7 @@ export function MenuFilterBar({ filters, setParam, toggleInList }: MenuFilterBar
         <button
           type="button"
           onClick={() => setParam("price", null)}
-          className="mt-1 text-start text-[11px] text-[#0D6EFD]"
+          className="mt-1 text-start text-[11px] text-[var(--octo-brand)]"
         >
           {t("store.filter.clear")}
         </button>
@@ -181,7 +181,7 @@ export function MenuFilterBar({ filters, setParam, toggleInList }: MenuFilterBar
               name="mealType"
               checked={filters.group === id}
               onChange={() => setParam("group", id)}
-              className="h-[14px] w-[14px] shrink-0 accent-[#0D6EFD]"
+              className="h-[14px] w-[14px] shrink-0 accent-[var(--octo-brand)]"
             />
             {t(`store.group.${id}`)}
           </label>

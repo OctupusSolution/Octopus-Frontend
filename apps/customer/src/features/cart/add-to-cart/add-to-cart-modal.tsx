@@ -104,7 +104,7 @@ export function AddToCartModal({ item, onClose }: AddToCartModalProps) {
                     className={clsx(
                       "rounded-full border px-3 py-1.5 text-[11.5px] font-medium transition-colors",
                       selected
-                        ? "border-[#0D6EFD] bg-[#0D6EFD] text-white"
+                        ? "border-[var(--octo-brand)] bg-[var(--octo-brand)] text-white"
                         : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]",
                     )}
                   >

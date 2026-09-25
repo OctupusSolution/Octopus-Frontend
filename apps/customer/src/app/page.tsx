@@ -1,12 +1,14 @@
 import { headers } from "next/headers";
-import { getMenuForTenant } from "@/entities/menu-item";
-import { getTenantBySlug, TENANT_SLUG_HEADER } from "@/entities/tenant";
+import { loadMenu } from "@/entities/menu-item/load";
+import { TENANT_SLUG_HEADER } from "@/entities/tenant";
+import { loadSite, loadTenant } from "@/entities/tenant/load";
+import { heroOf } from "@/shared/api/brand-theme";
 import { LandingView } from "@/views/landing";
 
-export default function HomePage() {
+export default async function HomePage() {
   const slug = headers().get(TENANT_SLUG_HEADER) ?? "burger-house";
-  const tenant = getTenantBySlug(slug);
-  const { categories, items } = getMenuForTenant(tenant.id);
+  const [tenant, site] = await Promise.all([loadTenant(slug), loadSite(slug)]);
+  const { categories, items } = await loadMenu(slug);
 
-  return <LandingView tenant={tenant} categories={categories} items={items} />;
+  return <LandingView tenant={tenant} categories={categories} items={items} hero={heroOf(site)} />;
 }

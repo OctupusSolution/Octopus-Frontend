@@ -92,7 +92,7 @@ export function CartView({ categories, items }: CartViewProps) {
             action={
               <Link
                 href="/menu"
-                className="inline-flex items-center justify-center rounded-[10px] bg-[#0D6EFD] px-4 py-2 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
+                className="inline-flex items-center justify-center rounded-[10px] bg-[var(--octo-brand)] px-4 py-2 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
               >
                 {t("store.cart.browse")}
               </Link>

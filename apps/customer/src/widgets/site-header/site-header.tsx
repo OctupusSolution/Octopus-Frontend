@@ -11,6 +11,9 @@ import { SwitchLocale } from "@/features/session/switch-locale";
 
 export interface SiteHeaderProps {
   locale: Locale;
+  /** The business's own logo; the platform mark until it uploads one. */
+  logoUrl?: string | null;
+  brandName?: string;
 }
 
 interface NavEntry {
@@ -30,7 +33,7 @@ const NAV: readonly NavEntry[] = [
   { href: "/orders", key: "store.nav.trackOrder" },
 ];
 
-export function SiteHeader({ locale }: SiteHeaderProps) {
+export function SiteHeader({ locale, logoUrl, brandName }: SiteHeaderProps) {
   const { t } = useI18n();
   const pathname = usePathname();
   const { state } = useOrderingSession();
@@ -41,9 +44,9 @@ export function SiteHeader({ locale }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)]">
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-6 px-4 sm:px-6">
-        <Link href="/" aria-label="OCTOPUS" className="shrink-0">
+        <Link href="/" aria-label={brandName ?? "OCTOPUS"} className="flex shrink-0 items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/octopus-logo.svg" alt="" className="h-[30px] w-[30px]" />
+          <img src={logoUrl ?? "/octopus-logo.svg"} alt="" className="h-[30px] w-auto max-w-[120px] object-contain" />
         </Link>
 
         <nav className="hidden items-center gap-[26px] md:flex">
@@ -56,8 +59,8 @@ export function SiteHeader({ locale }: SiteHeaderProps) {
                 aria-current={active ? "page" : undefined}
                 className={`relative text-[13.5px] transition-colors ${
                   active
-                    ? "font-semibold text-[#0D6EFD] after:absolute after:inset-x-0 after:-bottom-[17px] after:h-[2px] after:bg-[#0D6EFD]"
-                    : "text-[var(--octo-text-primary)] hover:text-[#0D6EFD]"
+                    ? "font-semibold text-[var(--octo-brand)] after:absolute after:inset-x-0 after:-bottom-[17px] after:h-[2px] after:bg-[var(--octo-brand)]"
+                    : "text-[var(--octo-text-primary)] hover:text-[var(--octo-brand)]"
                 }`}
               >
                 {t(entry.key)}
@@ -72,7 +75,7 @@ export function SiteHeader({ locale }: SiteHeaderProps) {
           <Link
             href="/cart"
             aria-label={t("store.nav.cart")}
-            className="relative grid h-[38px] w-[38px] place-items-center rounded-[11px] bg-[#0D6EFD] text-white transition-opacity hover:opacity-90"
+            className="relative grid h-[38px] w-[38px] place-items-center rounded-[11px] bg-[var(--octo-brand)] text-white transition-opacity hover:opacity-90"
           >
             <ShoppingBag size={17} />
             {itemCount > 0 && (

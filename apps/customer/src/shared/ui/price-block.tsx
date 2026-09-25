@@ -22,7 +22,7 @@ export function PriceBlock({ item, size = "card" }: PriceBlockProps) {
         <span className="text-[9.5px] text-[var(--octo-text-muted)]">{t("store.card.priceFrom")}</span>
       )}
 
-      <span className={`${main} font-bold text-[#0D6EFD]`}>
+      <span className={`${main} font-bold text-[var(--octo-brand)]`}>
         {formatAmount(item.priceSar)}
         <span className={`${unit} ms-1 font-semibold`}>{currency}</span>
       </span>

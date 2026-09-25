@@ -35,7 +35,7 @@ export function CheckoutView({ tenant }: CheckoutViewProps) {
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-4 py-16 text-center">
         <p className="text-[12.5px] text-[var(--octo-text-secondary)]">السلة فارغة.</p>
-        <Link href="/menu" className="text-[12.5px] font-medium text-[#0D6EFD] hover:underline">
+        <Link href="/menu" className="text-[12.5px] font-medium text-[var(--octo-brand)] hover:underline">
           تصفح القائمة
         </Link>
       </div>
@@ -84,7 +84,7 @@ export function CheckoutView({ tenant }: CheckoutViewProps) {
               <button
                 type="button"
                 onClick={() => setChangingChannel(true)}
-                className="shrink-0 text-[11.5px] font-medium text-[#0D6EFD] hover:underline"
+                className="shrink-0 text-[11.5px] font-medium text-[var(--octo-brand)] hover:underline"
               >
                 تغيير
               </button>

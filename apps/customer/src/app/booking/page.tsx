@@ -17,7 +17,7 @@ export default function BookingPage() {
         {t("store.placeholder.title")}
       </p>
       <p className="text-[12.5px] text-[var(--octo-text-muted)]">{t("store.placeholder.body")}</p>
-      <Link href="/menu" className="text-[12.5px] font-medium text-[#0D6EFD] hover:underline">
+      <Link href="/menu" className="text-[12.5px] font-medium text-[var(--octo-brand)] hover:underline">
         {t("store.nav.menu")}
       </Link>
     </div>

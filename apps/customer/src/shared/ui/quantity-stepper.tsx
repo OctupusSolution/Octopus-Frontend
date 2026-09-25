@@ -20,7 +20,7 @@ export function QuantityStepper({ value, onChange, min = 1 }: QuantityStepperPro
         type="button"
         aria-label={t("store.product.increase")}
         onClick={() => onChange(value + 1)}
-        className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[#0D6EFD] text-white transition-opacity hover:opacity-90"
+        className="grid h-[30px] w-[30px] place-items-center rounded-full bg-[var(--octo-brand)] text-white transition-opacity hover:opacity-90"
       >
         <Plus size={16} />
       </button>

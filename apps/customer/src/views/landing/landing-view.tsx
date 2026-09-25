@@ -13,11 +13,12 @@ import { StoreHero } from "@/widgets/store-hero";
 
 export interface LandingViewProps {
   tenant: Tenant;
+  hero?: import("@/widgets/store-hero").StoreHeroProps["copy"];
   categories: MenuCategory[];
   items: MenuItem[];
 }
 
-export function LandingView({ categories, items }: LandingViewProps) {
+export function LandingView({ categories, items, hero }: LandingViewProps) {
   const { t } = useI18n();
   const [selected, setSelected] = useState<MenuItem | null>(null);
 
@@ -28,7 +29,7 @@ export function LandingView({ categories, items }: LandingViewProps) {
 
   return (
     <>
-      <StoreHero />
+      <StoreHero copy={hero} />
 
       <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-4 py-14 sm:px-6">
         <section className="flex flex-col gap-5">

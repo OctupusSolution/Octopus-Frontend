@@ -57,7 +57,7 @@ export function CartLines({ lines, imageFor, hrefFor, onQuantityChange, onRemove
                   </p>
                 )}
 
-                <p className="mt-1 text-[18px] font-bold text-[#0D6EFD]">
+                <p className="mt-1 text-[18px] font-bold text-[var(--octo-brand)]">
                   {formatAmount(pricing.totalSar)} <span className="text-[11px]">{currency}</span>
                 </p>
               </div>

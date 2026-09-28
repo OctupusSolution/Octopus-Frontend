@@ -30,7 +30,7 @@ import { useThemeChoices, type MenuBrand, type MenuTheme } from "@/entities/menu
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { useDraft } from "../use-draft";
-import { PreviewRail } from "../preview-rail";
+import { MenuPreviewFrame } from "../preview/menu-preview-frame";
 import { QrPanel } from "./qr-panel";
 import { MENU_PRESETS, presetFor, type MenuPreset } from "./presets";
 import { seedBrand } from "./seed-brand";
@@ -586,7 +586,7 @@ export function ThemeStep() {
       </section>
 
       <div className="space-y-4">
-        <PreviewRail menu={draft} composition="menu" site={site} />
+        <MenuPreviewFrame menu={draft} site={site} />
         <QrPanel menuId={draft.id} />
       </div>
 

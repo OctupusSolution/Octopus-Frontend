@@ -46,7 +46,6 @@ import { useDraft } from "../use-draft";
 import { resolveImage } from "../preview-model";
 import { ValidationSummary } from "./validation-summary";
 import { CustomerPreview } from "./customer-preview";
-import { isServerId } from "@/entities/menu";
 
 /** Solid icon colours for the stat tiles, as the frame draws them. Tone
  *  tokens where the app has one; magenta has none, so it carries a fallback. */
@@ -311,7 +310,7 @@ export function ReviewStep() {
                 <span className="font-normal">({t("menuReview.previewComplete")})</span>
               </h2>
               <div className="flex flex-wrap items-center gap-4">
-                {isServerId(draft.id) && <CustomerPreview menuId={draft.id} onBeforeOpen={() => save()} />}
+                <CustomerPreview />
                 <button
                   type="button"
                   onClick={() => setFullMenu(true)}

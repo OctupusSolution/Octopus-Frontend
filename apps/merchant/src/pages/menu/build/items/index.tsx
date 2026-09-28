@@ -57,7 +57,7 @@ import { CatalogPicker } from "./catalog-picker";
 import { GroupPicker } from "./group-picker";
 import { OfferPicker } from "../offers/offer-picker";
 import { useDraft } from "../use-draft";
-import { PreviewRail } from "../preview-rail";
+import { MenuPreviewFrame } from "../preview/menu-preview-frame";
 import { ModifierPreview } from "./modifier-preview";
 import { OffersEditor, incompleteTabs, type OfferTabId } from "../offers";
 import { EntryList, type EntryAction } from "./entry-list";
@@ -544,7 +544,14 @@ export function ItemsStep() {
             </section>
           )}
 
-          <PreviewRail menu={draft} />
+          <MenuPreviewFrame
+            menu={draft}
+            selectedSectionId={section?.id ?? null}
+            onSelectSection={(id) => {
+              setSectionId(id);
+              setSelectedId(null);
+            }}
+          />
         </div>
       )}
 

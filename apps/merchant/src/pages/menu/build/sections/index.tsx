@@ -22,7 +22,7 @@ import {
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useDraft } from "../use-draft";
-import { PreviewRail } from "../preview-rail";
+import { MenuPreviewFrame } from "../preview/menu-preview-frame";
 import { SectionList } from "./section-list";
 import { SectionSettings } from "./section-settings";
 import { SectionModal } from "./section-modal";
@@ -129,7 +129,7 @@ export function SectionsStep() {
           onClearImage={() => patchSelected({ image: null })}
         />
 
-        <PreviewRail menu={draft} />
+        <MenuPreviewFrame menu={draft} selectedSectionId={selected?.id ?? null} onSelectSection={setSelectedId} />
       </div>
 
       <SectionModal

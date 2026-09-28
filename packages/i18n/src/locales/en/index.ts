@@ -5576,6 +5576,8 @@ export const en = {
   "menuWiz.sec.error.unreadable": "This file could not be read. Try another image.",
   "menuWiz.preview.title": "Live Preview",
   "menuWiz.preview.hint": "How it appear to your customers",
+  "menuWiz.preview.real": "Your real menu",
+  "menuWiz.preview.fallback": "Your storefront could not be reached, so the builder's own preview is shown.",
   "menuWiz.preview.menuHeading": "Menu",
   "menuWiz.preview.bestSellers": "Best Sellers",
   "menuWiz.preview.offersHeading": "Offers",

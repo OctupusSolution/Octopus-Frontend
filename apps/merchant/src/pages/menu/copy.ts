@@ -89,9 +89,7 @@ const en = {
   // Preview
   "preview.open": "Customer view",
   "preview.title": "Customer view (draft)",
-  "preview.hint": "Rendered by the platform from the saved draft — exactly what customers would get if you published now.",
   "preview.lang": "Language",
-  "preview.empty": "The draft has nothing to show yet.",
   "preview.unsaved": "Unsaved changes aren't included — save first to see them here.",
 
   // Schedule (library)
@@ -206,9 +204,7 @@ const ar: Record<Key, string> = {
 
   "preview.open": "عرض العميل",
   "preview.title": "عرض العميل (مسودة)",
-  "preview.hint": "تعرضه المنصة من المسودة المحفوظة — تمامًا ما سيراه العملاء لو نشرت الآن.",
   "preview.lang": "اللغة",
-  "preview.empty": "لا يوجد ما يُعرض في المسودة بعد.",
   "preview.unsaved": "التغييرات غير المحفوظة لا تظهر هنا — احفظ أولًا.",
 
   "schedule.presets": "قوالب المنصة",

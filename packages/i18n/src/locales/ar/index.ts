@@ -5580,6 +5580,8 @@ export const ar = {
   "menuWiz.sec.error.unreadable": "تعذّرت قراءة الملف. جرّب صورة أخرى.",
   "menuWiz.preview.title": "معاينة حية",
   "menuWiz.preview.hint": "كيف تظهر لعملائك",
+  "menuWiz.preview.real": "قائمتك الحقيقية",
+  "menuWiz.preview.fallback": "تعذّر الوصول إلى موقعك، لذا تُعرض معاينة أداة البناء.",
   "menuWiz.preview.menuHeading": "القائمة",
   "menuWiz.preview.bestSellers": "الأكثر مبيعاً",
   "menuWiz.preview.offersHeading": "العروض",

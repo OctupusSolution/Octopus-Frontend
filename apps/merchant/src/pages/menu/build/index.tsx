@@ -85,7 +85,7 @@ function FooterButton({
 }
 
 export function MenuBuilderPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const { pathname, state } = useLocation();
   const { menuId } = useParams();
@@ -124,14 +124,14 @@ export function MenuBuilderPage() {
   useEffect(() => {
     if (!activeBusinessId || !stored || pulled.current === stored.id) return;
     pulled.current = stored.id;
-    pullSections(activeBusinessId, stored)
+    pullSections(activeBusinessId, stored, locale)
       .then((m) => {
         syncedRef.current = m;
         setDraft((d) => (d && d.id === m.id ? m : d));
         replace(m);
       })
       .catch((err) => setSaveError(err instanceof Error ? err.message : "error"));
-  }, [activeBusinessId, stored, replace]);
+  }, [activeBusinessId, stored, replace, locale]);
 
   // Where the owner is in the builder, recorded server-side (PUT
   // builder-progress) each time a step opens. Losing it costs nothing the
@@ -168,7 +168,7 @@ export function MenuBuilderPage() {
     // Runs strictly one after another, and reads the baseline and id map at
     // run time, so a second save queued behind the first sees what it created.
     const run = pending.current.then(async () => {
-      const res = await pushMenu(activeBusinessId, syncedRef.current!, applyIds(menu, idsRef.current));
+      const res = await pushMenu(activeBusinessId, syncedRef.current!, applyIds(menu, idsRef.current), locale);
       Object.assign(idsRef.current, res.ids);
       syncedRef.current = res.menu;
       return res;

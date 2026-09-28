@@ -161,6 +161,17 @@ export interface Section {
   entries: (Item | Offer)[];
 }
 
+/** A menu's own brand, stored on its theme on the server (US-012): what its public page (site /menu, QR /c/{key})
+ *  is drawn in. Seeded from the Public Link site's brand the first time the Theme step opens a menu without one. */
+export interface MenuBrand {
+  colors: { primary: string; light: string; accent: string; dark: string };
+  /** A delivery URL, or a data: URL picked and not yet uploaded. */
+  logoUrl: string | null;
+  heroUrl: string | null;
+  heroText: string;
+  heroSubtext: string;
+}
+
 export interface MenuTheme {
   presetId: string;
   navStyle: "top-bar" | "side-drawer" | "bottom-bar" | "pill-scroll";
@@ -175,6 +186,8 @@ export interface MenuTheme {
   serverPresetCode?: string | null;
   titleFontCode?: string | null;
   bodyFontCode?: string | null;
+  /** undefined = not read from the server yet; null = the menu has no brand of its own yet. */
+  brand?: MenuBrand | null;
 }
 
 export interface MenuSchedule {

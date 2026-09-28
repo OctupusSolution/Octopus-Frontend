@@ -36,6 +36,7 @@ import {
   type AdvisoryDto,
   type AvailabilityScheduleDto,
   type CatalogItemResponse,
+  type MediaReferenceDto,
   type ModifierGroupResponse,
   type ModifierOptionResponse,
   type PriceEffectDto,
@@ -46,7 +47,7 @@ import { isLocalMedia, knownMedia, mediaUrl, uploadMedia } from "@/shared/api/me
 import { OFFERS_SECTION_ID, blankItem } from "./draft";
 import { pullOffers, pushOffers } from "./offers-sync";
 import { WEEKDAYS } from "./menu";
-import type { DisplayStyle, Item, ItemSchedule, Menu, MenuTheme, ModifierGroup, ModifierOption, Offer, Section, Weekday } from "./menu";
+import type { DisplayStyle, Item, ItemSchedule, Menu, MenuBrand, MenuTheme, ModifierGroup, ModifierOption, Offer, Section, Weekday } from "./menu";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isServerId = (id: string) => UUID.test(id);
@@ -106,9 +107,8 @@ export function toGroup(r: ModifierGroupResponse, local?: ModifierGroup): Modifi
 }
 
 // ---- theme ---------------------------------------------------------------------
-// Card/navigation/item-detail choices live on the menu's own theme in the API.
-// Colours, logo and hero are still owned by the site draft (shared with the
-// Public Link builder), so the API's copies of those are left as they are.
+// Card/navigation/item-detail choices and the menu's own brand (colours, logo,
+// hero, hero text) live on the menu's theme in the API.
 
 const NAV: Record<MenuTheme["navStyle"], string> = {
   "top-bar": "TopBar",
@@ -152,22 +152,66 @@ function themeFromServer(local: MenuTheme, t: Awaited<ReturnType<typeof getMenuT
   };
 }
 
-async function pushTheme(businessId: string, menuId: string, theme: MenuTheme): Promise<void> {
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+const validColor = (value: string | undefined, fallback: string | null) => (value && HEX.test(value) ? value : fallback);
+
+export function brandColorsToServer(
+  brand: MenuBrand | null | undefined,
+  current: { primaryColor: string | null; lightColor: string | null; accentColor: string | null; darkColor: string | null }
+) {
+  if (!brand) return { primaryColor: current.primaryColor, lightColor: current.lightColor, accentColor: current.accentColor, darkColor: current.darkColor };
+  return {
+    primaryColor: validColor(brand.colors.primary, current.primaryColor),
+    lightColor: validColor(brand.colors.light, current.lightColor),
+    accentColor: validColor(brand.colors.accent, current.accentColor),
+    darkColor: validColor(brand.colors.dark, current.darkColor),
+  };
+}
+
+export function themeTextToServer(value: string, lang: string, current: Record<string, string>): Record<string, string> {
+  const next = { ...current };
+  if (value.trim()) next[lang] = value.trim();
+  else delete next[lang];
+  return next;
+}
+
+/** A theme image as the reference to save: uploaded when it is a fresh pick, the known reference when it is a delivery URL, none when removed. */
+async function themeMedia(businessId: string, url: string | null, purpose: "ThemeLogo" | "ThemeHeroImage", current: MediaReferenceDto | null) {
+  if (!url) return null;
+  if (isLocalMedia(url)) return (await uploadMedia(businessId, url, purpose, purpose === "ThemeLogo" ? "logo.png" : "hero.png", "menu")).ref;
+  return knownMedia(url) ?? current;
+}
+
+async function brandFromServer(businessId: string, t: Awaited<ReturnType<typeof getMenuTheme>>, lang: string): Promise<MenuBrand | null> {
+  if (!t.primaryColor && !t.lightColor && !t.accentColor && !t.darkColor && !t.logo && !t.hero) return null;
+  const [logoUrl, heroUrl] = await Promise.all([
+    t.logo ? mediaUrl(businessId, t.logo, "menu").catch(() => null) : null,
+    t.hero ? mediaUrl(businessId, t.hero, "menu").catch(() => null) : null,
+  ]);
+  const pick = (map: Record<string, string> | null | undefined) => map?.[lang] ?? Object.values(map ?? {})[0] ?? "";
+  return {
+    colors: { primary: t.primaryColor ?? "#0d6efd", light: t.lightColor ?? "#f7f8fa", accent: t.accentColor ?? "#0d6efd", dark: t.darkColor ?? "#16161d" },
+    logoUrl,
+    heroUrl,
+    heroText: pick(t.heroText),
+    heroSubtext: pick(t.heroSubtext),
+  };
+}
+
+async function pushTheme(businessId: string, menuId: string, theme: MenuTheme, lang: string): Promise<void> {
   const current = await getMenuTheme(businessId, menuId);
+  const brand = theme.brand;
   await updateMenuTheme(businessId, menuId, {
     businessId,
     menuId,
     presetCode: theme.serverPresetCode !== undefined ? theme.serverPresetCode : current.presetCode,
-    logo: current.logo,
-    hero: current.hero,
-    heroText: current.heroText,
-    heroSubtext: current.heroSubtext,
+    logo: brand === undefined ? current.logo : await themeMedia(businessId, brand?.logoUrl ?? null, "ThemeLogo", current.logo),
+    hero: brand === undefined ? current.hero : await themeMedia(businessId, brand?.heroUrl ?? null, "ThemeHeroImage", current.hero),
+    heroText: brand ? themeTextToServer(brand.heroText, lang, current.heroText ?? {}) : current.heroText,
+    heroSubtext: brand ? themeTextToServer(brand.heroSubtext, lang, current.heroSubtext ?? {}) : current.heroSubtext,
     titleFontCode: theme.titleFontCode !== undefined ? theme.titleFontCode : current.titleFontCode,
     bodyFontCode: theme.bodyFontCode !== undefined ? theme.bodyFontCode : current.bodyFontCode,
-    primaryColor: current.primaryColor,
-    lightColor: current.lightColor,
-    accentColor: current.accentColor,
-    darkColor: current.darkColor,
+    ...brandColorsToServer(brand, current),
     navigationStyle: NAV[theme.navStyle],
     sectionNavStyle: CATEGORY[theme.categoryStyle],
     cardStyle: CARD[theme.cardStyle],
@@ -277,7 +321,7 @@ export async function loadItem(businessId: string, id: string, local?: Item): Pr
  *  local-only offers section last. A section is read in full through a no-op
  *  placement call (the API has no GET-one-section; an empty POST /placements
  *  returns the whole section, description, colour and placements included). */
-export async function pullSections(businessId: string, menu: Menu): Promise<Menu> {
+export async function pullSections(businessId: string, menu: Menu, lang: string): Promise<Menu> {
   const res = await listSections(businessId, menu.id, true);
   const local = new Map(menu.sections.map((s) => [s.id, s]));
   const localItems = new Map(
@@ -309,7 +353,8 @@ export async function pullSections(businessId: string, menu: Menu): Promise<Menu
     const pulled = await pullOffers(businessId, menu.id, offers.entries as unknown as Offer[]);
     if (pulled.length > 0) offers.entries = pulled as unknown as Section["entries"];
   }
-  const theme = themeFromServer(menu.theme, await getMenuTheme(businessId, menu.id));
+  const serverTheme = await getMenuTheme(businessId, menu.id);
+  const theme = { ...themeFromServer(menu.theme, serverTheme), brand: await brandFromServer(businessId, serverTheme, lang) };
   return { ...menu, theme, sections: offers ? [...sections, offers] : sections };
 }
 
@@ -551,7 +596,8 @@ export function applyIds(menu: Menu, ids: IdMap, media: MediaMap = {}): Menu {
 export async function pushMenu(
   businessId: string,
   prev: Menu,
-  next: Menu
+  next: Menu,
+  lang: string
 ): Promise<{ menu: Menu; ids: IdMap; media: MediaMap; version: number }> {
   const ids: IdMap = {};
   const media: MediaMap = {};
@@ -569,7 +615,7 @@ export async function pushMenu(
     version = res.version;
   }
 
-  if (JSON.stringify(prev.theme) !== JSON.stringify(next.theme)) await pushTheme(businessId, next.id, next.theme);
+  if (JSON.stringify(prev.theme) !== JSON.stringify(next.theme)) await pushTheme(businessId, next.id, next.theme, lang);
 
   const before = new Map(prev.sections.map((s) => [s.id, s]));
   const kept = new Set(next.sections.map((s) => s.id));

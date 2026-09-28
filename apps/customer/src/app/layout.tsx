@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Cairo, IBM_Plex_Sans_Arabic, Inter, Playfair_Display, Poppins, Tajawal } from "next/font/google";
+import { headers } from "next/headers";
+import { defaultLocale } from "@i18n/index";
 import { OrderingSessionProvider } from "@/entities/order";
 import { getStorefront, loadTenant } from "@/entities/tenant/load";
 import { StoreI18nProvider } from "@/app/providers";
 import { themeStyle } from "@/shared/api/brand-theme";
 import type { PublishedShell } from "@/shared/api/public-api";
 import { createTranslator } from "@/shared/i18n/translate";
+import { BUILDER_CANVAS_HEADER } from "@/shared/lib/merchant-origins";
 import { navLinks, SiteHeader } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
 import { ClearPreviewCookie, PreviewBanner } from "@/widgets/preview-banner";
@@ -30,8 +33,14 @@ const plexArabic = IBM_Plex_Sans_Arabic({
   display: "swap",
 });
 
+const FONT_CLASSES = `${inter.variable} ${interAlias.variable} ${plexArabic.variable} ${cairo.variable} ${tajawal.variable} ${poppins.variable} ${playfair.variable}`;
+
+/** The builder's canvas route (middleware marks its request): no published site is read for it. */
+const isBuilderCanvas = () => headers().get(BUILDER_CANVAS_HEADER) === "1";
+
 /** Site-wide metadata: the published site's defaults (a page's own metadata overrides them). */
 export async function generateMetadata(): Promise<Metadata> {
+  if (isBuilderCanvas()) return { title: "Preview", robots: { index: false, follow: false } };
   const { sample, shell, preview } = await getStorefront();
   if (sample || !shell) {
     return {
@@ -71,16 +80,28 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  if (isBuilderCanvas()) {
+    // The canvas sets lang, dir and the theme on <html> itself, from what the builder sends.
+    return (
+      <html lang="en" dir="ltr" className={FONT_CLASSES}>
+        <body>
+          <StoreI18nProvider locale={defaultLocale}>
+            <OrderingSessionProvider>{children}</OrderingSessionProvider>
+          </StoreI18nProvider>
+        </body>
+      </html>
+    );
+  }
+
   const storefront = await getStorefront();
   const { sample, shell, preview, locale, language, direction } = storefront;
-  const fonts = `${inter.variable} ${interAlias.variable} ${plexArabic.variable} ${cairo.variable} ${tajawal.variable} ${poppins.variable} ${playfair.variable}`;
 
   // A real subdomain with no published site: no chrome, just the 404 the page renders.
   // With a preview cookie this is also an unusable preview link (invalid, expired or revoked,
   // one uniform answer): the cookie is dropped and the visitor sees the same 404.
   if (!sample && !shell) {
     return (
-      <html lang={language} dir={direction} className={fonts}>
+      <html lang={language} dir={direction} className={FONT_CLASSES}>
         <body>
           {preview && <ClearPreviewCookie />}
           <StoreI18nProvider locale={locale}>
@@ -95,7 +116,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const t = createTranslator(locale);
 
   return (
-    <html lang={language} dir={direction} className={fonts} style={themeStyle(shell)}>
+    <html lang={language} dir={direction} className={FONT_CLASSES} style={themeStyle(shell)}>
       <body>
         <StoreI18nProvider locale={locale}>
           <OrderingSessionProvider>

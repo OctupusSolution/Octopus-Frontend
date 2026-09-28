@@ -22,6 +22,10 @@ export interface SiteHeaderProps {
   /** A published site's navigation switches; omitted for the sample storefront, which keeps its
    *  pinned header and underlined current page. */
   options?: { stickyHeader: boolean; showActivePageIndicator: boolean };
+  /** The page being shown, when it is not the URL's (the builder canvas renders every page at one URL). */
+  currentPath?: string;
+  /** Builder canvas only: the language pill reports the switch instead of reloading. */
+  onSwitchLanguage?: (language: string) => void;
 }
 
 export interface SiteNavLink {
@@ -50,7 +54,7 @@ const NAV: readonly { href: string; key: string }[] = [
   { href: "/orders", key: "store.nav.trackOrder" },
 ];
 
-export function SiteHeader({ locale, logoUrl, brandName, nav, languages, options }: SiteHeaderProps) {
+export function SiteHeader({ locale, logoUrl, brandName, nav, languages, options, currentPath, onSwitchLanguage }: SiteHeaderProps) {
   const sticky = options?.stickyHeader ?? true;
   const markActive = options?.showActivePageIndicator ?? true;
   const { t } = useI18n();
@@ -61,7 +65,8 @@ export function SiteHeader({ locale, logoUrl, brandName, nav, languages, options
   const drawerNav: NavEntry[] = nav
     ? nav.filter((e) => e.inDrawer).map((e) => ({ href: e.href, label: e.label, newTab: e.openInNewTab }))
     : sampleNav;
-  const pathname = usePathname();
+  const urlPath = usePathname();
+  const pathname = currentPath ?? urlPath;
   const { state } = useOrderingSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -102,7 +107,7 @@ export function SiteHeader({ locale, logoUrl, brandName, nav, languages, options
         </nav>
 
         <div className="flex shrink-0 items-center gap-2.5">
-          <SwitchLocale locale={locale} languages={languages} />
+          <SwitchLocale locale={locale} languages={languages} onSwitch={onSwitchLanguage} />
 
           <Link
             href="/cart"

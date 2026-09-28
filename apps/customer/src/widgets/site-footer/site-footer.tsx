@@ -24,7 +24,7 @@ export interface PublishedFooter {
 
 const SOCIAL_ICONS: Record<string, typeof Instagram> = { instagram: Instagram, facebook: Facebook, linkedin: Linkedin };
 
-function PublishedSiteFooter({ site }: { site: PublishedFooter }) {
+export function PublishedSiteFooter({ site }: { site: PublishedFooter }) {
   const { contact } = site;
   const hasContact = Boolean(contact.address || contact.hours || contact.phone);
   return (

@@ -300,13 +300,17 @@ export function PageSections({ sections, menus, brandName, title }: PageSections
 
   return (
     <>
-      {hero && (hero.hiddenOn?.length ? <div className={hiddenOnClass(hero.hiddenOn)}>{render(hero)}</div> : render(hero))}
+      {hero && (
+        <div data-section-id={hero.sectionId} className={hiddenOnClass(hero.hiddenOn) || undefined}>
+          {render(hero)}
+        </div>
+      )}
       <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-4 py-14 sm:px-6">
         {title && !hero && <h1 className="text-[26px] font-bold text-[var(--octo-text-primary)]">{title}</h1>}
         {body.map((section) => {
           const node = render(section);
           return node ? (
-            <div key={section.sectionId} className={hiddenOnClass(section.hiddenOn) || undefined}>
+            <div key={section.sectionId} data-section-id={section.sectionId} className={hiddenOnClass(section.hiddenOn) || undefined}>
               {node}
             </div>
           ) : null;

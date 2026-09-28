@@ -1,14 +1,14 @@
 // Step 2 of the builder: the merchant's brand identity — logo, business name,
 // four colours, English/Arabic typography, favicon and hero pattern — beside a
-// live `DeviceFrame` preview that updates per keystroke. Structurally this
-// follows `theme-step.tsx`: one card on the start side, `DeviceFrame` on the
-// end side, fed by the same `previewModelFromSite`.
+// preview that updates per keystroke (`SitePreview`: the live storefront when
+// connected). Structurally this follows `theme-step.tsx`: one card on the start
+// side, the preview on the end side.
 //
 // Laid out as the Brand Identity frame draws it: a large logo box with Change
 // Logo / Remove beside it, sentence-case field labels, each colour's swatch
 // and hex sharing one field, labelled font examples set in the chosen face,
 // the two assets side by side, and Reset to Theme Defaults as a blue link.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { RotateCcw, RotateCw, Upload } from "lucide-react";
 import clsx from "clsx";
 import { Button, Input, Select } from "@ui/primitives";
@@ -24,11 +24,11 @@ import {
   toFontCode,
   type SiteDraft,
 } from "../_shared/site-draft";
-import { previewModelFromSite } from "../_shared/preview-model";
-import { DeviceFrame } from "../ui/device-frame";
+import { SitePreview } from "../ui/site-preview";
 import type { StepProps } from "../_shared/steps";
 import { usePlText } from "../_shared/texts";
 import { LanguagesCard } from "./connected/languages-card";
+import { MediaLibraryButton, MediaLibraryManageButton } from "./connected/media-library";
 
 const HEX_PATTERN = /^#[0-9a-f]{6}$/i;
 const SECTION_TITLE = "text-[16px] font-semibold text-[var(--octo-text-primary)]";
@@ -130,7 +130,7 @@ function TypographyField({
  *  uploads too), with Change Logo and Remove stacked beside it. `readLogoFile`
  *  (a `File` in, a downscaled data URL out) serves the logo and both assets —
  *  a second reader would only duplicate its downscale logic. */
-function LogoPicker({ src, onPick, onRemove }: { src: string | null; onPick: (dataUrl: string) => void; onRemove: () => void }) {
+function LogoPicker({ src, onPick, onRemove, library }: { src: string | null; onPick: (dataUrl: string) => void; onRemove: () => void; library?: ReactNode }) {
   const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
   return (
@@ -166,6 +166,7 @@ function LogoPicker({ src, onPick, onRemove }: { src: string | null; onPick: (da
         >
           {t("publicLink.brand.remove")}
         </button>
+        {library}
         <p className="text-[11.5px] leading-relaxed text-[var(--octo-text-muted)]">{t("publicLink.brand.logoHint")}</p>
       </div>
     </div>
@@ -178,11 +179,14 @@ function AssetPicker({
   src,
   fit,
   onPick,
+  library,
 }: {
   label: string;
   src: string | null;
   fit: "contain" | "cover";
   onPick: (dataUrl: string) => void;
+  /** Connected: a "Library" button to reuse an uploaded file. */
+  library?: ReactNode;
 }) {
   const { t } = useI18n();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -207,6 +211,7 @@ function AssetPicker({
         <Button variant="secondary" onClick={() => fileRef.current?.click()} className="h-10 flex-1 justify-center">
           {t("publicLink.brand.change")}
         </Button>
+        {library}
       </div>
     </div>
   );
@@ -294,7 +299,7 @@ function SlugField({
 }
 
 export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   // Bumped by the preview's Refresh action so the frame in `key` genuinely
   // remounts rather than silently re-rendering with the same props.
@@ -306,8 +311,6 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
   // fetch resolves (draft.slug starts empty until then).
   useEffect(() => setDraftSlug(draft.slug), [draft.slug]);
 
-  const model = previewModelFromSite(draft, device, t, locale);
-
   const tx = usePlText();
   const [resetting, setResetting] = useState(false);
   const connected = publicLinkSync.connected;
@@ -316,6 +319,7 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
     if (connected) {
       // POST /draft/theme/reset clears the colour/font overrides (and section
       // styles); the sync hook then mirrors the theme's own values back here.
+      if (!window.confirm(tx("pl.brand.resetConfirm"))) return;
       setResetting(true);
       publicLinkSync
         .resetTheme()
@@ -339,6 +343,18 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
               src={brand.logoDataUrl}
               onPick={(logoDataUrl) => dispatch({ type: "patchBrand", patch: { logoDataUrl } })}
               onRemove={() => dispatch({ type: "patchBrand", patch: { logoDataUrl: null } })}
+              library={
+                connected ? (
+                  // A picked library file is remembered by the sync, so its delivery URL saves as its reference.
+                  <MediaLibraryButton
+                    sync={publicLinkSync}
+                    purposes={["Logo"]}
+                    kind="image"
+                    className="h-10 justify-center"
+                    onPick={(picked) => dispatch({ type: "patchBrand", patch: { logoDataUrl: picked.url } })}
+                  />
+                ) : undefined
+              }
             />
           </section>
 
@@ -462,9 +478,23 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
                 src={brand.faviconDataUrl}
                 fit="contain"
                 onPick={(faviconDataUrl) => dispatch({ type: "patchBrand", patch: { faviconDataUrl } })}
+                library={
+                  connected ? (
+                    <MediaLibraryButton
+                      sync={publicLinkSync}
+                      purposes={["Favicon"]}
+                      kind="image"
+                      className="h-10"
+                      onPick={(picked) => dispatch({ type: "patchBrand", patch: { faviconDataUrl: picked.url } })}
+                    />
+                  ) : undefined
+                }
               />
               {connected ? (
-                <p className="self-end text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.brand.heroMoved")}</p>
+                <div className="flex flex-col justify-end gap-2">
+                  <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.brand.heroMoved")}</p>
+                  <MediaLibraryManageButton sync={publicLinkSync} />
+                </div>
               ) : (
                 <AssetPicker
                   label={t("publicLink.brand.heroPattern")}
@@ -489,13 +519,15 @@ export function BrandStep({ draft, dispatch, publicLinkSync }: StepProps) {
           {connected && <LanguagesCard sync={publicLinkSync} />}
         </div>
 
-        <DeviceFrame
+        <SitePreview
           key={refreshKey}
-          model={model}
+          draft={draft}
+          dispatch={dispatch}
+          sync={publicLinkSync}
           device={device}
           onDevice={setDevice}
           paged
-          modelFor={(previewT, previewLocale) => previewModelFromSite(draft, device, previewT, previewLocale)}
+          withLanguage
           actions={
             <Button
               variant="ghost"

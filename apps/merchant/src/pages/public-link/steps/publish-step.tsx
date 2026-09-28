@@ -28,7 +28,7 @@ import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
 import { GO_LIVE_ITEMS } from "../_shared/checklist";
 import { previewModelFromSite } from "../_shared/preview-model";
-import { DeviceFrame } from "../ui/device-frame";
+import { SitePreview } from "../ui/site-preview";
 import { QrCode } from "../ui/qr-code";
 import { SitePreviewModal } from "../ui/site-preview-modal";
 import { PublicLinkVersionsModal } from "../ui/versions-modal";
@@ -36,6 +36,7 @@ import type { SiteAction } from "../_shared/site-draft";
 import type { StepProps } from "../_shared/steps";
 import { usePlText } from "../_shared/texts";
 import { Switch } from "../ui/switch";
+import { MediaLibraryButton } from "./connected/media-library";
 import { ReviewCard } from "./connected/review-card";
 
 const COPY_RESET_MS = 2000;
@@ -86,7 +87,9 @@ function ChecklistItemRow({
 
 /** Where each incomplete checklist row sends the merchant. Rows with no
  *  setting of their own (payments, responsive, analytics) have no entry. */
-function fixActionFor(id: string, dispatch: (action: SiteAction) => void, focusSeo: () => void): (() => void) | undefined {
+function fixActionFor(id: string, dispatch: (action: SiteAction) => void, focusSeo: () => void, connected = false): (() => void) | undefined {
+  // Connected, menu/reservations are added as module pages or bound sections (Pages step).
+  if (connected && (id === "menu" || id === "reservations")) return () => dispatch({ type: "goTo", step: 3 });
   switch (id) {
     case "address":
       return () => dispatch({ type: "goTo", step: 2 });
@@ -245,14 +248,14 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.goLiveChecklist")}</p>
           <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.checklistNote")}</p>
           <div className="flex flex-col gap-3">
-            {GO_LIVE_ITEMS.map((item) => (
+            {GO_LIVE_ITEMS.filter((item) => !item.hidden?.(draft)).map((item) => (
               <ChecklistItemRow
                 key={item.id}
                 label={tx(item.labelKey)}
                 note={tx(item.noteKey)}
                 done={item.done(draft)}
                 fixLabel={t("publicLink.fix")}
-                onFix={fixActionFor(item.id, dispatch, focusSeo)}
+                onFix={fixActionFor(item.id, dispatch, focusSeo, connected)}
               />
             ))}
           </div>
@@ -365,9 +368,19 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
                     )
                   }
                 />
-                <Button size="sm" variant="secondary" onClick={() => socialImageRef.current?.click()} className="w-fit">
-                  {t("publicLink.changeImage")}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => socialImageRef.current?.click()} className="w-fit">
+                    {t("publicLink.changeImage")}
+                  </Button>
+                  {connected && (
+                    <MediaLibraryButton
+                      sync={publicLinkSync}
+                      purposes={["SocialImage"]}
+                      kind="image"
+                      onPick={(picked) => dispatch({ type: "patchPublish", patch: { seo: { ...seo, socialImageDataUrl: picked.url } } })}
+                    />
+                  )}
+                </div>
                 <span className="text-[10.5px] text-[var(--octo-text-muted)]">{t("publicLink.socialImageHint")}</span>
               </div>
             </div>
@@ -459,20 +472,25 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
         </div>
       </div>
 
-      <DeviceFrame
-        model={previewModelFromSite(draft, previewDevice, t, locale)}
+      <SitePreview
+        draft={draft}
+        dispatch={dispatch}
+        sync={publicLinkSync}
         device={previewDevice}
         onDevice={setPreviewDevice}
         devices={["desktop", "mobile"]}
         title={t("publicLink.livePreview")}
         paged
-        modelFor={(scopedT, scopedLocale) => previewModelFromSite(draft, previewDevice, scopedT, scopedLocale as typeof locale)}
+        withLanguage
+        height={640}
       />
 
       <SitePreviewModal
         open={siteView !== null}
         onClose={() => setSiteView(null)}
         draft={draft}
+        dispatch={dispatch}
+        sync={publicLinkSync}
         initialDevice={siteView ?? "desktop"}
       />
 

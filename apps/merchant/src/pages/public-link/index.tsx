@@ -110,7 +110,7 @@ export function PublicLinkBuilderPage() {
           setSiteOpen(true);
         }}
       />
-      <SitePreviewModal open={siteOpen} onClose={() => setSiteOpen(false)} draft={draft} />
+      <SitePreviewModal open={siteOpen} onClose={() => setSiteOpen(false)} draft={draft} dispatch={dispatch} sync={publicLinkSync} />
     </div>
   );
 }

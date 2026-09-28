@@ -39,6 +39,9 @@ export function themeStyle(site: PublishedShell | null): CSSProperties {
     style["--font-latin"] = `${body}, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
     style["--font-arabic"] = `${body}, var(--font-latin-loaded), -apple-system, "Segoe UI", sans-serif`;
   }
+  // The titles face (globals.css sets h1-h3 in it); without one, headings keep the body face.
+  const heading = fonts?.heading ? FONT_VAR[fonts.heading] : undefined;
+  if (heading) style["--font-heading"] = `${heading}, var(--font-family-active)`;
   return style as CSSProperties;
 }
 

@@ -1,7 +1,9 @@
 // A section inspector generated from the catalogue (GET /catalogues
 // sectionTypes[].fields): every built-in section type gets typed editors for
-// its fields — text, rich text (as paragraphs), media (uploaded into the site
-// library), link, choice, toggle, number, colour and one level of lists — plus
+// its fields — text, rich text (a block editor that keeps headings, lists,
+// marks and links; see rich-text-editor.tsx), media (uploaded into the site
+// library or picked from it), link, choice, toggle, number, colour and one
+// level of lists — plus
 // the presentation choices every section shares (layout variant, alignment,
 // devices it is hidden on, anchor). Edits stay local until Save, which sends the
 // whole field set (PUT /draft/pages/{pageId}/sections/{sectionId}).
@@ -21,15 +23,19 @@ import type {
   SectionFieldValue,
   SectionLinkTarget,
   SectionStyle,
+  SiteMediaPurpose as ApiSiteMediaPurpose,
 } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { withText, type PublicLinkSync } from "@/entities/site-draft";
 import type { SiteMediaPurpose } from "@/shared/api/media";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
+import { isRichTextEmpty } from "../../_shared/rich-text";
 import { humanizeKey, usePlText } from "../../_shared/texts";
 import { Switch } from "../../ui/switch";
 import { FieldRow } from "../customize/controls";
-import { orderedPages, pageTitle, SMALL_BUTTON, useBusy } from "./common";
+import { orderedPages, pageTitle, SMALL_BUTTON, useBusy, usePreviewEdit } from "./common";
+import { ALL_PURPOSES, MediaLibraryButton } from "./media-library";
+import { RichTextEditor } from "./rich-text-editor";
 
 const kindOf = (field: CatalogueFieldDefinition) => String(field.kind).toLowerCase();
 /** "sections.hero.fields.title" -> "Title"; a missing label key falls back to the field key. */
@@ -38,33 +44,6 @@ const newId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
-
-// ---- rich text <-> paragraphs -------------------------------------------------------------------
-
-type RichDoc = Extract<SectionFieldValue, { kind: "richText" }>["text"][string];
-
-export function richTextToPlain(doc: RichDoc | undefined): string {
-  if (!doc) return "";
-  const inline = (inlines: { kind: string; text?: string; runs?: { text: string }[] }[]) =>
-    inlines.map((i) => (i.kind === "text" ? i.text ?? "" : i.kind === "link" ? (i.runs ?? []).map((r) => r.text).join("") : "\n")).join("");
-  return doc.blocks
-    .map((b) =>
-      b.kind === "list"
-        ? b.items.map((item) => item.map((ib) => ("inlines" in ib ? inline(ib.inlines as never) : "")).join(" ")).join("\n")
-        : inline(b.inlines as never)
-    )
-    .join("\n\n");
-}
-
-export function plainToRichText(text: string): RichDoc {
-  return {
-    blocks: text
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => ({ kind: "p" as const, inlines: [{ kind: "text" as const, text: p, bold: false, italic: false, underline: false }] })),
-  };
-}
 
 // ---- one field ----------------------------------------------------------------------------------
 
@@ -102,6 +81,10 @@ function MediaEditor({ field, value, onChange, sync, purposeHint }: FieldEditorP
   const purpose: SiteMediaPurpose = purposes.includes(purposeHint.toLowerCase())
     ? purposeHint
     : ((field.mediaPurposes[0] as SiteMediaPurpose | undefined) ?? "SectionImage");
+  // The library offers only what this field accepts (the server refuses other purposes: media.asset-not-usable).
+  const accepted = ALL_PURPOSES.filter((p) => purposes.includes(p.toLowerCase()));
+  const kinds = field.mediaKinds.map((k) => k.toLowerCase());
+  const libraryKind = kinds.length === 1 && (kinds[0] === "image" || kinds[0] === "video") ? (kinds[0] as "image" | "video") : undefined;
 
   function pick(dataUrl: string) {
     setUploading(true);
@@ -130,6 +113,16 @@ function MediaEditor({ field, value, onChange, sync, purposeHint }: FieldEditorP
         <Button variant="secondary" size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
           {uploading ? tx("pl.common.saving") : tx("pl.field.upload")}
         </Button>
+        <MediaLibraryButton
+          sync={sync}
+          purposes={(accepted.length ? accepted : [purpose]) as ApiSiteMediaPurpose[]}
+          kind={libraryKind}
+          onPick={(picked) => {
+            setFailed(false);
+            setUrl(picked.url);
+            onChange({ kind: "media", media: { assetId: picked.assetId, kind: picked.kind }, alt: current?.alt ?? {} });
+          }}
+        />
         {current && (
           <button type="button" aria-label={tx("pl.common.remove")} className="rounded p-1 text-[var(--octo-text-faint)] hover:text-[#EF4444]" onClick={() => onChange(undefined)}>
             <X size={14} />
@@ -251,13 +244,17 @@ function FieldEditor(props: FieldEditorProps) {
   if (kind === "richtext") {
     const docs = value && value.kind === "richText" ? value.text : {};
     return (
-      <Textarea
-        rows={5}
-        value={richTextToPlain(docs[lang])}
-        onChange={(e) => {
+      <RichTextEditor
+        key={lang}
+        label={labelOf(field)}
+        sync={props.sync}
+        page={props.page}
+        value={docs[lang]}
+        onChange={(doc) => {
+          // Other languages are kept exactly as stored; an empty document means "absent".
           const next = { ...docs };
-          if (e.target.value.trim()) next[lang] = plainToRichText(e.target.value);
-          else delete next[lang];
+          if (isRichTextEmpty(doc)) delete next[lang];
+          else next[lang] = doc;
           onChange(Object.keys(next).length ? { kind: "richText", text: next } : undefined);
         }}
       />
@@ -445,6 +442,9 @@ export function FieldsInspector({
     setHiddenOn(section.hiddenOn ?? []);
     setAnchor(section.anchor ?? "");
   }, [section]);
+
+  // The live preview shows these edits as they are typed, before Save.
+  usePreviewEdit(sync, page, section, { fields, style, hiddenOn, anchor });
 
   function save() {
     setSaved(false);

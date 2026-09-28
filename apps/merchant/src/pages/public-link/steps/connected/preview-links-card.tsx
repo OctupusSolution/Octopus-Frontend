@@ -1,13 +1,20 @@
 // Step 6 while connected: real private preview links (POST/GET /preview-links,
-// POST …/{id}/revoke, POST …/revoke-all). The secret address is returned only
-// once, so the newest one is kept in this component for the session; the list
+// POST …/{id}/revoke, POST …/revoke-all). The secret is returned only once, at
+// creation, so the address carrying it is shown once — kept in this component
+// only until the merchant dismisses it or leaves the step — and the list
 // afterwards shows labels and expiry only.
+//
+// The address opens the customer storefront's preview entry point on the
+// site's own host (`https://<host>/_preview?token=…`, or
+// `http://<slug>.localhost:3000/_preview?token=…` in local development); see
+// _shared/preview-url.ts.
 import { useCallback, useEffect, useState } from "react";
-import { Copy, QrCode as QrCodeIcon } from "lucide-react";
+import { Copy, ExternalLink, QrCode as QrCodeIcon } from "lucide-react";
 import { Button, Input } from "@ui/primitives";
 import type { CreatePreviewLinkResponse, PreviewLinkResponse } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PublicLinkSync } from "@/entities/site-draft";
+import { storefrontPreviewUrl } from "../../_shared/preview-url";
 import { usePlText } from "../../_shared/texts";
 import { QrCode } from "../../ui/qr-code";
 import { CARD_NOTE, SMALL_BUTTON, useBusy } from "./common";
@@ -25,6 +32,17 @@ export function PreviewLinksCard({ sync, expiresInDays }: { sync: PublicLinkSync
     sync.listPreviewLinks().then(setLinks, () => setLinks([]));
   }, [sync]);
   useEffect(reload, [reload]);
+
+  const address = sync.server?.overview.address;
+  const createdUrl = created
+    ? storefrontPreviewUrl(created.token, {
+        host: address?.hostname,
+        slug: address?.slug,
+        currentHostname: typeof window !== "undefined" ? window.location.hostname : "",
+        expiresAtUtc: created.expiresAtUtc,
+        fallback: created.previewUrl,
+      })
+    : "";
 
   const fmt = (iso: string) => new Date(iso).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 
@@ -47,19 +65,36 @@ export function PreviewLinksCard({ sync, expiresInDays }: { sync: PublicLinkSync
         <div className="flex flex-col gap-2 rounded-[10px] border border-[#22C55E]/40 bg-[#22C55E]/5 px-3 py-2.5">
           <span className="text-[11px] font-medium text-[#16a34a]">{tx("pl.preview.newLink")}</span>
           <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--octo-text-primary)]" dir="ltr">
-              {created.previewUrl}
+            <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--octo-text-primary)]" dir="ltr" title={createdUrl}>
+              {createdUrl}
             </span>
-            <Button size="sm" variant="secondary" icon={<Copy size={13} />} onClick={() => void copy(created.previewUrl)}>
+            <Button size="sm" variant="secondary" icon={<Copy size={13} />} onClick={() => void copy(createdUrl)}>
               {copied ? tx("publicLink.preview.copied") : tx("publicLink.preview.copyLink")}
             </Button>
+            <a
+              href={createdUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={SMALL_BUTTON}
+            >
+              <ExternalLink size={13} />
+              {tx("pl.preview.open")}
+            </a>
           </div>
-          <div className="flex items-center gap-2">
-            <QrCodeIcon size={13} className="shrink-0 text-[var(--octo-text-faint)]" />
-            {/* The QR encoder's byte budget is small; a very long address is shown as text only. */}
-            {created.previewUrl.length <= 78 ? <QrCode value={created.previewUrl} size={88} /> : null}
+          {/* The QR encoder's byte budget is small; a longer address is shown as text only. */}
+          {createdUrl.length <= 78 && (
+            <div className="flex items-center gap-2">
+              <QrCodeIcon size={13} className="shrink-0 text-[var(--octo-text-faint)]" />
+              <QrCode value={createdUrl} size={88} />
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-[var(--octo-text-muted)]">{tx("pl.preview.expires", { date: fmt(created.expiresAtUtc) })}</span>
+            <button type="button" className={SMALL_BUTTON} onClick={() => setCreated(null)}>
+              {tx("pl.preview.hide")}
+            </button>
           </div>
-          <span className="text-[11px] text-[var(--octo-text-muted)]">{tx("pl.preview.expires", { date: fmt(created.expiresAtUtc) })}</span>
+          <span className="text-[10.5px] text-[var(--octo-text-muted)]">{tx("pl.preview.onceNote")}</span>
         </div>
       ) : (
         <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.preview.createFirst")}</p>

@@ -1,15 +1,19 @@
 // The in-app "customer view" of the site. "Open Website" and "Visit as
 // customer" used to be plain links to the mock domain, which doesn't resolve
 // anywhere in this build — a merchant pressing them landed on a browser error.
-// This renders the real storefront from the draft, full screen, at desktop or
-// phone width, so both buttons actually show what a customer will see.
+// This renders the storefront from the draft, full screen, at desktop or
+// phone width, so both buttons actually show what a customer will see:
+// connected, the live storefront (live-preview-frame.tsx) with its own pages
+// and languages; without a business session, the sample depiction.
 import { useEffect, useState } from "react";
 import { Monitor, Smartphone, X } from "lucide-react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
+import type { PublicLinkSync, SiteAction } from "@/entities/site-draft";
 import { StorefrontPreview, type PreviewDevice } from "@/widgets/storefront-preview";
 import { previewModelFromSite } from "../_shared/preview-model";
 import type { SiteDraft } from "../_shared/site-draft";
+import { LivePreviewFrame } from "./live-preview-frame";
 
 const DEVICES = [
   { id: "desktop", Icon: Monitor, labelKey: "publicLink.device.desktop" },
@@ -20,11 +24,15 @@ export function SitePreviewModal({
   open,
   onClose,
   draft,
+  dispatch,
+  sync,
   initialDevice = "desktop",
 }: {
   open: boolean;
   onClose: () => void;
   draft: SiteDraft;
+  dispatch?: (action: SiteAction) => void;
+  sync?: PublicLinkSync;
   initialDevice?: PreviewDevice;
 }) {
   const { t, locale } = useI18n();
@@ -51,6 +59,7 @@ export function SitePreviewModal({
 
   if (!open) return null;
   const model = previewModelFromSite(draft, device, t, locale);
+  const live = Boolean(sync?.connected && sync.server && dispatch);
 
   return (
     <div
@@ -95,16 +104,33 @@ export function SitePreviewModal({
       <p className="bg-[#0D6EFD]/10 px-4 py-1.5 text-center text-[11.5px] text-[#0D6EFD]">
         {t("publicLink.sitePreview.note")}
       </p>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <div
-          className={clsx(
-            "mx-auto overflow-hidden rounded-xl border border-[var(--octo-border-card)] bg-white",
-            device === "mobile" ? "w-fit max-w-full" : "max-w-[1280px]"
-          )}
-        >
-          <StorefrontPreview model={model} />
+      {live ? (
+        <div className="min-h-0 flex-1 px-4 py-4">
+          <div className={clsx("mx-auto", device === "mobile" ? "max-w-[430px]" : "max-w-[1280px]")}>
+            <LivePreviewFrame
+              sync={sync!}
+              draft={draft}
+              dispatch={dispatch!}
+              device={device}
+              onDevice={setDevice}
+              devices={[]}
+              height="calc(100vh - 160px)"
+              bare
+            />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div
+            className={clsx(
+              "mx-auto overflow-hidden rounded-xl border border-[var(--octo-border-card)] bg-white",
+              device === "mobile" ? "w-fit max-w-full" : "max-w-[1280px]"
+            )}
+          >
+            <StorefrontPreview model={model} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

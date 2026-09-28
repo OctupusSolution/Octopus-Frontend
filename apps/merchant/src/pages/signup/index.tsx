@@ -3,7 +3,7 @@
 // merchant on their own form with everything they typed still there.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { resendVerificationCode, verifyEmail } from "@octopus/api-client";
+import { ApiError, resendVerificationCode, verifyEmail } from "@octopus/api-client";
 import { SignUpForm, type SignUpDraft } from "@/features/session/signup";
 import { AuthLayout } from "@/pages/auth/_shared/auth-layout";
 import { OtpDialog } from "@/features/session/auth-dialogs";
@@ -24,7 +24,17 @@ export function SignUpPage() {
   async function handleVerified(code: string) {
     if (!draft) return;
     await verifyEmail({ email: draft.email, code });
-    await signInWithPassword(draft.email, draft.password);
+    try {
+      await signInWithPassword(draft.email, draft.password);
+    } catch (err) {
+      // verify-email answers 200 for an address that's already verified, so a
+      // duplicate signup gets this far with any code — and only the sign-in
+      // with the new password gives it away. Say so plainly.
+      if (err instanceof ApiError && err.problem?.errorCode === "identity.auth.invalid-credentials") {
+        throw new ApiError(409, { errorCode: "identity.account.email-taken" });
+      }
+      throw err;
+    }
     navigate("/onboarding", { replace: true });
   }
 
@@ -38,6 +48,7 @@ export function SignUpPage() {
         variant="verifyAccount"
         onVerified={handleVerified}
         onResend={() => resendVerificationCode({ email: draft?.email ?? "" })}
+        onSignIn={() => navigate("/login")}
       />
     </AuthLayout>
   );

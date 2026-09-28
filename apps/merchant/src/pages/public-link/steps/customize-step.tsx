@@ -15,6 +15,7 @@ import { SITE_SECTIONS } from "../_shared/section-catalog";
 import type { SectionEntry, SiteAction } from "../_shared/site-draft";
 import { DeviceFrame } from "../ui/device-frame";
 import { ReorderList } from "../ui/reorder-list";
+import { SitePreview } from "../ui/site-preview";
 import { Switch } from "../ui/switch";
 import { GenericInspector } from "./customize/generic-inspector";
 import { HeroInspector } from "./customize/hero-inspector";
@@ -82,7 +83,13 @@ export function CustomizeStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [serverSection, setServerSection] = useState<string | null>(null);
 
-  // Connected: the server's pages and their typed sections.
+  // Connected: the server's pages and their typed sections. The hand-written
+  // inspectors below (reservations, waitlist, menu, offers) and
+  // `draft.sectionSettings` are the local, no-business-session builder only;
+  // connected, a Menu/Reservation section is a bound section edited with real
+  // data in connected/module-section-inspector.tsx, and modules the backend
+  // registers no content source for (offers, events, loyalty, waitlist) are
+  // not offered at all.
   if (publicLinkSync.connected) {
     return (
       <div className="flex flex-col gap-4">
@@ -90,9 +97,9 @@ export function CustomizeStep({ draft, dispatch, publicLinkSync }: StepProps) {
           <ServerSectionsList sync={publicLinkSync} draft={draft} dispatch={dispatch} selected={serverSection} onSelect={setServerSection} />
           <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
             <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.customize.settingForSelected")}</p>
-            <ServerSectionInspector sync={publicLinkSync} draft={draft} sectionId={serverSection} onDeleted={() => setServerSection(null)} />
+            <ServerSectionInspector sync={publicLinkSync} draft={draft} sectionId={serverSection} onDeleted={() => setServerSection(null)} onSelect={setServerSection} />
           </div>
-          <DeviceFrame model={previewModelFromSite(draft, device, t, locale)} device={device} onDevice={setDevice} devices={["desktop"]} />
+          <SitePreview draft={draft} dispatch={dispatch} sync={publicLinkSync} device={device} onDevice={setDevice} height={680} />
         </div>
       </div>
     );

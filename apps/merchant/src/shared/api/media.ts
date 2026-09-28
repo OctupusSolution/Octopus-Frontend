@@ -111,3 +111,13 @@ export async function mediaUrl(
   if (hit) return hit;
   return remember(library === "site" ? await getSiteMediaAsset(businessId, ref.assetId) : await getMediaAsset(businessId, ref.assetId)).url;
 }
+
+/** Drops a deleted asset from the session caches, so its old delivery URL no longer resolves to a reference. */
+export function forgetMedia(assetId: string): void {
+  const url = byId.get(assetId);
+  byId.delete(assetId);
+  if (url && byUrl.get(url)?.assetId === assetId) byUrl.delete(url);
+  for (const [key, job] of uploaded) {
+    job.then((up) => up.ref.assetId === assetId && uploaded.delete(key), () => undefined);
+  }
+}

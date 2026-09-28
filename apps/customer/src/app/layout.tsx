@@ -8,6 +8,7 @@ import type { PublicNavItem, PublishedShell } from "@/shared/api/public-api";
 import { createTranslator } from "@/shared/i18n/translate";
 import { SiteHeader, type SiteNavLink } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
+import { ClearPreviewCookie, PreviewBanner } from "@/widgets/preview-banner";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-latin-loaded", display: "swap" });
@@ -31,8 +32,14 @@ const plexArabic = IBM_Plex_Sans_Arabic({
 
 /** Site-wide metadata: the published site's defaults (a page's own metadata overrides them). */
 export async function generateMetadata(): Promise<Metadata> {
-  const { sample, shell } = await getStorefront();
-  if (sample || !shell) return { title: sample ? "OCTOPUS" : "Not found", description: sample ? "Order online" : undefined };
+  const { sample, shell, preview } = await getStorefront();
+  if (sample || !shell) {
+    return {
+      title: sample ? "OCTOPUS" : "Not found",
+      description: sample ? "Order online" : undefined,
+      robots: preview ? { index: false, follow: false } : undefined,
+    };
+  }
   const name = shell.brand.displayName;
   const template = shell.seo.titleTemplate?.includes("{page}")
     ? shell.seo.titleTemplate.replaceAll("{page}", "%s").replaceAll("{site}", name)
@@ -90,14 +97,17 @@ function navLinks(shell: PublishedShell, homeLabel: string): SiteNavLink[] {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const storefront = await getStorefront();
-  const { sample, shell, locale, language, direction } = storefront;
+  const { sample, shell, preview, locale, language, direction } = storefront;
   const fonts = `${inter.variable} ${interAlias.variable} ${plexArabic.variable} ${cairo.variable} ${tajawal.variable} ${poppins.variable} ${playfair.variable}`;
 
   // A real subdomain with no published site: no chrome, just the 404 the page renders.
+  // With a preview cookie this is also an unusable preview link (invalid, expired or revoked,
+  // one uniform answer): the cookie is dropped and the visitor sees the same 404.
   if (!sample && !shell) {
     return (
       <html lang={language} dir={direction} className={fonts}>
         <body>
+          {preview && <ClearPreviewCookie />}
           <StoreI18nProvider locale={locale}>
             <main>{children}</main>
           </StoreI18nProvider>
@@ -121,6 +131,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 brandName={shell.brand.displayName}
                 nav={navLinks(shell, t("store.nav.home"))}
                 languages={shell.languages.map((l) => l.code)}
+                options={shell.navigation.options}
               />
             ) : (
               <SiteHeader locale={locale} brandName={tenant.name} />
@@ -140,6 +151,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   : undefined
               }
             />
+            {shell?.isPreview && <PreviewBanner language={language} expiresAtUtc={shell.preview?.expiresAtUtc} />}
           </OrderingSessionProvider>
         </StoreI18nProvider>
       </body>

@@ -13,17 +13,20 @@ export interface ModalProps {
   /** Overrides the scrim. Console dialogs keep the default light wash; the
    *  auth screens sit on a photograph-like page and need a much darker one. */
   backdropClassName?: string;
+  /** When false, neither Escape nor a click on the scrim closes the dialog —
+   *  only the dialog's own controls do. Defaults to true. */
+  dismissible?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, footer, className, backdropClassName }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, className, backdropClassName, dismissible = true }: ModalProps) {
   useEffect(() => {
-    if (!open) return;
+    if (!open || !dismissible) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
@@ -39,7 +42,7 @@ export function Modal({ open, onClose, title, children, footer, className, backd
   return (
     <div
       className={clsx("fixed inset-0 z-50 flex items-center justify-center p-4", backdropClassName ?? "bg-black/30")}
-      onClick={onClose}
+      onClick={dismissible ? onClose : undefined}
     >
       <div
         role="dialog"

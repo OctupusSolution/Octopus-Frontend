@@ -14,6 +14,7 @@ import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { previewModelFromSite } from "../_shared/preview-model";
 import { SITE_THEMES, THEME_FILTERS, type SiteTheme } from "../_shared/theme-catalog";
 import { DeviceFrame } from "../ui/device-frame";
+import { SitePreview } from "../ui/site-preview";
 import type { StepProps } from "../_shared/steps";
 import { ServerThemeGrid, StarterCard } from "./connected/theme-panel";
 
@@ -151,15 +152,15 @@ export function ThemeStep({ draft, dispatch, publicLinkSync }: StepProps) {
             dispatch={dispatch}
             device={device}
             onDevice={setDevice}
-            renderCard={(props) => <ThemeCard {...props} />}
+            renderCard={({ key, ...props }) => <ThemeCard key={key} {...props} />}
           />
-          <DeviceFrame
-            model={previewModelFromSite(draft, device, t, locale)}
+          <SitePreview
+            draft={draft}
+            dispatch={dispatch}
+            sync={publicLinkSync}
             device={device}
             onDevice={setDevice}
-            devices={["desktop", "mobile"]}
             subtitle={t("publicLink.preview.subtitleTheme")}
-            paged
           />
         </div>
         <StarterCard sync={publicLinkSync} />

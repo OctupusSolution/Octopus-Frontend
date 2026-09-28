@@ -2,12 +2,19 @@
 // whole) and footer (GET/PUT /draft/footer). With no explicit menu items the
 // storefront header lists every visible page in order; the first edit here
 // materialises that list so the merchant edits what they see.
+//
+// Menu items may have one level of sub-items (a dropdown in the header, a
+// nested list in the drawer): an item links somewhere or is a group whose only
+// job is to hold sub-items. The item editor adds, edits, reorders and removes
+// sub-items, and moves items between levels; it checks the backend's limits
+// (_shared/nav-tree.ts) before saving and shows the server's refusal if any.
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
-import { Button, Checkbox, Input, Select } from "@ui/primitives";
-import type { FooterGroupDto, NavigationOptionsDto, NavItemDto, SocialLinkDto } from "@octopus/api-client";
+import { CornerDownRight, CornerLeftUp, Eye, EyeOff, FolderOpen, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Button, Checkbox, Input, Modal, Select } from "@ui/primitives";
+import type { FooterGroupDto, LinkTargetDto, NavigationOptionsDto, NavItemDto, SocialLinkDto } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { pickText, withText, type PublicLinkServer, type PublicLinkSync } from "@/entities/site-draft";
+import { demoteItem, MAX_NAV_LABEL, navigationInput, promoteChild, removeChild, validateNavigation } from "../../_shared/nav-tree";
 import { usePlText } from "../../_shared/texts";
 import { ReorderList } from "../../ui/reorder-list";
 import { Switch } from "../../ui/switch";
@@ -85,23 +92,358 @@ export function NavigationDisplayCard({ sync }: { sync: PublicLinkSync }) {
   );
 }
 
+/** How a navigation target reads in the builder: the page's title, `#anchor` on a page, or the address. */
+function targetText(server: PublicLinkServer, target: LinkTargetDto | null | undefined, lang: string, fallback: string, groupText: string): string {
+  if (!target) return groupText;
+  const kind = String(target.kind).toLowerCase();
+  const page = server.overview.pages.find((p) => p.pageId === target.pageId);
+  if (kind === "page") return pageTitle(page, lang, fallback);
+  if (kind === "anchor") {
+    const section = server.pages[target.pageId ?? ""]?.sections.find((s) => s.sectionId === target.sectionId);
+    return `${pageTitle(page, lang, fallback)} #${section?.anchor ?? "…"}`;
+  }
+  return target.url ?? "—";
+}
+
+function navLimits(server: PublicLinkServer) {
+  return {
+    maxTopLevel: server.catalogues?.limits.maxNavTopLevelItems ?? server.overview.limits.maxNavTopLevelItems,
+    maxChildren: server.catalogues?.limits.maxNavChildren ?? 10,
+    maxLabel: MAX_NAV_LABEL,
+  };
+}
+
+/** A problem's human text: `pl.navp.<last segment of the code>`. */
+const problemKey = (code: string) => `pl.navp.${code.split(".").pop()}`;
+
+type TargetKind = "group" | "page" | "anchor" | "external";
+
+/** The link part of an item: none (a group), a page, a section of a page, or an https address. */
+function TargetEditor({
+  sync,
+  target,
+  onChange,
+  allowGroup,
+}: {
+  sync: PublicLinkSync;
+  target: LinkTargetDto | null | undefined;
+  onChange: (target: LinkTargetDto | null) => void;
+  allowGroup: boolean;
+}) {
+  const tx = usePlText();
+  const { locale } = useI18n();
+  const server = sync.server!;
+  const pages = orderedPages(server);
+  const kind: TargetKind = !target ? "group" : (String(target.kind).toLowerCase() as TargetKind);
+  const anchorPage = kind === "anchor" ? server.pages[target?.pageId ?? ""] : undefined;
+
+  useEffect(() => {
+    if (kind === "anchor" && target?.pageId && !server.pages[target.pageId]) void sync.loadPage(target.pageId).catch(() => undefined);
+  }, [kind, target?.pageId, server.pages, sync]);
+
+  function changeKind(next: TargetKind) {
+    const first = pages[0]?.pageId ?? null;
+    if (next === "group") onChange(null);
+    else if (next === "page") onChange({ kind: "page", pageId: target?.pageId ?? first });
+    else if (next === "anchor") onChange({ kind: "anchor", pageId: target?.pageId ?? first, sectionId: null });
+    else onChange({ kind: "external", url: "https://", openInNewTab: true });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Select aria-label={tx("pl.field.linkKind")} value={kind} onChange={(e) => changeKind(e.target.value as TargetKind)}>
+        {allowGroup && <option value="group">{tx("pl.nav.group")}</option>}
+        <option value="page">{tx("pl.field.link.page")}</option>
+        <option value="anchor">{tx("pl.field.link.anchor")}</option>
+        <option value="external">{tx("pl.field.link.external")}</option>
+      </Select>
+      {(kind === "page" || kind === "anchor") && (
+        <Select
+          aria-label={tx("pl.field.link.page")}
+          value={target?.pageId ?? ""}
+          onChange={(e) => onChange(kind === "page" ? { kind: "page", pageId: e.target.value } : { kind: "anchor", pageId: e.target.value, sectionId: null })}
+        >
+          {pages.map((p) => (
+            <option key={p.pageId} value={p.pageId}>
+              {pageTitle(p, locale, sync.editLanguage)}
+            </option>
+          ))}
+        </Select>
+      )}
+      {kind === "anchor" && (
+        <Select
+          aria-label={tx("pl.field.link.anchor")}
+          value={target?.sectionId ?? ""}
+          onChange={(e) => onChange({ kind: "anchor", pageId: target?.pageId ?? null, sectionId: e.target.value || null })}
+        >
+          <option value="">—</option>
+          {(anchorPage?.sections ?? [])
+            .filter((s) => s.anchor)
+            .map((s) => (
+              <option key={s.sectionId} value={s.sectionId}>
+                #{s.anchor}
+              </option>
+            ))}
+        </Select>
+      )}
+      {kind === "external" && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <Input dir="ltr" aria-label="URL" placeholder="https://…" value={target?.url ?? ""} onChange={(e) => onChange({ ...target!, url: e.target.value.trim() })} />
+          </div>
+          <label className="flex items-center gap-2 text-[12px] text-[var(--octo-text-secondary)]">
+            <Switch checked={target?.openInNewTab !== false} onChange={() => onChange({ ...target!, openInNewTab: target?.openInNewTab === false })} label={tx("pl.field.newTab")} />
+            {tx("pl.field.newTab")}
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ChildRow {
+  key: string;
+  item: NavItemDto;
+}
+
+let rowSeq = 0;
+const rowKey = (item: NavItemDto) => item.id ?? `new-${++rowSeq}`;
+
+/**
+ * One menu item with its sub-items, edited as a local copy: label (edit language), link or group,
+ * header/drawer, and up to `maxNavChildren` sub-items (add, edit, reorder, remove, move to the top
+ * level). A childless top-level item can instead be put under another item. Saved whole.
+ */
+function NavItemModal({
+  sync,
+  items,
+  index,
+  initial,
+  onClose,
+}: {
+  sync: PublicLinkSync;
+  /** The whole current menu (the write replaces it). */
+  items: NavItemDto[];
+  /** The item's position, or null for a new one. */
+  index: number | null;
+  initial: NavItemDto;
+  onClose: () => void;
+}) {
+  const tx = usePlText();
+  const { locale } = useI18n();
+  const { act, busy } = useBusy();
+  const server = sync.server!;
+  const lang = sync.editLanguage;
+  const limits = navLimits(server);
+  const options = server.navigation?.options ?? DEFAULT_OPTIONS;
+  const [item, setItem] = useState<NavItemDto>(initial);
+  const [children, setChildren] = useState<ChildRow[]>(() => (initial.children ?? []).map((c) => ({ key: rowKey(c), item: c })));
+  const [promoted, setPromoted] = useState<NavItemDto[]>([]);
+  const [parent, setParent] = useState<string>("");
+  const [pickPage, setPickPage] = useState("");
+  const [failed, setFailed] = useState(false);
+  const pages = orderedPages(server);
+  const groupText = tx("pl.nav.group");
+
+  // The menu this edit would save.
+  const edited: NavItemDto = { ...item, children: children.map((c) => c.item) };
+  let next: NavItemDto[] = index === null ? [...items, edited] : items.map((it, i) => (i === index ? edited : it));
+  const at = index === null ? next.length - 1 : index;
+  if (promoted.length) next.splice(at + 1, 0, ...promoted.map((p) => ({ ...p, children: [] })));
+  const chosenParent = parent === "" ? null : Number(parent);
+  // Promoted sub-items were inserted right after this item, so later positions moved down.
+  const parentIndex = chosenParent !== null && chosenParent > at ? chosenParent + promoted.length : chosenParent;
+  if (parentIndex !== null && children.length === 0) next = demoteItem(next, at, parentIndex);
+  const problems = validateNavigation(next, limits);
+
+  const setChild = (i: number, child: NavItemDto) => setChildren((cs) => cs.map((c, n) => (n === i ? { ...c, item: child } : c)));
+  const addChildRow = (child: NavItemDto) => setChildren((cs) => [...cs, { key: rowKey(child), item: { ...child, children: [] } }]);
+
+  function save() {
+    setFailed(false);
+    void act("save", () => sync.saveNavigation(navigationInput(next, options))).then((ok) => (ok ? onClose() : setFailed(true)));
+  }
+
+  const others = items.map((it, i) => ({ it, i })).filter(({ i }) => i !== index);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={index === null ? tx("pl.nav.addItemTitle") : tx("pl.nav.editItem")}
+      className="max-w-2xl"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            {tx("pl.common.cancel")}
+          </Button>
+          <Button onClick={save} disabled={busy !== null || problems.length > 0}>
+            {busy ? tx("pl.common.saving") : tx("pl.common.save")}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto pe-1">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input
+            label={tx("pl.nav.linkLabel")}
+            maxLength={limits.maxLabel}
+            placeholder={item.target ? targetText(server, item.target, locale, lang, groupText) : ""}
+            value={item.label?.[lang] ?? ""}
+            onChange={(e) => setItem((it) => ({ ...it, label: withText(it.label, lang, e.target.value) }))}
+          />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{tx("pl.field.linkKind")}</span>
+            <TargetEditor sync={sync} target={item.target} allowGroup onChange={(target) => setItem((it) => ({ ...it, target }))} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-5">
+          <label className="flex items-center gap-2 text-[12px] text-[var(--octo-text-secondary)]">
+            <Switch checked={item.showInHeader} onChange={() => setItem((it) => ({ ...it, showInHeader: !it.showInHeader }))} label={tx("pl.nav.header")} />
+            {tx("pl.nav.header")}
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-[var(--octo-text-secondary)]">
+            <Switch checked={item.showInDrawer} onChange={() => setItem((it) => ({ ...it, showInDrawer: !it.showInDrawer }))} label={tx("pl.nav.drawer")} />
+            {tx("pl.nav.drawer")}
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-[var(--octo-divider)] pt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{tx("pl.nav.children")}</span>
+            <span className="text-[11px] text-[var(--octo-text-muted)]">{tx("pl.nav.childrenCount", { n: children.length, max: limits.maxChildren })}</span>
+          </div>
+          {children.length === 0 && <p className="text-[11.5px] text-[var(--octo-text-muted)]">{item.target ? tx("pl.nav.noChildren") : tx("pl.nav.groupNeedsChildren")}</p>}
+          <ReorderList
+            items={children}
+            getId={(c) => c.key}
+            getLabel={(c) => targetText(server, c.item.target, locale, lang, groupText)}
+            onReorder={setChildren}
+            renderRow={(row, i, grip) => (
+              <div className="flex w-full flex-col gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-2.5 py-2">
+                <div className="flex items-center gap-2">
+                  {grip}
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      aria-label={tx("pl.nav.linkLabel")}
+                      maxLength={limits.maxLabel}
+                      placeholder={targetText(server, row.item.target, locale, lang, groupText)}
+                      value={row.item.label?.[lang] ?? ""}
+                      onChange={(e) => setChild(i, { ...row.item, label: withText(row.item.label, lang, e.target.value) })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className={SMALL_BUTTON}
+                    title={tx("pl.nav.promote")}
+                    onClick={() => {
+                      setPromoted((p) => [...p, row.item]);
+                      setChildren((cs) => cs.filter((_c, n) => n !== i));
+                    }}
+                  >
+                    <CornerLeftUp size={13} />
+                    <span className="sr-only">{tx("pl.nav.promote")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={tx("pl.common.remove")}
+                    onClick={() => setChildren((cs) => cs.filter((_c, n) => n !== i))}
+                    className="rounded p-1 text-[var(--octo-text-faint)] hover:text-[#EF4444]"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <TargetEditor sync={sync} target={row.item.target} allowGroup={false} onChange={(target) => setChild(i, { ...row.item, target })} />
+              </div>
+            )}
+          />
+          {children.length < limits.maxChildren && (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[180px] flex-1">
+                <Select aria-label={tx("pl.nav.addChildPage")} value={pickPage} onChange={(e) => setPickPage(e.target.value)}>
+                  <option value="">{tx("pl.nav.addChildPage")}</option>
+                  {pages.map((p) => (
+                    <option key={p.pageId} value={p.pageId}>
+                      {pageTitle(p, locale, lang)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <button
+                type="button"
+                className={SMALL_BUTTON}
+                disabled={!pickPage}
+                onClick={() => {
+                  addChildRow({ target: { kind: "page", pageId: pickPage }, showInHeader: true, showInDrawer: true, children: [] });
+                  setPickPage("");
+                }}
+              >
+                <Plus size={13} />
+                {tx("pl.common.add")}
+              </button>
+              <button
+                type="button"
+                className={SMALL_BUTTON}
+                onClick={() => addChildRow({ label: {}, target: { kind: "external", url: "https://", openInNewTab: !options.openLinksInSameTab }, showInHeader: true, showInDrawer: true, children: [] })}
+              >
+                <Plus size={13} />
+                {tx("pl.nav.addLink")}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {index !== null && children.length === 0 && others.length > 0 && (
+          <div className="flex flex-col gap-1.5 border-t border-[var(--octo-divider)] pt-3">
+            <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{tx("pl.nav.putUnder")}</span>
+            <Select aria-label={tx("pl.nav.putUnder")} value={parent} onChange={(e) => setParent(e.target.value)}>
+              <option value="">{tx("pl.nav.topLevel")}</option>
+              {others
+                .filter(({ it }) => (it.children ?? []).length < limits.maxChildren)
+                .map(({ it, i }) => (
+                  <option key={i} value={String(i)}>
+                    {itemLabel(server, it, locale, lang)}
+                  </option>
+                ))}
+            </Select>
+          </div>
+        )}
+
+        {problems.length > 0 && (
+          <ul role="alert" className="flex list-disc flex-col gap-0.5 ps-5 text-[11.5px] text-[#DC2626]">
+            {Array.from(new Set(problems.map((p) => problemKey(p.code)))).map((key) => (
+              <li key={key}>{tx(key, { max: key.endsWith("too-many-children") ? limits.maxChildren : key.endsWith("too-many-items") ? limits.maxTopLevel : limits.maxLabel })}</li>
+            ))}
+          </ul>
+        )}
+        {failed && sync.error && (
+          <p role="alert" className="text-[11.5px] text-[#DC2626]">
+            {sync.error}
+          </p>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export function NavigationItemsCard({ sync }: { sync: PublicLinkSync }) {
   const tx = usePlText();
   const { t, locale } = useI18n();
   const { act, busy } = useBusy();
   const [pickPage, setPickPage] = useState("");
-  const [linkLabel, setLinkLabel] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
+  const [editing, setEditing] = useState<{ index: number | null; item: NavItemDto } | null>(null);
   const server = sync.server!;
   const lang = sync.editLanguage;
   const items = effectiveItems(server);
   const explicit = (server.navigation?.items ?? []).length > 0;
   const options = server.navigation?.options ?? DEFAULT_OPTIONS;
-  const inMenu = new Set(items.filter((i) => i.target?.kind === "page").map((i) => i.target?.pageId));
+  const inMenu = new Set(items.flatMap((i) => [i, ...(i.children ?? [])]).filter((i) => i.target?.kind === "page").map((i) => i.target?.pageId));
   const addable = orderedPages(server).filter((p) => !inMenu.has(p.pageId));
-  const max = server.catalogues?.limits.maxNavTopLevelItems ?? server.overview.limits.maxNavTopLevelItems;
+  const limits = navLimits(server);
+  const max = limits.maxTopLevel;
+  const groupText = tx("pl.nav.group");
 
-  const save = (next: NavItemDto[]) => act("nav", () => sync.saveNavigation({ items: next, options }));
+  const save = (next: NavItemDto[]) => act("nav", () => sync.saveNavigation(navigationInput(next, options)));
 
   return (
     <div className={CARD}>
@@ -115,13 +457,50 @@ export function NavigationItemsCard({ sync }: { sync: PublicLinkSync }) {
         renderRow={(item, index, grip) => {
           const hidden = !item.showInHeader && !item.showInDrawer;
           const label = itemLabel(server, item, locale, lang);
+          const kids = item.children ?? [];
           return (
             <>
               {grip}
-              <span className="flex-1 truncate text-[12.5px] text-[var(--octo-text-primary)]">
-                {label}
-                {(item.children ?? []).length > 0 && <span className="ms-1 text-[11px] text-[var(--octo-text-muted)]">+{item.children!.length}</span>}
-              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-1.5 truncate text-[12.5px] text-[var(--octo-text-primary)]">
+                  {!item.target && <FolderOpen size={13} className="shrink-0 text-[var(--octo-text-faint)]" />}
+                  <span className="truncate">{label}</span>
+                </span>
+                {kids.map((child, ci) => (
+                  <span key={child.id ?? ci} className="flex min-w-0 items-center gap-1 ps-3 text-[11.5px] text-[var(--octo-text-muted)]">
+                    <CornerDownRight size={11} className="shrink-0 rtl:-scale-x-100" />
+                    <span className="truncate">{pickText(child.label, locale, lang) || targetText(server, child.target, locale, lang, groupText)}</span>
+                    <button
+                      type="button"
+                      title={tx("pl.nav.promote")}
+                      aria-label={`${tx("pl.nav.promote")} — ${pickText(child.label, locale, lang) || targetText(server, child.target, locale, lang, groupText)}`}
+                      disabled={busy !== null || items.length >= max}
+                      onClick={() => void save(promoteChild(items, index, ci))}
+                      className="shrink-0 rounded p-0.5 text-[var(--octo-text-faint)] hover:text-[var(--octo-text-secondary)] disabled:opacity-40"
+                    >
+                      <CornerLeftUp size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${tx("pl.common.remove")} — ${pickText(child.label, locale, lang) || targetText(server, child.target, locale, lang, groupText)}`}
+                      disabled={busy !== null || (!item.target && kids.length === 1)}
+                      onClick={() => void save(removeChild(items, index, ci))}
+                      className="shrink-0 rounded p-0.5 text-[var(--octo-text-faint)] hover:text-[#EF4444] disabled:opacity-40"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                aria-label={`${label} — ${tx("pl.nav.editItem")}`}
+                disabled={busy !== null}
+                onClick={() => setEditing({ index, item })}
+                className="shrink-0 rounded p-1 text-[var(--octo-text-faint)] hover:text-[var(--octo-text-secondary)]"
+              >
+                <Pencil size={13} />
+              </button>
               <button
                 type="button"
                 aria-label={`${label} — ${t(hidden ? "publicLink.nav.showPage" : "publicLink.nav.hidePage")}`}
@@ -147,69 +526,61 @@ export function NavigationItemsCard({ sync }: { sync: PublicLinkSync }) {
       />
       {(server.navigation?.warnings ?? []).length > 0 && <p className="text-[11px] text-[#B45309]">{tx("pl.nav.warning")}</p>}
 
-      {items.length < max && addable.length > 0 && (
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Select aria-label={tx("pl.nav.addPage")} value={pickPage} onChange={(e) => setPickPage(e.target.value)}>
-              <option value="">{tx("pl.nav.addPage")}</option>
-              {addable.map((p) => (
-                <option key={p.pageId} value={p.pageId}>
-                  {pageTitle(p, locale, lang)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={<Plus size={13} />}
-            disabled={!pickPage || busy !== null}
-            onClick={() =>
-              void save([...items, { target: { kind: "page", pageId: pickPage }, showInHeader: true, showInDrawer: true, children: [] }]).then(
-                (ok) => ok && setPickPage("")
-              )
-            }
-          >
-            {tx("pl.common.add")}
-          </Button>
-        </div>
-      )}
       {items.length < max && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Input aria-label={tx("pl.nav.linkLabel")} placeholder={tx("pl.nav.linkLabel")} value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} />
-          </div>
-          <div className="flex-1">
-            <Input aria-label="URL" dir="ltr" placeholder={tx("pl.nav.linkUrl")} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value.trim())} />
-          </div>
+        <div className="flex flex-wrap items-end gap-2">
+          {addable.length > 0 && (
+            <>
+              <div className="min-w-[180px] flex-1">
+                <Select aria-label={tx("pl.nav.addPage")} value={pickPage} onChange={(e) => setPickPage(e.target.value)}>
+                  <option value="">{tx("pl.nav.addPage")}</option>
+                  {addable.map((p) => (
+                    <option key={p.pageId} value={p.pageId}>
+                      {pageTitle(p, locale, lang)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Plus size={13} />}
+                disabled={!pickPage || busy !== null}
+                onClick={() =>
+                  void save([...items, { target: { kind: "page", pageId: pickPage }, showInHeader: true, showInDrawer: true, children: [] }]).then((ok) => ok && setPickPage(""))
+                }
+              >
+                {tx("pl.common.add")}
+              </Button>
+            </>
+          )}
           <Button
             size="sm"
             variant="secondary"
             icon={<Plus size={13} />}
-            disabled={!linkLabel.trim() || !/^https:\/\/\S+\.\S+/.test(linkUrl) || busy !== null}
+            disabled={busy !== null}
             onClick={() =>
-              void save([
-                ...items,
-                {
-                  label: withText(null, lang, linkLabel),
-                  target: { kind: "external", url: linkUrl, openInNewTab: !options.openLinksInSameTab },
-                  showInHeader: true,
-                  showInDrawer: true,
-                  children: [],
-                },
-              ]).then((ok) => {
-                if (ok) {
-                  setLinkLabel("");
-                  setLinkUrl("");
-                }
+              setEditing({
+                index: null,
+                item: { label: {}, target: { kind: "external", url: "https://", openInNewTab: !options.openLinksInSameTab }, showInHeader: true, showInDrawer: true, children: [] },
               })
             }
           >
             {tx("pl.nav.addLink")}
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<FolderOpen size={13} />}
+            disabled={busy !== null}
+            onClick={() => setEditing({ index: null, item: { label: {}, target: null, showInHeader: true, showInDrawer: true, children: [] } })}
+          >
+            {tx("pl.nav.addGroup")}
+          </Button>
         </div>
       )}
       <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.navigation.pageOrderHint")}</p>
+      <p className="text-[11px] text-[var(--octo-text-muted)]">{tx("pl.nav.childrenHint", { max: limits.maxChildren })}</p>
+      {editing && <NavItemModal sync={sync} items={items} index={editing.index} initial={editing.item} onClose={() => setEditing(null)} />}
     </div>
   );
 }

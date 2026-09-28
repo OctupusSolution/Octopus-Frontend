@@ -7,6 +7,7 @@ import { defaultLocale, getDirection, locales, type Locale } from "@i18n/index";
 import {
   fetchPage,
   fetchShell,
+  isPreviewRequest,
   tenantFromShell,
   type Direction,
   type PublicPage,
@@ -19,7 +20,9 @@ export interface Storefront {
   slug: string;
   /** Plain localhost with no subdomain: the built-in sample tenant, no API. */
   sample: boolean;
-  /** The published shell; null for the sample storefront or a site that is not served. */
+  /** The visitor holds a draft-preview cookie: the shell and pages are the preview reads. */
+  preview: boolean;
+  /** The published (or, in preview, draft) shell; null for the sample storefront or a site that is not served. */
   shell: PublishedShell | null;
   /** The language the site answered in (one it has enabled), else the UI locale. */
   language: string;
@@ -39,17 +42,18 @@ export const getStorefront = cache(async (): Promise<Storefront> => {
 
   if (sample) {
     const locale = isLocale(cookie) ? cookie : defaultLocale;
-    return { slug, sample, shell: null, language: locale, direction: getDirection(locale), locale };
+    return { slug, sample, preview: false, shell: null, language: locale, direction: getDirection(locale), locale };
   }
 
   // The visitor's chosen language (cookie) wins; else the API negotiates from
   // Accept-Language and falls back to the site's default. It always answers in a
   // language the site has enabled.
+  const preview = isPreviewRequest();
   const shell = await fetchShell(slug, cookie, h.get("accept-language"));
   const language = shell?.language ?? (isLocale(cookie) ? cookie : defaultLocale);
   const locale: Locale = isLocale(language) ? language : defaultLocale;
   const direction: Direction = shell?.direction ?? getDirection(locale);
-  return { slug, sample, shell, language, direction, locale };
+  return { slug, sample, preview, shell, language, direction, locale };
 });
 
 /** The storefront for a page that needs a served site: a real subdomain whose

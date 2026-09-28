@@ -3,9 +3,44 @@
 // readers over the server copy. Errors from sync actions are surfaced once, by
 // the builder's status banner (index.tsx) — these helpers only swallow them so
 // no click handler leaves an unhandled rejection behind.
-import { useCallback, useState } from "react";
-import type { NavItemDto, PageDraftResponse, PageSummaryResponse, UpdatePageInput } from "@octopus/api-client";
-import { pickText, type PublicLinkServer } from "@/entities/site-draft";
+import { useCallback, useEffect, useState } from "react";
+import type { NavItemDto, PageDraftResponse, PageSummaryResponse, SectionDraftResponse, UpdatePageInput } from "@octopus/api-client";
+import { pickText, stableJson, type PreviewSectionEdit, type PublicLinkServer, type PublicLinkSync } from "@/entities/site-draft";
+
+/**
+ * Hands an inspector's unsaved state of a section to the live preview, so it shows before Save.
+ * Nothing is reported while the state matches the saved section, and the edit is dropped when the
+ * inspector closes (its unsaved state goes with it).
+ */
+export function usePreviewEdit(
+  sync: PublicLinkSync,
+  page: PageDraftResponse,
+  section: SectionDraftResponse,
+  state: Omit<PreviewSectionEdit, "pageId" | "anchor"> & { anchor: string }
+) {
+  const { setPreviewEdit } = sync;
+  const { sectionId } = section;
+  const edit: PreviewSectionEdit = {
+    pageId: page.pageId,
+    ...state,
+    anchor: state.anchor.replace(/-+$/, "") || null,
+  };
+  const saved: PreviewSectionEdit = {
+    pageId: page.pageId,
+    ...(state.fields !== undefined ? { fields: section.fields ?? {} } : {}),
+    style: section.style ?? {},
+    hiddenOn: section.hiddenOn ?? [],
+    anchor: section.anchor ?? null,
+  };
+  const editJson = stableJson(edit);
+  const dirty = editJson !== stableJson(saved);
+
+  useEffect(() => {
+    setPreviewEdit(sectionId, dirty ? (JSON.parse(editJson) as PreviewSectionEdit) : null);
+  }, [dirty, editJson, sectionId, setPreviewEdit]);
+
+  useEffect(() => () => setPreviewEdit(sectionId, null), [sectionId, setPreviewEdit]);
+}
 
 export const CARD = "flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]";
 export const CARD_TITLE = "text-[13px] font-semibold text-[var(--octo-text-primary)]";

@@ -21,6 +21,9 @@ const FALLBACK: Record<"en" | "ar", Record<string, string>> = {
     "publicLink.versions.rollbackConfirm":
       "Make version {n} live now? Visitors will see it immediately. It is published as a new version; your draft is not changed.",
     "publicLink.versions.rollbackConfirmAction": "Yes, make it live",
+    "publicLink.versions.restoreConfirm":
+      "Copy version {n} into your draft? It replaces the current draft, including any changes you haven't published.",
+    "publicLink.versions.restoreConfirmAction": "Yes, replace my draft",
     "publicLink.versions.cancel": "Cancel",
     "publicLink.versions.rolledBack": "Version {n} is live again.",
     "publicLink.versions.rollbackFailed": "Couldn't make that version live.",
@@ -44,6 +47,9 @@ const FALLBACK: Record<"en" | "ar", Record<string, string>> = {
     "publicLink.versions.rollbackConfirm":
       "نشر النسخة {n} الآن؟ سيراها الزوار فورًا. تُنشر كنسخة جديدة ولن تتغير مسودتك.",
     "publicLink.versions.rollbackConfirmAction": "نعم، انشرها",
+    "publicLink.versions.restoreConfirm":
+      "نسخ النسخة {n} إلى المسودة؟ ستحل محل المسودة الحالية، بما فيها أي تعديلات لم تُنشر بعد.",
+    "publicLink.versions.restoreConfirmAction": "نعم، استبدل المسودة",
     "publicLink.versions.cancel": "إلغاء",
     "publicLink.versions.rolledBack": "النسخة {n} منشورة من جديد.",
     "publicLink.versions.rollbackFailed": "تعذّر نشر هذه النسخة.",
@@ -171,7 +177,9 @@ export function PublicLinkVersionsModal({
   const [notice, setNotice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [details, setDetails] = useState<Record<number, Details>>({});
-  const [confirming, setConfirming] = useState<number | null>(null);
+  // Both replace something the owner can't get back from here — the live site
+  // (rollback) or the unpublished draft (restore) — so both ask first.
+  const [confirming, setConfirming] = useState<{ version: number; action: "restore" | "rollback" } | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -213,6 +221,7 @@ export function PublicLinkVersionsModal({
   }
 
   async function restore(version: number) {
+    setConfirming(null);
     setBusy({ version, action: "restore" });
     setError(null);
     setNotice(null);
@@ -318,7 +327,7 @@ export function PublicLinkVersionsModal({
                       <>
                         <button
                           type="button"
-                          onClick={() => void restore(v.version)}
+                          onClick={() => setConfirming({ version: v.version, action: "restore" })}
                           disabled={busy !== null}
                           className={secondaryBtn}
                         >
@@ -327,7 +336,7 @@ export function PublicLinkVersionsModal({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirming(v.version)}
+                          onClick={() => setConfirming({ version: v.version, action: "rollback" })}
                           disabled={busy !== null}
                           className={secondaryBtn}
                         >
@@ -341,18 +350,18 @@ export function PublicLinkVersionsModal({
                   </div>
                 </div>
 
-                {confirming === v.version && (
+                {confirming?.version === v.version && (
                   <div role="alertdialog" className="mt-2 rounded-[9px] border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-3 py-2.5">
                     <p className="text-[12.5px] text-[var(--octo-text-primary)]">
-                      {tx("publicLink.versions.rollbackConfirm").replace("{n}", String(v.version))}
+                      {tx(confirming.action === "restore" ? "publicLink.versions.restoreConfirm" : "publicLink.versions.rollbackConfirm").replace("{n}", String(v.version))}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => void rollback(v.version)}
+                        onClick={() => void (confirming.action === "restore" ? restore(v.version) : rollback(v.version))}
                         className="rounded-[8px] bg-[#0D6EFD] px-3 py-1.5 text-[12px] font-medium text-white hover:bg-[#0D6EFD]/90"
                       >
-                        {tx("publicLink.versions.rollbackConfirmAction")}
+                        {tx(confirming.action === "restore" ? "publicLink.versions.restoreConfirmAction" : "publicLink.versions.rollbackConfirmAction")}
                       </button>
                       <button type="button" onClick={() => setConfirming(null)} className={secondaryBtn}>
                         {tx("publicLink.versions.cancel")}

@@ -5,10 +5,11 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, User, Building2 } from "lucide-react";
-import { register, ApiError } from "@octopus/api-client";
+import { register } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthField, AuthButton } from "../_shared/auth-field";
 import { SocialRow } from "../_shared/social-row";
+import { AuthErrorDialog, isEmailTaken, useAuthError } from "../_shared/auth-error";
 import { useExternalSignIn, type ExternalLinkRouteState } from "../_shared/use-external-sign-in";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -28,7 +29,7 @@ interface SignUpErrors {
 }
 
 export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -61,17 +62,18 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
 
     setSubmitting(true);
     try {
-      // register() always returns 200 regardless of whether the email is
-      // already taken (AuthEndpoints.cs — enumeration-safe by design), so
-      // there is no "email already registered" error to surface here; a
-      // duplicate simply won't receive a new verification code.
+      // register() currently returns 200 even when the email is already
+      // taken (AuthEndpoints.cs — enumeration-safe by design): a duplicate
+      // just never receives a code, and the verify dialog says so. Should the
+      // backend start answering with an email-taken error, the error dialog
+      // below offers sign-in instead.
       await register(
         { fullName: draft.name, email: draft.email, password: draft.password, companyName: draft.company },
         crypto.randomUUID()
       );
       onSubmitted(draft);
     } catch (err) {
-      setErrors({ email: err instanceof ApiError ? err.problem?.errorCode ?? err.message : t("auth.error.genericFailure") });
+      failure.show(err);
     } finally {
       setSubmitting(false);
     }
@@ -83,6 +85,12 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
   const social = useExternalSignIn((externalLink) => {
     const state: ExternalLinkRouteState = { externalLink };
     navigate("/login", { state });
+  });
+
+  const failure = useAuthError({
+    label: locale === "ar" ? "تسجيل الدخول" : "Sign in",
+    onClick: () => navigate("/login"),
+    when: isEmailTaken,
   });
 
   return (
@@ -100,11 +108,8 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
         onCredential={(provider, credential, mail) => void social.signIn(provider, credential, mail)}
         busy={social.busy}
       />
-      {social.error && (
-        <p role="alert" className="-mt-2 text-[13px] text-error">
-          {social.error}
-        </p>
-      )}
+      <AuthErrorDialog message={social.error} onClose={() => social.setError(null)} />
+      {failure.dialog}
 
       <AuthField
         label={t("auth.fullName")}

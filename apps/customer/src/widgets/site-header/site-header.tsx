@@ -19,6 +19,9 @@ export interface SiteHeaderProps {
   nav?: SiteNavLink[];
   /** The languages the published site offers. */
   languages?: string[];
+  /** A published site's navigation switches; omitted for the sample storefront, which keeps its
+   *  pinned header and underlined current page. */
+  options?: { stickyHeader: boolean; showActivePageIndicator: boolean };
 }
 
 export interface SiteNavLink {
@@ -47,7 +50,9 @@ const NAV: readonly { href: string; key: string }[] = [
   { href: "/orders", key: "store.nav.trackOrder" },
 ];
 
-export function SiteHeader({ locale, logoUrl, brandName, nav, languages }: SiteHeaderProps) {
+export function SiteHeader({ locale, logoUrl, brandName, nav, languages, options }: SiteHeaderProps) {
+  const sticky = options?.stickyHeader ?? true;
+  const markActive = options?.showActivePageIndicator ?? true;
   const { t } = useI18n();
   const sampleNav: NavEntry[] = NAV.map((e) => ({ href: e.href, label: t(e.key) }));
   const headerNav: NavEntry[] = nav
@@ -63,7 +68,7 @@ export function SiteHeader({ locale, logoUrl, brandName, nav, languages }: SiteH
   const itemCount = state.lines.reduce((sum, line) => sum + line.quantity, 0);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)]">
+    <header className={`${sticky ? "sticky top-0" : "relative"} z-30 border-b border-[var(--octo-border-card)] bg-[var(--octo-card)]`}>
       <div className="mx-auto flex h-14 max-w-[1200px] items-center justify-between gap-6 px-4 sm:px-6">
         <Link href="/" aria-label={brandName ?? "OCTOPUS"} className="flex shrink-0 items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -85,7 +90,7 @@ export function SiteHeader({ locale, logoUrl, brandName, nav, languages }: SiteH
                 rel={entry.newTab ? "noopener noreferrer" : undefined}
                 aria-current={active ? "page" : undefined}
                 className={`relative text-[13.5px] transition-colors ${
-                  active
+                  active && markActive
                     ? "font-semibold text-[var(--octo-brand)] after:absolute after:inset-x-0 after:-bottom-[17px] after:h-[2px] after:bg-[var(--octo-brand)]"
                     : "text-[var(--octo-text-primary)] hover:text-[var(--octo-brand)]"
                 }`}

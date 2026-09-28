@@ -34,7 +34,12 @@ export interface GoLiveItem {
    *  SEO are optional per business (the backend publishes without them), so
    *  they are shown as recommendations instead of gates. */
   required?: boolean;
+  /** Not shown at all for this draft (e.g. a module the backend has no content source for while connected). */
+  hidden?: (draft: SiteDraft) => boolean;
 }
+
+/** Connected, whether a module page or an enabled bound section shows this content source. */
+const bound = (draft: SiteDraft, sourceKey: string) => (draft.remote?.boundSources ?? []).includes(sourceKey);
 
 // While connected (`draft.remote` set by public-link-sync.ts) the structural
 // rows read the server's projection — its pages and navigation — instead of
@@ -70,19 +75,21 @@ export const GO_LIVE_ITEMS: readonly GoLiveItem[] = [
     id: "menu",
     labelKey: "publicLink.checklist.menu.label",
     noteKey: "publicLink.checklist.menu.note",
-    done: (draft) => draft.sectionSettings.menu.connectedMenuId.trim() !== "",
+    done: (draft) => (draft.remote ? bound(draft, "menu") : draft.sectionSettings.menu.connectedMenuId.trim() !== ""),
   },
   {
     id: "reservations",
     labelKey: "publicLink.checklist.reservations.label",
     noteKey: "publicLink.checklist.reservations.note",
-    done: (draft) => draft.sectionSettings.reservations.enabled,
+    done: (draft) => (draft.remote ? bound(draft, "reservation") : draft.sectionSettings.reservations.enabled),
   },
   {
     id: "waitlist",
     labelKey: "publicLink.checklist.waitlist.label",
     noteKey: "publicLink.checklist.waitlist.note",
     done: (draft) => draft.sectionSettings.waitlist.enabled,
+    // The backend registers no waitlist content source, so there is nothing to connect while connected.
+    hidden: (draft) => Boolean(draft.remote),
   },
   {
     id: "payments",

@@ -4,20 +4,21 @@
 // (PUT …/sections/{id}/enabled), are added from the catalogue or bound to
 // another module's content (POST …/sections) and removed (DELETE …). The
 // selected section opens in the catalogue-driven inspector; a bound section
-// opens a summary of the content it shows.
+// opens the module inspector (module-section-inspector.tsx): the item it is
+// bound to, its display settings, whether it is shown.
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { ExternalLink, Link2, Pencil, Plus } from "lucide-react";
-import { Badge, Button, EmptyState, Modal, Select } from "@ui/primitives";
-import type { DeviceClass, PageDraftResponse, SectionDraftResponse, SectionStyle } from "@octopus/api-client";
+import { Link2, Pencil, Plus } from "lucide-react";
+import { Button, EmptyState, Modal, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PublicLinkSync, SiteAction, SiteDraft } from "@/entities/site-draft";
 import { usePlText } from "../../_shared/texts";
+import { catalogueText } from "../../_shared/catalogue-text";
 import { ReorderList } from "../../ui/reorder-list";
 import { Switch } from "../../ui/switch";
 import { CARD, CARD_TITLE, orderedPages, pageTitle, useBusy } from "./common";
-import { FieldsInspector, StyleEditor } from "./fields-inspector";
+import { FieldsInspector } from "./fields-inspector";
+import { ModuleSectionInspector } from "./module-section-inspector";
 
 const KNOWN_LABELS: Record<string, string> = {
   hero: "publicLink.section.hero",
@@ -35,72 +36,14 @@ export function useSectionLabel() {
       const text = tx(key);
       if (text !== key) return text;
     }
+    const camel = type.replace(/[-_](\w)/g, (_, c: string) => c.toUpperCase());
+    const fromCatalogue = catalogueText(`sections.${camel}.name`);
+    if (fromCatalogue) return fromCatalogue;
     return type
       .split(/[-_]/)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
   };
-}
-
-const MANAGE_ROUTE: Record<string, string> = { menu: "/menu", reservation: "/reservations" };
-
-function BoundSectionInspector({ sync, page, section }: { sync: PublicLinkSync; page: PageDraftResponse; section: SectionDraftResponse }) {
-  const tx = usePlText();
-  const { locale } = useI18n();
-  const navigate = useNavigate();
-  const { act, busy } = useBusy();
-  const label = useSectionLabel();
-  const [style, setStyle] = useState<SectionStyle>(section.style ?? {});
-  const [hiddenOn, setHiddenOn] = useState<DeviceClass[]>(section.hiddenOn ?? []);
-  const [anchor, setAnchor] = useState(section.anchor ?? "");
-  useEffect(() => {
-    setStyle(section.style ?? {});
-    setHiddenOn(section.hiddenOn ?? []);
-    setAnchor(section.anchor ?? "");
-  }, [section]);
-
-  const sourceKey = section.source?.sourceKey ?? section.type;
-  const item = sync.server?.sources.find((s) => s.sourceKey === sourceKey)?.items.find((i) => i.contentKey === section.source?.contentKey);
-  const route = MANAGE_ROUTE[sourceKey];
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <Link2 size={14} className="text-[var(--octo-text-faint)]" />
-        <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{tx("pl.sections.bound")}</span>
-        {section.sourceState === "unavailable" && <Badge tone="warning">!</Badge>}
-      </div>
-      <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.sections.boundNote")}</p>
-      <div className="rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)]">
-        {label(sourceKey)} · {item ? item.displayNames?.[locale] ?? item.displayName : section.source?.contentKey}
-      </div>
-      {section.sourceState === "unavailable" && <p className="text-[11.5px] text-[#B45309]">{tx("pl.sections.unavailable")}</p>}
-      {section.primary && <p className="text-[11.5px] text-[var(--octo-text-muted)]">{tx("pl.sections.primary")}</p>}
-      {route && (
-        <Button size="sm" variant="secondary" icon={<ExternalLink size={13} />} onClick={() => navigate(route)} className="w-fit">
-          {tx("pl.sections.manage")}
-        </Button>
-      )}
-      <StyleEditor type={undefined} style={style} hiddenOn={hiddenOn} anchor={anchor} onStyle={setStyle} onHiddenOn={setHiddenOn} onAnchor={setAnchor} />
-      <Button
-        className="w-fit"
-        disabled={busy !== null}
-        onClick={() =>
-          void act("save", () =>
-            sync.updateSection(page.pageId, section.sectionId, {
-              fields: {},
-              style,
-              hiddenOn,
-              anchor: anchor.replace(/-+$/, "") || null,
-              sourceSettings: section.sourceSettings ?? null,
-            })
-          )
-        }
-      >
-        {busy ? tx("pl.common.saving") : tx("pl.common.save")}
-      </Button>
-    </div>
-  );
 }
 
 export function ServerSectionsList({
@@ -271,9 +214,22 @@ export function ServerSectionsList({
   );
 }
 
-export function ServerSectionInspector({ sync, draft, sectionId, onDeleted }: { sync: PublicLinkSync; draft: SiteDraft; sectionId: string | null; onDeleted: () => void }) {
+export function ServerSectionInspector({
+  sync,
+  draft,
+  sectionId,
+  onDeleted,
+  onSelect,
+}: {
+  sync: PublicLinkSync;
+  draft: SiteDraft;
+  sectionId: string | null;
+  onDeleted: () => void;
+  onSelect: (sectionId: string) => void;
+}) {
   const tx = usePlText();
   const { t } = useI18n();
+  const label = useSectionLabel();
   const { act, busy } = useBusy();
   const server = sync.server!;
   const pages = orderedPages(server);
@@ -287,7 +243,14 @@ export function ServerSectionInspector({ sync, draft, sectionId, onDeleted }: { 
   return (
     <div className="flex flex-col gap-4">
       {section.source || !type ? (
-        <BoundSectionInspector key={section.sectionId} sync={sync} page={page} section={section} />
+        <ModuleSectionInspector
+          key={section.sectionId}
+          sync={sync}
+          page={page}
+          section={section}
+          label={label(section.source?.sourceKey ?? section.type)}
+          onRebound={onSelect}
+        />
       ) : (
         <FieldsInspector key={section.sectionId} sync={sync} page={page} section={section} type={type} />
       )}

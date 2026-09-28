@@ -9,12 +9,11 @@ import { Info } from "lucide-react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PreviewDevice } from "@/widgets/storefront-preview";
-import { previewModelFromSite } from "../_shared/preview-model";
 import { PAGE_MODULES } from "../_shared/page-catalog";
 import { SECTION_FOR_PAGE } from "../_shared/section-catalog";
 import type { PageEntry, SiteAction } from "../_shared/site-draft";
-import { DeviceFrame } from "../ui/device-frame";
 import { DrawerNavPreview } from "../ui/nav-preview";
+import { SitePreview } from "../ui/site-preview";
 import { ReorderList } from "../ui/reorder-list";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
@@ -93,10 +92,8 @@ function pageLabel(page: PageEntry, t: (key: string) => string): string {
 }
 
 export function PagesStep({ draft, dispatch, publicLinkSync }: StepProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
-
-  const model = previewModelFromSite(draft, device, t, locale);
 
   return (
     <div className="flex flex-col gap-4">
@@ -161,7 +158,7 @@ export function PagesStep({ draft, dispatch, publicLinkSync }: StepProps) {
           <DrawerNavPreview draft={draft} />
         </div>
 
-        <DeviceFrame model={model} device={device} onDevice={setDevice} paged />
+        <SitePreview draft={draft} dispatch={dispatch} sync={publicLinkSync} device={device} onDevice={setDevice} paged />
       </div>
     </div>
   );

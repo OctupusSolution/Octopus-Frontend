@@ -302,17 +302,41 @@ export type SectionLinkTarget =
   | { kind: "email"; address: string }
   | { kind: "phone"; number: string };
 
-/** Rich text: a closed block tree per language. */
+/**
+ * Rich text (Domain `RichText.cs`): a CLOSED block tree per language — no HTML, no Markdown.
+ *  - blocks: paragraph `p`, heading `h` (level 2-4 only), `list` (ordered or not; each item is a
+ *    list of blocks holding only paragraphs and nested lists, at most `MaxRichTextListDepth`
+ *    (default 2) deep, never empty), `quote`;
+ *  - inlines: a text run (`bold`/`italic`/`underline` marks), a typed `link` (page, anchor or https
+ *    external only — email/phone belong to link fields) wrapping runs, and a line break `br`.
+ * A run's text may not be empty nor hold control/format characters (U+200C/U+200D excepted), so a
+ * newline is always a `br`. The whole value is capped at `MaxRichTextNodes` (default 2000) nodes.
+ * Canonical storage omits defaults, so on reads a `false` mark (or `openInNewTab`) may be absent.
+ */
+export interface RichTextRun {
+  kind?: "text";
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
+/** The link kinds rich text accepts (`RichTextDocument.AllowedLinkKinds`). */
+export type RichLinkTarget =
+  | { kind: "page"; pageId: string }
+  | { kind: "anchor"; pageId: string; sectionId: string }
+  | { kind: "external"; url: string; openInNewTab?: boolean };
+
 export type RichInline =
-  | { kind: "text"; text: string; bold: boolean; italic: boolean; underline: boolean }
-  | { kind: "link"; target: SectionLinkTarget; runs: { kind?: "text"; text: string; bold: boolean; italic: boolean; underline: boolean }[] }
+  | ({ kind: "text" } & RichTextRun)
+  | { kind: "link"; target: RichLinkTarget; runs: RichTextRun[] }
   | { kind: "br" };
 
 export type RichBlock =
-  | { kind: "p"; inlines: RichInline[] }
-  | { kind: "h"; level: number; inlines: RichInline[] }
-  | { kind: "list"; ordered: boolean; items: RichBlock[][] }
-  | { kind: "quote"; inlines: RichInline[] };
+  | { kind: "p"; inlines?: RichInline[] }
+  | { kind: "h"; level: number; inlines?: RichInline[] }
+  | { kind: "list"; ordered?: boolean; items: RichBlock[][] }
+  | { kind: "quote"; inlines?: RichInline[] };
 
 export interface RichTextDocument {
   blocks: RichBlock[];
@@ -783,6 +807,28 @@ export interface ContentSourceDescriptorResponse {
   placements: string[];
   maxPagesPerContentKey: number;
   suggestedPathSegment: string | null;
+  /**
+   * The display settings a bound section of this source accepts, declared as data.
+   * NOT emitted by the current backend: `ContentSourceDescriptor` has no settings schema and the
+   * Menu/Reservation providers accept any settings (`ValidateSettingsAsync` answers Valid). The
+   * builder renders these when present and falls back to a generic key/value editor otherwise.
+   */
+  settingsSchema?: SourceSettingDefinition[] | null;
+}
+
+/** One declared display setting of a content source (see `settingsSchema`). Stored as plain JSON under `key`. */
+export interface SourceSettingDefinition {
+  key: string;
+  /** "text" (string), "localizedText" (LocalizedTextMap), "number", "toggle" (boolean), "choice" (one of `choices`). */
+  kind: "text" | "localizedText" | "number" | "toggle" | "choice" | string;
+  labelKey?: string | null;
+  choices?: CatalogueChoice[] | null;
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+  maxLength?: number | null;
+  default?: unknown;
+  required?: boolean;
 }
 
 export interface ContentSourceResponse {
@@ -837,6 +883,12 @@ export interface SiteMediaUsageResponse {
 export interface SiteMediaAssetDetailResponse extends SiteMediaLibraryItemResponse {
   usage: SiteMediaUsageResponse;
   isDeletable: boolean;
+}
+
+/** Extensions of the 409 `publiclink.media.asset-in-use` problem (`SiteMediaReleasePolicy.Describe`). */
+export interface SiteMediaInUseDetails {
+  draft: { pageId: string | null; sectionId: string | null; field: string }[];
+  publishedVersions: number[];
 }
 
 export interface ListSiteMediaParams {

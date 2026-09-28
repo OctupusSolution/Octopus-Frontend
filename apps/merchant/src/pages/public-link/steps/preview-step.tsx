@@ -13,8 +13,8 @@ import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { previewModelFromSite } from "../_shared/preview-model";
 import { resultsFor, SIM_STEPS } from "../_shared/simulation";
 import type { SiteAction, Tester } from "../_shared/site-draft";
-import { DeviceFrame } from "../ui/device-frame";
 import { QrCode } from "../ui/qr-code";
+import { SitePreview } from "../ui/site-preview";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
 import { usePlText } from "../_shared/texts";
@@ -243,7 +243,10 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
   }
 
   const running = preview.simulation === "running";
-  const done = preview.results !== null;
+  // The rehearsal is a scripted walkthrough, not a test of the real site: connected, the live
+  // preview beside it and the real preview links replace it, so it is not offered.
+  const rehearsal = !publicLinkSync.connected;
+  const done = rehearsal && preview.results !== null;
   const successCount = preview.results?.filter((r) => r.status === "success").length ?? 0;
   const score = done ? Math.round((successCount / SIM_STEPS.length) * 100) : 0;
 
@@ -261,6 +264,8 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
         {/* Start: test-mode status + rehearsal checklist */}
         <div className="flex flex-col gap-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <div className="flex flex-col gap-2">
+            {rehearsal ? (
+              <>
             <div className="flex items-center justify-between gap-2">
               <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.preview.testMode")}</span>
               <Switch
@@ -270,7 +275,14 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
               />
             </div>
             <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.preview.testModeNote")}</p>
-            {preview.testMode && (
+              </>
+            ) : (
+              <>
+                <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.live.previewTitle")}</span>
+                <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.live.previewNote")}</p>
+              </>
+            )}
+            {rehearsal && preview.testMode && (
               <Badge tone="info" className="w-fit">
                 {t("publicLink.preview.testModeOn")}
               </Badge>
@@ -289,6 +301,8 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
             </p>
           </div>
 
+          {rehearsal && (
+            <>
           <div className="flex flex-col gap-3">
             {SIM_STEPS.map((step, index) => (
               <ChecklistRow
@@ -304,6 +318,8 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
           <Button variant={running ? "danger" : "primary"} onClick={toggleRun}>
             {running ? t("publicLink.preview.endSimulation") : t("publicLink.preview.startSimulation")}
           </Button>
+            </>
+          )}
         </div>
 
         {/* Middle: results — the column itself only exists once a run has
@@ -395,7 +411,7 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
           </div>
           )}
 
-          <DeviceFrame model={model} device={device} onDevice={setDevice} />
+          <SitePreview draft={draft} dispatch={dispatch} sync={publicLinkSync} device={device} onDevice={setDevice} height={640} />
         </div>
       </div>
 

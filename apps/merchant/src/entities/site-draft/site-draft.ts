@@ -147,6 +147,8 @@ export interface SiteRemote {
   navItems: readonly { label: string; visible: boolean; drawer?: boolean }[];
   /** How many pages are visible (Home always is). */
   visiblePages: number;
+  /** Content sources (e.g. `menu`, `reservation`) shown by a module page or an enabled bound section. */
+  boundSources?: readonly string[];
   /** The home page's enabled sections, as preview widget ids (hero/menu/offers). */
   homeSections: readonly string[];
   /** The home page hero's copy and image, when it has one. */

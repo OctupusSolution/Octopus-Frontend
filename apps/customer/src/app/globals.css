@@ -53,3 +53,10 @@
 body {
   @apply bg-[var(--octo-store-page)] text-[var(--octo-text-primary)] antialiased;
 }
+
+/* A published site's titles face (brand-theme.ts); unset, headings keep the body face. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading, inherit);
+}

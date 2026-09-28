@@ -27,14 +27,17 @@ import {
   createDraftPage,
   createPreviewLink as createPreviewLinkApi,
   deleteDraftPage,
+  deleteSiteMediaAsset,
   getCatalogues,
   getDraftFooter,
   getDraftNavigation,
   getDraftPage,
   getDraftReview,
   getPublicLinkSite,
+  getSiteMediaAsset,
   getVersion as getSiteVersion,
   listContentSources,
+  listSiteMediaAssets,
   listPreviewLinks as listPreviewLinksApi,
   listVersions as listSiteVersions,
   publishSite,
@@ -65,6 +68,7 @@ import {
   type DraftVersionsResponse,
   type FontResponse,
   type FooterResponse,
+  type ListSiteMediaParams,
   type LocalizedTextMap,
   type NavigationResponse,
   type PageDraftResponse,
@@ -74,6 +78,9 @@ import {
   type ReplaceNavigationInput,
   type ReviewFindingResponse,
   type ReviewResponse,
+  type SiteMediaAssetDetailResponse,
+  type SiteMediaInUseDetails,
+  type SiteMediaLibraryItemResponse,
   type SiteOverviewResponse,
   type SiteStatusResponse,
   type UpdateBrandInput,
@@ -86,7 +93,7 @@ import {
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
-import { isLocalMedia, knownMedia, mediaUrl, uploadMedia, type SiteMediaPurpose } from "@/shared/api/media";
+import { forgetMedia, isLocalMedia, knownMedia, mediaUrl, rememberMedia, uploadMedia, type SiteMediaPurpose } from "@/shared/api/media";
 import type { SiteAction, SiteDraft, SiteRemote } from "./site-draft";
 import { FALLBACK_SITE_FONTS, toFontCode } from "./site-fonts";
 
@@ -115,6 +122,33 @@ export interface PublicLinkServer {
   /** The last review read (publish step); null until asked for. */
   review: ReviewResponse | null;
   sources: ContentSourceResponse[];
+}
+
+/** A library delete the server refused (409 publiclink.media.asset-in-use): where the asset is still used. */
+export class MediaInUseError extends Error {
+  readonly usage: SiteMediaInUseDetails;
+  constructor(usage: SiteMediaInUseDetails) {
+    super("publiclink.media.asset-in-use");
+    this.name = "MediaInUseError";
+    this.usage = usage;
+  }
+}
+
+/** The in-use extensions of a 409 problem, read defensively (top-level or under `extensions`). */
+export function mediaInUseDetails(err: unknown): SiteMediaInUseDetails | null {
+  if (!(err instanceof ApiError) || err.problem?.errorCode !== "publiclink.media.asset-in-use") return null;
+  const problem = err.problem as unknown as Record<string, unknown>;
+  const ext = (problem.extensions && typeof problem.extensions === "object" ? problem.extensions : problem) as Record<string, unknown>;
+  const draft = Array.isArray(ext.draft) ? (ext.draft as SiteMediaInUseDetails["draft"]) : [];
+  const publishedVersions = Array.isArray(ext.publishedVersions) ? (ext.publishedVersions as unknown[]).filter((v): v is number => typeof v === "number") : [];
+  return { draft, publishedVersions };
+}
+
+/** A picked library asset, ready for a media field. */
+export interface PickedSiteMedia {
+  assetId: string;
+  kind: "image" | "video";
+  url: string;
 }
 
 /** Publish refused before it was sent: the review has blocking findings. */
@@ -176,6 +210,33 @@ export interface PublicLinkSync {
   uploadSiteImage: (src: string, purpose: SiteMediaPurpose) => Promise<{ assetId: string; kind: "image" | "video"; url: string }>;
   /** The delivery URL of a site asset (cached). */
   siteMediaUrl: (assetId: string) => Promise<string | null>;
+  // ---- media library ----
+  /** One page of the site's media library (`GET /media-assets`). */
+  listMediaLibrary: (params: ListSiteMediaParams) => Promise<{ items: SiteMediaLibraryItemResponse[]; total: number }>;
+  /** One asset with every place it is used and whether it can be deleted. */
+  getMediaAsset: (assetId: string) => Promise<SiteMediaAssetDetailResponse>;
+  /** Deletes an unused asset; rejects with `MediaInUseError` while anything still shows it. */
+  deleteMediaAsset: (assetId: string) => Promise<void>;
+  /** Makes a library asset resolvable on save (`rememberMedia`) and returns it for a media field. */
+  pickLibraryAsset: (asset: SiteMediaLibraryItemResponse) => PickedSiteMedia;
+  /** Rebinds a (non-primary) bound section to another item of its source, keeping its place and presentation. */
+  rebindSection: (pageId: string, sectionId: string, contentKey: string) => Promise<string | null>;
+  // ---- live preview ----
+  /** Delivery URLs of the site assets resolved so far, by asset id. */
+  mediaUrls: Readonly<Record<string, string>>;
+  /** Unsaved inspector edits, by section id: the preview shows them before they are saved. */
+  previewEdits: Readonly<Record<string, PreviewSectionEdit>>;
+  /** Records (or, with null, drops) the unsaved edit of one section. */
+  setPreviewEdit: (sectionId: string, edit: PreviewSectionEdit | null) => void;
+}
+
+/** An inspector's unsaved state of one section. */
+export interface PreviewSectionEdit {
+  pageId: string;
+  fields?: PageDraftResponse["sections"][number]["fields"];
+  style?: PageDraftResponse["sections"][number]["style"];
+  hiddenOn?: PageDraftResponse["sections"][number]["hiddenOn"];
+  anchor?: string | null;
 }
 
 // ---- pure mapping (exported for tests) ------------------------------------------------------------
@@ -397,9 +458,15 @@ export function projectRemote(server: PublicLinkServer, lang: string, urls: Reco
     };
   }
 
+  // Which content sources the site shows anywhere: module pages (summaries) and enabled bound sections of loaded pages.
+  const bound = new Set<string>();
+  for (const p of overview.pages) if (p.source?.sourceKey) bound.add(p.source.sourceKey);
+  for (const p of Object.values(server.pages)) for (const s of p.sections) if (s.source?.sourceKey && s.enabled) bound.add(s.source.sourceKey);
+
   return {
     host: overview.address.hostname ?? null,
     status: overview.status,
+    boundSources: Array.from(bound).sort(),
     navItems,
     visiblePages: visiblePages.length,
     homeSections: enabled.map(widgetIdFor).filter((id): id is string => id !== null),
@@ -433,6 +500,25 @@ const ERROR_TEXT: Record<"en" | "ar", Record<string, string>> = {
     "publiclink.slug.cooldown-active": "The address was changed recently and can't be changed again yet.",
     "entitlements.module-disabled": "Your plan does not include the Public Link website.",
     "authorization.forbidden": "You don't have permission to do that.",
+    "publiclink.media.asset-in-use": "This file is still used by your draft or a published version, so it can't be deleted.",
+    "publiclink.media.asset-not-usable": "That file can't be used here.",
+    "publiclink.media.asset-not-active": "That file is no longer in your library.",
+    "publiclink.media.asset-not-found": "That file is no longer in your library.",
+    "publiclink.navigation.too-many-items": "The menu has too many top-level items.",
+    "publiclink.navigation.too-many-children": "A menu item has too many sub-items.",
+    "publiclink.navigation.too-deep": "Sub-items can't have sub-items of their own.",
+    "publiclink.navigation.target-required": "A menu group needs at least one sub-item.",
+    "publiclink.navigation.label-required": "Outside links in the menu need a label.",
+    "publiclink.navigation.duplicate-id": "A menu item appears twice. Reload and try again.",
+    "publiclink.navigation.icon-unknown": "That icon isn't available.",
+    "publiclink.link.url-invalid": "Links to other websites must start with https://.",
+    "publiclink.link.target-not-found": "A link points at a page or section that no longer exists.",
+    "publiclink.link.kind-not-allowed": "That kind of link can't be used here.",
+    "publiclink.text.too-long": "A text is longer than allowed.",
+    "publiclink.section.rich-text-invalid": "The formatted text can't be saved as it is.",
+    "publiclink.source.settings-invalid": "The connected content refused these display settings.",
+    "publiclink.source.not-connectable": "That content can't be connected here.",
+    "publiclink.source.unknown": "That content source is not available.",
   },
   ar: {
     "publiclink.concurrency.stale": "تم تعديل الموقع من مكان آخر. تم تحميل أحدث نسخة — حاول مرة أخرى.",
@@ -456,12 +542,32 @@ const ERROR_TEXT: Record<"en" | "ar", Record<string, string>> = {
     "publiclink.slug.cooldown-active": "تم تغيير العنوان مؤخرًا ولا يمكن تغييره الآن.",
     "entitlements.module-disabled": "باقتك لا تشمل موقع الرابط العام.",
     "authorization.forbidden": "ليست لديك صلاحية لهذا الإجراء.",
+    "publiclink.media.asset-in-use": "هذا الملف مستخدم في المسودة أو في نسخة منشورة، لذا لا يمكن حذفه.",
+    "publiclink.media.asset-not-usable": "لا يمكن استخدام هذا الملف هنا.",
+    "publiclink.media.asset-not-active": "هذا الملف لم يعد في مكتبتك.",
+    "publiclink.media.asset-not-found": "هذا الملف لم يعد في مكتبتك.",
+    "publiclink.navigation.too-many-items": "عدد عناصر القائمة الرئيسية أكثر من المسموح.",
+    "publiclink.navigation.too-many-children": "أحد عناصر القائمة يحتوي على عناصر فرعية أكثر من المسموح.",
+    "publiclink.navigation.too-deep": "لا يمكن أن تحتوي العناصر الفرعية على عناصر فرعية.",
+    "publiclink.navigation.target-required": "مجموعة القائمة تحتاج إلى عنصر فرعي واحد على الأقل.",
+    "publiclink.navigation.label-required": "الروابط الخارجية في القائمة تحتاج إلى نص.",
+    "publiclink.navigation.duplicate-id": "أحد عناصر القائمة مكرر. أعد التحميل وحاول مجددًا.",
+    "publiclink.navigation.icon-unknown": "هذه الأيقونة غير متاحة.",
+    "publiclink.link.url-invalid": "يجب أن تبدأ روابط المواقع الأخرى بـ https://.",
+    "publiclink.link.target-not-found": "رابط يشير إلى صفحة أو قسم لم يعد موجودًا.",
+    "publiclink.link.kind-not-allowed": "لا يمكن استخدام هذا النوع من الروابط هنا.",
+    "publiclink.text.too-long": "أحد النصوص أطول من المسموح.",
+    "publiclink.section.rich-text-invalid": "لا يمكن حفظ النص المنسق بصيغته الحالية.",
+    "publiclink.source.settings-invalid": "رفض المحتوى المرتبط إعدادات العرض هذه.",
+    "publiclink.source.not-connectable": "لا يمكن ربط هذا المحتوى هنا.",
+    "publiclink.source.unknown": "مصدر المحتوى هذا غير متاح.",
   },
 };
 
 export function describePublicLinkError(err: unknown, locale: string = "en"): string {
   const table = ERROR_TEXT[locale === "ar" ? "ar" : "en"];
   if (err instanceof PublishBlockedError) return table["publiclink.publish.blocked"];
+  if (err instanceof MediaInUseError) return table["publiclink.media.asset-in-use"];
   if (err instanceof ApiError) {
     const code = err.problem?.errorCode;
     if (code && table[code]) return table[code];
@@ -488,6 +594,7 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
   const [error, setError] = useState<string | null>(null);
   const [server, setServer] = useState<PublicLinkServer | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [previewEdits, setPreviewEdits] = useState<Record<string, PreviewSectionEdit>>({});
   const srv = useRef<PublicLinkServer | null>(null);
   const loaded = useRef(false);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -500,6 +607,34 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     if (!srv.current) return;
     srv.current = update(srv.current);
     setServer(srv.current);
+  }, []);
+
+  /**
+   * Shows a write's outcome before the server answers, so the preview follows every click. Returns
+   * the undo, which puts back what `pick` selected from the copy as it was; the server's answer (or a
+   * reload after a stale version) replaces the guess either way.
+   */
+  const optimistic = useCallback(
+    (update: (current: PublicLinkServer) => PublicLinkServer, restore: (current: PublicLinkServer, before: PublicLinkServer) => PublicLinkServer) => {
+      const before = srv.current;
+      commit(update);
+      return () => {
+        if (before) commit((c) => restore(c, before));
+      };
+    },
+    [commit]
+  );
+
+  const setPreviewEdit = useCallback((sectionId: string, edit: PreviewSectionEdit | null) => {
+    setPreviewEdits((prev) => {
+      if (!edit) {
+        if (!(sectionId in prev)) return prev;
+        const next = { ...prev };
+        delete next[sectionId];
+        return next;
+      }
+      return { ...prev, [sectionId]: edit };
+    });
   }, []);
 
   /** Folds a write's versions into the overview and the loaded pages. */
@@ -936,14 +1071,26 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
         dispatch({ type: "patchTheme", patch: { id: themeKey } });
         return;
       }
-      await write(async (b, s) => {
-        const res = await applyDraftTheme(b, s.overview.siteVersion, themeKey);
-        commit((c) => ({ ...c, overview: { ...c.overview, themeKey: res.themeKey } }));
-        foldVersions(res.versions);
+      const undo = optimistic(
+        (c) => ({ ...c, overview: { ...c.overview, themeKey } }),
+        (c, before) => ({ ...c, overview: { ...c.overview, themeKey: before.overview.themeKey } })
+      );
+      // The theme's colours and fonts reach the local swatches at once, so the preview is not a mix.
+      applyOverview(srv.current!.overview, srv.current!.catalogues);
+      try {
+        await write(async (b, s) => {
+          const res = await applyDraftTheme(b, s.overview.siteVersion, themeKey);
+          commit((c) => ({ ...c, overview: { ...c.overview, themeKey: res.themeKey } }));
+          foldVersions(res.versions);
+          applyOverview(srv.current!.overview, srv.current!.catalogues);
+        });
+      } catch (err) {
+        undo();
         applyOverview(srv.current!.overview, srv.current!.catalogues);
-      });
+        throw err;
+      }
     },
-    [businessId, dispatch, write, commit, foldVersions, applyOverview]
+    [businessId, dispatch, write, commit, foldVersions, applyOverview, optimistic]
   );
 
   const resetTheme = useCallback(async () => {
@@ -1053,14 +1200,50 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
 
   const reorderPages = useCallback(
     async (orderedPageIds: string[]) => {
-      await write(async (b, s) => {
-        const home = s.overview.pages.find((p) => p.isHome)?.pageId;
-        const res = await reorderDraftPages(b, s.overview.siteVersion, orderedPageIds.filter((id) => id !== home));
-        commit((c) => ({ ...c, overview: { ...c.overview, pages: res.pages } }));
-        foldVersions(res.versions);
-      });
+      const undo = optimistic(
+        (c) => ({
+          ...c,
+          overview: {
+            ...c.overview,
+            pages: [...c.overview.pages].sort((a, b) => {
+              const ia = orderedPageIds.indexOf(a.pageId);
+              const ib = orderedPageIds.indexOf(b.pageId);
+              return (a.isHome ? -1 : ia) - (b.isHome ? -1 : ib);
+            }),
+          },
+        }),
+        (c, before) => ({ ...c, overview: { ...c.overview, pages: before.overview.pages } })
+      );
+      try {
+        await write(async (b, s) => {
+          const home = s.overview.pages.find((p) => p.isHome)?.pageId;
+          const res = await reorderDraftPages(b, s.overview.siteVersion, orderedPageIds.filter((id) => id !== home));
+          commit((c) => ({ ...c, overview: { ...c.overview, pages: res.pages } }));
+          foldVersions(res.versions);
+        });
+      } catch (err) {
+        undo();
+        throw err;
+      }
     },
-    [write, commit, foldVersions]
+    [write, commit, foldVersions, optimistic]
+  );
+
+  /** Shows a change to one loaded page's sections at once; the undo puts that page's sections back. */
+  const optimisticSections = useCallback(
+    (pageId: string, change: (sections: PageDraftResponse["sections"]) => PageDraftResponse["sections"]) =>
+      optimistic(
+        (c) => {
+          const page = c.pages[pageId];
+          return page ? { ...c, pages: { ...c.pages, [pageId]: { ...page, sections: change(page.sections) } } } : c;
+        },
+        (c, before) => {
+          const was = before.pages[pageId];
+          const page = c.pages[pageId];
+          return was && page ? { ...c, pages: { ...c.pages, [pageId]: { ...page, sections: was.sections } } } : c;
+        }
+      ),
+    [optimistic]
   );
 
   // ---- sections -----------------------------------------------------------------------------------
@@ -1087,12 +1270,18 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
 
   const setSectionEnabled = useCallback(
     async (pageId: string, sectionId: string, enabled: boolean) => {
-      await write(async (b) => {
-        const res = await setPageSectionEnabled(b, pageId, sectionId, await pageVersion(b, pageId), enabled);
-        foldVersions(res.versions, res.page);
-      });
+      const undo = optimisticSections(pageId, (sections) => sections.map((s) => (s.sectionId === sectionId ? { ...s, enabled } : s)));
+      try {
+        await write(async (b) => {
+          const res = await setPageSectionEnabled(b, pageId, sectionId, await pageVersion(b, pageId), enabled);
+          foldVersions(res.versions, res.page);
+        });
+      } catch (err) {
+        undo();
+        throw err;
+      }
     },
-    [write, pageVersion, foldVersions]
+    [write, pageVersion, foldVersions, optimisticSections]
   );
 
   const removeSection = useCallback(
@@ -1107,36 +1296,79 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
 
   const reorderSections = useCallback(
     async (pageId: string, orderedSectionIds: string[]) => {
-      await write(async (b) => {
-        const res = await reorderPageSections(b, pageId, await pageVersion(b, pageId), orderedSectionIds);
-        foldVersions(res.versions, res.page);
-      });
+      const undo = optimisticSections(pageId, (sections) =>
+        [...sections].sort((a, b) => orderedSectionIds.indexOf(a.sectionId) - orderedSectionIds.indexOf(b.sectionId))
+      );
+      try {
+        await write(async (b) => {
+          const res = await reorderPageSections(b, pageId, await pageVersion(b, pageId), orderedSectionIds);
+          foldVersions(res.versions, res.page);
+        });
+      } catch (err) {
+        undo();
+        throw err;
+      }
     },
-    [write, pageVersion, foldVersions]
+    [write, pageVersion, foldVersions, optimisticSections]
   );
 
   // ---- navigation and footer ----------------------------------------------------------------------
 
   const saveNavigation = useCallback(
     async (input: ReplaceNavigationInput) => {
-      await write(async (b, s) => {
-        const res = await replaceDraftNavigation(b, s.overview.siteVersion, input);
-        commit((c) => ({ ...c, navigation: res }));
-        foldVersions(res.versions);
-      });
+      const undo = optimistic(
+        (c) => ({
+          ...c,
+          navigation: {
+            versions: c.navigation?.versions ?? { siteVersion: c.overview.siteVersion, pageVersion: null, pageVersions: null },
+            warnings: c.navigation?.warnings ?? [],
+            items: input.items,
+            options: input.options ?? c.navigation?.options ?? { stickyHeader: false, showActivePageIndicator: false, showIcons: false, openLinksInSameTab: false },
+          },
+        }),
+        (c, before) => ({ ...c, navigation: before.navigation })
+      );
+      try {
+        await write(async (b, s) => {
+          const res = await replaceDraftNavigation(b, s.overview.siteVersion, input);
+          commit((c) => ({ ...c, navigation: res }));
+          foldVersions(res.versions);
+        });
+      } catch (err) {
+        undo();
+        throw err;
+      }
     },
-    [write, commit, foldVersions]
+    [write, commit, foldVersions, optimistic]
   );
 
   const saveFooter = useCallback(
     async (input: ReplaceFooterInput) => {
-      await write(async (b, s) => {
-        const res = await replaceDraftFooter(b, s.overview.siteVersion, input);
-        commit((c) => ({ ...c, footer: res }));
-        foldVersions(res.versions);
-      });
+      const undo = optimistic(
+        (c) => ({
+          ...c,
+          footer: {
+            versions: c.footer?.versions ?? { siteVersion: c.overview.siteVersion, pageVersion: null, pageVersions: null },
+            warnings: c.footer?.warnings ?? [],
+            groups: input.groups,
+            socialLinks: input.socialLinks,
+            contact: input.contact ?? {},
+          },
+        }),
+        (c, before) => ({ ...c, footer: before.footer })
+      );
+      try {
+        await write(async (b, s) => {
+          const res = await replaceDraftFooter(b, s.overview.siteVersion, input);
+          commit((c) => ({ ...c, footer: res }));
+          foldVersions(res.versions);
+        });
+      } catch (err) {
+        undo();
+        throw err;
+      }
     },
-    [write, commit, foldVersions]
+    [write, commit, foldVersions, optimistic]
   );
 
   // ---- review and preview links -------------------------------------------------------------------
@@ -1212,6 +1444,90 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     [businessId, urls]
   );
 
+  // ---- media library --------------------------------------------------------------------------------
+
+  const listMediaLibrary = useCallback(
+    async (params: ListSiteMediaParams) => {
+      if (!businessId) return { items: [] as SiteMediaLibraryItemResponse[], total: 0 };
+      const res = await listSiteMediaAssets(businessId, params);
+      const items = res.data ?? [];
+      return { items, total: res.metadata?.totalCount ?? items.length };
+    },
+    [businessId]
+  );
+
+  const getMediaAsset = useCallback(
+    async (assetId: string) => {
+      if (!businessId) throw new Error("No active business");
+      return getSiteMediaAsset(businessId, assetId);
+    },
+    [businessId]
+  );
+
+  const deleteMediaAsset = useCallback(
+    async (assetId: string) => {
+      if (!businessId) throw new Error("No active business");
+      try {
+        await deleteSiteMediaAsset(businessId, assetId);
+      } catch (err) {
+        // The refusal is shown inside the library (with where the file is used), not in the builder's banner.
+        const usage = mediaInUseDetails(err);
+        if (usage) throw new MediaInUseError(usage);
+        throw err;
+      }
+      forgetMedia(assetId);
+      setUrls((prev) => {
+        const next = { ...prev };
+        delete next[assetId];
+        return next;
+      });
+    },
+    [businessId]
+  );
+
+  const pickLibraryAsset = useCallback((asset: SiteMediaLibraryItemResponse): PickedSiteMedia => {
+    const up = rememberMedia({ assetId: asset.assetId, kind: asset.kind, deliveryUrl: asset.deliveryUrl });
+    setUrls((prev) => (prev[asset.assetId] === up.url ? prev : { ...prev, [asset.assetId]: up.url }));
+    return { assetId: asset.assetId, kind: String(asset.kind).toLowerCase() === "video" ? "video" : "image", url: up.url };
+  }, []);
+
+  const rebindSection = useCallback(
+    async (pageId: string, sectionId: string, contentKey: string) =>
+      write(async (b) => {
+        const page = srv.current!.pages[pageId] ?? (await getDraftPage(b, pageId));
+        const index = page.sections.findIndex((s) => s.sectionId === sectionId);
+        const section = page.sections[index];
+        if (!section?.source || section.primary) throw new Error("Only a bound, non-primary section can be rebound.");
+        // No endpoint changes a binding in place: remove, then add at the same position with the same presentation.
+        const removed = await removePageSection(b, pageId, sectionId, page.version);
+        foldVersions(removed.versions, removed.page);
+        const readd = (key: string, version: number) =>
+          addPageSection(b, pageId, version, {
+            source: { sourceKey: section.source!.sourceKey, contentKey: key, settings: section.sourceSettings ?? null },
+            style: section.style,
+            hiddenOn: section.hiddenOn,
+            anchor: section.anchor,
+            position: index,
+          });
+        let added;
+        try {
+          added = await readd(contentKey, removed.page.version);
+        } catch (err) {
+          // The new item was refused: put the original binding back where it was, then report the refusal.
+          const restored = await readd(section.source.contentKey, removed.page.version).catch(() => null);
+          if (restored) foldVersions(restored.versions, restored.page);
+          throw err;
+        }
+        foldVersions(added.versions, added.page);
+        if (!section.enabled && added.sectionId) {
+          const off = await setPageSectionEnabled(b, pageId, added.sectionId, added.page.version, false);
+          foldVersions(off.versions, off.page);
+        }
+        return added.sectionId;
+      }),
+    [write, foldVersions]
+  );
+
   const connectableContent = useMemo(
     () =>
       (server?.sources ?? []).flatMap((s) =>
@@ -1262,5 +1578,13 @@ export function usePublicLinkSync(draft: SiteDraft, dispatch: (action: SiteActio
     revokeAllPreviewLinks,
     uploadSiteImage,
     siteMediaUrl,
+    listMediaLibrary,
+    getMediaAsset,
+    deleteMediaAsset,
+    pickLibraryAsset,
+    rebindSection,
+    mediaUrls: urls,
+    previewEdits,
+    setPreviewEdit,
   };
 }

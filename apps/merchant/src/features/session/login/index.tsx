@@ -9,6 +9,7 @@ import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthField, AuthButton } from "../_shared/auth-field";
 import { SocialRow } from "../_shared/social-row";
+import { AuthErrorDialog, useAuthError } from "../_shared/auth-error";
 import { fillText, useSessionText } from "../_shared/session-text";
 import {
   confirmPendingLink,
@@ -40,6 +41,7 @@ export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<LoginErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const failure = useAuthError();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,10 +63,10 @@ export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }
     setSubmitting(true);
     try {
       await signInWithPassword(email, password);
-    } catch {
+    } catch (err) {
       // Every login failure (wrong password, unverified email, unknown
       // account) comes back as the same generic 401 — see AuthEndpoints.cs.
-      setErrors({ password: t("login.error.passwordIncorrect") });
+      failure.show(err);
       setSubmitting(false);
       return;
     }
@@ -121,11 +123,7 @@ export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }
       ) : (
         <>
           <SocialRow onCredential={(provider, credential, mail) => void social.signIn(provider, credential, mail)} busy={social.busy} />
-          {social.error && (
-            <p role="alert" className="-mt-2 text-[13px] text-error">
-              {social.error}
-            </p>
-          )}
+          <AuthErrorDialog message={social.error} onClose={() => social.setError(null)} />
         </>
       )}
 
@@ -172,6 +170,7 @@ export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }
           {t("auth.createAccountSubmit")}
         </button>
       </p>
+      {failure.dialog}
     </form>
   );
 }

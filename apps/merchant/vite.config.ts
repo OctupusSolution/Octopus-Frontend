@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5180,
+    port: 5290,
     strictPort: true,
     // AdminApi has no CORS configured, so calls go through this dev proxy
     // instead of hitting http://localhost:8081 directly from the browser.

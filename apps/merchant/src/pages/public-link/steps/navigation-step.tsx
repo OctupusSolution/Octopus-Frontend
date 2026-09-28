@@ -8,12 +8,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Eye, EyeOff, Info } from "lucide-react";
 import { Checkbox } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { StorefrontPreview } from "@/widgets/storefront-preview";
+import { StorefrontPreview, type PreviewDevice } from "@/widgets/storefront-preview";
 import { PAGE_MODULES } from "../_shared/page-catalog";
 import { previewModelFromSite } from "../_shared/preview-model";
 import type { PageEntry, SiteAction, SiteDraft } from "../_shared/site-draft";
 import { MobileDrawerPreview } from "../ui/nav-preview";
 import { ReorderList } from "../ui/reorder-list";
+import { SitePreview } from "../ui/site-preview";
 import { Switch } from "../ui/switch";
 import type { StepProps } from "../_shared/steps";
 import { FooterCard, NavigationDisplayCard, NavigationItemsCard } from "./connected/navigation-panel";
@@ -152,6 +153,7 @@ function pageLabel(page: PageEntry, t: (key: string) => string): string {
 export function NavigationStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t } = useI18n();
   const { navigation } = draft;
+  const [device, setDevice] = useState<PreviewDevice>("desktop");
 
   const patchNav = (patch: Partial<Omit<SiteDraft["navigation"], "hidden">>) =>
     dispatch({ type: "patchNavigation", patch });
@@ -226,7 +228,11 @@ export function NavigationStep({ draft, dispatch, publicLinkSync }: StepProps) {
         </>)}
 
         {/* End: the frame's Live Preview card — the site as it reads on the
-            web, beside the phone drawer. */}
+            web, beside the phone drawer. Connected, the live storefront itself:
+            its header, drawer (mobile) and footer follow every change here. */}
+        {publicLinkSync.connected ? (
+          <SitePreview draft={draft} dispatch={dispatch} sync={publicLinkSync} device={device} onDevice={setDevice} height={520} />
+        ) : (
         <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]">
           <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.livePreview")}</p>
           <div className="grid grid-cols-[minmax(0,1fr)_148px] gap-3">
@@ -248,6 +254,7 @@ export function NavigationStep({ draft, dispatch, publicLinkSync }: StepProps) {
             {t("publicLink.navigation.updatesInstantly")}
           </p>
         </div>
+        )}
       </div>
       {publicLinkSync.connected && <FooterCard sync={publicLinkSync} />}
     </div>

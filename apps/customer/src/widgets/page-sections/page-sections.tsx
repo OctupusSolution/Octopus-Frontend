@@ -150,6 +150,12 @@ function MenuSection({
   );
 }
 
+/** The breakpoint classes that hide a section on the devices its owner chose: phones below
+ *  md, tablets from md to lg, desktops from lg (the builder's preview uses the same split). */
+const HIDDEN_ON: Record<string, string> = { mobile: "max-md:hidden", tablet: "md:max-lg:hidden", desktop: "lg:hidden" };
+export const hiddenOnClass = (hiddenOn: readonly string[] | null | undefined): string =>
+  (hiddenOn ?? []).map((device) => HIDDEN_ON[device]).filter(Boolean).join(" ");
+
 /** Renders a published page's sections in order. Section types the storefront has
  *  no widget for, and sections with nothing to show, are skipped. */
 export function PageSections({ sections, menus, brandName, title }: PageSectionsProps) {
@@ -294,12 +300,16 @@ export function PageSections({ sections, menus, brandName, title }: PageSections
 
   return (
     <>
-      {hero && render(hero)}
+      {hero && (hero.hiddenOn?.length ? <div className={hiddenOnClass(hero.hiddenOn)}>{render(hero)}</div> : render(hero))}
       <div className="mx-auto flex max-w-[1200px] flex-col gap-14 px-4 py-14 sm:px-6">
         {title && !hero && <h1 className="text-[26px] font-bold text-[var(--octo-text-primary)]">{title}</h1>}
         {body.map((section) => {
           const node = render(section);
-          return node ? <div key={section.sectionId}>{node}</div> : null;
+          return node ? (
+            <div key={section.sectionId} className={hiddenOnClass(section.hiddenOn) || undefined}>
+              {node}
+            </div>
+          ) : null;
         })}
       </div>
       <AddToCartModal item={selected} onClose={() => setSelected(null)} />

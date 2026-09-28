@@ -2,22 +2,34 @@
 // Each async callback prop (onSent/onVerified/onDone) calls a real /auth or
 // /accounts endpoint at the call site (pages/login/index.tsx,
 // pages/signup/index.tsx) — these components stay presentational and just
-// await the promise, showing whatever error it throws.
+// await the promise; a server failure opens the shared error dialog.
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail, Lock } from "lucide-react";
 import { ApiError } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthDialog, VERIFY_ART_URL, STAMP_ART_URL } from "../_shared/auth-dialog";
+import { isEmailTaken, useAuthError } from "../_shared/auth-error";
 import { AuthField, AuthButton } from "../_shared/auth-field";
 import { OtpInput, OTP_LENGTH_EMAIL_VERIFICATION, OTP_LENGTH_PASSWORD_RESET } from "../_shared/otp-input";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESEND_SECONDS = 30;
 
-function errorMessage(err: unknown, t: (key: string) => string): string {
-  if (err instanceof ApiError) return err.problem?.errorCode ?? err.message;
-  return t("auth.error.genericFailure");
-}
+const TEXT = {
+  ar: {
+    existingHint: "إذا كان هذا البريد مسجّلًا لدينا من قبل فلن يصلك رمز —",
+    signIn: "سجّل الدخول",
+  },
+  en: {
+    existingHint: "If this email is already registered, no code will arrive —",
+    signIn: "Sign in",
+  },
+} as const;
+
+// Failures after which "Sign in" is the likely way forward.
+const suggestsSignIn = (err: unknown) =>
+  isEmailTaken(err) ||
+  (err instanceof ApiError && err.problem?.errorCode === "identity.email-verification.code-invalid");
 
 export function ForgotPasswordDialog({
   open,
@@ -35,6 +47,7 @@ export function ForgotPasswordDialog({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
+  const failure = useAuthError();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -45,13 +58,14 @@ export function ForgotPasswordDialog({
     try {
       await onSent(trimmed);
     } catch (err) {
-      setError(errorMessage(err, t));
+      failure.show(err);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
+    <>
     <AuthDialog open={open} onClose={onClose} title={t("auth.forgot.title")} art={VERIFY_ART_URL} body={t("auth.forgot.body")}>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
         <AuthField
@@ -68,6 +82,8 @@ export function ForgotPasswordDialog({
         <AuthButton disabled={submitting}>{t("auth.forgot.submit")}</AuthButton>
       </form>
     </AuthDialog>
+    {failure.dialog}
+    </>
   );
 }
 
@@ -77,6 +93,7 @@ export function OtpDialog({
   variant,
   onVerified,
   onResend,
+  onSignIn,
 }: {
   open: boolean;
   onClose: () => void;
@@ -89,15 +106,22 @@ export function OtpDialog({
    *  code and never rejects it here. */
   onVerified: (code: string) => Promise<void>;
   onResend: () => Promise<void>;
+  /** Signup only: the way out when the email turns out to be registered
+   *  already (the backend answers registration with 200 either way and just
+   *  never sends that address a code). */
+  onSignIn?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const text = TEXT[locale === "ar" ? "ar" : "en"];
+  const failure = useAuthError(
+    onSignIn ? { label: text.signIn, onClick: onSignIn, when: suggestsSignIn } : undefined,
+  );
   // verifyAccount (signup) codes are 6 digits from EmailVerificationOtpGenerator;
   // enterCode (password reset) codes are 4 from the separate OtpGenerator —
   // see otp-input.tsx's note.
   const length = variant === "verifyAccount" ? OTP_LENGTH_EMAIL_VERIFICATION : OTP_LENGTH_PASSWORD_RESET;
   const [digits, setDigits] = useState<string[]>(Array(length).fill(""));
   const [invalid, setInvalid] = useState(false);
-  const [errorText, setErrorText] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
 
@@ -107,7 +131,6 @@ export function OtpDialog({
     if (!open) return;
     setDigits(Array(length).fill(""));
     setInvalid(false);
-    setErrorText(null);
     setSecondsLeft(RESEND_SECONDS);
   }, [open]);
 
@@ -124,12 +147,11 @@ export function OtpDialog({
       return;
     }
     setSubmitting(true);
-    setErrorText(null);
     try {
       await onVerified(digits.join(""));
     } catch (err) {
       setInvalid(true);
-      setErrorText(errorMessage(err, t));
+      failure.show(err);
     } finally {
       setSubmitting(false);
     }
@@ -139,15 +161,16 @@ export function OtpDialog({
     setSecondsLeft(RESEND_SECONDS);
     try {
       await onResend();
-    } catch {
-      // Resend failing silently is better than blocking the countdown reset
-      // — the merchant can just hit Resend again once it re-enables.
+    } catch (err) {
+      // The countdown still restarts, so Resend re-enables on its own.
+      failure.show(err);
     }
   }
 
   const clock = `00:${String(secondsLeft).padStart(2, "0")}`;
 
   return (
+    <>
     <AuthDialog
       open={open}
       onClose={onClose}
@@ -158,10 +181,8 @@ export function OtpDialog({
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         <OtpInput value={digits} onChange={(next) => { setDigits(next); setInvalid(false); }} invalid={invalid} length={length} />
 
-        {invalid && (
-          <p className="text-center text-[12.5px] text-[#EF4444]">
-            {errorText ?? t("auth.error.otpIncomplete")}
-          </p>
+        {invalid && digits.some((d) => !d) && (
+          <p className="text-center text-[12.5px] text-[#EF4444]">{t("auth.error.otpIncomplete")}</p>
         )}
 
         <div className="text-center text-[14px] text-[var(--octo-text-secondary)]">
@@ -180,8 +201,19 @@ export function OtpDialog({
         </div>
 
         <AuthButton disabled={submitting}>{t("auth.otp.submit")}</AuthButton>
+
+        {onSignIn && (
+          <p className="text-center text-[13px] leading-relaxed text-[var(--octo-text-muted)]">
+            {text.existingHint}{" "}
+            <button type="button" onClick={onSignIn} className="font-semibold text-ocean-blue hover:underline">
+              {text.signIn}
+            </button>
+          </p>
+        )}
       </form>
     </AuthDialog>
+    {failure.dialog}
+    </>
   );
 }
 
@@ -203,6 +235,7 @@ export function SetPasswordDialog({
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
+  const failure = useAuthError();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -213,13 +246,14 @@ export function SetPasswordDialog({
     try {
       await onDone(password);
     } catch (err) {
-      setError(errorMessage(err, t));
+      failure.show(err);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
+    <>
     <AuthDialog open={open} onClose={onClose} title={t("auth.setPassword.title")} art={VERIFY_ART_URL} body={t("auth.setPassword.body")}>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
         <AuthField
@@ -245,6 +279,8 @@ export function SetPasswordDialog({
         <AuthButton disabled={submitting}>{t("auth.setPassword.submit")}</AuthButton>
       </form>
     </AuthDialog>
+    {failure.dialog}
+    </>
   );
 }
 

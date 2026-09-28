@@ -4,11 +4,13 @@
 // search settings, old addresses) or deleted (DELETE /draft/pages/{id}); rows
 // reorder with PUT /draft/pages/order (Home stays first). "Add page" creates one
 // from a catalogue template or from another module's content (POST /draft/pages).
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { BookOpen, CalendarClock, FileText, Home, Info, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { BookOpen, CalendarClock, FileText, Home, Info, Link2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { Badge, Button, Checkbox, Input, Modal, Textarea } from "@ui/primitives";
-import type { PageDraftResponse, PageSummaryResponse } from "@octopus/api-client";
+import type { PageDraftResponse, PageMediaReference, PageSummaryResponse } from "@octopus/api-client";
+import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
+import { MediaLibraryButton } from "./media-library";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { withText, type PublicLinkSync, type SiteAction } from "@/entities/site-draft";
 import { usePlText } from "../../_shared/texts";
@@ -276,6 +278,84 @@ function AddPageModal({ open, onClose, sync }: { open: boolean; onClose: () => v
   );
 }
 
+/** The page's own social image (overrides the site default when shared). */
+function PageSocialImage({
+  sync,
+  value,
+  onChange,
+}: {
+  sync: PublicLinkSync;
+  value: PageMediaReference | null;
+  onChange: (value: PageMediaReference | null) => void;
+}) {
+  const tx = usePlText();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!value) {
+      setUrl(null);
+      return;
+    }
+    sync.siteMediaUrl(value.assetId).then((u) => !cancelled && setUrl(u), () => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [value, sync]);
+
+  function upload(dataUrl: string) {
+    setUploading(true);
+    setFailed(false);
+    sync
+      .uploadSiteImage(dataUrl, "SocialImage")
+      .then((up) => {
+        setUrl(up.url);
+        onChange({ assetId: up.assetId, kind: up.kind === "video" ? "Video" : "Image" });
+      })
+      .catch(() => setFailed(true)) // the previous image stays
+      .finally(() => setUploading(false));
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">{tx("pl.pages.socialImage")}</span>
+      <div className="flex flex-wrap items-center gap-3">
+        {url ? (
+          <img src={url} alt="" className="h-14 w-24 rounded-[8px] border border-[var(--octo-border-input)] object-cover" />
+        ) : (
+          <span className="flex h-14 w-24 items-center justify-center rounded-[8px] border border-dashed border-[var(--octo-border-input)] text-[var(--octo-text-faint)]">
+            <Upload size={14} />
+          </span>
+        )}
+        <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={(e) => readLogoFile(e.target.files?.[0], upload)} />
+        <Button variant="secondary" size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
+          {uploading ? tx("pl.common.saving") : tx("pl.field.upload")}
+        </Button>
+        <MediaLibraryButton
+          sync={sync}
+          purposes={["SocialImage"]}
+          kind="image"
+          onPick={(picked) => {
+            setFailed(false);
+            setUrl(picked.url);
+            onChange({ assetId: picked.assetId, kind: picked.kind === "video" ? "Video" : "Image" });
+          }}
+        />
+        {value && (
+          <button type="button" aria-label={tx("pl.common.remove")} className="rounded p-1 text-[var(--octo-text-faint)] hover:text-[#EF4444]" onClick={() => onChange(null)}>
+            <X size={14} />
+          </button>
+        )}
+      </div>
+      <span className="text-[11px] text-[var(--octo-text-muted)]">{tx("pl.pages.socialImageHint")}</span>
+      {failed && <span className="text-[11px] text-[#DC2626]">{tx("pl.field.uploadFailed")}</span>}
+    </div>
+  );
+}
+
 function PageSettingsModal({ page, onClose, sync }: { page: PageDraftResponse; onClose: () => void; sync: PublicLinkSync }) {
   const tx = usePlText();
   const { act, busy } = useBusy();
@@ -287,6 +367,7 @@ function PageSettingsModal({ page, onClose, sync }: { page: PageDraftResponse; o
   const [noIndex, setNoIndex] = useState(page.seo?.hideFromSearchEngines ?? false);
   const [hideFooter, setHideFooter] = useState(page.layout?.hideFooter ?? false);
   const [dropPaths, setDropPaths] = useState<string[]>([]);
+  const [socialImage, setSocialImage] = useState<PageMediaReference | null>(page.seo?.socialImage ?? null);
 
   function save() {
     const base = pageInput(page);
@@ -299,6 +380,7 @@ function PageSettingsModal({ page, onClose, sync }: { page: PageDraftResponse; o
           ...base.seo!,
           title: withText(page.seo?.title, lang, seoTitle),
           description: withText(page.seo?.description, lang, seoDescription),
+          socialImage,
           hideFromSearchEngines: noIndex,
         },
         layout: { header: base.layout?.header ?? null, hideFooter },
@@ -360,6 +442,7 @@ function PageSettingsModal({ page, onClose, sync }: { page: PageDraftResponse; o
         )}
         <Input label={tx("pl.pages.seoTitle")} value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
         <Textarea label={tx("pl.pages.seoDescription")} rows={2} value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} />
+        <PageSocialImage sync={sync} value={socialImage} onChange={setSocialImage} />
         <Checkbox checked={noIndex} onChange={(e) => setNoIndex(e.target.checked)} label={tx("pl.pages.noIndex")} />
         <Checkbox checked={hideFooter} onChange={(e) => setHideFooter(e.target.checked)} label={tx("pl.pages.hideFooter")} />
       </div>

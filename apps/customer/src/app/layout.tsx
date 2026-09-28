@@ -4,9 +4,9 @@ import { OrderingSessionProvider } from "@/entities/order";
 import { getStorefront, loadTenant } from "@/entities/tenant/load";
 import { StoreI18nProvider } from "@/app/providers";
 import { themeStyle } from "@/shared/api/brand-theme";
-import type { PublicNavItem, PublishedShell } from "@/shared/api/public-api";
+import type { PublishedShell } from "@/shared/api/public-api";
 import { createTranslator } from "@/shared/i18n/translate";
-import { SiteHeader, type SiteNavLink } from "@/widgets/site-header";
+import { navLinks, SiteHeader } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
 import { ClearPreviewCookie, PreviewBanner } from "@/widgets/preview-banner";
 import "./globals.css";
@@ -69,31 +69,6 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
 };
-
-/** The published navigation, flattened for the header (children follow their parent). */
-function navLinks(shell: PublishedShell, homeLabel: string): SiteNavLink[] {
-  const titleOf = (href: string) => shell.pages.find((p) => p.path === href)?.title;
-  const out: SiteNavLink[] = [];
-  const walk = (items: PublicNavItem[]) => {
-    for (const item of items) {
-      if (item.href) {
-        const label = item.label || titleOf(item.href) || (item.href === "/" ? homeLabel : "");
-        if (label) {
-          out.push({
-            label,
-            href: item.href,
-            openInNewTab: item.openInNewTab && !shell.navigation.options.openLinksInSameTab,
-            inHeader: item.showInHeader,
-            inDrawer: item.showInDrawer,
-          });
-        }
-      }
-      walk(item.children);
-    }
-  };
-  walk(shell.navigation.items);
-  return out;
-}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const storefront = await getStorefront();

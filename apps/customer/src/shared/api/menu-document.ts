@@ -18,7 +18,15 @@ export interface PublicMenuDocument {
       tags?: string[];
     }
   >;
-  modifierGroups: Record<string, { name: string; selectionMode: string; isRequired?: boolean; showAsRadio?: boolean; options: { id?: string; name: string; effect?: { amount?: { amount: number } | null }; isDefault?: boolean }[] }>;
+  modifierGroups: Record<string, {
+    promptLabel?: string;
+    name?: string;
+    selectionMode: string;
+    minSelected?: number;
+    isRequired?: boolean;
+    showAsRadio?: boolean;
+    options: { id?: string; name: string; effect?: { amount?: { amount: number } | null }; isDefault?: boolean }[];
+  }>;
 }
 
 const PLACEHOLDER = "/images/storefront/all.png";
@@ -63,8 +71,8 @@ export function menuFromDocument(doc: Pick<PublicMenuDocument, "sections" | "ite
         return [
           {
             id: ref,
-            label: g.name,
-            required: Boolean(g.isRequired),
+            label: g.promptLabel ?? g.name ?? "",
+            required: g.isRequired ?? (g.minSelected ?? 0) > 0,
             multiple: g.selectionMode.toLowerCase() !== "single",
             display: g.options.length <= 4 ? ("pills" as const) : ("accordion" as const),
             options: g.options.map((o, i) => ({

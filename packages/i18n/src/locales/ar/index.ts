@@ -4280,6 +4280,14 @@ export const ar = {
   "store.nav.language": "العربية",
   "store.nav.cart": "السلة",
   "store.nav.openMenu": "فتح القائمة",
+  "store.menu.unavailable": "غير متاح",
+  "store.menu.notAvailableNow": "هذه القائمة غير متاحة الآن.",
+  "store.menu.preOrder": "طلب مسبق — تُقدَّم من {time}.",
+  "store.menu.empty": "لا توجد أصناف في هذه القائمة بعد.",
+  "store.menu.add": "أضف",
+  "store.menu.close": "إغلاق",
+  "store.menu.sections": "الأقسام",
+  "store.menu.save": "وفّر {n}",
 
   "store.hero.title": "نكهة تُصنع بشغف، وتُحفظ في الذاكرة",
   "store.hero.subtitle":

@@ -4276,6 +4276,14 @@ export const en = {
   "store.nav.language": "English",
   "store.nav.cart": "Cart",
   "store.nav.openMenu": "Open menu",
+  "store.menu.unavailable": "Unavailable",
+  "store.menu.notAvailableNow": "This menu is not being served right now.",
+  "store.menu.preOrder": "Pre-order — served from {time}.",
+  "store.menu.empty": "This menu has no items yet.",
+  "store.menu.add": "Add",
+  "store.menu.close": "Close",
+  "store.menu.sections": "Sections",
+  "store.menu.save": "Save {n}",
 
   "store.hero.title": "Flavour made with passion, remembered for life",
   "store.hero.subtitle":

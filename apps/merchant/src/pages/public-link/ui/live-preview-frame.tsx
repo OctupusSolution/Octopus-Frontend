@@ -16,7 +16,8 @@ import { I18nScope, useI18n } from "@/app/providers/i18n-provider";
 import { ensureFontLoaded, type PublicLinkSync, type SiteAction, type SiteDraft } from "@/entities/site-draft";
 import { mediaUrl } from "@/shared/api/media";
 import { storefrontAsset } from "@/shared/lib/storefront-assets";
-import { mediaIdsOf, menuFromDocument, menuMediaIds, projectLiveSite, type LiveMenu } from "../_shared/live-site";
+import { mediaIdsOf, projectLiveSite, type LiveMenu } from "../_shared/live-site";
+import { builderMenuDocument, menuFromDocument, menuMediaIds } from "../_shared/preview-menu";
 import { LiveSiteCanvas, VIEWPORT_WIDTH, type LiveDevice } from "./live-site-canvas";
 
 const DEVICE_ICON: Readonly<Record<LiveDevice, typeof Monitor>> = { desktop: Monitor, tablet: Tablet, mobile: Smartphone };
@@ -48,7 +49,7 @@ function loadMenu(businessId: string, menuId: string, lang: string): Promise<Liv
           if (url) urls.set(id, url);
         })
       );
-      return menuFromDocument(doc, (image) => (image ? (urls.get(image.assetId) ?? null) : null), storefrontAsset("all.png"));
+      return menuFromDocument(builderMenuDocument(doc, (id) => urls.get(id) ?? null), storefrontAsset("all.png"));
     })().catch(() => {
       menuJobs.delete(key);
       return null;

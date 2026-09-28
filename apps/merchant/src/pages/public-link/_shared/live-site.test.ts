@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CataloguesResponse, NavItemDto, PageDraftResponse, SectionDraftResponse, SiteOverviewResponse } from "@octopus/api-client";
 import { EMPTY_SITE_DRAFT, type PublicLinkServer, type SiteDraft } from "@/entities/site-draft";
-import { draftPublicRead, menuFromDocument, projectLiveSite, type LiveSiteInput } from "./live-site";
+import { draftPublicRead, projectLiveSite, type LiveSiteInput } from "./live-site";
 
 const catalogues = {
   eTag: "x",
@@ -274,21 +274,6 @@ describe("projectLiveSite", () => {
     expect(site.cssVars["--octo-text-secondary"]).toBe("#334155");
     expect(site.cssVars["--octo-card"]).toBe("#ffffff");
     expect(site.brandName).toBe("أوشن");
-  });
-
-  it("reads the menu document the way the storefront does", () => {
-    const menu = menuFromDocument(
-      {
-        sections: [{ name: "Main", description: null, image: { assetId: "a", kind: "Image" }, displayStyle: "grid", color: null, entries: [{ ref: "i1", kind: "Item" }, { ref: "o1", kind: "Offer" }] }],
-        items: {
-          i1: { name: "Burger", description: null, image: null, video: null, tags: [], price: { amount: 25, currency: "SAR" }, facts: [], advisories: { labels: [], additionalInfo: null }, isAvailable: true, modifierGroupRefs: [] },
-        },
-      },
-      (image) => (image?.assetId === "a" ? "https://cdn/a.jpg" : null),
-      "/all.png"
-    );
-    expect(menu.categories).toEqual([{ id: "cat-1", slug: "main", name: "Main", imageUrl: "https://cdn/a.jpg" }]);
-    expect(menu.items).toEqual([{ id: "cat-1-i1", categoryId: "cat-1", name: "Burger", description: "", price: 25, imageUrl: "/all.png" }]);
   });
 });
 

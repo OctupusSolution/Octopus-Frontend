@@ -19,7 +19,6 @@ import type {
   DeviceClass,
   LinkTargetDto,
   LocalizedTextMap,
-  MenuPreviewResponse,
   NavItemDto,
   NavigationOptionsDto,
   PageDraftResponse,
@@ -581,48 +580,4 @@ export function projectLiveSite(input: LiveSiteInput): LiveSite {
 export interface LiveMenu {
   categories: { id: string; slug: string; name: string; imageUrl: string }[];
   items: { id: string; categoryId: string; name: string; description: string; price: number; imageUrl: string }[];
-}
-
-function slugify(name: string, index: number): string {
-  const ascii = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  return ascii || `section-${index + 1}`;
-}
-
-/** Every media asset id a menu document references (the draft read gives ids, not URLs). */
-export function menuMediaIds(doc: Pick<MenuPreviewResponse, "sections" | "items">): string[] {
-  const ids = new Set<string>();
-  for (const s of doc.sections) if (s.image?.assetId) ids.add(s.image.assetId);
-  for (const i of Object.values(doc.items)) if (i.image?.assetId) ids.add(i.image.assetId);
-  return [...ids];
-}
-
-/**
- * The menu document as the storefront reads it (public-api.ts menuFromDocument). `imageUrl` turns an
- * image into its delivery URL; `placeholder` is the storefront's stock photograph for one without.
- */
-export function menuFromDocument(
-  doc: Pick<MenuPreviewResponse, "sections" | "items">,
-  imageUrl: (image: { assetId: string } | null) => string | null,
-  placeholder: string
-): LiveMenu {
-  const categories: LiveMenu["categories"] = [];
-  const items: LiveMenu["items"] = [];
-  doc.sections.forEach((section, index) => {
-    const category = { id: `cat-${index + 1}`, slug: slugify(section.name, index), name: section.name, imageUrl: imageUrl(section.image) ?? placeholder };
-    categories.push(category);
-    for (const entry of section.entries) {
-      if (entry.kind !== "Item") continue;
-      const item = doc.items[entry.ref];
-      if (!item) continue;
-      items.push({
-        id: `${category.id}-${entry.ref}`,
-        categoryId: category.id,
-        name: item.name,
-        description: item.description ?? "",
-        price: item.price?.amount ?? 0,
-        imageUrl: imageUrl(item.image) ?? placeholder,
-      });
-    }
-  });
-  return { categories, items };
 }

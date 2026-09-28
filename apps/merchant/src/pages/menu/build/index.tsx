@@ -15,7 +15,7 @@ import clsx from "clsx";
 import { SEED_BRANCHES, blankMenu, saveBuilderStep, useMenuLibrary, type Menu } from "@/entities/menu";
 import { useAuth } from "@/app/providers/auth-provider";
 import { pullSections } from "@/entities/menu/menu-sync";
-import { applyIds, pushMenu, type IdMap } from "@/entities/menu/menu-sync";
+import { applyIds, foldBrandMedia, pushMenu, type IdMap } from "@/entities/menu/menu-sync";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { DraftProvider } from "./use-draft";
 import { Stepper, WIZARD_STEPS, type WizardStep } from "./stepper";
@@ -176,10 +176,23 @@ export function MenuBuilderPage() {
     pending.current = run.then(() => undefined, () => undefined);
     return run
       .then((res) => {
-        // Fold ids and version into whatever the merchant has typed meanwhile,
-        // rather than replacing the draft with the saved snapshot.
-        setDraft((d) => (d ? { ...applyIds(d, res.ids, res.media), version: res.version } : d));
-        replace({ ...applyIds(stored!, res.ids, res.media), version: res.version });
+        // Fold ids, version and (once uploaded) the brand's delivery URLs into
+        // whatever the merchant has typed meanwhile, rather than replacing the
+        // draft with the saved snapshot. foldBrandMedia only touches an image
+        // field that still matches what was actually sent, so a pick or a
+        // removal made while the save was in flight is never overwritten.
+        const savedBrand = res.menu.theme.brand;
+        const saved = savedBrand
+          ? { logoUrl: savedBrand.logoUrl, heroUrl: savedBrand.heroUrl, logoRef: savedBrand.logoRef, heroRef: savedBrand.heroRef }
+          : null;
+        setDraft((d) =>
+          d ? { ...applyIds(d, res.ids, res.media), theme: foldBrandMedia(d.theme, menu.theme.brand, saved), version: res.version } : d
+        );
+        replace({
+          ...applyIds(stored!, res.ids, res.media),
+          theme: foldBrandMedia(stored!.theme, menu.theme.brand, saved),
+          version: res.version,
+        });
       })
       .catch((err) => setSaveError(err instanceof Error ? err.message : "error"));
   }

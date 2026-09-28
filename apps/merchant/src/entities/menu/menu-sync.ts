@@ -175,40 +175,83 @@ export function themeTextToServer(value: string, lang: string, current: Record<s
   return next;
 }
 
-/** A theme image as the reference to save: uploaded when it is a fresh pick, the known reference when it is a delivery URL, none when removed. */
-async function themeMedia(businessId: string, url: string | null, purpose: "ThemeLogo" | "ThemeHeroImage", current: MediaReferenceDto | null) {
-  if (!url) return null;
-  if (isLocalMedia(url)) return (await uploadMedia(businessId, url, purpose, purpose === "ThemeLogo" ? "logo.png" : "hero.png", "menu")).ref;
-  return knownMedia(url) ?? current;
+/** What a theme image resolves to when it is pushed: the reference to save (`ref`) and, when known,
+ *  its delivery URL (`url`) — an upload's fresh URL, an already-known one, or null when the URL is
+ *  either genuinely absent or merely unresolved (the ref still says otherwise). */
+export interface ThemeImageResult {
+  ref: MediaReferenceDto | null;
+  url: string | null;
 }
 
-async function brandFromServer(businessId: string, t: Awaited<ReturnType<typeof getMenuTheme>>, lang: string): Promise<MenuBrand | null> {
+/** A theme image as the reference (and, once known, the delivery URL) to save: uploaded when it is a
+ *  fresh pick, the known reference when it is a delivery URL, and — when the URL is null — the ref
+ *  passed alongside it (an unresolved lookup, not a removal) rather than `current`'s ref, which is only
+ *  a last-resort fallback for a delivery URL this session has not seen before. Null only when both the
+ *  URL and the ref are null: the merchant actually cleared the image. */
+export async function themeImageRef(
+  businessId: string,
+  url: string | null,
+  ref: MediaReferenceDto | null,
+  purpose: "ThemeLogo" | "ThemeHeroImage",
+  current: MediaReferenceDto | null
+): Promise<ThemeImageResult> {
+  if (url && isLocalMedia(url)) {
+    const up = await uploadMedia(businessId, url, purpose, purpose === "ThemeLogo" ? "logo.png" : "hero.png", "menu");
+    return { ref: up.ref, url: up.url };
+  }
+  if (url) return { ref: knownMedia(url) ?? ref ?? current, url };
+  return { ref, url: null };
+}
+
+export async function brandFromServer(businessId: string, t: Awaited<ReturnType<typeof getMenuTheme>>, lang: string): Promise<MenuBrand | null> {
   if (!t.primaryColor && !t.lightColor && !t.accentColor && !t.darkColor && !t.logo && !t.hero) return null;
   const [logoUrl, heroUrl] = await Promise.all([
     t.logo ? mediaUrl(businessId, t.logo, "menu").catch(() => null) : null,
     t.hero ? mediaUrl(businessId, t.hero, "menu").catch(() => null) : null,
   ]);
-  const pick = (map: Record<string, string> | null | undefined) => map?.[lang] ?? Object.values(map ?? {})[0] ?? "";
+  const hasText = (map: Record<string, string> | null | undefined) => Boolean(map?.[lang]);
+  const firstTextKey = (map: Record<string, string> | null | undefined) => Object.entries(map ?? {}).find(([, v]) => v)?.[0];
+  const textLanguage =
+    hasText(t.heroText) || hasText(t.heroSubtext) ? lang : firstTextKey(t.heroText) ?? firstTextKey(t.heroSubtext) ?? lang;
   return {
     colors: { primary: t.primaryColor ?? "#0d6efd", light: t.lightColor ?? "#f7f8fa", accent: t.accentColor ?? "#0d6efd", dark: t.darkColor ?? "#16161d" },
     logoUrl,
     heroUrl,
-    heroText: pick(t.heroText),
-    heroSubtext: pick(t.heroSubtext),
+    logoRef: t.logo ?? null,
+    heroRef: t.hero ?? null,
+    heroText: t.heroText?.[textLanguage] ?? "",
+    heroSubtext: t.heroSubtext?.[textLanguage] ?? "",
+    textLanguage,
   };
 }
 
-async function pushTheme(businessId: string, menuId: string, theme: MenuTheme, lang: string): Promise<void> {
+/** What `pushTheme` saved for the brand's images, so the caller can fold delivery URLs (from a fresh
+ *  upload) back into the theme it keeps as its baseline — without that, every save would re-upload a
+ *  picked image that was never replaced by its delivery URL locally. */
+export interface PushedThemeMedia {
+  logoUrl: string | null;
+  heroUrl: string | null;
+  logoRef: MediaReferenceDto | null;
+  heroRef: MediaReferenceDto | null;
+}
+
+export async function pushTheme(businessId: string, menuId: string, theme: MenuTheme, lang: string): Promise<PushedThemeMedia | null> {
   const current = await getMenuTheme(businessId, menuId);
   const brand = theme.brand;
+  const logo =
+    brand === undefined ? { ref: current.logo, url: null } : await themeImageRef(businessId, brand?.logoUrl ?? null, brand?.logoRef ?? null, "ThemeLogo", current.logo);
+  const hero =
+    brand === undefined ? { ref: current.hero, url: null } : await themeImageRef(businessId, brand?.heroUrl ?? null, brand?.heroRef ?? null, "ThemeHeroImage", current.hero);
   await updateMenuTheme(businessId, menuId, {
     businessId,
     menuId,
     presetCode: theme.serverPresetCode !== undefined ? theme.serverPresetCode : current.presetCode,
-    logo: brand === undefined ? current.logo : await themeMedia(businessId, brand?.logoUrl ?? null, "ThemeLogo", current.logo),
-    hero: brand === undefined ? current.hero : await themeMedia(businessId, brand?.heroUrl ?? null, "ThemeHeroImage", current.hero),
-    heroText: brand ? themeTextToServer(brand.heroText, lang, current.heroText ?? {}) : current.heroText,
-    heroSubtext: brand ? themeTextToServer(brand.heroSubtext, lang, current.heroSubtext ?? {}) : current.heroSubtext,
+    logo: logo.ref,
+    hero: hero.ref,
+    // Written into the brand's own recorded language, never the builder's current display
+    // language: switching the builder's language mid-edit must not relabel this text.
+    heroText: brand ? themeTextToServer(brand.heroText, brand.textLanguage, current.heroText ?? {}) : current.heroText,
+    heroSubtext: brand ? themeTextToServer(brand.heroSubtext, brand.textLanguage, current.heroSubtext ?? {}) : current.heroSubtext,
     titleFontCode: theme.titleFontCode !== undefined ? theme.titleFontCode : current.titleFontCode,
     bodyFontCode: theme.bodyFontCode !== undefined ? theme.bodyFontCode : current.bodyFontCode,
     ...brandColorsToServer(brand, current),
@@ -220,6 +263,25 @@ async function pushTheme(businessId: string, menuId: string, theme: MenuTheme, l
     showItemTags: theme.showItemTags,
     expectedVersion: null,
   });
+  if (!brand) return null;
+  return { logoUrl: logo.url, heroUrl: hero.url, logoRef: logo.ref, heroRef: hero.ref };
+}
+
+/** Folds a saved brand's fresh image URLs/refs back into `theme`'s brand — but only for an image field
+ *  whose URL still matches what was actually sent, so an edit made while the save was in flight (a new
+ *  pick, or a removal) is never overwritten by a stale upload result. */
+export function foldBrandMedia(theme: MenuTheme, sent: MenuBrand | null | undefined, saved: PushedThemeMedia | null): MenuTheme {
+  if (!theme.brand || !sent || !saved) return theme;
+  const brand = { ...theme.brand };
+  if (brand.logoUrl === sent.logoUrl) {
+    brand.logoUrl = saved.logoUrl;
+    brand.logoRef = saved.logoRef;
+  }
+  if (brand.heroUrl === sent.heroUrl) {
+    brand.heroUrl = saved.heroUrl;
+    brand.heroRef = saved.heroRef;
+  }
+  return { ...theme, brand };
 }
 
 const isItem = (e: Item | { entries: unknown }): e is Item => "modifierGroups" in e;
@@ -615,7 +677,11 @@ export async function pushMenu(
     version = res.version;
   }
 
-  if (JSON.stringify(prev.theme) !== JSON.stringify(next.theme)) await pushTheme(businessId, next.id, next.theme, lang);
+  let theme = next.theme;
+  if (JSON.stringify(prev.theme) !== JSON.stringify(next.theme)) {
+    const saved = await pushTheme(businessId, next.id, next.theme, lang);
+    theme = foldBrandMedia(next.theme, next.theme.brand, saved);
+  }
 
   const before = new Map(prev.sections.map((s) => [s.id, s]));
   const kept = new Set(next.sections.map((s) => s.id));
@@ -686,5 +752,5 @@ export async function pushMenu(
     await reorderSections(businessId, next.id, { orderedSectionIds: order });
   }
 
-  return { menu: { ...next, sections, version }, ids, media, version };
+  return { menu: { ...next, sections, theme, version }, ids, media, version };
 }

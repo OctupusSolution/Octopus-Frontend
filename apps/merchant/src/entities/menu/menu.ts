@@ -5,6 +5,7 @@
 // Item, Offer and ModifierGroup are declared here rather than in the wizard
 // plan because `Section.entries` needs them and the library cards count them.
 // Their editing behaviour arrives with the wizard.
+import type { MediaReferenceDto } from "@octopus/api-client";
 
 export type Weekday = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
 
@@ -168,8 +169,17 @@ export interface MenuBrand {
   /** A delivery URL, or a data: URL picked and not yet uploaded. */
   logoUrl: string | null;
   heroUrl: string | null;
+  /** The reference behind logoUrl/heroUrl, kept alongside the resolved URL so a
+   *  lookup failure (offline asset host, stale cache) never reads as "removed":
+   *  a save with the URL unresolved still sends this reference, not null. */
+  logoRef: MediaReferenceDto | null;
+  heroRef: MediaReferenceDto | null;
   heroText: string;
   heroSubtext: string;
+  /** Which of the server's localized heroText/heroSubtext keys heroText/heroSubtext above were read
+   *  from, and the key a save writes back into — never the builder's current display language, so
+   *  switching the builder's language never relabels the brand's own text into the wrong key. */
+  textLanguage: string;
 }
 
 export interface MenuTheme {

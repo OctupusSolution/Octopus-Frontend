@@ -1,11 +1,11 @@
 // Step 3 — Menu Theme & Public Experience.
 //
-// Ownership is split, and the split is the point. Logo, the four colours,
-// typography and hero live on SiteDraft: one thing the merchant owns, shared
-// with the Public Link Builder, so setting the logo here sets it there. Card
-// style, category style, navigation style, item-details behaviour, sticky cart
-// and tag visibility live on this menu's own MenuTheme.
-import { useState } from "react";
+// Everything here belongs to this menu's own MenuTheme: its brand (logo, hero,
+// the four colours — seeded once from the Public Link site's brand when the
+// menu has none), its font codes, card/category/navigation style, item-details
+// behaviour, sticky cart and tag visibility. The site draft is only read, as the
+// seed and as the fallback while a menu's theme is still loading.
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   AlignLeft,
@@ -26,14 +26,14 @@ import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { FONTS } from "@/shared/lib/brand-tokens";
 import { storefrontAsset } from "@/shared/lib/storefront-assets";
 import { useSiteDraft } from "@/entities/site-draft";
-import { useThemeChoices, type MenuTheme } from "@/entities/menu";
+import { useThemeChoices, type MenuBrand, type MenuTheme } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { useDraft } from "../use-draft";
 import { PreviewRail } from "../preview-rail";
 import { QrPanel } from "./qr-panel";
 import { MENU_PRESETS, presetFor, type MenuPreset } from "./presets";
-import { publicMenuUrl } from "./public-url";
+import { seedBrand } from "./seed-brand";
 
 const NAV: { id: MenuTheme["navStyle"]; icon: LucideIcon; key: string }[] = [
   { id: "top-bar", icon: ArrowUpToLine, key: "menuTheme.nav.topBar" },
@@ -264,21 +264,34 @@ function unknownPreset(code: string): MenuPreset {
 }
 
 export function ThemeStep() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { draft, setDraft } = useDraft();
-  const { draft: site, dispatch } = useSiteDraft();
+  const { draft: site } = useSiteDraft();
   const { activeBusiness } = useTenantConfig();
   const [moreThemes, setMoreThemes] = useState(false);
-
-  const logo = useFilePicker((dataUrl) => dispatch({ type: "patchBrand", patch: { logoDataUrl: dataUrl } }));
-  const hero = useFilePicker((dataUrl) =>
-    dispatch({ type: "patchSection", section: "hero", patch: { imageDataUrl: dataUrl } })
-  );
+  const language = locale === "ar" ? "ar" : "en";
 
   const theme = draft.theme;
   function patchTheme(patch: Partial<MenuTheme>) {
     setDraft({ ...draft, theme: { ...theme, ...patch } });
   }
+
+  // The menu's own brand. A menu read from the server without one (null) starts
+  // from the site's brand, once; undefined (not read yet) is left alone.
+  const brand = theme.brand ?? null;
+  useEffect(() => {
+    if (theme.brand === null) patchTheme({ brand: seedBrand(site, presetFor(theme.presetId) ?? null, language) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme.brand === null]);
+  const shownBrand = brand ?? seedBrand(site, null, language);
+  function patchBrand(patch: Partial<MenuBrand>) {
+    patchTheme({ brand: { ...shownBrand, ...patch } });
+  }
+
+  // A newly picked image is a data: URL until the save uploads it; the old
+  // image's media reference no longer describes it.
+  const logo = useFilePicker((dataUrl) => patchBrand({ logoUrl: dataUrl, logoRef: null }));
+  const hero = useFilePicker((dataUrl) => patchBrand({ heroUrl: dataUrl, heroRef: null }));
 
   // The platform's preset and font codes (GET /theme-presets). When it lists
   // any, they are the choices — the API refuses a code it does not list — with
@@ -288,7 +301,6 @@ export function ThemeStep() {
   const serverPresets = choices.data?.presets ?? [];
   const serverFonts = choices.data?.fonts ?? [];
   const isServerPreset = (id: string) => serverPresets.some((code) => code.toLowerCase() === id.toLowerCase());
-  const isServerFont = (id: string) => serverFonts.some((code) => code.toLowerCase() === id.toLowerCase());
   const presets: readonly MenuPreset[] =
     serverPresets.length > 0 ? serverPresets.map((code) => presetFor(code) ?? unknownPreset(code)) : MENU_PRESETS;
   const fontOptions = (current: string) => {
@@ -301,18 +313,22 @@ export function ThemeStep() {
   /** A preset is a palette: picking one sets all four brand colours, which
    *  the merchant can still fine-tune below. */
   function selectPreset(preset: MenuPreset) {
-    patchTheme({ presetId: preset.id, serverPresetCode: isServerPreset(preset.id) ? preset.id : undefined });
-    dispatch({ type: "patchColors", patch: preset.colors });
+    patchTheme({
+      presetId: preset.id,
+      serverPresetCode: isServerPreset(preset.id) ? preset.id : undefined,
+      brand: { ...shownBrand, colors: { ...preset.colors } },
+    });
   }
 
-  const COLORS: { key: string; field: keyof typeof site.brand.colors }[] = [
+  const COLORS: { key: string; field: keyof MenuBrand["colors"] }[] = [
     { key: "menuTheme.primary", field: "primary" },
     { key: "menuTheme.light", field: "light" },
     { key: "menuTheme.accent", field: "accent" },
     { key: "menuTheme.dark", field: "dark" },
   ];
 
-  const url = publicMenuUrl(activeBusiness?.businessName || site.brand.businessName, draft.id);
+  const titleFont = theme.titleFontCode ?? site.brand.typography.en.titles;
+  const bodyFont = theme.bodyFontCode ?? site.brand.typography.en.body;
   const card = "rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4";
   const heading = "text-[16px] font-semibold text-[var(--octo-text-primary)]";
 
@@ -346,8 +362,8 @@ export function ThemeStep() {
             aria-label={t("menuTheme.changeLogo")}
             className="grid h-[128px] w-full place-items-center overflow-hidden rounded-[10px] bg-[var(--octo-track)]"
           >
-            {site.brand.logoDataUrl ? (
-              <img src={site.brand.logoDataUrl} alt="" className="h-full w-full object-contain p-3" />
+            {shownBrand.logoUrl ? (
+              <img src={shownBrand.logoUrl} alt="" className="h-full w-full object-contain p-3" />
             ) : (
               <span className="text-[16px] font-semibold text-[var(--octo-text-secondary)]">
                 {site.brand.businessName || activeBusiness?.businessName || "—"}
@@ -369,9 +385,9 @@ export function ThemeStep() {
             aria-label={t("menuTheme.changeMedia")}
             className="relative grid h-[118px] w-full place-items-center overflow-hidden rounded-[8px] bg-[var(--octo-track)]"
           >
-            {site.sectionSettings.hero.imageDataUrl && (
+            {shownBrand.heroUrl && (
               <img
-                src={site.sectionSettings.hero.imageDataUrl}
+                src={shownBrand.heroUrl}
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -394,7 +410,7 @@ export function ThemeStep() {
           <button
             type="button"
             aria-label={t("menuTheme.heroMedia")}
-            onClick={() => dispatch({ type: "patchSection", section: "hero", patch: { imageDataUrl: null } })}
+            onClick={() => patchBrand({ heroUrl: null, heroRef: null })}
             className="grid h-10 w-10 place-items-center rounded-[9px] bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)] hover:brightness-95"
           >
             <Trash2 size={17} />
@@ -405,8 +421,8 @@ export function ThemeStep() {
         <label className="mt-3 block">
           <span className="text-[15px] text-[var(--octo-text-primary)]">{t("menuTheme.heroText")}</span>
           <input
-            value={site.sectionSettings.hero.heading}
-            onChange={(e) => dispatch({ type: "patchSection", section: "hero", patch: { heading: e.target.value } })}
+            value={shownBrand.heroText}
+            onChange={(e) => patchBrand({ heroText: e.target.value })}
             placeholder={t("menuTheme.heroTextPlaceholder")}
             className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
           />
@@ -414,10 +430,8 @@ export function ThemeStep() {
         <label className="mt-3 block">
           <span className="text-[15px] text-[var(--octo-text-primary)]">{t("menuTheme.heroSubtext")}</span>
           <input
-            value={site.sectionSettings.hero.subheading}
-            onChange={(e) =>
-              dispatch({ type: "patchSection", section: "hero", patch: { subheading: e.target.value } })
-            }
+            value={shownBrand.heroSubtext}
+            onChange={(e) => patchBrand({ heroSubtext: e.target.value })}
             placeholder={t("menuTheme.heroSubtextPlaceholder")}
             className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
           />
@@ -427,19 +441,17 @@ export function ThemeStep() {
       <section className={clsx(card, "space-y-4")}>
         <h2 className={heading}>{t("menuTheme.lookFeel")}</h2>
 
-        {/* FONTS ids, not display names: the preview resolves the face by id,
-            and the Public Link Builder writes the same ids to the same field. */}
+        {/* The menu's own font codes: the platform's codes when it lists any
+            (GET /theme-presets), else the builder's FONTS ids. Until the menu
+            has one, the site's typography is shown. */}
         <label className="block">
           <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.titles")}</span>
           <Select
             className="mt-1.5"
-            value={site.brand.typography.en.titles}
-            onChange={(e) => {
-              dispatch({ type: "patchTypography", locale: "en", patch: { titles: e.target.value } });
-              patchTheme({ titleFontCode: isServerFont(e.target.value) ? e.target.value : undefined });
-            }}
+            value={titleFont}
+            onChange={(e) => patchTheme({ titleFontCode: e.target.value })}
           >
-            {fontOptions(site.brand.typography.en.titles).map((f) => (
+            {fontOptions(titleFont).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </Select>
@@ -448,13 +460,10 @@ export function ThemeStep() {
           <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.body")}</span>
           <Select
             className="mt-1.5"
-            value={site.brand.typography.en.body}
-            onChange={(e) => {
-              dispatch({ type: "patchTypography", locale: "en", patch: { body: e.target.value } });
-              patchTheme({ bodyFontCode: isServerFont(e.target.value) ? e.target.value : undefined });
-            }}
+            value={bodyFont}
+            onChange={(e) => patchTheme({ bodyFontCode: e.target.value })}
           >
-            {fontOptions(site.brand.typography.en.body).map((f) => (
+            {fontOptions(bodyFont).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </Select>
@@ -469,12 +478,12 @@ export function ThemeStep() {
                 <span className="mt-1 flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-2 py-1.5">
                   <input
                     type="color"
-                    value={site.brand.colors[field]}
-                    onChange={(e) => dispatch({ type: "patchColors", patch: { [field]: e.target.value } })}
+                    value={shownBrand.colors[field]}
+                    onChange={(e) => patchBrand({ colors: { ...shownBrand.colors, [field]: e.target.value } })}
                     className="h-8 w-8 shrink-0 cursor-pointer rounded-[6px] border-0 bg-transparent p-0"
                   />
                   <span className="text-[13px] font-medium uppercase text-[var(--octo-text-primary)]" dir="ltr">
-                    {site.brand.colors[field]}
+                    {shownBrand.colors[field]}
                   </span>
                 </span>
               </label>
@@ -558,7 +567,7 @@ export function ThemeStep() {
 
       <div className="space-y-4">
         <PreviewRail menu={draft} composition="menu" site={site} />
-        <QrPanel url={url} />
+        <QrPanel menuId={draft.id} />
       </div>
 
       <Modal

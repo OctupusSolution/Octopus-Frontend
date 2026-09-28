@@ -8,11 +8,12 @@ export const DEV_MERCHANT_ORIGINS: readonly string[] = ["http://localhost:5290",
 
 const ORIGIN = /^https?:\/\/[a-z0-9.-]+(:\d+)?$/i;
 
-/** `configured` is MERCHANT_APP_ORIGINS: origins separated by spaces or commas; anything else is ignored. */
+/** `configured` is MERCHANT_APP_ORIGINS: origins separated by spaces or commas; anything else is ignored.
+ *  Lowercased, since `event.origin` is always lowercase and origin checks must match it exactly. */
 export function merchantOrigins(configured: string | null | undefined, production: boolean): string[] {
   const listed = (configured ?? "")
     .split(/[\s,]+/)
-    .map((o) => o.trim().replace(/\/+$/, ""))
+    .map((o) => o.trim().replace(/\/+$/, "").toLowerCase())
     .filter((o) => ORIGIN.test(o));
   return [...new Set(production ? listed : [...listed, ...DEV_MERCHANT_ORIGINS])];
 }

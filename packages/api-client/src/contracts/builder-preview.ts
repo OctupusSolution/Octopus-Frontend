@@ -47,6 +47,8 @@ export interface BuilderRenderPayload {
   menus: Record<string, BuilderMenuDocument | null>;
   /** The section the merchant is editing: outlined and scrolled into view. */
   highlightSectionId: string | null;
+  /** Whether the canvas should show selection chrome (hover outline, pointer cursor) and report clicked sections. */
+  selectable: boolean;
 }
 
 export type ToCanvasBody = ({ type: "render" } & BuilderRenderPayload) | { type: "scroll-to"; anchor: string };
@@ -67,7 +69,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "obj
 
 export function isToCanvasMessage(data: unknown): data is ToCanvasMessage {
   if (!isObject(data) || data.channel !== BUILDER_CHANNEL || data.protocol !== BUILDER_PREVIEW_PROTOCOL) return false;
-  if (data.type === "render") return isObject(data.shell) && (data.page === null || isObject(data.page)) && isObject(data.menus);
+  if (data.type === "render") return isObject(data.shell) && (data.page === null || isObject(data.page)) && isObject(data.menus) && typeof data.selectable === "boolean";
   if (data.type === "scroll-to") return typeof data.anchor === "string";
   return false;
 }

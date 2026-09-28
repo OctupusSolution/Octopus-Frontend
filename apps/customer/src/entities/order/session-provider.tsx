@@ -187,12 +187,22 @@ interface OrderingSessionContextValue {
 
 const OrderingSessionContext = createContext<OrderingSessionContextValue | null>(null);
 
-export function OrderingSessionProvider({ children }: { children: ReactNode }) {
+interface OrderingSessionProviderProps {
+  children: ReactNode;
+  /** False for the builder's canvas: the preview must never read or write the merchant's real cart. */
+  persist?: boolean;
+}
+
+export function OrderingSessionProvider({ children, persist = true }: OrderingSessionProviderProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (!persist) {
+      setHydrated(true);
+      return;
+    }
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try {
@@ -204,16 +214,16 @@ export function OrderingSessionProvider({ children }: { children: ReactNode }) {
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [persist]);
 
   useEffect(() => {
     // Skip writes until hydration has run — otherwise the pre-hydration
     // initial state overwrites whatever was persisted before this mount
     // (and React StrictMode's double-invoked effects turn that into a race
     // that can wipe a real session on reload).
-    if (!hydrated) return;
+    if (!hydrated || !persist) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, hydrated]);
+  }, [state, hydrated, persist]);
 
   const value: OrderingSessionContextValue = {
     state,

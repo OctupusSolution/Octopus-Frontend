@@ -4514,6 +4514,7 @@ export const en = {
   "publicLink.live.previewNote": "The preview beside you is your real site, draft included. Share a private preview link to test it on another device.",
   "publicLink.live.fallback": "Your storefront could not be reached, so the builder's own preview is shown.",
   "publicLink.live.connected": "Your real site",
+  "publicLink.live.noAddress": "Claim your address in the Brand step to see your real site here.",
   "publicLink.preview.subtitleTheme": "See how your site could look with this theme.",
   "publicLink.preview.language": "Preview language",
   "publicLink.preview.prevSlide": "Previous section",

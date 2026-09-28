@@ -89,10 +89,12 @@ export function BuilderCanvas({ allowedOrigins }: { allowedOrigins: string[] }) 
   const highlight = render?.highlightSectionId ?? null;
   useEffect(() => {
     if (!highlight) return;
-    document.querySelector(`[data-section-id="${CSS.escape(highlight)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector(`[data-section-id="${CSS.escape(highlight)}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [highlight]);
 
-  // Links never navigate the frame; forms never submit.
+  // Links never navigate the frame; forms never submit. A section click is reported only when
+  // the builder wired up selection (the Customize step) — elsewhere the canvas is a plain preview.
+  const selectable = render?.selectable ?? false;
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
@@ -103,6 +105,7 @@ export function BuilderCanvas({ allowedOrigins }: { allowedOrigins: string[] }) 
         if (href) send({ type: "navigate", href });
         return;
       }
+      if (!selectable) return;
       if (target?.closest("button, input, select, textarea, label, [role='dialog']")) return;
       const section = target?.closest<HTMLElement>("[data-section-id]");
       if (section?.dataset.sectionId) send({ type: "select-section", sectionId: section.dataset.sectionId });
@@ -114,7 +117,7 @@ export function BuilderCanvas({ allowedOrigins }: { allowedOrigins: string[] }) 
       document.removeEventListener("click", onClick, true);
       document.removeEventListener("submit", onSubmit, true);
     };
-  }, [send]);
+  }, [send, selectable]);
 
   if (!render) {
     return <p className="mx-auto max-w-[480px] px-6 py-24 text-center text-[14px] text-[var(--octo-text-muted)]">{COPY.en.waiting}</p>;
@@ -124,8 +127,7 @@ export function BuilderCanvas({ allowedOrigins }: { allowedOrigins: string[] }) 
   return (
     <StoreI18nProvider locale={locale}>
       <style>{`
-        [data-section-id] { cursor: pointer; }
-        [data-section-id]:hover { outline: 1px dashed rgba(13, 110, 253, 0.5); outline-offset: 4px; }
+        ${render.selectable ? `[data-section-id] { cursor: pointer; }\n        [data-section-id]:hover { outline: 1px dashed rgba(13, 110, 253, 0.5); outline-offset: 4px; }` : ""}
         ${highlight ? `[data-section-id="${CSS.escape(highlight)}"] { outline: 2px solid #0D6EFD; outline-offset: 4px; }` : ""}
       `}</style>
       <CanvasSite render={render} locale={locale} onLanguage={(language) => send({ type: "language", language })} />

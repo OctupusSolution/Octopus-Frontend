@@ -4518,6 +4518,7 @@ export const ar = {
   "publicLink.live.previewNote": "المعاينة بجانبك هي موقعك الحقيقي بما فيه المسودة. شارك رابط معاينة خاص لتجربته على جهاز آخر.",
   "publicLink.live.fallback": "تعذّر الوصول إلى موقعك، لذا تُعرض معاينة أداة البناء.",
   "publicLink.live.connected": "موقعك الحقيقي",
+  "publicLink.live.noAddress": "احجز عنوان موقعك في خطوة الهوية لترى موقعك الحقيقي هنا.",
   "publicLink.preview.subtitleTheme": "شاهد كيف قد يبدو موقعك بهذا القالب.",
   "publicLink.preview.language": "لغة المعاينة",
   "publicLink.preview.prevSlide": "القسم السابق",

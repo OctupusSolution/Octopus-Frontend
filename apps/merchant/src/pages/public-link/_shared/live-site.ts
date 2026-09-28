@@ -575,7 +575,7 @@ export function projectLiveSite(input: LiveSiteInput): LiveSite {
   return liveSiteFromRead(draftPublicRead(input), input.fonts);
 }
 
-// ---- the menu a Menu section shows (public-api.ts menuFromDocument) --------------------------------
+// ---- LiveMenu: the mirror's menu shape, built by preview-menu.ts's menuFromDocument -----------------
 
 export interface LiveMenu {
   categories: { id: string; slug: string; name: string; imageUrl: string }[];

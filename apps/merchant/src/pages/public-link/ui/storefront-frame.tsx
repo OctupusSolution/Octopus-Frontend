@@ -18,6 +18,8 @@ export interface StorefrontFrameProps {
   onNavigate: (href: string) => void;
   onLanguage: (language: string) => void;
   onSelectSection?: (sectionId: string) => void;
+  /** Called on each accepted `ready` (the canvas announces it repeatedly until the parent answers). */
+  onReady?: () => void;
   onUnavailable: () => void;
   height: number | string;
   maxCardWidth: number;
@@ -53,6 +55,7 @@ export function StorefrontFrame({ origin, device, payload, scrollRequest, height
         case "ready":
           ready = true;
           setReadyCount((n) => n + 1);
+          latest.current.onReady?.();
           break;
         case "navigate":
           latest.current.onNavigate(message.href);

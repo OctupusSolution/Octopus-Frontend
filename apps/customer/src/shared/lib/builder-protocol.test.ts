@@ -18,7 +18,7 @@ describe("builder preview protocol", () => {
   });
 
   it("recognises the messages it builds", () => {
-    expect(isToCanvasMessage(toCanvas({ type: "render", shell, page: null, pageLoading: false, menus: {}, highlightSectionId: null }))).toBe(true);
+    expect(isToCanvasMessage(toCanvas({ type: "render", shell, page: null, pageLoading: false, menus: {}, highlightSectionId: null, selectable: false }))).toBe(true);
     expect(isToCanvasMessage(toCanvas({ type: "scroll-to", anchor: "menu" }))).toBe(true);
     expect(isFromCanvasMessage(fromCanvas({ type: "ready" }))).toBe(true);
     expect(isFromCanvasMessage(fromCanvas({ type: "navigate", href: "/about" }))).toBe(true);
@@ -32,6 +32,7 @@ describe("builder preview protocol", () => {
     expect(isFromCanvasMessage({ ...fromCanvas({ type: "navigate", href: "/" }), href: 42 })).toBe(false);
     expect(isToCanvasMessage({ ...toCanvas({ type: "scroll-to", anchor: "a" }), channel: "octopus-builder-canvas" })).toBe(false);
     expect(isToCanvasMessage({ channel: "octopus-builder", protocol: 1, type: "render", shell, page: null, menus: null })).toBe(false);
+    expect(isToCanvasMessage({ ...toCanvas({ type: "render", shell, page: null, pageLoading: false, menus: {}, highlightSectionId: null, selectable: false }), selectable: undefined })).toBe(false);
     expect(isToCanvasMessage("render")).toBe(false);
     expect(isToCanvasMessage(null)).toBe(false);
   });

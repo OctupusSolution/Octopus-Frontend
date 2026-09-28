@@ -86,7 +86,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <html lang="en" dir="ltr" className={FONT_CLASSES}>
         <body>
           <StoreI18nProvider locale={defaultLocale}>
-            <OrderingSessionProvider>{children}</OrderingSessionProvider>
+            <OrderingSessionProvider persist={false}>{children}</OrderingSessionProvider>
           </StoreI18nProvider>
         </body>
       </html>

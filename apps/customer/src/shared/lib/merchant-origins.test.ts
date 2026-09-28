@@ -13,6 +13,10 @@ describe("merchantOrigins", () => {
     expect(merchantOrigins(undefined, false)).toEqual(DEV_MERCHANT_ORIGINS);
     expect(merchantOrigins(undefined, true)).toEqual([]);
   });
+
+  it("lowercases configured origins, since event.origin is always lowercase", () => {
+    expect(merchantOrigins("https://App.Octopus.app", true)).toEqual(["https://app.octopus.app"]);
+  });
 });
 
 describe("frameAncestors", () => {

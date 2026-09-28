@@ -20,6 +20,8 @@ export function middleware(request: NextRequest) {
   if (isBuilderCanvasPath(request.nextUrl.pathname)) {
     const canvasHeaders = new Headers(request.headers);
     canvasHeaders.set(BUILDER_CANVAS_HEADER, "1");
+    canvasHeaders.delete(TENANT_SLUG_HEADER);
+    canvasHeaders.delete(SAMPLE_STOREFRONT_HEADER);
     const res = NextResponse.next({ request: { headers: canvasHeaders } });
     for (const [k, v] of Object.entries(builderCanvasResponseHeaders(currentMerchantOrigins()))) res.headers.set(k, v);
     return res;

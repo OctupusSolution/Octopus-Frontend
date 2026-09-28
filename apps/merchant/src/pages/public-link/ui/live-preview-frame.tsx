@@ -108,6 +108,7 @@ export function LivePreviewFrame({
   const [pendingHash, setPendingHash] = useState<string | null>(null);
   const [scrollRequest, setScrollRequest] = useState<{ anchor: string; id: number } | null>(null);
   const [frameFailed, setFrameFailed] = useState(false);
+  const [frameReady, setFrameReady] = useState(false);
 
   // A language the site stops offering falls back to the one being edited.
   const enabled = server.overview.settings.enabledLanguages;
@@ -133,7 +134,10 @@ export function LivePreviewFrame({
       }),
     [server.overview.address.hostname, server.overview.address.slug, draft.slug]
   );
-  useEffect(() => setFrameFailed(false), [origin]);
+  useEffect(() => {
+    setFrameFailed(false);
+    setFrameReady(false);
+  }, [origin]);
   const framed = Boolean(origin) && !frameFailed;
 
   // The page shown has to be loaded (only Home is read up front) — asked for once.
@@ -189,8 +193,8 @@ export function LivePreviewFrame({
   }, [shownDocs]);
 
   const payload = useMemo(
-    () => ({ shell: read.shell, page: read.page, pageLoading: read.pageLoading, menus: shownDocs, highlightSectionId: selectedSectionId }),
-    [read, shownDocs, selectedSectionId]
+    () => ({ shell: read.shell, page: read.page, pageLoading: read.pageLoading, menus: shownDocs, highlightSectionId: selectedSectionId, selectable: Boolean(onSelectSection) }),
+    [read, shownDocs, selectedSectionId, onSelectSection]
   );
 
   // The mirror's faces (the framed storefront loads its own).
@@ -266,6 +270,7 @@ export function LivePreviewFrame({
         onNavigate={navigate}
         onLanguage={(code) => setLanguage(code)}
         onSelectSection={onSelectSection}
+        onReady={() => setFrameReady(true)}
         onUnavailable={() => setFrameFailed(true)}
         height={height}
         maxCardWidth={DEVICE_MAX_CARD_WIDTH[device]}
@@ -274,6 +279,7 @@ export function LivePreviewFrame({
     ) : (
       <div className="flex flex-col gap-2">
         {origin && frameFailed && <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.live.fallback")}</p>}
+        {!origin && <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.live.noAddress")}</p>}
         {mirror}
       </div>
     );
@@ -348,7 +354,7 @@ export function LivePreviewFrame({
             {title ?? t("publicLink.livePreview")}
             <span className="inline-flex items-center gap-1 rounded-full bg-[#16a34a]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[#16a34a]">
               <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" aria-hidden />
-              {framed ? t("publicLink.live.connected") : t("publicLink.live.badge")}
+              {framed && frameReady ? t("publicLink.live.connected") : t("publicLink.live.badge")}
             </span>
           </p>
           {subtitle && <p className="text-[11.5px] text-[var(--octo-text-muted)]">{subtitle}</p>}

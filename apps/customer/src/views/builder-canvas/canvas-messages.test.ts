@@ -15,8 +15,9 @@ describe("acceptToCanvas", () => {
     expect(acceptToCanvas({ origin: "https://app.octopus.app", source: { name: "opener" }, data: scroll }, allowed, parent)).toBeNull();
     expect(acceptToCanvas({ origin: "https://evil.test", source: parent, data: scroll }, allowed, parent)).toBeNull();
     expect(acceptToCanvas({ origin: "https://app.octopus.app", source: parent, data: { ...scroll, protocol: 9 } }, allowed, parent)).toBeNull();
-    const render = toCanvas({ type: "render", shell: {} as PublicSiteShell, page: null, pageLoading: false, menus: {}, highlightSectionId: null });
+    const render = toCanvas({ type: "render", shell: {} as PublicSiteShell, page: null, pageLoading: false, menus: {}, highlightSectionId: null, selectable: false });
     expect(acceptToCanvas({ origin: "https://app.octopus.app", source: parent, data: render }, [], parent)).toBeNull();
+    expect(acceptToCanvas({ origin: "https://app.octopus.app", source: parent, data: { ...render, selectable: undefined } }, allowed, parent)).toBeNull();
   });
 });
 

@@ -17,11 +17,12 @@ import { I18nScope, useI18n } from "@/app/providers/i18n-provider";
 import { ensureFontLoaded, type PublicLinkSync, type SiteAction, type SiteDraft } from "@/entities/site-draft";
 import { mediaUrl } from "@/shared/api/media";
 import { storefrontAsset } from "@/shared/lib/storefront-assets";
+import { StorefrontFrame } from "@/widgets/storefront-frame";
 import { draftPublicRead, liveSiteFromRead, mediaIdsOf, type LiveMenu } from "../_shared/live-site";
 import { builderMenuDocument, menuFromDocument, menuMediaIds } from "../_shared/preview-menu";
 import { storefrontOrigin } from "../_shared/preview-url";
+import { SITE_CANVAS_CHANNEL } from "../_shared/site-canvas-channel";
 import { LiveSiteCanvas, VIEWPORT_WIDTH, type LiveDevice } from "./live-site-canvas";
-import { StorefrontFrame } from "./storefront-frame";
 
 const DEVICE_ICON: Readonly<Record<LiveDevice, typeof Monitor>> = { desktop: Monitor, tablet: Tablet, mobile: Smartphone };
 const DEVICE_LABEL_KEY: Readonly<Record<LiveDevice, string>> = {
@@ -263,6 +264,7 @@ export function LivePreviewFrame({
   const canvas =
     framed && origin ? (
       <StorefrontFrame
+        channel={SITE_CANVAS_CHANNEL}
         origin={origin}
         device={device}
         payload={payload}

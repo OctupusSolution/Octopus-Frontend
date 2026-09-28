@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { storefrontPreviewUrl } from "./preview-url";
+import { storefrontOrigin, storefrontPreviewUrl } from "./preview-url";
 
 const TOKEN = "plpv_abc-DEF_123";
 const base = { host: "cookdoor.octopus.app", slug: "cookdoor", fallback: "https://cookdoor.octopus.app/preview#t=x" };
@@ -19,5 +19,9 @@ describe("preview link address", () => {
 
   it("falls back to the backend's address when no host is known", () => {
     expect(storefrontPreviewUrl(TOKEN, { ...base, host: null, currentHostname: "merchant.octopus.app" })).toBe(base.fallback);
+  });
+
+  it("has no storefront to frame outside development before an address is claimed", () => {
+    expect(storefrontOrigin({ host: null, slug: "", currentHostname: "app.octopus.app" })).toBeNull();
   });
 });

@@ -1,24 +1,20 @@
-// The customer storefront itself, framed: its /preview/builder canvas, laid out at the device's real
-// width and scaled into the card. Every change of `payload` is posted to it (at most once per
-// animation frame), and it is re-posted whenever the canvas says it is ready (a storefront reload
-// recovers on its own). No `ready` within READY_TIMEOUT_MS -> `onUnavailable`, and the host shows
-// its mirror instead.
+// A storefront canvas, framed: laid out at the device's real width and scaled into the card. Every change of `payload` is
+// posted (at most once per animation frame) and re-posted whenever the canvas says it is ready. No `ready` within
+// READY_TIMEOUT_MS -> `onUnavailable`. Messages are accepted only from this iframe's window at `origin`.
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { toCanvas, type BuilderRenderPayload } from "@octopus/api-client";
-import { acceptFromCanvas, canvasUrl, frameGeometry, READY_TIMEOUT_MS } from "../_shared/frame-bridge";
-import { VIEWPORT_WIDTH, type LiveDevice } from "./live-site-canvas";
+import { acceptFromCanvas, canvasUrl, frameGeometry, FRAME_VIEWPORT_WIDTH, READY_TIMEOUT_MS, type CanvasChannel, type FrameDevice } from "./frame-bridge";
 
-export interface StorefrontFrameProps {
+export interface StorefrontFrameProps<P> {
+  channel: CanvasChannel<P>;
   origin: string;
-  device: LiveDevice;
-  payload: BuilderRenderPayload;
+  device: FrameDevice;
+  payload: P;
   /** Scroll the canvas to an anchor ("" = top) each time `id` changes. */
   scrollRequest: { anchor: string; id: number } | null;
   onNavigate: (href: string) => void;
-  onLanguage: (language: string) => void;
-  onSelectSection?: (sectionId: string) => void;
-  /** Called on each accepted `ready` (the canvas announces it repeatedly until the parent answers). */
+  onLanguage?: (language: string) => void;
+  onSelectSection?: (id: string) => void;
   onReady?: () => void;
   onUnavailable: () => void;
   height: number | string;
@@ -26,14 +22,15 @@ export interface StorefrontFrameProps {
   title: string;
 }
 
-export function StorefrontFrame({ origin, device, payload, scrollRequest, height, maxCardWidth, title, ...handlers }: StorefrontFrameProps) {
+export function StorefrontFrame<P>({ channel, origin, device, payload, scrollRequest, height, maxCardWidth, title, ...handlers }: StorefrontFrameProps<P>) {
   const boxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [readyCount, setReadyCount] = useState(0);
-  // The latest callbacks, so the message listener is attached once per origin.
   const latest = useRef(handlers);
   latest.current = handlers;
+  const channelRef = useRef(channel);
+  channelRef.current = channel;
 
   useEffect(() => {
     const box = boxRef.current;
@@ -49,7 +46,7 @@ export function StorefrontFrame({ origin, device, payload, scrollRequest, height
     let ready = false;
     setReadyCount(0);
     const onMessage = (event: MessageEvent) => {
-      const message = acceptFromCanvas(event, origin, frameRef.current?.contentWindow);
+      const message = acceptFromCanvas(event, origin, frameRef.current?.contentWindow, (data) => channelRef.current.accept(data));
       if (!message) return;
       switch (message.type) {
         case "ready":
@@ -61,10 +58,10 @@ export function StorefrontFrame({ origin, device, payload, scrollRequest, height
           latest.current.onNavigate(message.href);
           break;
         case "language":
-          latest.current.onLanguage(message.language);
+          latest.current.onLanguage?.(message.language);
           break;
         case "select-section":
-          latest.current.onSelectSection?.(message.sectionId);
+          latest.current.onSelectSection?.(message.id);
           break;
       }
     };
@@ -78,22 +75,21 @@ export function StorefrontFrame({ origin, device, payload, scrollRequest, height
     };
   }, [origin]);
 
-  // Render: once per animation frame at most, and again on every `ready`.
   useEffect(() => {
     if (readyCount === 0) return;
-    const id = requestAnimationFrame(() => frameRef.current?.contentWindow?.postMessage(toCanvas({ type: "render", ...payload }), origin));
+    const id = requestAnimationFrame(() => frameRef.current?.contentWindow?.postMessage(channelRef.current.render(payload), origin));
     return () => cancelAnimationFrame(id);
   }, [readyCount, payload, origin]);
 
   const scrollId = scrollRequest?.id ?? 0;
   useEffect(() => {
     if (readyCount === 0 || !scrollRequest) return;
-    const id = requestAnimationFrame(() => frameRef.current?.contentWindow?.postMessage(toCanvas({ type: "scroll-to", anchor: scrollRequest.anchor }), origin));
+    const id = requestAnimationFrame(() => frameRef.current?.contentWindow?.postMessage(channelRef.current.scrollTo(scrollRequest.anchor), origin));
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyCount > 0, scrollId, origin]);
 
-  const viewport = VIEWPORT_WIDTH[device];
+  const viewport = FRAME_VIEWPORT_WIDTH[device];
   const geo = frameGeometry(viewport, size.width, size.height, maxCardWidth);
 
   return (
@@ -101,17 +97,11 @@ export function StorefrontFrame({ origin, device, payload, scrollRequest, height
       {geo.scale > 0 && (
         <iframe
           ref={frameRef}
-          src={canvasUrl(origin)}
+          src={canvasUrl(origin, channel.path)}
           title={title}
           sandbox="allow-scripts allow-same-origin allow-forms"
           className="absolute top-0 border-0 bg-white"
-          style={{
-            left: Math.max(0, (size.width - geo.drawnWidth) / 2),
-            width: viewport,
-            height: geo.frameHeight,
-            transform: `scale(${geo.scale})`,
-            transformOrigin: "top left",
-          }}
+          style={{ left: Math.max(0, (size.width - geo.drawnWidth) / 2), width: viewport, height: geo.frameHeight, transform: `scale(${geo.scale})`, transformOrigin: "top left" }}
         />
       )}
       {readyCount === 0 && (

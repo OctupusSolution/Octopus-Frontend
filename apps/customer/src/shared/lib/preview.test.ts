@@ -7,7 +7,6 @@ import {
   UNUSABLE_TOKEN,
   planApiRequest,
   previewCookieMaxAge,
-  previewFrameAncestors,
   sanitizePreviewToken,
 } from "./preview";
 import { applyPreviewHeaders, handlePreviewRoute } from "./preview-middleware";
@@ -118,18 +117,8 @@ describe("handlePreviewRoute", () => {
   });
 });
 
-describe("previewFrameAncestors", () => {
-  it("lets only the storefront frame a preview by default", () => {
-    expect(previewFrameAncestors(undefined)).toBe("frame-ancestors 'self'");
-  });
-
-  it("adds the configured merchant console origins and ignores anything that is not an origin", () => {
-    expect(previewFrameAncestors("https://app.octopus.app, http://localhost:5173/ javascript:alert(1) *")).toBe(
-      "frame-ancestors 'self' https://app.octopus.app http://localhost:5173"
-    );
-  });
-
-  it("marks every preview response with it", () => {
+describe("preview framing", () => {
+  it("marks every preview response with frame-ancestors", () => {
     const res = applyPreviewHeaders(req("https://x.octopus.app/", `${PREVIEW_COOKIE_NAME}=${TOKEN}`), NextResponse.next());
     expect(res.headers.get("Content-Security-Policy")).toMatch(/^frame-ancestors 'self'/);
   });

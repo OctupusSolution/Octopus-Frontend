@@ -96,18 +96,3 @@ export const PREVIEW_RESPONSE_HEADERS: Readonly<Record<string, string>> = {
   "Referrer-Policy": "no-referrer",
   "X-Robots-Tag": "noindex, nofollow",
 };
-
-/**
- * Who may frame a draft preview: the storefront itself and the merchant console origins listed
- * in `PREVIEW_FRAME_ANCESTORS` (space- or comma-separated, e.g. `https://app.octopus.app`), which
- * the builder's live preview needs. Nobody else: a preview carries an unpublished draft behind a
- * secret, and a page that frames it could dress it up as the real site. The published site is
- * not restricted here — merchants embed it on their own websites (the Publish step's embed code).
- */
-export function previewFrameAncestors(configured: string | null | undefined): string {
-  const origins = (configured ?? "")
-    .split(/[\s,]+/)
-    .map((o) => o.trim().replace(/\/+$/, ""))
-    .filter((o) => /^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o));
-  return ["frame-ancestors 'self'", ...origins].join(" ");
-}

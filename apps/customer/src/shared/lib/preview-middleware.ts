@@ -5,13 +5,14 @@ import {
   PREVIEW_EXIT_PATH,
   PREVIEW_RESPONSE_HEADERS,
   previewCookieMaxAge,
-  previewFrameAncestors,
   sanitizePreviewToken,
 } from "./preview";
+import { currentMerchantOrigins, frameAncestors } from "./merchant-origins";
 
 function withPreviewHeaders(res: NextResponse): NextResponse {
   for (const [k, v] of Object.entries(PREVIEW_RESPONSE_HEADERS)) res.headers.set(k, v);
-  res.headers.set("Content-Security-Policy", previewFrameAncestors(process.env.PREVIEW_FRAME_ANCESTORS));
+  // A draft preview may be framed by the storefront itself and the merchant console only.
+  res.headers.set("Content-Security-Policy", frameAncestors(currentMerchantOrigins()));
   return res;
 }
 

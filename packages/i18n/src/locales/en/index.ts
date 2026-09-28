@@ -4512,6 +4512,8 @@ export const en = {
   "publicLink.live.notServed": "This page is not on your site right now (it is hidden, or its content is unavailable).",
   "publicLink.live.previewTitle": "Try your site before publishing",
   "publicLink.live.previewNote": "The preview beside you is your real site, draft included. Share a private preview link to test it on another device.",
+  "publicLink.live.fallback": "Your storefront could not be reached, so the builder's own preview is shown.",
+  "publicLink.live.connected": "Your real site",
   "publicLink.preview.subtitleTheme": "See how your site could look with this theme.",
   "publicLink.preview.language": "Preview language",
   "publicLink.preview.prevSlide": "Previous section",

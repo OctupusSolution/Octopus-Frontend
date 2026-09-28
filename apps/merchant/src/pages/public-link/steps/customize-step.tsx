@@ -99,7 +99,16 @@ export function CustomizeStep({ draft, dispatch, publicLinkSync }: StepProps) {
             <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.customize.settingForSelected")}</p>
             <ServerSectionInspector sync={publicLinkSync} draft={draft} sectionId={serverSection} onDeleted={() => setServerSection(null)} onSelect={setServerSection} />
           </div>
-          <SitePreview draft={draft} dispatch={dispatch} sync={publicLinkSync} device={device} onDevice={setDevice} height={680} />
+          <SitePreview
+            draft={draft}
+            dispatch={dispatch}
+            sync={publicLinkSync}
+            device={device}
+            onDevice={setDevice}
+            height={680}
+            selectedSectionId={serverSection}
+            onSelectSection={setServerSection}
+          />
         </div>
       </div>
     );

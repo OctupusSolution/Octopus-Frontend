@@ -26,9 +26,27 @@ export interface SitePreviewProps {
   withLanguage?: boolean;
   /** Live preview only: viewport height. */
   height?: number | string;
+  /** Live preview only: the section being edited, and a section clicked in the preview. */
+  selectedSectionId?: string | null;
+  onSelectSection?: (sectionId: string) => void;
 }
 
-export function SitePreview({ draft, dispatch, sync, device, onDevice, devices, title, subtitle, actions, paged, withLanguage, height }: SitePreviewProps) {
+export function SitePreview({
+  draft,
+  dispatch,
+  sync,
+  device,
+  onDevice,
+  devices,
+  title,
+  subtitle,
+  actions,
+  paged,
+  withLanguage,
+  height,
+  selectedSectionId,
+  onSelectSection,
+}: SitePreviewProps) {
   const { t, locale } = useI18n();
   if (sync.connected && sync.server) {
     return (
@@ -42,6 +60,8 @@ export function SitePreview({ draft, dispatch, sync, device, onDevice, devices, 
         subtitle={subtitle}
         actions={actions}
         height={height}
+        selectedSectionId={selectedSectionId}
+        onSelectSection={onSelectSection}
       />
     );
   }

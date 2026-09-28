@@ -1,4 +1,4 @@
-﻿// @octopus/api-client public surface
+// @octopus/api-client public surface
 export * from "./contracts/order";
 export * from "./contracts/tenant";
 export * from "./contracts/menu";

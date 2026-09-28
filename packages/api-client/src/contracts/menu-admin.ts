@@ -16,6 +16,17 @@
 // in menu-admin-client.ts with a real user's token 403s, including plain
 // GETs. See FRONTEND_INTEGRATION_GAPS.md 4.1 and MENU_INTEGRATION_NOTES.md.
 
+import type {
+  PublicMenuDocument,
+  PublicMenuItem,
+  PublicMenuMedia,
+  PublicMenuModifierGroup,
+  PublicMenuMoney,
+  PublicMenuOffer,
+  PublicMenuSection,
+  PublicMenuTheme,
+} from "./public-menu";
+
 export interface LocalizedMap {
   [locale: string]: string;
 }
@@ -917,111 +928,21 @@ export interface BulkOperationSummaryResponse {
 // Every string is already resolved to one language. Prefixed `MenuPreview`
 // so nothing here collides with a future public-read contract file.
 
-export interface MenuPreviewMoney {
-  amount: number;
-  currency: string;
-}
+export type MenuPreviewMoney = PublicMenuMoney;
 
-export interface MenuPreviewMedia {
-  assetId: string;
-  kind: string;
-}
+export type MenuPreviewMedia = PublicMenuMedia;
 
-export interface MenuPreviewTheme {
-  presetCode: string | null;
-  logo: MenuPreviewMedia | null;
-  hero: MenuPreviewMedia | null;
-  heroText: string | null;
-  heroSubtext: string | null;
-  titleFontCode: string | null;
-  bodyFontCode: string | null;
-  primaryColor: string | null;
-  lightColor: string | null;
-  accentColor: string | null;
-  darkColor: string | null;
-  navigationStyle: string;
-  sectionNavStyle: string;
-  cardStyle: string;
-  itemDetailsBehavior: string;
-  stickyPrimaryAction: boolean;
-  showItemTags: boolean;
-}
+export type MenuPreviewTheme = PublicMenuTheme;
 
-export interface MenuPreviewSection {
-  name: string;
-  description: string | null;
-  image: MenuPreviewMedia | null;
-  displayStyle: string;
-  color: string | null;
-  /** `ref` keys into `items` or `offers`, depending on `kind`. */
-  entries: { ref: string; kind: string }[];
-}
+export type MenuPreviewSection = PublicMenuSection;
 
-export interface MenuPreviewItem {
-  name: string;
-  description: string | null;
-  image: MenuPreviewMedia | null;
-  video: MenuPreviewMedia | null;
-  tags: string[];
-  price: MenuPreviewMoney | null;
-  facts: MeasuredFactDto[];
-  advisories: { labels: string[]; additionalInfo: string | null };
-  isAvailable: boolean;
-  modifierGroupRefs: string[];
-}
+export type MenuPreviewItem = PublicMenuItem;
 
-export interface MenuPreviewModifierGroup {
-  promptLabel: string;
-  helpText: string | null;
-  selectionMode: string;
-  minSelected: number;
-  maxSelected: number | null;
-  options: {
-    name: string;
-    effect: { kind: string; amount: MenuPreviewMoney | null };
-    isDefault: boolean;
-    isAvailable: boolean;
-  }[];
-}
+export type MenuPreviewModifierGroup = PublicMenuModifierGroup;
 
-export interface MenuPreviewOffer {
-  name: string;
-  image: MenuPreviewMedia | null;
-  badge: string | null;
-  showSavingBadge: boolean;
-  components: { itemRef: string; quantity: number }[];
-  pricingRule: {
-    kind: string;
-    fixedPrice: MenuPreviewMoney | null;
-    discountPercent: number | null;
-    discountAmount: MenuPreviewMoney | null;
-    dynamicBasePrice: MenuPreviewMoney | null;
-  };
-  price: {
-    referenceTotal: MenuPreviewMoney;
-    price: MenuPreviewMoney;
-    saving: MenuPreviewMoney;
-    savingPercent: number;
-  };
-  isAvailable: boolean;
-}
+export type MenuPreviewOffer = PublicMenuOffer;
 
-export interface MenuPreviewResponse {
-  /** Always "Available" on the draft preview. */
-  availability: "Available" | "PreOrder" | "NotAvailableNow" | string;
-  nextAvailableAtUtc: string | null;
-  servedAsFallback: boolean;
-  locationLabel: string | null;
-  language: string;
-  availableLanguages: string[];
-  menu: { name: string; theme: MenuPreviewTheme };
-  sections: MenuPreviewSection[];
-  items: Record<string, MenuPreviewItem>;
-  modifierGroups: Record<string, MenuPreviewModifierGroup>;
-  offers: Record<string, MenuPreviewOffer>;
-  currency: { code: string; minorUnits: number } | null;
-  tax: { configured: boolean; pricesIncludeTax: boolean | null };
-}
+export type MenuPreviewResponse = PublicMenuDocument;
 
 /** `GET /access-codes/{codeId}/image` — `format` is REQUIRED (missing = 400). */
 export type AccessCodeImageFormat = "png" | "svg";

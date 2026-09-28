@@ -5,6 +5,8 @@ export * from "./contracts/menu";
 export * from "./contracts/public-link";
 export * from "./contracts/public-read";
 export * from "./contracts/builder-preview";
+export * from "./contracts/public-menu";
+export * from "./contracts/menu-preview";
 export * from "./contracts/identity";
 export * from "./contracts/setup";
 export * from "./contracts/menu-admin";

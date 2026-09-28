@@ -5937,6 +5937,8 @@ export const en = {
   "menuTheme.qr.error": "Couldn't load the QR code.",
   "menuTheme.qr.retry": "Try again",
   "menuTheme.qr.copy": "Copy link",
+  "menuTheme.qr.saveFirst": "Save the menu first to create its QR code.",
+  "menuTheme.fontsUnavailable": "Fonts become available once the platform lists them.",
   "menuTheme.table": "Table",
   "menuTheme.tableNumber": "Table number",
   "menuTheme.previewViewCart": "View Cart",

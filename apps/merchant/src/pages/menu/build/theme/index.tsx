@@ -34,6 +34,7 @@ import { PreviewRail } from "../preview-rail";
 import { QrPanel } from "./qr-panel";
 import { MENU_PRESETS, presetFor, type MenuPreset } from "./presets";
 import { seedBrand } from "./seed-brand";
+import { serverFontCode } from "./font-code";
 
 const NAV: { id: MenuTheme["navStyle"]; icon: LucideIcon; key: string }[] = [
   { id: "top-bar", icon: ArrowUpToLine, key: "menuTheme.nav.topBar" },
@@ -306,8 +307,16 @@ export function ThemeStep() {
   const fontOptions = (current: string) => {
     const base: { id: string; label: string }[] =
       serverFonts.length > 0 ? serverFonts.map((code) => FONTS.find((f) => f.id === code.toLowerCase()) ?? { id: code, label: code }) : [...FONTS];
-    return base.some((f) => f.id === current) ? base : [...base, FONTS.find((f) => f.id === current) ?? { id: current, label: current }];
+    const same = (f: { id: string }) => f.id.toLowerCase() === current.toLowerCase();
+    return base.some(same) ? base : [...base, FONTS.find(same) ?? { id: current, label: current }];
   };
+  /** The option standing for `code`: server codes and FONTS ids differ only in case. */
+  const fontOptionId = (options: { id: string }[], code: string) =>
+    options.find((f) => f.id.toLowerCase() === code.toLowerCase())?.id ?? code;
+  // A font pick is sent only when the platform lists it (see serverFontCode);
+  // with no platform fonts there is nothing the API would accept, so the
+  // pickers are disabled rather than offering a choice that cannot be saved.
+  const fontsEditable = serverFonts.length > 0;
 
   const activePreset = presets.find((p) => p.id === (presetFor(theme.presetId)?.id ?? theme.presetId)) ?? null;
   /** A preset is a palette: picking one sets all four brand colours, which
@@ -441,15 +450,19 @@ export function ThemeStep() {
       <section className={clsx(card, "space-y-4")}>
         <h2 className={heading}>{t("menuTheme.lookFeel")}</h2>
 
-        {/* The menu's own font codes: the platform's codes when it lists any
-            (GET /theme-presets), else the builder's FONTS ids. Until the menu
-            has one, the site's typography is shown. */}
+        {/* The menu's own font codes, only ever ones the platform lists
+            (GET /theme-presets). Until the menu has one, the site's
+            typography is shown. */}
         <label className="block">
           <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.titles")}</span>
           <Select
             className="mt-1.5"
-            value={titleFont}
-            onChange={(e) => patchTheme({ titleFontCode: e.target.value })}
+            disabled={!fontsEditable}
+            value={fontOptionId(fontOptions(titleFont), titleFont)}
+            onChange={(e) => {
+              const code = serverFontCode(e.target.value, serverFonts);
+              if (code) patchTheme({ titleFontCode: code });
+            }}
           >
             {fontOptions(titleFont).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
@@ -460,14 +473,21 @@ export function ThemeStep() {
           <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.body")}</span>
           <Select
             className="mt-1.5"
-            value={bodyFont}
-            onChange={(e) => patchTheme({ bodyFontCode: e.target.value })}
+            disabled={!fontsEditable}
+            value={fontOptionId(fontOptions(bodyFont), bodyFont)}
+            onChange={(e) => {
+              const code = serverFontCode(e.target.value, serverFonts);
+              if (code) patchTheme({ bodyFontCode: code });
+            }}
           >
             {fontOptions(bodyFont).map((f) => (
               <option key={f.id} value={f.id}>{f.label}</option>
             ))}
           </Select>
         </label>
+        {!fontsEditable && (
+          <p className="-mt-2 text-[12.5px] text-[var(--octo-text-muted)]">{t("menuTheme.fontsUnavailable")}</p>
+        )}
 
         <div>
           <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuTheme.colors")}</p>

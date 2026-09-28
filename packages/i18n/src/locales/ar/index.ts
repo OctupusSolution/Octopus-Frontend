@@ -5941,6 +5941,8 @@ export const ar = {
   "menuTheme.qr.error": "تعذّر تحميل QR.",
   "menuTheme.qr.retry": "حاول مرة أخرى",
   "menuTheme.qr.copy": "نسخ الرابط",
+  "menuTheme.qr.saveFirst": "احفظ القائمة أولاً لإنشاء رمز QR الخاص بها.",
+  "menuTheme.fontsUnavailable": "تتوفر الخطوط عندما تُدرجها المنصة.",
   "menuTheme.table": "طاولة",
   "menuTheme.tableNumber": "رقم الطاولة",
   "menuTheme.previewViewCart": "عرض السلة",

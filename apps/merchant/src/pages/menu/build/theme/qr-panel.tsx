@@ -15,6 +15,7 @@ import { Modal, Select } from "@ui/primitives";
 import { QrCode } from "@/pages/public-link/ui/qr-code";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { isServerId } from "@/entities/menu";
 
 const TABLES = Array.from({ length: 30 }, (_, i) => i + 1);
 
@@ -70,16 +71,27 @@ export function QrPanel({ menuId }: { menuId: string }) {
   const [tableOpen, setTableOpen] = useState(false);
   const [table, setTable] = useState(1);
   const [code, setCode] = useState<AccessCodeResponse | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "creating" | "error">("loading");
+  const [state, setState] = useState<"loading" | "ready" | "creating" | "error" | "unavailable" | "unsaved">("loading");
   const [copied, setCopied] = useState(false);
+  // Bumped by every request and by the effect's cleanup: a response whose
+  // number is no longer current belongs to an earlier menu id (the local id a
+  // first save replaces with the server's) or to an unmounted panel, and is dropped.
+  const request = useRef(0);
+  // A menu only on this device (not saved yet) has no server id to hang a code on.
+  const saved = isServerId(menuId);
 
   const load = useCallback(async () => {
-    if (!activeBusinessId) return;
+    const mine = ++request.current;
+    setCode(null);
+    if (!activeBusinessId) return setState("unavailable");
+    if (!saved) return setState("unsaved");
     setState("loading");
     try {
-      // A list envelope ({ data: [...] }), like every GET list here. Status and
-      // kind compared case-insensitively, as the library's access-codes modal does.
-      const list = (await listAccessCodes(activeBusinessId)).data ?? [];
+      // Filtered on the server: the list is paged and business-wide, so an
+      // unfiltered first page can miss this menu's code. Status and kind are
+      // still checked here, case-insensitively, as the library's modal does.
+      const list = (await listAccessCodes(activeBusinessId, { menuId, kind: "MenuDirect" })).data ?? [];
+      if (mine !== request.current) return;
       setCode(
         list.find(
           (c) => c.menuId === menuId && c.kind.toLowerCase() === "menudirect" && c.status.toLowerCase() === "active"
@@ -87,25 +99,31 @@ export function QrPanel({ menuId }: { menuId: string }) {
       );
       setState("ready");
     } catch {
-      setState("error");
+      if (mine === request.current) setState("error");
     }
-  }, [activeBusinessId, menuId]);
-  useEffect(() => void load(), [load]);
+  }, [activeBusinessId, menuId, saved]);
+  useEffect(() => {
+    void load();
+    return () => {
+      request.current++;
+    };
+  }, [load]);
 
   async function create() {
-    if (!activeBusinessId) return;
+    if (!activeBusinessId || !saved) return;
+    const mine = ++request.current;
     setState("creating");
     try {
-      setCode(
-        await createAccessCode(
-          activeBusinessId,
-          { businessId: activeBusinessId, kind: "MenuDirect", branchId: null, menuId },
-          newKey()
-        )
+      const created = await createAccessCode(
+        activeBusinessId,
+        { businessId: activeBusinessId, kind: "MenuDirect", branchId: null, menuId },
+        newKey()
       );
+      if (mine !== request.current) return;
+      setCode(created);
       setState("ready");
     } catch {
-      setState("error");
+      if (mine === request.current) setState("error");
     }
   }
 
@@ -162,6 +180,10 @@ export function QrPanel({ menuId }: { menuId: string }) {
               {t("menuTheme.downloadQr")}
             </button>
           </>
+        ) : state === "unsaved" ? (
+          <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.saveFirst")}</p>
+        ) : state === "unavailable" ? (
+          <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.error")}</p>
         ) : state === "error" ? (
           <>
             <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.error")}</p>

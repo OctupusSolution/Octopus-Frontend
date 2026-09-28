@@ -646,8 +646,30 @@ export function republishVersion(
 
 // ---- Access codes (QR) -----------------------------------------------------------
 
-export function listAccessCodes(businessId: string): Promise<ListEnvelope<AccessCodeResponse>> {
-  return apiRequest(`${base(businessId)}/access-codes`);
+/** Paged (default 25, newest first) and business-wide unless filtered: pass
+ *  `menuId`/`kind` to read one menu's codes rather than the first page of all.
+ *  Revoked codes are excluded unless `includeRevoked`. */
+export function listAccessCodes(
+  businessId: string,
+  filter: {
+    kind?: string;
+    branchId?: string;
+    menuId?: string;
+    includeRevoked?: boolean;
+    page?: number;
+    pageSize?: number;
+  } = {}
+): Promise<ListEnvelope<AccessCodeResponse>> {
+  return apiRequest(`${base(businessId)}/access-codes`, {
+    query: {
+      kind: filter.kind,
+      branchId: filter.branchId,
+      menuId: filter.menuId,
+      includeRevoked: filter.includeRevoked?.toString(),
+      page: filter.page?.toString(),
+      pageSize: filter.pageSize?.toString(),
+    },
+  });
 }
 
 export function createAccessCode(

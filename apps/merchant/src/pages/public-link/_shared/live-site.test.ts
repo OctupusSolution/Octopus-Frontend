@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CataloguesResponse, NavItemDto, PageDraftResponse, SectionDraftResponse, SiteOverviewResponse } from "@octopus/api-client";
 import { EMPTY_SITE_DRAFT, type PublicLinkServer, type SiteDraft } from "@/entities/site-draft";
-import { menuFromDocument, projectLiveSite, type LiveSiteInput } from "./live-site";
+import { draftPublicRead, menuFromDocument, projectLiveSite, type LiveSiteInput } from "./live-site";
 
 const catalogues = {
   eTag: "x",
@@ -289,5 +289,68 @@ describe("projectLiveSite", () => {
     );
     expect(menu.categories).toEqual([{ id: "cat-1", slug: "main", name: "Main", imageUrl: "https://cdn/a.jpg" }]);
     expect(menu.items).toEqual([{ id: "cat-1-i1", categoryId: "cat-1", name: "Burger", description: "", price: 25, imageUrl: "/all.png" }]);
+  });
+});
+
+describe("draftPublicRead", () => {
+  it("builds the shell the storefront reads: language, direction, theme, brand, pages", () => {
+    const { shell } = draftPublicRead(input());
+    expect(shell.language).toBe("ar");
+    expect(shell.direction).toBe("rtl");
+    expect(shell.languages).toEqual([
+      { code: "ar", direction: "rtl" },
+      { code: "en", direction: "ltr" },
+    ]);
+    expect(shell.theme.colors["core.primary"]).toBe(EMPTY_SITE_DRAFT.brand.colors.primary);
+    expect(shell.theme.colors["text.body"]).toBe("#334155");
+    expect(shell.brand.displayName).toBe("أوشن");
+    expect(shell.pages.map((p) => [p.path, p.title, p.isHome])).toEqual([
+      ["/", "الرئيسية", true],
+      ["/about", "من نحن", false],
+    ]);
+    expect(shell.host).toBe("ocean.octopus.app");
+  });
+
+  it("keeps the navigation as a tree with the storefront's kinds", () => {
+    const items = [
+      { label: { ar: "روابط" }, target: null, showInHeader: true, showInDrawer: true, children: [{ target: { kind: "page", pageId: "about" }, showInHeader: true, showInDrawer: false }] },
+    ];
+    const options = { stickyHeader: true, showActivePageIndicator: false, showIcons: false, openLinksInSameTab: false };
+    const { shell } = draftPublicRead(input({ server: server({ navigation: { items, options, versions: { siteVersion: 3, pageVersion: null, pageVersions: null }, warnings: [] } }) }));
+    expect(shell.navigation.options).toEqual(options);
+    expect(shell.navigation.items).toEqual([
+      {
+        label: "روابط",
+        iconKey: null,
+        href: null,
+        kind: "Group",
+        openInNewTab: false,
+        showInHeader: true,
+        showInDrawer: true,
+        children: [{ label: "", iconKey: null, href: "/about", kind: "Page", openInNewTab: false, showInHeader: true, showInDrawer: false, children: [] }],
+      },
+    ]);
+  });
+
+  it("gives each section its resolved variant, devices and bound content (by content key)", () => {
+    const withMenu = page("home", [
+      section({ sectionId: "hero", type: "hero", hiddenOn: ["mobile"] }),
+      section({ sectionId: "m", type: "menu", source: { sourceKey: "menu", contentKey: "menu-1" }, sourceSettings: { layout: "grid" } }),
+    ]);
+    const themed = { ...catalogues, themes: [{ ...catalogues.themes[0], sectionVariants: { hero: "split" } }] };
+    const { page: read, pageIds } = draftPublicRead(input({ server: server({ pages: { home: withMenu }, catalogues: themed }) }));
+    expect(read?.sections.map((s) => [s.sectionId, s.styleVariant, s.hiddenOn, s.source?.publicLinkKey ?? null])).toEqual([
+      ["hero", "split", ["mobile"], null],
+      ["m", null, [], "menu-1"],
+    ]);
+    expect(read?.sections[1].source?.settings).toEqual({ layout: "grid" });
+    expect(pageIds["/"]).toBe("home");
+  });
+
+  it("drops a blob: logo, which only the builder's own origin can read", () => {
+    const draft = { ...EMPTY_SITE_DRAFT, brand: { ...EMPTY_SITE_DRAFT.brand, logoDataUrl: "blob:http://localhost:5290/1234" } };
+    expect(draftPublicRead(input({ draft })).shell.brand.logo).toBeNull();
+    const kept = { ...EMPTY_SITE_DRAFT, brand: { ...EMPTY_SITE_DRAFT.brand, logoDataUrl: "https://cdn/logo.png" } };
+    expect(draftPublicRead(input({ draft: kept })).shell.brand.logo).toEqual({ url: "https://cdn/logo.png" });
   });
 });

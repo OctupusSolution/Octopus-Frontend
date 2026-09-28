@@ -24,6 +24,10 @@ import type {
   NavigationOptionsDto,
   PageDraftResponse,
   PageSummaryResponse,
+  PublicSiteNavItem,
+  PublicSitePage,
+  PublicSiteSection,
+  PublicSiteShell,
   RichBlock,
   RichInline,
   RichTextRun,
@@ -323,21 +327,19 @@ export function withEdit(section: SectionDraftResponse, edit: SectionEdit | unde
   };
 }
 
-function navItem(item: NavItemDto, ctx: Context, options: NavigationOptionsDto) {
-  type Out = { label: string; href: string | null; openInNewTab: boolean; showInHeader: boolean; showInDrawer: boolean; children: Out[] };
-  const walk = (entry: NavItemDto): Out | null => {
-    const children = (entry.children ?? []).map(walk).filter((c): c is Out => c !== null);
-    const label = textOf(entry.label, ctx.lang, ctx.fallback) ?? "";
-    const group = (): Out | null =>
-      children.length === 0 ? null : { label, href: null, openInNewTab: false, showInHeader: entry.showInHeader, showInDrawer: entry.showInDrawer, children };
-    if (!entry.target) return group();
-    const link = resolveLink(entry.target, ctx);
-    if (!link) return group();
-    // NavigationOptions.OpensInNewTab: an outside link asked to, and the site does not keep links in the same tab.
-    const newTab = String(entry.target.kind).toLowerCase() === "external" && entry.target.openInNewTab === true && !options.openLinksInSameTab;
-    return { label, href: link.href, openInNewTab: newTab, showInHeader: entry.showInHeader, showInDrawer: entry.showInDrawer, children };
-  };
-  return walk(item);
+function navItem(item: NavItemDto, ctx: Context, options: NavigationOptionsDto): PublicSiteNavItem | null {
+  const children = (item.children ?? []).map((child) => navItem(child, ctx, options)).filter((c): c is PublicSiteNavItem => c !== null);
+  const label = textOf(item.label, ctx.lang, ctx.fallback) ?? "";
+  const group = (): PublicSiteNavItem | null =>
+    children.length === 0
+      ? null
+      : { label, iconKey: item.icon ?? null, href: null, kind: "Group", openInNewTab: false, showInHeader: item.showInHeader, showInDrawer: item.showInDrawer, children };
+  if (!item.target) return group();
+  const link = resolveLink(item.target, ctx);
+  if (!link) return group();
+  // NavigationOptions.OpensInNewTab: an outside link asked to, and the site does not keep links in the same tab.
+  const newTab = String(item.target.kind).toLowerCase() === "external" && item.target.openInNewTab === true && !options.openLinksInSameTab;
+  return { label, iconKey: item.icon ?? null, href: link.href, kind: link.kind, openInNewTab: newTab, showInHeader: item.showInHeader, showInDrawer: item.showInDrawer, children };
 }
 
 const DEFAULT_NAV_OPTIONS: NavigationOptionsDto = { stickyHeader: false, showActivePageIndicator: false, showIcons: false, openLinksInSameTab: false };
@@ -361,9 +363,24 @@ function fontCode(server: PublicLinkServer, draft: SiteDraft, lang: string, role
   return server.overview.brand.typography?.[lang]?.[role] ?? themeFonts(server.catalogues, server.overview.themeKey, lang)[role] ?? null;
 }
 
+/** A URL another origin can load: a blob: URL belongs to the builder's own document. */
+const portableUrl = (url: string | null | undefined): string | null => (url && !url.startsWith("blob:") ? url : null);
+
+/** Unused by rendering; a constant, so equal drafts give equal messages. */
+const DRAFT_INSTANT = "1970-01-01T00:00:00.000Z";
+
+export interface DraftPublicRead {
+  shell: PublicSiteShell;
+  page: PublicSitePage | null;
+  /** The page asked for is still loading. */
+  pageLoading: boolean;
+  /** Page id by public path (the shell's page index carries paths only). */
+  pageIds: Readonly<Record<string, string>>;
+}
+
 // ---- the projection -------------------------------------------------------------------------------
 
-export function projectLiveSite(input: LiveSiteInput): LiveSite {
+export function draftPublicRead(input: LiveSiteInput): DraftPublicRead {
   const { server, draft, edits, mediaUrls } = input;
   const { overview } = server;
   const fallback = overview.settings.defaultLanguage;
@@ -390,42 +407,24 @@ export function projectLiveSite(input: LiveSiteInput): LiveSite {
   const ordered = [...overview.pages.filter((p) => p.isHome), ...overview.pages.filter((p) => !p.isHome)];
   const servable = ordered.filter(served);
 
-  // Navigation (PublicProjector.Navigation), then flattened for the header (layout.tsx navLinks).
   const options = server.navigation?.options ?? DEFAULT_NAV_OPTIONS;
   const items = server.navigation?.items ?? [];
   const titleOf = (p: PageSummaryResponse) => textOf(p.title, lang, fallback) ?? "";
-  const tree =
+  const navigationItems: PublicSiteNavItem[] =
     items.length === 0
-      ? servable.map((p) => ({ label: titleOf(p), href: pathOf(p), openInNewTab: false, showInHeader: true, showInDrawer: true, children: [] as never[] }))
-      : items.map((item) => navItem(item, ctx, options)).filter((x): x is NonNullable<typeof x> => x !== null);
-  const links: LiveNavLink[] = [];
-  const titleByPath = (href: string) => {
-    const p = servable.find((page) => pathOf(page) === href);
-    return p ? titleOf(p) : "";
-  };
-  const walk = (entries: typeof tree) => {
-    for (const entry of entries) {
-      if (entry.href) {
-        const label = entry.label || titleByPath(entry.href);
-        if (label || entry.href === "/") {
-          links.push({ label, href: entry.href, openInNewTab: entry.openInNewTab, inHeader: entry.showInHeader, inDrawer: entry.showInDrawer });
-        }
-      }
-      walk(entry.children as typeof tree);
-    }
-  };
-  walk(tree);
+      ? servable.map((p) => ({ label: titleOf(p), iconKey: null, href: pathOf(p), kind: "Page", openInNewTab: false, showInHeader: true, showInDrawer: true, children: [] }))
+      : items.map((item) => navItem(item, ctx, options)).filter((x): x is PublicSiteNavItem => x !== null);
 
   // Footer (PublicProjector.Footer).
   const footer = server.footer;
-  const liveFooter: LiveFooter = {
+  const shellFooter: PublicSiteShell["footer"] = {
     groups: (footer?.groups ?? [])
       .map((group) => ({
         title: textOf(group.title, lang, fallback) ?? "",
         links: (group.links ?? []).flatMap((link) => {
           const resolved = resolveLink(link.target, ctx);
           return resolved
-            ? [{ label: textOf(link.label, lang, fallback) ?? "", href: resolved.href, openInNewTab: String(link.target.kind).toLowerCase() === "external" && link.target.openInNewTab === true }]
+            ? [{ label: textOf(link.label, lang, fallback) ?? "", href: resolved.href, kind: resolved.kind, openInNewTab: String(link.target.kind).toLowerCase() === "external" && link.target.openInNewTab === true }]
             : [];
         }),
       }))
@@ -438,59 +437,143 @@ export function projectLiveSite(input: LiveSiteInput): LiveSite {
     },
   };
 
+  const theme = server.catalogues?.themes.find((t) => t.key === overview.themeKey);
+  const variantOf = (s: SectionDraftResponse): string | null =>
+    s.style?.variant ?? theme?.sectionVariants?.[s.type] ?? server.catalogues?.sectionTypes.find((t) => t.key === s.type)?.defaultVariant ?? null;
+  const sourceOf = (s: Pick<SectionDraftResponse, "source" | "sourceSettings">) =>
+    s.source ? { sourceKey: s.source.sourceKey, version: null, publicLinkKey: s.source.contentKey, settings: s.sourceSettings ?? null } : null;
+
   // The page (PublicProjector.Page): the one asked for, else home.
   const home = ordered.find((p) => p.isHome) ?? ordered[0];
   const wanted = (input.pageId && summaries.get(input.pageId)) || home;
   const loaded = wanted ? drafts[wanted.pageId] : undefined;
-  let page: LivePage | null = null;
+  const host = overview.address.hostname ?? "";
+  let page: PublicSitePage | null = null;
   if (wanted && loaded && served(wanted)) {
+    const title = textOf(loaded.title, lang, fallback) ?? "";
+    const path = pathOf(wanted);
+    const primary = loaded.sections.find((s) => s.primary);
     page = {
       pageId: wanted.pageId,
-      path: pathOf(wanted),
+      path,
       isHome: wanted.isHome,
-      title: textOf(loaded.title, lang, fallback) ?? "",
-      hideFooter: loaded.layout?.hideFooter ?? false,
+      kind: wanted.isHome ? "Home" : primary?.source ? "SourceBound" : "Standard",
+      title,
+      seo: { title, description: null, socialImageUrl: null, noIndex: true, canonicalUrl: host ? `https://${host}${path}` : path },
+      layout: { header: loaded.layout?.header ?? null, hideFooter: loaded.layout?.hideFooter ?? false },
+      source: primary ? sourceOf(primary) : null,
       sections: loaded.sections
         .filter((s) => s.enabled && (!s.source || available(s)))
-        .map((s) => ({
-          sectionId: s.sectionId,
-          type: s.type,
-          anchor: s.anchor,
-          hiddenOn: s.hiddenOn ?? [],
-          fields: fields(s.fields, ctx),
-          source: s.source ? { sourceKey: s.source.sourceKey, contentKey: s.source.contentKey } : null,
-        })),
+        .map(
+          (s): PublicSiteSection => ({
+            sectionId: s.sectionId,
+            type: s.type,
+            anchor: s.anchor,
+            styleVariant: variantOf(s),
+            style: (s.style ?? {}) as Record<string, unknown>,
+            fields: fields(s.fields, ctx),
+            source: sourceOf(s),
+            hiddenOn: s.hiddenOn ?? [],
+          })
+        ),
+      lastModifiedUtc: DRAFT_INSTANT,
     };
   }
 
-  // Theme (brand-theme.ts themeStyle) over the storefront's defaults.
-  const cssVars: Record<string, string> = { ...STOREFRONT_DEFAULT_VARS };
   const colors = resolvedColors(server, draft, server.catalogues);
-  for (const [token, vars] of Object.entries(COLOR_VARS)) {
-    const v = colors[token];
-    if (v && HEX.test(v)) for (const name of vars) cssVars[name] = v;
-  }
   const codes = input.fonts.map((f) => f.code);
-  const nameOf = (code: string | null) => (code ? (input.fonts.find((f) => f.code === code)?.displayName ?? null) : null);
-  const fontName = nameOf(fontCode(server, draft, lang, "body", codes));
-  const headingFontName = nameOf(fontCode(server, draft, lang, "heading", codes));
+  const typography = Object.fromEntries(
+    enabled.map((l) => [l, { heading: fontCode(server, draft, l, "heading", codes), body: fontCode(server, draft, l, "body", codes) }])
+  );
+  const name = draft.brand.businessName.trim() || textOf(overview.brand.displayName, lang, fallback) || "";
+  const logo = portableUrl(draft.brand.logoDataUrl);
 
-  const storedName = textOf(overview.brand.displayName, lang, fallback);
-  return {
+  const shell: PublicSiteShell = {
+    host,
+    canonicalBaseUrl: host ? `https://${host}` : "",
     language: lang,
     direction: directionOf(lang),
-    languages: enabled,
-    brandName: draft.brand.businessName.trim() || storedName || "",
-    logoUrl: draft.brand.logoDataUrl,
-    cssVars,
-    fontName,
-    headingFontName,
-    navigation: { options, links },
-    footer: liveFooter,
-    pages: servable.map((p) => ({ pageId: p.pageId, path: pathOf(p), title: titleOf(p), isHome: p.isHome })),
+    defaultLanguage: fallback,
+    languages: enabled.map((code) => ({ code, direction: directionOf(code) })),
+    theme: { key: overview.themeKey, colors, typography, layout: {} },
+    brand: { displayName: name, logo: logo ? { url: logo } : null, favicon: null },
+    seo: { titleTemplate: overview.seo.titleTemplate, defaultTitle: name, defaultDescription: textOf(overview.seo.description, lang, fallback), socialImageUrl: null, noIndex: true },
+    navigation: { options, items: navigationItems },
+    footer: shellFooter,
+    pages: servable.map((p) => ({ path: pathOf(p), title: titleOf(p), isHome: p.isHome, noIndex: false, lastModifiedUtc: DRAFT_INSTANT })),
+    isPreview: true,
+    preview: null,
+  };
+
+  return {
+    shell,
     page,
     pageLoading: Boolean(wanted && !loaded),
+    pageIds: Object.fromEntries(servable.map((p) => [pathOf(p), p.pageId])),
   };
+}
+
+/** The mirror's model (live-site-canvas.tsx) from the public read — the storefront's own layout.tsx and brand-theme.ts steps. */
+export function liveSiteFromRead(read: DraftPublicRead, fonts: readonly { code: string; displayName: string }[]): LiveSite {
+  const { shell, page, pageLoading, pageIds } = read;
+  const titleByPath = (href: string) => shell.pages.find((p) => p.path === href)?.title ?? "";
+  const links: LiveNavLink[] = [];
+  const walk = (items: PublicSiteNavItem[]) => {
+    for (const item of items) {
+      if (item.href) {
+        const label = item.label || titleByPath(item.href);
+        if (label || item.href === "/") links.push({ label, href: item.href, openInNewTab: item.openInNewTab, inHeader: item.showInHeader, inDrawer: item.showInDrawer });
+      }
+      walk(item.children);
+    }
+  };
+  walk(shell.navigation.items);
+
+  const cssVars: Record<string, string> = { ...STOREFRONT_DEFAULT_VARS };
+  for (const [token, vars] of Object.entries(COLOR_VARS)) {
+    const v = shell.theme.colors[token];
+    if (v && HEX.test(v)) for (const name of vars) cssVars[name] = v;
+  }
+  const pair = shell.theme.typography[shell.language];
+  const nameOf = (code: string | null | undefined) => (code ? (fonts.find((f) => f.code === code)?.displayName ?? null) : null);
+
+  return {
+    language: shell.language,
+    direction: shell.direction,
+    languages: shell.languages.map((l) => l.code),
+    brandName: shell.brand.displayName,
+    logoUrl: shell.brand.logo?.url ?? null,
+    cssVars,
+    fontName: nameOf(pair?.body),
+    headingFontName: nameOf(pair?.heading),
+    navigation: { options: shell.navigation.options, links },
+    footer: {
+      groups: shell.footer.groups.map((g) => ({ title: g.title, links: g.links.map((l) => ({ label: l.label, href: l.href, openInNewTab: l.openInNewTab })) })),
+      socialLinks: shell.footer.socialLinks,
+      contact: shell.footer.contact,
+    },
+    pages: shell.pages.map((p) => ({ pageId: pageIds[p.path], path: p.path, title: p.title, isHome: p.isHome })),
+    page: page && {
+      pageId: page.pageId,
+      path: page.path,
+      isHome: page.isHome,
+      title: page.title,
+      hideFooter: page.layout.hideFooter,
+      sections: page.sections.map((s) => ({
+        sectionId: s.sectionId,
+        type: s.type,
+        anchor: s.anchor,
+        hiddenOn: (s.hiddenOn ?? []) as DeviceClass[],
+        fields: s.fields,
+        source: s.source ? { sourceKey: s.source.sourceKey, contentKey: s.source.publicLinkKey ?? "" } : null,
+      })),
+    },
+    pageLoading,
+  };
+}
+
+export function projectLiveSite(input: LiveSiteInput): LiveSite {
+  return liveSiteFromRead(draftPublicRead(input), input.fonts);
 }
 
 // ---- the menu a Menu section shows (public-api.ts menuFromDocument) --------------------------------

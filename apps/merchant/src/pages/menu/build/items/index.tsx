@@ -487,6 +487,7 @@ export function ItemsStep() {
             onSectionChange={(id) => {
               setSectionId(id);
               setSelectedId(null);
+              setPickGroup(false);
             }}
             entries={entries}
             selectedId={isOffers ? (offer?.id ?? null) : (selected?.id ?? null)}
@@ -550,6 +551,7 @@ export function ItemsStep() {
             onSelectSection={(id) => {
               setSectionId(id);
               setSelectedId(null);
+              setPickGroup(false);
             }}
           />
         </div>
@@ -717,7 +719,7 @@ export function ItemsStep() {
 
       <GroupPicker
         open={pickGroup}
-        attachedIds={selected?.modifierGroups.map((g) => g.id) ?? []}
+        attachedIds={!isOffers && selected ? selected.modifierGroups.map((g) => g.id) : []}
         busy={opBusy}
         onClose={() => setPickGroup(false)}
         onAttach={attachGroup}

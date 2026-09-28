@@ -1,7 +1,7 @@
 // The merchant console origins the storefront trusts: they may frame a draft preview and drive
 // the builder's live preview canvas (/preview/builder) with postMessage. Pure helpers (no next/* imports),
 // shared by the middleware, the canvas route and the tests.
-import { BUILDER_PREVIEW_PATH } from "@octopus/api-client";
+import { BUILDER_PREVIEW_PATH, MENU_PREVIEW_PATH } from "@octopus/api-client";
 
 /** The merchant app's Vite dev server (apps/merchant/vite.config.ts `server.port`). */
 export const DEV_MERCHANT_ORIGINS: readonly string[] = ["http://localhost:5290", "http://127.0.0.1:5290"];
@@ -27,6 +27,17 @@ export const frameAncestors = (origins: readonly string[]): string => ["frame-an
 export const BUILDER_CANVAS_HEADER = "x-octo-builder-canvas";
 
 export const isBuilderCanvasPath = (pathname: string): boolean => (pathname.replace(/\/+$/, "") || "/") === BUILDER_PREVIEW_PATH;
+
+const trimmed = (pathname: string) => pathname.replace(/\/+$/, "") || "/";
+
+/** The two builder canvases (Public Link and menu): framable by the merchant console only. */
+export const isCanvasPath = (pathname: string): boolean => {
+  const path = trimmed(pathname);
+  return path === BUILDER_PREVIEW_PATH || path === MENU_PREVIEW_PATH;
+};
+
+/** Pages drawn without the site's chrome and without resolving a tenant from the host: the canvases and the QR menu. */
+export const isBareDocumentPath = (pathname: string): boolean => isCanvasPath(pathname) || /^\/c\/[^/]+/.test(pathname);
 
 export function builderCanvasResponseHeaders(origins: readonly string[]): Record<string, string> {
   return {

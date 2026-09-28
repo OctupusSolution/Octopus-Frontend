@@ -2,7 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { getMenuForTenant, getTenantBySlug, type MenuCategory, type MenuItem } from "@octopus/api-client";
 import { requireStorefront, tryLoadPage } from "@/entities/tenant/load";
-import { fetchMenuByAccessKey, fetchSiteMenu, type PublicPage, type PublicSource } from "@/shared/api/public-api";
+import { fetchMenuByAccessKey, fetchSiteMenu, fetchSiteMenuDocument, type PublicPage, type PublicSource } from "@/shared/api/public-api";
+import type { PublicMenuDocument } from "@octopus/api-client";
 
 type Menu = { categories: MenuCategory[]; items: MenuItem[] };
 
@@ -56,4 +57,12 @@ export const loadMenu = cache(async (_slug?: string): Promise<Menu> => {
     if (menu) return menu;
   }
   return (await fetchMenuByAccessKey(slug, language)) ?? EMPTY;
+});
+
+/** The site's bound menu as the full document, or null (sample storefront, no bound menu). */
+export const loadMenuDocument = cache(async (): Promise<PublicMenuDocument | null> => {
+  const { sample, slug, language } = await requireStorefront();
+  if (sample) return null;
+  const key = await findMenuKey();
+  return key ? fetchSiteMenuDocument(slug, key, language) : null;
 });

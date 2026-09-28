@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { builderCanvasResponseHeaders, DEV_MERCHANT_ORIGINS, frameAncestors, isBuilderCanvasPath, merchantOrigins } from "./merchant-origins";
+import {
+  builderCanvasResponseHeaders,
+  DEV_MERCHANT_ORIGINS,
+  frameAncestors,
+  isBareDocumentPath,
+  isBuilderCanvasPath,
+  isCanvasPath,
+  merchantOrigins,
+} from "./merchant-origins";
 
 describe("merchantOrigins", () => {
   it("keeps real origins only, without trailing slashes", () => {
@@ -41,5 +49,17 @@ describe("the builder canvas route", () => {
       "X-Robots-Tag": "noindex, nofollow",
       "Referrer-Policy": "no-referrer",
     });
+  });
+});
+
+describe("bare documents", () => {
+  it("covers both canvases and the QR menu, nothing else", () => {
+    expect(isCanvasPath("/preview/builder")).toBe(true);
+    expect(isCanvasPath("/preview/menu/")).toBe(true);
+    expect(isCanvasPath("/c/abc")).toBe(false);
+    expect(isBareDocumentPath("/c/abc")).toBe(true);
+    expect(isBareDocumentPath("/c/")).toBe(false);
+    expect(isBareDocumentPath("/menu")).toBe(false);
+    expect(isBareDocumentPath("/preview/menu")).toBe(true);
   });
 });

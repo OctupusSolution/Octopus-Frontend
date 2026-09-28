@@ -20,7 +20,7 @@ import http from "node:http";
 import https from "node:https";
 import { cookies } from "next/headers";
 import { PREVIEW_COOKIE_NAME, planApiRequest } from "@/shared/lib/preview";
-import type { Tenant } from "@octopus/api-client";
+import type { PublicMenuDocument, Tenant } from "@octopus/api-client";
 
 const BASE = new URL(process.env.PUBLIC_API_URL ?? "http://localhost:8082");
 const SUFFIX = process.env.DEV_TENANT_DOMAIN_SUFFIX ?? "octopus.app";
@@ -121,7 +121,10 @@ export type PublicSource = PublicSiteSource;
 export type PublicSection = PublicSiteSection;
 export type PublicPage = PublicSitePage;
 
-import { menuFromDocument, type Menu, type PublicMenuDocument } from "./menu-document";
+// Note: `menu-document.ts` exports its own local, narrower `PublicMenuDocument` (the legacy shape
+// `fetchSiteMenu`/`fetchMenuByAccessKey` reduce to `Menu`); the widget-facing document below is the
+// richer `@octopus/api-client` one that `ThemedMenu` renders, so the local one is aliased here.
+import { menuFromDocument, type Menu, type PublicMenuDocument as LegacyMenuDocument } from "./menu-document";
 export { imageUrl, menuFromDocument, type Menu } from "./menu-document";
 
 /** A resolved field value: text is a string, media `{url,…}`, link `{href,kind,label?}`, rich text a block array, list `[{id,fields}]`. */
@@ -172,7 +175,7 @@ export function tenantFromShell(slug: string, shell: PublishedShell): Tenant {
 
 /** The menu a published site's Menu section / page is bound to, by its publicLinkKey. */
 export async function fetchSiteMenu(slug: string, publicLinkKey: string, lang?: string | null): Promise<Menu | null> {
-  const doc = await get<PublicMenuDocument>(slug, `/v1/public/site-menu/${encodeURIComponent(publicLinkKey)}${query({ lang })}`);
+  const doc = await get<LegacyMenuDocument>(slug, `/v1/public/site-menu/${encodeURIComponent(publicLinkKey)}${query({ lang })}`);
   return doc ? menuFromDocument(doc) : null;
 }
 
@@ -185,6 +188,27 @@ export function menuAccessKey(slug: string): string | null {
 export async function fetchMenuByAccessKey(slug: string, lang?: string | null): Promise<Menu | null> {
   const key = menuAccessKey(slug);
   if (!key) return null;
-  const doc = await get<PublicMenuDocument>(slug, `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang: lang ?? "ar" })}`);
+  const doc = await get<LegacyMenuDocument>(slug, `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang: lang ?? "ar" })}`);
   return doc ? menuFromDocument(doc) : null;
+}
+
+/** The site-bound menu as the full public document (theme, currency, offers, image URLs). */
+export const fetchSiteMenuDocument = (slug: string, publicLinkKey: string, lang?: string | null) =>
+  get<PublicMenuDocument>(slug, `/v1/public/site-menu/${encodeURIComponent(publicLinkKey)}${query({ lang })}`);
+
+/** A scanned QR code's menu. The code alone names the business (no Host needed); every failure reads as null. */
+export async function fetchMenuDocumentByCode(key: string, lang?: string | null, label?: string | null): Promise<PublicMenuDocument | null> {
+  const path = `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang, l: label })}`;
+  const cacheKey = `code|${path}`;
+  const hit = cache.get(cacheKey);
+  if (hit && Date.now() - hit.at < hit.ttl) return hit.value as PublicMenuDocument | null;
+  let value: PublicMenuDocument | null = null;
+  try {
+    const res = await request(BASE.host, path);
+    value = res.status >= 200 && res.status < 300 ? (JSON.parse(res.body) as PublicMenuDocument) : null;
+  } catch {
+    value = null;
+  }
+  cache.set(cacheKey, { at: Date.now(), ttl: value ? TTL_MS : MISS_TTL_MS, value });
+  return value;
 }

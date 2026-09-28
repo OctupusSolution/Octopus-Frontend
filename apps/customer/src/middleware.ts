@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SAMPLE_STOREFRONT_HEADER, SAMPLE_TENANT_SLUG, TENANT_SLUG_HEADER } from "@/entities/tenant";
 import { applyPreviewHeaders, handlePreviewRoute } from "@/shared/lib/preview-middleware";
-import { BUILDER_CANVAS_HEADER, builderCanvasResponseHeaders, currentMerchantOrigins, isBuilderCanvasPath } from "@/shared/lib/merchant-origins";
+import { BUILDER_CANVAS_HEADER, builderCanvasResponseHeaders, currentMerchantOrigins, isBareDocumentPath, isCanvasPath } from "@/shared/lib/merchant-origins";
 
 /** A host with no subdomain (plain `localhost`, an IP address) is local development
  *  of the storefront itself: it renders the built-in sample tenant. Any subdomain
@@ -15,15 +15,17 @@ export function middleware(request: NextRequest) {
   const preview = handlePreviewRoute(request);
   if (preview) return preview;
 
-  // The builder's live preview canvas: a bare document the merchant console fills with postMessage.
-  // It reads no site data itself, so it needs no tenant; it may only be framed by the console.
-  if (isBuilderCanvasPath(request.nextUrl.pathname)) {
-    const canvasHeaders = new Headers(request.headers);
-    canvasHeaders.set(BUILDER_CANVAS_HEADER, "1");
-    canvasHeaders.delete(TENANT_SLUG_HEADER);
-    canvasHeaders.delete(SAMPLE_STOREFRONT_HEADER);
-    const res = NextResponse.next({ request: { headers: canvasHeaders } });
-    for (const [k, v] of Object.entries(builderCanvasResponseHeaders(currentMerchantOrigins()))) res.headers.set(k, v);
+  // Bare documents: the builder's live preview canvases (postMessage-filled, no tenant, framed
+  // by the console only) and the QR menu (/c/*, no tenant resolved from the host either).
+  if (isBareDocumentPath(request.nextUrl.pathname)) {
+    const bareHeaders = new Headers(request.headers);
+    bareHeaders.set(BUILDER_CANVAS_HEADER, "1");
+    bareHeaders.delete(TENANT_SLUG_HEADER);
+    bareHeaders.delete(SAMPLE_STOREFRONT_HEADER);
+    const res = NextResponse.next({ request: { headers: bareHeaders } });
+    if (isCanvasPath(request.nextUrl.pathname)) {
+      for (const [k, v] of Object.entries(builderCanvasResponseHeaders(currentMerchantOrigins()))) res.headers.set(k, v);
+    }
     return res;
   }
 

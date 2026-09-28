@@ -1,10 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PublicMenuDocument } from "@octopus/api-client";
 import { StoreI18nProvider } from "@/app/providers";
 import { OrderingSessionProvider } from "@/entities/order";
 import { ThemedMenu } from "./themed-menu";
+
+// useRouter needs a mounted app router, which renderToStaticMarkup does not have.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const money = (amount: number) => ({ amount, currency: "SAR" });
 function doc(themePatch: Partial<PublicMenuDocument["menu"]["theme"]> = {}, patch: Partial<PublicMenuDocument> = {}): PublicMenuDocument {
@@ -41,11 +44,11 @@ function doc(themePatch: Partial<PublicMenuDocument["menu"]["theme"]> = {}, patc
   };
 }
 
-function render(document: PublicMenuDocument, mode: "order" | "view", selectable = false) {
+function render(document: PublicMenuDocument, mode: "order" | "view", selectable = false, highlightSectionRef: string | null = null) {
   return renderToStaticMarkup(
     createElement(StoreI18nProvider, {
       locale: "en",
-      children: createElement(OrderingSessionProvider, { persist: false, children: createElement(ThemedMenu, { document, mode, selectable }) }),
+      children: createElement(OrderingSessionProvider, { persist: false, children: createElement(ThemedMenu, { document, mode, selectable, highlightSectionRef }) }),
     })
   );
 }
@@ -85,5 +88,19 @@ describe("ThemedMenu", () => {
   it("explains a menu that is not served now, and an empty menu", () => {
     expect(render(doc({}, { availability: "NotAvailableNow" }), "view")).toContain("not being served right now");
     expect(render(doc({}, { sections: [] }), "view")).toContain("no items yet");
+  });
+
+  it("opens item pages without wrapping the card (and its add button) in a link", () => {
+    for (const cardStyle of ["Classic", "CleanMinimal", "ImageTop", "ImageLeft"]) {
+      const html = render(doc({ itemDetailsBehavior: "NewPage", cardStyle }), "order");
+      expect(html).toContain('data-menu-add="i1"');
+      expect(html).not.toMatch(/<a\s[^>]*>\s*<article/);
+    }
+  });
+
+  it("outlines only a section ref", () => {
+    // React escapes the quotes inside <style> text.
+    expect(render(doc(), "view", false, "s1")).toContain("[data-section-ref=&quot;s1&quot;]{outline:2px");
+    expect(render(doc(), "view", false, 'x"]{} body{')).not.toContain("outline:2px");
   });
 });

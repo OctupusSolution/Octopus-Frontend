@@ -6,6 +6,7 @@
 // outline and select them.
 import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type CSSProperties } from "react";
 import type { MenuItem, PublicMenuDocument } from "@octopus/api-client";
 import { useI18n } from "@/app/providers";
@@ -30,6 +31,7 @@ export interface ThemedMenuProps {
 
 export function ThemedMenu({ document, mode, selectable = false, highlightSectionRef = null, header = "brand" }: ThemedMenuProps) {
   const { t } = useI18n();
+  const router = useRouter();
   const layout = menuLayout(document.menu.theme);
   const view = useMemo(() => menuView(document, (code) => (code === "SAR" ? t("store.currency") : code)), [document, t]);
   // The storefront's cart items, addressed by the same refs (menuFromDocument ids are `cat-{n}-{ref}`).
@@ -52,10 +54,19 @@ export function ThemedMenu({ document, mode, selectable = false, highlightSectio
     setActive(ref);
     globalThis.document?.getElementById(ref)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function openEntry(sectionIndex: number, entry: EntryView) {
-    if (layout.details === "same-page") setExpanded((cur) => (cur === entry.ref ? null : entry.ref));
-    else setOpen(entry);
+  /** NewPage in order mode: the item's own page, when the entry resolves to a storefront item. Otherwise null. */
+  function pageFor(sectionIndex: number, orderItem: MenuItem | null): string | null {
+    if (layout.details !== "new-page" || mode !== "order" || !orderItem) return null;
+    const slug = orderItems?.categories[sectionIndex]?.slug;
+    return slug ? `/menu/${slug}/${orderItem.id}` : null;
   }
+  function openEntry(entry: EntryView, page: string | null) {
+    if (page) router.push(page);
+    else if (layout.details === "same-page") setExpanded((cur) => (cur === entry.ref ? null : entry.ref));
+    else setOpen(entry); // Overlay, and NewPage in view mode or when the item page cannot be resolved
+  }
+  // Only a section ref (s{index}) reaches the <style> below.
+  const highlight = highlightSectionRef && /^s\d+$/.test(highlightSectionRef) ? highlightSectionRef : null;
 
   const status =
     view.availability === "NotAvailableNow"
@@ -66,7 +77,7 @@ export function ThemedMenu({ document, mode, selectable = false, highlightSectio
 
   return (
     <div className="min-h-full bg-[var(--octo-store-page)] text-[var(--octo-text-primary)]" style={style}>
-      {highlightSectionRef && <style>{`[data-section-ref="${highlightSectionRef.replace(/"/g, "")}"]{outline:2px solid #0D6EFD;outline-offset:6px;border-radius:12px}`}</style>}
+      {highlight && <style>{`[data-section-ref="${highlight}"]{outline:2px solid #0D6EFD;outline-offset:6px;border-radius:12px}`}</style>}
       {selectable && <style>{`[data-selectable]{cursor:pointer}[data-selectable]:hover{outline:1px dashed rgba(13,110,253,.5);outline-offset:6px;border-radius:12px}`}</style>}
 
       {header === "brand" && (
@@ -92,27 +103,16 @@ export function ThemedMenu({ document, mode, selectable = false, highlightSectio
               <SectionBlock key={section.ref} section={section} selectable={selectable}>
                 {section.entries.map((entry) => {
                   const orderItem = entry.kind === "item" ? itemFor(sectionIndex, entry.ref) : null;
-                  const card = (
-                    <EntryCard
-                      key={entry.ref}
-                      entry={entry}
-                      card={layout.card}
-                      showTags={layout.showTags}
-                      onAdd={mode === "order" && orderItem ? () => setAdding(orderItem) : undefined}
-                      onOpen={() => openEntry(sectionIndex, entry)}
-                    />
-                  );
-                  if (layout.details === "new-page" && mode === "order" && orderItem) {
-                    const slug = orderItems?.categories[sectionIndex]?.slug;
-                    return (
-                      <Link key={entry.ref} href={`/menu/${slug}/${orderItem.id}`} className="contents">
-                        {card}
-                      </Link>
-                    );
-                  }
+                  const page = pageFor(sectionIndex, orderItem);
                   return (
                     <div key={entry.ref} className="flex flex-col gap-2">
-                      {card}
+                      <EntryCard
+                        entry={entry}
+                        card={layout.card}
+                        showTags={layout.showTags}
+                        onAdd={mode === "order" && orderItem ? () => setAdding(orderItem) : undefined}
+                        onOpen={() => openEntry(entry, page)}
+                      />
                       {expanded === entry.ref && entry.kind === "item" && entry.description && <p className="px-2 text-[13px] leading-[1.8] text-[var(--octo-text-secondary)]">{entry.description}</p>}
                     </div>
                   );

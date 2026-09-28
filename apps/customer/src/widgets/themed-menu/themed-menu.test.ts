@@ -44,11 +44,11 @@ function doc(themePatch: Partial<PublicMenuDocument["menu"]["theme"]> = {}, patc
   };
 }
 
-function render(document: PublicMenuDocument, mode: "order" | "view", selectable = false, highlightSectionRef: string | null = null) {
+function render(document: PublicMenuDocument, mode: "order" | "view", selectable = false, highlightSectionRef: string | null = null, itemPages?: boolean) {
   return renderToStaticMarkup(
     createElement(StoreI18nProvider, {
       locale: "en",
-      children: createElement(OrderingSessionProvider, { persist: false, children: createElement(ThemedMenu, { document, mode, selectable, highlightSectionRef }) }),
+      children: createElement(OrderingSessionProvider, { persist: false, children: createElement(ThemedMenu, { document, mode, selectable, highlightSectionRef, itemPages }) }),
     })
   );
 }
@@ -96,6 +96,16 @@ describe("ThemedMenu", () => {
       expect(html).toContain('data-menu-add="i1"');
       expect(html).not.toMatch(/<a\s[^>]*>\s*<article/);
     }
+  });
+
+  it("sends NewPage taps to the item page on the storefront, but to the overlay in the builder canvas (itemPages={false})", () => {
+    const newPage = doc({ itemDetailsBehavior: "NewPage" });
+    expect(render(newPage, "order")).toContain('data-item-page="/menu/');
+    const canvas = render(newPage, "order", true, null, false);
+    expect(canvas).not.toContain("data-item-page");
+    // Still an ordering canvas: only the navigation is switched off.
+    expect(canvas).toContain('data-menu-add="i1"');
+    expect(render(newPage, "view")).not.toContain("data-item-page");
   });
 
   it("outlines only a section ref", () => {

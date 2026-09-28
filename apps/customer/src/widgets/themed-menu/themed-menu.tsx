@@ -27,9 +27,12 @@ export interface ThemedMenuProps {
   highlightSectionRef?: string | null;
   /** "brand": the menu's own logo/name/hero header (QR and canvas); "none": the site's header is already above. */
   header?: "brand" | "none";
+  /** False in the builder canvas: NewPage then opens the overlay, as view mode does, because navigating to an item page
+   *  would take the canvas iframe away from the builder. Default true. */
+  itemPages?: boolean;
 }
 
-export function ThemedMenu({ document, mode, selectable = false, highlightSectionRef = null, header = "brand" }: ThemedMenuProps) {
+export function ThemedMenu({ document, mode, selectable = false, highlightSectionRef = null, header = "brand", itemPages = true }: ThemedMenuProps) {
   const { t } = useI18n();
   const router = useRouter();
   const layout = menuLayout(document.menu.theme);
@@ -54,16 +57,17 @@ export function ThemedMenu({ document, mode, selectable = false, highlightSectio
     setActive(ref);
     globalThis.document?.getElementById(ref)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  /** NewPage in order mode: the item's own page, when the entry resolves to a storefront item. Otherwise null. */
+  /** NewPage in order mode: the item's own page, when item pages are allowed and the entry resolves to a storefront item.
+   *  Otherwise null. */
   function pageFor(sectionIndex: number, orderItem: MenuItem | null): string | null {
-    if (layout.details !== "new-page" || mode !== "order" || !orderItem) return null;
+    if (layout.details !== "new-page" || mode !== "order" || !itemPages || !orderItem) return null;
     const slug = orderItems?.categories[sectionIndex]?.slug;
     return slug ? `/menu/${slug}/${orderItem.id}` : null;
   }
   function openEntry(entry: EntryView, page: string | null) {
     if (page) router.push(page);
     else if (layout.details === "same-page") setExpanded((cur) => (cur === entry.ref ? null : entry.ref));
-    else setOpen(entry); // Overlay, and NewPage in view mode or when the item page cannot be resolved
+    else setOpen(entry); // Overlay, and NewPage in view mode, in the canvas, or when the item page cannot be resolved
   }
   // Only a section ref (s{index}) reaches the <style> below.
   const highlight = highlightSectionRef && /^s\d+$/.test(highlightSectionRef) ? highlightSectionRef : null;
@@ -105,7 +109,7 @@ export function ThemedMenu({ document, mode, selectable = false, highlightSectio
                   const orderItem = entry.kind === "item" ? itemFor(sectionIndex, entry.ref) : null;
                   const page = pageFor(sectionIndex, orderItem);
                   return (
-                    <div key={entry.ref} className="flex flex-col gap-2">
+                    <div key={entry.ref} className="flex flex-col gap-2" data-item-page={page ?? undefined}>
                       <EntryCard
                         entry={entry}
                         card={layout.card}

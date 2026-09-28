@@ -19,6 +19,7 @@
 import http from "node:http";
 import https from "node:https";
 import { cookies } from "next/headers";
+import { locales } from "@i18n/index";
 import { PREVIEW_COOKIE_NAME, planApiRequest } from "@/shared/lib/preview";
 import type { PublicMenuDocument, Tenant } from "@octopus/api-client";
 
@@ -33,8 +34,43 @@ export const hostFor = (slug: string) => `${slug}.${SUFFIX}`;
 
 // `fetch` (undici) silently drops a custom Host header, and PublicApi picks the
 // site from Host, so requests are made with node:http, which sends it as given.
-// A short in-memory cache stands in for fetch's data cache.
-const cache = new Map<string, { at: number; ttl: number; value: unknown }>();
+// A short in-memory cache stands in for fetch's data cache. Its keys carry visitor input (a QR code's key and ?l=, a
+// path, a language), so it is bounded: least recently used entries go first once it is full, and an expired entry is
+// dropped when it is read.
+export const PUBLIC_CACHE_MAX = 200;
+
+type CacheEntry = { at: number; ttl: number; value: unknown };
+
+const cache = {
+  entries: new Map<string, CacheEntry>(),
+  /** A live entry (marked as most recently used), else undefined. */
+  get(key: string): CacheEntry | undefined {
+    const hit = this.entries.get(key);
+    if (!hit) return undefined;
+    this.entries.delete(key);
+    if (Date.now() - hit.at >= hit.ttl) return undefined;
+    this.entries.set(key, hit);
+    return hit;
+  },
+  set(key: string, entry: CacheEntry): void {
+    this.entries.delete(key);
+    this.entries.set(key, entry);
+    while (this.entries.size > PUBLIC_CACHE_MAX) {
+      const oldest = this.entries.keys().next().value;
+      if (oldest === undefined) break;
+      this.entries.delete(oldest);
+    }
+  },
+};
+
+/** How many answers the cache holds (tests). */
+export const publicCacheSize = () => cache.entries.size;
+
+/** A visitor-supplied language as one of the storefront's locales ("ar-SA" -> "ar"), else null (the API's default). */
+function knownLocale(lang: string | null | undefined): string | null {
+  const primary = lang?.trim().split(/[-_;,]/)[0]?.toLowerCase() ?? "";
+  return (locales as readonly string[]).includes(primary) ? primary : null;
+}
 
 /** The preview secret of the request being rendered, if the visitor holds one. */
 function currentPreviewToken(): string | null {
@@ -198,7 +234,7 @@ export const fetchSiteMenuDocument = (slug: string, publicLinkKey: string, lang?
 
 /** A scanned QR code's menu. The code alone names the business (no Host needed); every failure reads as null. */
 export async function fetchMenuDocumentByCode(key: string, lang?: string | null, label?: string | null): Promise<PublicMenuDocument | null> {
-  const path = `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang, l: label })}`;
+  const path = `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang: knownLocale(lang), l: label })}`;
   const cacheKey = `code|${path}`;
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.at < hit.ttl) return hit.value as PublicMenuDocument | null;

@@ -78,3 +78,31 @@ describe("public-api preview plumbing", () => {
     expect(seen[0]).toMatchObject({ url: "/v1/public/site-menu/key1?lang=ar", token: undefined });
   });
 });
+
+describe("public-api cache bounds", () => {
+  it("normalises the QR menu's language to a known locale before caching", async () => {
+    await api.fetchMenuDocumentByCode("lang-key", "ar-SA");
+    await api.fetchMenuDocumentByCode("lang-key", "AR");
+    await api.fetchMenuDocumentByCode("lang-key", "ar");
+    await api.fetchMenuDocumentByCode("lang-key", "xx-random");
+    await api.fetchMenuDocumentByCode("lang-key", "zz-other");
+    expect(seen.map((s) => s.url)).toEqual(["/v1/public/menu-codes/lang-key?lang=ar", "/v1/public/menu-codes/lang-key"]);
+  });
+
+  it("stays bounded however many visitor-chosen keys are read", async () => {
+    for (let i = 0; i < api.PUBLIC_CACHE_MAX + 50; i++) await api.fetchMenuDocumentByCode("flood-key", "en", `label-${i}`);
+    expect(api.publicCacheSize()).toBeLessThanOrEqual(api.PUBLIC_CACHE_MAX);
+    // The newest entries are still served from the cache; the oldest were evicted.
+    seen.length = 0;
+    await api.fetchMenuDocumentByCode("flood-key", "en", `label-${api.PUBLIC_CACHE_MAX + 49}`);
+    expect(seen).toHaveLength(0);
+    await api.fetchMenuDocumentByCode("flood-key", "en", "label-0");
+    expect(seen).toHaveLength(1);
+  });
+
+  it("keeps the site reads cached through the same bounded cache", async () => {
+    await api.fetchShell("bounded-shell", "en");
+    await api.fetchShell("bounded-shell", "en");
+    expect(seen).toHaveLength(1);
+  });
+});

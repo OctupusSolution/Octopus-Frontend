@@ -27,15 +27,17 @@ export interface UploadedMedia {
   url: string;
 }
 
-/** Assets already known in this session, by delivery URL and by id. */
-const byUrl = new Map<string, MediaReferenceDto>();
+export type MediaLibrary = "menu" | "site";
+
+/** Assets already known in this session, by delivery URL (with the library that holds them) and by id. */
+const byUrl = new Map<string, { ref: MediaReferenceDto; library: MediaLibrary }>();
 const byId = new Map<string, string>();
 /** Picked files already uploaded, so two saves in a row send one upload. */
 const uploaded = new Map<string, Promise<UploadedMedia>>();
 
-const remember = (asset: Pick<MediaAssetResponse, "assetId" | "kind" | "deliveryUrl">): UploadedMedia => {
+const remember = (asset: Pick<MediaAssetResponse, "assetId" | "kind" | "deliveryUrl">, library: MediaLibrary): UploadedMedia => {
   const ref = { assetId: asset.assetId, kind: asset.kind };
-  byUrl.set(asset.deliveryUrl, ref);
+  byUrl.set(asset.deliveryUrl, { ref, library });
   byId.set(asset.assetId, asset.deliveryUrl);
   return { ref, url: asset.deliveryUrl };
 };
@@ -44,11 +46,16 @@ const remember = (asset: Pick<MediaAssetResponse, "assetId" | "kind" | "delivery
 export const isLocalMedia = (src: string | null | undefined): src is string =>
   Boolean(src && (src.startsWith("data:") || src.startsWith("blob:")));
 
-/** The reference for an image URL the API has already given us, else null. */
-export const knownMedia = (src: string | null | undefined): MediaReferenceDto | null =>
-  (src && byUrl.get(src)) || null;
+/** The reference for an image URL the API has already given us, else null. With `library`, only an
+ *  asset held by that library counts: the Menu and Public Link libraries are separate, and one
+ *  library's reference is AssetNotFound in the other. */
+export const knownMedia = (src: string | null | undefined, library?: MediaLibrary): MediaReferenceDto | null => {
+  const hit = src ? byUrl.get(src) : undefined;
+  if (!hit || (library && hit.library !== library)) return null;
+  return hit.ref;
+};
 
-export function uploadMedia(businessId: string, src: string, purpose: MediaPurpose | SiteMediaPurpose, fileName = "image", library: "menu" | "site" = "menu"): Promise<UploadedMedia> {
+export function uploadMedia(businessId: string, src: string, purpose: MediaPurpose | SiteMediaPurpose, fileName = "image", library: MediaLibrary = "menu"): Promise<UploadedMedia> {
   const cacheKey = `${library}:${purpose}:${src}`;
   let job = uploaded.get(cacheKey);
   if (!job) {
@@ -61,7 +68,7 @@ export function uploadMedia(businessId: string, src: string, purpose: MediaPurpo
   return job;
 }
 
-async function doUpload(businessId: string, src: string, purpose: string, fileName: string, library: "menu" | "site"): Promise<UploadedMedia> {
+async function doUpload(businessId: string, src: string, purpose: string, fileName: string, library: MediaLibrary): Promise<UploadedMedia> {
   const blob = await (await fetch(src)).blob();
   const request = { purpose, fileName, contentType: blob.type || "image/jpeg", bytes: blob.size };
   const ticket =
@@ -90,33 +97,34 @@ async function doUpload(businessId: string, src: string, purpose: string, fileNa
   return remember(
     library === "site"
       ? await completeSiteMediaUpload(businessId, ticket.uploadId)
-      : await completeMediaUpload(businessId, ticket.uploadId, { businessId })
+      : await completeMediaUpload(businessId, ticket.uploadId, { businessId }),
+    library
   );
 }
 
 /** Remembers an asset the caller already holds (e.g. from the site media library) so
  *  `knownMedia(url)` recognises its delivery URL on the next save. */
-export function rememberMedia(asset: Pick<MediaAssetResponse, "assetId" | "kind" | "deliveryUrl">): UploadedMedia {
-  return remember(asset);
+export function rememberMedia(asset: Pick<MediaAssetResponse, "assetId" | "kind" | "deliveryUrl">, library: MediaLibrary = "site"): UploadedMedia {
+  return remember(asset, library);
 }
 
 /** The delivery URL for a stored reference (one call per new asset). */
 export async function mediaUrl(
   businessId: string,
   ref: { assetId: string; kind: string } | null | undefined,
-  library: "menu" | "site" = "menu"
+  library: MediaLibrary = "menu"
 ): Promise<string | null> {
   if (!ref) return null;
   const hit = byId.get(ref.assetId);
   if (hit) return hit;
-  return remember(library === "site" ? await getSiteMediaAsset(businessId, ref.assetId) : await getMediaAsset(businessId, ref.assetId)).url;
+  return remember(library === "site" ? await getSiteMediaAsset(businessId, ref.assetId) : await getMediaAsset(businessId, ref.assetId), library).url;
 }
 
 /** Drops a deleted asset from the session caches, so its old delivery URL no longer resolves to a reference. */
 export function forgetMedia(assetId: string): void {
   const url = byId.get(assetId);
   byId.delete(assetId);
-  if (url && byUrl.get(url)?.assetId === assetId) byUrl.delete(url);
+  if (url && byUrl.get(url)?.ref.assetId === assetId) byUrl.delete(url);
   for (const [key, job] of uploaded) {
     job.then((up) => up.ref.assetId === assetId && uploaded.delete(key), () => undefined);
   }

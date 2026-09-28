@@ -183,10 +183,18 @@ export interface ThemeImageResult {
   url: string | null;
 }
 
-/** A theme image as the reference (and, once known, the delivery URL) to save: uploaded when it is a
- *  fresh pick, the known reference when it is a delivery URL, and — when the URL is null — the ref
- *  passed alongside it (an unresolved lookup, not a removal) rather than `current`'s ref, which is only
- *  a last-resort fallback for a delivery URL this session has not seen before. Null only when both the
+const REMOTE = /^https?:\/\//i;
+
+/** A theme image as the reference (and, once known, the delivery URL) to save:
+ *  - a fresh pick (data:/blob:) is uploaded to the menu library;
+ *  - a delivery URL the menu library already holds resolves to its reference, and a URL whose `ref`
+ *    is set (loaded from the server, unchanged since) keeps that ref;
+ *  - any other http(s) URL (e.g. a brand seeded from the Public Link site, whose images live in the
+ *    site library and are AssetNotFound in the menu's) is fetched and uploaded to the menu library as
+ *    a fresh pick. If that fails the image is sent as null, so one image never fails the whole save;
+ *    the URL stays in the draft and the next save tries again;
+ *  - when the URL is null, the ref passed alongside it (an unresolved lookup, not a removal).
+ *  `current`'s ref is only a last resort for a non-http URL nothing else resolves. Null when both the
  *  URL and the ref are null: the merchant actually cleared the image. */
 export async function themeImageRef(
   businessId: string,
@@ -195,12 +203,21 @@ export async function themeImageRef(
   purpose: "ThemeLogo" | "ThemeHeroImage",
   current: MediaReferenceDto | null
 ): Promise<ThemeImageResult> {
+  const fileName = purpose === "ThemeLogo" ? "logo.png" : "hero.png";
   if (url && isLocalMedia(url)) {
-    const up = await uploadMedia(businessId, url, purpose, purpose === "ThemeLogo" ? "logo.png" : "hero.png", "menu");
+    const up = await uploadMedia(businessId, url, purpose, fileName, "menu");
     return { ref: up.ref, url: up.url };
   }
-  if (url) return { ref: knownMedia(url) ?? ref ?? current, url };
-  return { ref, url: null };
+  if (!url) return { ref, url: null };
+  const known = knownMedia(url, "menu") ?? ref;
+  if (known) return { ref: known, url };
+  if (!REMOTE.test(url)) return { ref: current, url };
+  try {
+    const up = await uploadMedia(businessId, url, purpose, fileName, "menu");
+    return { ref: up.ref, url: up.url };
+  } catch {
+    return { ref: null, url };
+  }
 }
 
 export async function brandFromServer(businessId: string, t: Awaited<ReturnType<typeof getMenuTheme>>, lang: string): Promise<MenuBrand | null> {

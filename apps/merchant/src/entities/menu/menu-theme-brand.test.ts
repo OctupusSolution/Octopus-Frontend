@@ -124,7 +124,72 @@ describe("themeImageRef", () => {
     knownMedia.mockReturnValue(REF);
     const result = await themeImageRef("biz-1", "https://cdn.example/known.png", null, "ThemeLogo", null);
     expect(result).toEqual({ ref: REF, url: "https://cdn.example/known.png" });
+    expect(knownMedia).toHaveBeenCalledWith("https://cdn.example/known.png", "menu");
     expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  // A brand seeded from the Public Link site carries the site library's delivery URLs.
+  const SITE_REF: MediaReferenceDto = { assetId: "site-asset", kind: "Image" };
+  const SITE_URL = "https://cdn.example/site/logo.png";
+  const siteOnly = (_src: unknown, library?: unknown) => (library === "menu" ? null : SITE_REF);
+
+  it("never sends a Public Link (site) asset as a menu theme ref; re-uploads it to the menu library instead", async () => {
+    knownMedia.mockImplementation(siteOnly);
+    const uploaded = { ref: { assetId: "menu-copy", kind: "Image" }, url: "https://cdn.example/menu/copy.png" };
+    uploadMedia.mockResolvedValue(uploaded);
+    const result = await themeImageRef("biz-1", SITE_URL, null, "ThemeLogo", null);
+    expect(result.ref).not.toEqual(SITE_REF);
+    expect(result).toEqual({ ref: uploaded.ref, url: uploaded.url });
+    expect(uploadMedia).toHaveBeenCalledWith("biz-1", SITE_URL, "ThemeLogo", "logo.png", "menu");
+  });
+
+  it("uploads an unknown remote URL as the hero image", async () => {
+    knownMedia.mockReturnValue(null);
+    const uploaded = { ref: { assetId: "menu-hero", kind: "Image" }, url: "https://cdn.example/menu/hero.png" };
+    uploadMedia.mockResolvedValue(uploaded);
+    const result = await themeImageRef("biz-1", "https://elsewhere.example/hero.jpg", null, "ThemeHeroImage", { assetId: "old", kind: "Image" });
+    expect(result).toEqual({ ref: uploaded.ref, url: uploaded.url });
+    expect(uploadMedia).toHaveBeenCalledWith("biz-1", "https://elsewhere.example/hero.jpg", "ThemeHeroImage", "hero.png", "menu");
+  });
+
+  it("keeps the brand's own ref for an unchanged URL without uploading", async () => {
+    knownMedia.mockReturnValue(null);
+    const result = await themeImageRef("biz-1", "https://cdn.example/menu/logo.png", REF, "ThemeLogo", null);
+    expect(result).toEqual({ ref: REF, url: "https://cdn.example/menu/logo.png" });
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  it("sends null for an image whose fetch or upload fails", async () => {
+    knownMedia.mockImplementation(siteOnly);
+    uploadMedia.mockRejectedValue(new Error("Image upload failed (500)"));
+    const result = await themeImageRef("biz-1", SITE_URL, null, "ThemeLogo", SITE_REF);
+    expect(result.ref).toBeNull();
+  });
+
+  it("pushTheme still saves the theme when a seeded image's upload fails", async () => {
+    knownMedia.mockImplementation(siteOnly);
+    uploadMedia.mockImplementation(async (_b: string, src: string) => {
+      if (src === SITE_URL) throw new Error("could not fetch");
+      return { ref: { assetId: "menu-hero", kind: "Image" }, url: "https://cdn.example/menu/hero.png" };
+    });
+    getMenuTheme.mockResolvedValue({
+      presetCode: null, logo: null, hero: null, heroText: {}, heroSubtext: {},
+      titleFontCode: null, bodyFontCode: null, primaryColor: null, lightColor: null, accentColor: null, darkColor: null,
+      navigationStyle: "TopBar", sectionNavStyle: "IconAndText", cardStyle: "Classic", itemDetailsBehavior: "SamePage",
+      stickyPrimaryAction: false, showItemTags: false, isConfigured: false,
+    });
+    updateMenuTheme.mockResolvedValue({});
+    const theme = {
+      presetId: "p", navStyle: "top-bar", categoryStyle: "icon-text", cardStyle: "classic", itemDetails: "same-page",
+      stickyAddToCart: false, showItemTags: false,
+      brand: { ...brand, logoUrl: SITE_URL, heroUrl: "https://cdn.example/site/hero.png" },
+    } as never;
+    await expect(pushTheme("biz-1", "menu-1", theme, "en")).resolves.not.toBeNull();
+    expect(updateMenuTheme).toHaveBeenCalledWith(
+      "biz-1",
+      "menu-1",
+      expect.objectContaining({ logo: null, hero: { assetId: "menu-hero", kind: "Image" } })
+    );
   });
 });
 

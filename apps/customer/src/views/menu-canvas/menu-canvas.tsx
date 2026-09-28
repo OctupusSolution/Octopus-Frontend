@@ -2,7 +2,8 @@
 
 // The menu builder's live preview canvas (route /preview/menu). Renders nothing of its own: the merchant console frames it
 // and sends the menu document with postMessage; it draws it with ThemedMenu. Clicks go back to the console (a section click
-// selects it when the builder wires selection); nothing here ever navigates away.
+// selects it when the builder wires selection); nothing here ever navigates away, so NewPage item details open the overlay
+// (itemPages={false}).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fromMenuCanvas, type FromMenuCanvasBody, type MenuRenderMessage } from "@octopus/api-client";
 import { defaultLocale, getDirection, locales, type Locale } from "@i18n/index";
@@ -86,7 +87,7 @@ export function MenuCanvas({ allowedOrigins }: { allowedOrigins: string[] }) {
   return (
     <StoreI18nProvider locale={locale}>
       <div dir={getDirection(locale)} lang={render.document.language}>
-        <ThemedMenu document={render.document} mode={render.mode} selectable={render.selectable} highlightSectionRef={render.highlightSectionRef} />
+        <ThemedMenu document={render.document} mode={render.mode} selectable={render.selectable} highlightSectionRef={render.highlightSectionRef} itemPages={false} />
       </div>
     </StoreI18nProvider>
   );

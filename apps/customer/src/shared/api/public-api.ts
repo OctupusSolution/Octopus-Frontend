@@ -15,8 +15,8 @@
 // reads go to GET /v1/public-site/preview[/pages] with the secret in X-Preview-Token, and
 // no preview answer is ever cached here (shared/lib/preview.ts, planApiRequest).
 //
-// The types below are defined locally on purpose: they mirror the backend's
-// PublicReadContracts.cs and must not depend on the api-client's builder types.
+// The public read types are shared with the builder's live preview (@octopus/api-client contracts/public-read.ts).
+// 
 import http from "node:http";
 import https from "node:https";
 import { cookies } from "next/headers";
@@ -101,107 +101,34 @@ function query(params: Record<string, string | null | undefined>): string {
 
 // ---- published shell ---------------------------------------------------------------
 
-export type Direction = "ltr" | "rtl";
+// The public read shapes live in @octopus/api-client (contracts/public-read.ts): the builder's live
+// preview produces the same shapes from the draft and hands them to the canvas route.
+import type {
+  PublicSiteDirection,
+  PublicSiteFooterLink,
+  PublicSiteMedia,
+  PublicSiteNavItem,
+  PublicSitePage,
+  PublicSiteSection,
+  PublicSiteShell,
+  PublicSiteSource,
+} from "@octopus/api-client";
+export type Direction = PublicSiteDirection;
+export type PublicMedia = PublicSiteMedia;
+export type PublicNavItem = PublicSiteNavItem;
+export type PublicFooterLink = PublicSiteFooterLink;
+export type PublishedShell = PublicSiteShell;
+export type PublicSource = PublicSiteSource;
+export type PublicSection = PublicSiteSection;
+export type PublicPage = PublicSitePage;
 
-export interface PublicMedia {
-  url: string;
-  width?: number | null;
-  height?: number | null;
-}
-
-export interface PublicNavItem {
-  label: string;
-  iconKey: string | null;
-  href: string | null;
-  kind: string;
-  openInNewTab: boolean;
-  showInHeader: boolean;
-  showInDrawer: boolean;
-  children: PublicNavItem[];
-}
-
-export interface PublicFooterLink {
-  label: string;
-  href: string;
-  kind: string;
-  openInNewTab: boolean;
-}
-
-export interface PublishedShell {
-  host: string;
-  canonicalBaseUrl: string;
-  language: string;
-  direction: Direction;
-  defaultLanguage: string;
-  languages: { code: string; direction: Direction }[];
-  theme: {
-    key: string;
-    colors: Record<string, string>;
-    typography: Record<string, { heading: string; body: string }>;
-    layout: Record<string, string>;
-  };
-  brand: { displayName: string; logo: PublicMedia | null; favicon: PublicMedia | null };
-  seo: {
-    titleTemplate: string | null;
-    defaultTitle: string;
-    defaultDescription: string | null;
-    socialImageUrl: string | null;
-    noIndex: boolean;
-  };
-  navigation: {
-    options: { stickyHeader: boolean; showActivePageIndicator: boolean; showIcons: boolean; openLinksInSameTab: boolean };
-    items: PublicNavItem[];
-  };
-  footer: {
-    groups: { title: string; links: PublicFooterLink[] }[];
-    socialLinks: { network: string; url: string }[];
-    contact: { address: string | null; hours: string | null; phone: string | null };
-  };
-  pages: { path: string; title: string; isHome: boolean; noIndex: boolean; lastModifiedUtc: string }[];
-  isPreview: boolean;
-  /** Present on a preview read only. */
-  preview?: { siteVersion: number; expiresAtUtc: string } | null;
-}
+/** A resolved field value: text is a string, media `{url,…}`, link `{href,kind,label?}`, rich text a block array, list `[{id,fields}]`. */
+export type SectionFields = Record<string, unknown>;
 
 export const fetchShell = (slug: string, lang?: string | null, acceptLanguage?: string | null) =>
   get<PublishedShell>(slug, `/v1/public-site${query({ lang })}`, lang ? undefined : acceptLanguage ?? undefined);
 
 // ---- one page ----------------------------------------------------------------------
-
-export interface PublicSource {
-  sourceKey: string;
-  version: number | null;
-  publicLinkKey: string | null;
-  settings: unknown;
-}
-
-/** A resolved field value: text is a string, media `{url,…}`, link `{href,kind,label?}`, rich text a block array, list `[{id,fields}]`. */
-export type SectionFields = Record<string, unknown>;
-
-export interface PublicSection {
-  sectionId: string;
-  type: string;
-  anchor: string | null;
-  styleVariant: string | null;
-  style: Record<string, unknown>;
-  fields: SectionFields;
-  source: PublicSource | null;
-  /** Device classes (`mobile`, `tablet`, `desktop`) the section is hidden on; absent from older reads. */
-  hiddenOn?: string[] | null;
-}
-
-export interface PublicPage {
-  pageId: string;
-  path: string;
-  isHome: boolean;
-  kind: string;
-  title: string;
-  seo: { title: string; description: string | null; socialImageUrl: string | null; noIndex: boolean; canonicalUrl: string };
-  layout: { header: unknown; hideFooter: boolean };
-  source: PublicSource | null;
-  sections: PublicSection[];
-  lastModifiedUtc: string;
-}
 
 export type PublishedPageRead =
   | { type: "page"; language: string; page: PublicPage; redirect: null }

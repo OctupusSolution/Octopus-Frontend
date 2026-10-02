@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Ban, CalendarDays, CreditCard, Link2, Mail, MessageSquarePlus, Share, SquarePen, Tag, Trash2, Users, Utensils } from "lucide-react";
 import { EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { customerStore, useCustomers } from "../_shared/customer-store";
+import { customerActions, useCustomers, useCustomerSync } from "../_shared/customer-store";
 import { customerName, formatDate, formatReservationDateTime, formatSar, formatSarWhole } from "../_shared/format";
 import { Avatar } from "../_shared/avatar";
 import { ActionButton } from "../_shared/action-button";
@@ -18,14 +18,15 @@ import { PaymentLinkModal } from "../_shared/payment-link-modal";
 import { AddNoteModal } from "../_shared/add-note-modal";
 import { AddTagModal } from "../_shared/add-tag-modal";
 import { EditInfoModal } from "../_shared/edit-info-modal";
-import type { CustomerRecord } from "../_shared/types";
+import { actionErrorKey } from "../_shared/crm-api";
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, locale } = useI18n();
+  useCustomerSync(id);
   const customer = useCustomers().find((c) => c.id === id);
-  const [toast, showToast] = useToast();
+  const [toast, showToast, toastTone] = useToast();
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
@@ -57,8 +58,12 @@ export function CustomerDetailPage() {
   }
 
   const current = customer;
-  function patch(updater: (c: CustomerRecord) => Partial<CustomerRecord>) {
-    customerStore.updateCustomer(current.id, updater);
+  /** Runs a store action and confirms it, or says why the server refused it. */
+  function run(action: Promise<unknown>, confirmation: string) {
+    action.then(
+      () => showToast(confirmation),
+      (err: unknown) => showToast(t(actionErrorKey(err)), "error")
+    );
   }
 
   const name = customerName(customer);
@@ -187,7 +192,7 @@ export function CustomerDetailPage() {
                 <CreditCard size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[14px] text-[var(--octo-text-secondary)]">{formatDate(payment.date, locale)}</div>
-                  <div className="text-[14px] text-[var(--octo-text-primary)]" dir="ltr">**** **** **** {payment.cardLast4}</div>
+                  <div className="text-[14px] text-[var(--octo-text-primary)]" dir="ltr">{payment.cardLast4 ? `**** **** **** ${payment.cardLast4}` : payment.method ?? "—"}</div>
                   <div className="text-[16px] font-semibold text-[#0D6EFD]">{formatSar(payment.amountSar)}</div>
                 </div>
                 <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[13px]" style={{ color: style.text, backgroundColor: style.bg }}>
@@ -211,8 +216,7 @@ export function CustomerDetailPage() {
           icon={<Ban size={19} />}
           label={t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block")}
           onClick={() => {
-            patch((c) => ({ isBlocked: !c.isBlocked }));
-            showToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
+            run(customerActions.toggleBlocked(current.id), t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
           }}
         />
         <ActionButton
@@ -223,28 +227,28 @@ export function CustomerDetailPage() {
           tint={ACTION_TINT.danger}
           onClick={() => {
             if (!window.confirm(t("customers.rowAction.deleteConfirm"))) return;
-            customerStore.setCustomers((prev) => prev.filter((c) => c.id !== current.id));
-            navigate("/customers");
+            customerActions.remove([current.id]).then(
+              () => navigate("/customers"),
+              (err: unknown) => showToast(t(actionErrorKey(err)), "error")
+            );
           }}
         />
       </div>
 
-      <Toast message={toast} />
+      <Toast message={toast} tone={toastTone} />
       <PaymentLinkModal customer={paymentLinkOpen ? customer : null} onClose={() => setPaymentLinkOpen(false)} onSent={() => showToast(t("customers.paymentLink.sentConfirm"))} />
       <AddNoteModal
         open={noteOpen}
         onClose={() => setNoteOpen(false)}
         onSave={(text) => {
-          patch((c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }));
-          showToast(t("customers.addNote.savedConfirm"));
+          run(customerActions.addNote(current.id, text), t("customers.addNote.savedConfirm"));
         }}
       />
       <AddTagModal
         open={tagOpen}
         onClose={() => setTagOpen(false)}
         onSave={(tag) => {
-          patch((c) => ({ tags: c.tags.includes(tag) ? c.tags : [...c.tags, tag] }));
-          showToast(t("customers.addTag.savedConfirm").replace("{tag}", tag));
+          run(customerActions.addTag([current.id], tag), t("customers.addTag.savedConfirm").replace("{tag}", tag));
         }}
       />
       <EditInfoModal
@@ -258,12 +262,14 @@ export function CustomerDetailPage() {
         ]}
         onClose={() => setAboutEditOpen(false)}
         onSave={(values) => {
-          patch(() => ({
-            preferredBranch: values.preferredBranch,
-            preferredAreaTable: values.preferredAreaTable,
-            referredBy: values.referredBy.trim() || undefined,
-          }));
-          showToast(t("customers.detail.savedConfirm"));
+          run(
+            customerActions.saveAbout(current.id, {
+              preferredBranch: values.preferredBranch,
+              preferredAreaTable: values.preferredAreaTable,
+              referredBy: values.referredBy.trim() || undefined,
+            }),
+            t("customers.detail.savedConfirm")
+          );
         }}
       />
       <EditInfoModal
@@ -279,14 +285,16 @@ export function CustomerDetailPage() {
         ]}
         onClose={() => setPreferencesEditOpen(false)}
         onSave={(values) => {
-          patch(() => ({
-            cuisinePreference: values.cuisinePreference.split(",").map((s) => s.trim()).filter(Boolean),
-            dietaryPreference: values.dietaryPreference,
-            occasion: values.occasion,
-            visitTime: values.visitTime,
-            specialRequests: values.specialRequests,
-          }));
-          showToast(t("customers.detail.savedConfirm"));
+          run(
+            customerActions.savePreferences(current.id, {
+              cuisinePreference: values.cuisinePreference.split(",").map((s) => s.trim()).filter(Boolean),
+              dietaryPreference: values.dietaryPreference,
+              occasion: values.occasion,
+              visitTime: values.visitTime,
+              specialRequests: values.specialRequests,
+            }),
+            t("customers.detail.savedConfirm")
+          );
         }}
       />
     </div>

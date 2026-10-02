@@ -14,6 +14,8 @@ const EN_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** "15 May 2026" (frames' day-first style; built by hand because en-GB
  *  prints September as "Sept"). Arabic uses the ar-SA locale formatter. */
 export function formatDate(iso: string, locale: string): string {
+  // A customer who has never visited has no date to show.
+  if (!iso) return "—";
   const date = new Date(iso);
   if (locale === "ar") return date.toLocaleDateString("ar-SA", { day: "numeric", month: "short", year: "numeric" });
   return `${date.getDate()} ${EN_MONTHS[date.getMonth()]} ${date.getFullYear()}`;

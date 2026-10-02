@@ -31,6 +31,8 @@ export interface OrderSummary {
 export interface PaymentSummary {
   date: string; // ISO date
   cardLast4: string;
+  /** How it was paid, where no card number is known (real payments never carry one). */
+  method?: string;
   amountSar: number;
   status: PaymentRecordStatus;
 }

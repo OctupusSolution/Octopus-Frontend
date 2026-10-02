@@ -27,3 +27,5 @@ export * from "./contracts/staff";
 export * from "./lib/staff-client";
 export * from "./contracts/order-admin";
 export * from "./lib/order-admin-client";
+export * from "./contracts/crm";
+export * from "./lib/crm-client";

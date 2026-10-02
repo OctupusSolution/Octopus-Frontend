@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Bookmark, MessageSquareMore, Plus, RotateCcw, Search, Users } from "lucide-react";
 import { Button, EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { customerStore, useCustomers, useSavedSegments } from "./_shared/customer-store";
+import { customerActions, useCustomers, useCustomerSync, useSavedSegments } from "./_shared/customer-store";
 import { CustomerStatCards } from "./_shared/stat-cards";
 import { CustomerRow } from "./_shared/customer-row";
 import { TagsFilterPopover, RangeFilterPopover } from "./_shared/filter-popover";
@@ -19,15 +19,14 @@ import { SendMessageWizard } from "./_shared/send-message-wizard";
 import { SaveSegmentModal } from "./_shared/save-segment-modal";
 import { EmptyCustomersIllustration } from "./_shared/empty-illustration";
 import { EMPTY_LIST_FILTERS, hasActiveFilters, matchesListFilters, type ListFilters } from "./_shared/list-filter";
-import { mergeCustomers } from "./_shared/merge";
+import { actionErrorKey } from "./_shared/crm-api";
 import { Toast, useToast } from "./_shared/toast";
 import { Pagination } from "@/pages/inventory/_shared/pagination";
 import type { CustomerRecord } from "./_shared/types";
 
 const PAGE_SIZE = 10;
 
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -45,12 +44,13 @@ function downloadCsv(filename: string, csv: string) {
 export function CustomersPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
+  useCustomerSync();
   const customers = useCustomers();
   const segments = useSavedSegments();
   const [filters, setFiltersState] = useState<ListFilters>(EMPTY_LIST_FILTERS);
   const [page, setPage] = useState(1);
   const [paymentLinkFor, setPaymentLinkFor] = useState<CustomerRecord | null>(null);
-  const [toast, showToast] = useToast();
+  const [toast, showToast, toastTone] = useToast();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [rowMenu, setRowMenu] = useState<{ anchor: HTMLElement; customer: CustomerRecord } | null>(null);
   const [noteFor, setNoteFor] = useState<CustomerRecord | null>(null);
@@ -58,6 +58,14 @@ export function CustomersPage() {
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [sendMessageOpen, setSendMessageOpen] = useState(false);
   const [saveSegmentOpen, setSaveSegmentOpen] = useState(false);
+
+  /** Runs a store action and confirms it, or says why the server refused it. */
+  function run(action: Promise<unknown>, confirmation: string) {
+    action.then(
+      () => showToast(confirmation),
+      (err: unknown) => showToast(t(actionErrorKey(err)), "error")
+    );
+  }
 
   // Any change to search/filters starts again from page 1.
   function setFilters(patch: Partial<ListFilters>) {
@@ -102,13 +110,11 @@ export function CustomersPage() {
         setTagTarget({ ids: [customer.id] });
         break;
       case "toggleBlock":
-        customerStore.updateCustomer(customer.id, (c) => ({ isBlocked: !c.isBlocked }));
-        showToast(t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
+        run(customerActions.toggleBlocked(customer.id), t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
         break;
       case "delete":
         if (window.confirm(t("customers.rowAction.deleteConfirm"))) {
-          customerStore.setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
-          showToast(t("customers.rowAction.deleted"));
+          run(customerActions.remove([customer.id]), t("customers.rowAction.deleted"));
         }
         break;
     }
@@ -128,9 +134,7 @@ export function CustomersPage() {
 
   function handleBulkDelete() {
     if (!window.confirm(countText("customers.bulk.deleteConfirm"))) return;
-    showToast(countText("customers.bulk.deletedConfirm"));
-    customerStore.setCustomers((prev) => prev.filter((c) => !selectedIds.has(c.id)));
-    setSelectedIds(new Set());
+    run(customerActions.remove(selectedCustomers.map((c) => c.id)), countText("customers.bulk.deletedConfirm"));
   }
 
   function handleBulkMerge() {
@@ -138,16 +142,20 @@ export function CustomersPage() {
       showToast(t("customers.bulk.mergeNeedsTwo"));
       return;
     }
-    const merged = mergeCustomers(selectedCustomers);
-    const removed = new Set(selectedCustomers.slice(1).map((c) => c.id));
-    customerStore.setCustomers((prev) => prev.filter((c) => !removed.has(c.id)).map((c) => (c.id === merged.id ? merged : c)));
-    setSelectedIds(new Set([merged.id]));
-    showToast(countText("customers.bulk.mergedConfirm"));
+    run(customerActions.merge(selectedCustomers), countText("customers.bulk.mergedConfirm"));
   }
 
   function handleBulkExport() {
-    downloadCsv(`customers-${new Date().toISOString().slice(0, 10)}.csv`, customersToCsv(selectedCustomers));
-    showToast(countText("customers.bulk.exportedConfirm"));
+    const confirmation = countText("customers.bulk.exportedConfirm");
+    const selected = selectedCustomers;
+    customerActions.exportCustomers(selected.map((c) => c.id)).then(
+      (file) => {
+        if (file) downloadFile(file.fileName, file.blob);
+        else downloadFile(`customers-${new Date().toISOString().slice(0, 10)}.csv`, new Blob([customersToCsv(selected)], { type: "text/csv;charset=utf-8;" }));
+        showToast(confirmation);
+      },
+      (err: unknown) => showToast(t(actionErrorKey(err)), "error")
+    );
   }
 
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
@@ -293,7 +301,7 @@ export function CustomersPage() {
           </>
         )}
       </div>
-      <Toast message={toast} />
+      <Toast message={toast} tone={toastTone} />
       <PaymentLinkModal
         customer={paymentLinkFor}
         onClose={() => setPaymentLinkFor(null)}
@@ -312,8 +320,7 @@ export function CustomersPage() {
         onClose={() => setNoteFor(null)}
         onSave={(text) => {
           if (!noteFor) return;
-          customerStore.updateCustomer(noteFor.id, (c) => ({ notes: [...c.notes, { date: new Date().toISOString().slice(0, 10), text }] }));
-          showToast(t("customers.addNote.savedConfirm"));
+          run(customerActions.addNote(noteFor.id, text), t("customers.addNote.savedConfirm"));
         }}
       />
       <AddTagModal
@@ -321,18 +328,14 @@ export function CustomersPage() {
         onClose={() => setTagTarget(null)}
         onSave={(tag) => {
           if (!tagTarget) return;
-          customerStore.setCustomers((prev) =>
-            prev.map((c) => (tagTarget.ids.includes(c.id) && !c.tags.includes(tag) ? { ...c, tags: [...c.tags, tag] } : c))
-          );
-          showToast(t("customers.addTag.savedConfirm").replace("{tag}", tag));
+          run(customerActions.addTag(tagTarget.ids, tag), t("customers.addTag.savedConfirm").replace("{tag}", tag));
         }}
       />
       <AddCustomerModal
         open={addCustomerOpen}
         onClose={() => setAddCustomerOpen(false)}
         onCreate={(customer) => {
-          customerStore.setCustomers((prev) => [customer, ...prev]);
-          showToast(t("customers.addCustomer.createdConfirm"));
+          run(customerActions.create(customer), t("customers.addCustomer.createdConfirm"));
         }}
       />
       <SaveSegmentModal
@@ -340,8 +343,7 @@ export function CustomersPage() {
         defaultName={t("customers.segment.defaultName").replace("{n}", String(segments.length + 1))}
         onClose={() => setSaveSegmentOpen(false)}
         onSave={(name) => {
-          customerStore.addSegment(name, filters);
-          showToast(t("customers.segment.savedConfirm").replace("{name}", name));
+          run(customerActions.saveSegment(name, filters), t("customers.segment.savedConfirm").replace("{name}", name));
         }}
       />
       <SendMessageWizard
@@ -349,6 +351,7 @@ export function CustomersPage() {
         customers={customers}
         segments={segments}
         onClose={() => setSendMessageOpen(false)}
+        onError={(err) => showToast(t(actionErrorKey(err)), "error")}
         onSent={(count, timing) => {
           const n = count.toLocaleString("en-US");
           if (timing.kind === "later") {

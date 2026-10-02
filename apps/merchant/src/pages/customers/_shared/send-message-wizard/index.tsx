@@ -1,10 +1,10 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/index.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { CRM_MODAL_CLASS } from "../action-button";
-import type { SavedSegment } from "../customer-store";
+import { customerActions, type SavedSegment } from "../customer-store";
 import { AudienceStep } from "./audience-step";
 import { ChannelContentStep } from "./channel-content-step";
 import { ReviewSendStep, type SendTiming } from "./review-send-step";
@@ -19,26 +19,70 @@ export function SendMessageWizard({
   segments,
   onClose,
   onSent,
+  onError,
 }: {
   open: boolean;
   customers: readonly CustomerRecord[];
   segments: readonly SavedSegment[];
   onClose: () => void;
   onSent: (count: number, timing: SendTiming) => void;
+  /** The server refused the audience or the send; the wizard stays open. */
+  onError: (err: unknown) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [step, setStep] = useState<Step>(1);
   const [filters, setFilters] = useState<AudienceFilters>(EMPTY_AUDIENCE_FILTERS);
   const [channels, setChannels] = useState<CommunicationChannel[]>(["WhatsApp"]);
   const [message, setMessage] = useState("");
 
-  const totalSelected = useMemo(() => audienceOf(customers, filters).length, [customers, filters]);
+  const [sending, setSending] = useState(false);
+  // On real data the audience is the server's count, asked again shortly after
+  // the filters settle; until it answers (and on the mock data) the loaded
+  // customers are counted here.
+  const [serverCount, setServerCount] = useState<number | null>(null);
+  const localCount = useMemo(() => audienceOf(customers, filters).length, [customers, filters]);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      customerActions.estimateAudience(filters).then(
+        (count) => !cancelled && setServerCount(count),
+        (err: unknown) => {
+          if (cancelled) return;
+          setServerCount(null);
+          onError(err);
+        }
+      );
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, filters]);
+  const totalSelected = serverCount ?? localCount;
+
+  function send(timing: SendTiming) {
+    if (sending) return;
+    setSending(true);
+    customerActions
+      .sendMessage({ filters, channels, message, timing, language: locale === "ar" ? "ar" : "en" })
+      .then(
+        () => {
+          onSent(totalSelected, timing);
+          close();
+        },
+        (err: unknown) => onError(err)
+      )
+      .finally(() => setSending(false));
+  }
 
   function reset() {
     setStep(1);
     setFilters(EMPTY_AUDIENCE_FILTERS);
     setChannels(["WhatsApp"]);
     setMessage("");
+    setServerCount(null);
   }
 
   function close() {
@@ -105,7 +149,7 @@ export function SendMessageWizard({
           <ReviewSendStep
             totalSelected={totalSelected}
             channels={channels}
-            onSend={(timing) => { onSent(totalSelected, timing); close(); }}
+            onSend={send}
           />
         )}
       </div>

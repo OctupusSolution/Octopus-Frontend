@@ -3,6 +3,7 @@ import { ChartNoAxesColumnIncreasing } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { STAT_CARD_THEME, type StatCardKey } from "./theme";
 import { customerStats } from "./mock-data";
+import { useCustomerStats } from "./customer-store";
 
 const CARD_ORDER: readonly StatCardKey[] = ["total", "active", "newThisMonth", "vip", "returning", "totalSpend"];
 const LABEL_KEY: Record<StatCardKey, string> = {
@@ -16,13 +17,15 @@ const LABEL_KEY: Record<StatCardKey, string> = {
 
 export function CustomerStatCards({ isEmpty }: { isEmpty?: boolean }) {
   const { t } = useI18n();
+  // The business's own figures once they have loaded, the decorative ones until then.
+  const stats = useCustomerStats() ?? customerStats;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {CARD_ORDER.map((key) => {
         const theme = STAT_CARD_THEME[key];
         const Icon = theme.icon;
-        const stat = customerStats[key];
+        const stat = stats[key];
         // When the customer list is genuinely empty, every KPI reads 0 (per
         // CRM-Empty state.png) instead of the decorative mock totals.
         const value = isEmpty ? "0" : key === "totalSpend" ? (stat as { display: string }).display : (stat as { value: number }).value.toLocaleString("en-US");

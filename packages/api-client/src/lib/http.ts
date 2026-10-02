@@ -153,3 +153,52 @@ export async function apiRequest<TResponse>(path: string, options: RequestOption
   if (!text) return undefined as TResponse;
   return JSON.parse(text) as TResponse;
 }
+
+export interface ApiDownload {
+  blob: Blob;
+  /** From Content-Disposition, when the server names the file. */
+  fileName: string | null;
+}
+
+/** Sends one request whose success body is a file rather than JSON. Failures
+ *  are the same problem+json ApiError as apiRequest; an expired token is
+ *  renewed once, like there. */
+export async function apiDownload(
+  path: string,
+  options: Pick<RequestOptions, "method" | "body" | "query"> = {}
+): Promise<ApiDownload> {
+  const send = (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {};
+    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(buildUrl(path, options.query), {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  };
+  const problemOf = async (res: Response): Promise<ProblemDetails | null> => {
+    try {
+      return (await res.json()) as ProblemDetails;
+    } catch {
+      return null;
+    }
+  };
+
+  const token = getAccessToken();
+  let res = await send(token);
+  let problem = res.ok ? null : await problemOf(res);
+  const looksExpired = res.status === 401 || (res.status === 403 && problem?.errorCode === "authorization.forbidden");
+  if (looksExpired && token && onUnauthorized) {
+    const fresh = await onUnauthorized();
+    if (fresh) {
+      res = await send(fresh);
+      problem = res.ok ? null : await problemOf(res);
+    }
+  }
+  if (!res.ok) throw new ApiError(res.status, problem);
+
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  return { blob: await res.blob(), fileName: match ? match[1] : null };
+}

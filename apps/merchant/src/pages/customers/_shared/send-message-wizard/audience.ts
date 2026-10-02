@@ -1,5 +1,6 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/audience.ts
 import { matchesListFilters, type ListFilters } from "../list-filter";
+import type { CrmCustomerCriteriaDto } from "@octopus/api-client";
 import type { CustomerRecord } from "../types";
 
 export type VisitFrequency = "weekly" | "monthly" | "occasional" | "firstTime";
@@ -29,7 +30,7 @@ export interface AudienceFilters {
   ageRange: "" | AgeRange;
   /** Filters of a saved segment chosen under "Saved Audiences"; ANDed with
    *  the fields above. */
-  segment: { id: string; name: string; filters: ListFilters } | null;
+  segment: { id: string; name: string; filters: ListFilters; criteria?: CrmCustomerCriteriaDto } | null;
 }
 
 export const EMPTY_AUDIENCE_FILTERS: AudienceFilters = {

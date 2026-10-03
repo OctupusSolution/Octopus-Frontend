@@ -392,8 +392,15 @@ interface ZoneLike {
 }
 
 /** Server zones as local rectangles: the rectangle the merchant drew when this
- *  browser has it, otherwise one drawn around the zone's tables. */
-function zonesFrom(server: readonly ZoneLike[], tables: readonly FloorTable[], zoneOfTable: ReadonlyMap<string, string | null>, local: readonly FloorZone[] | undefined): FloorZone[] {
+ *  browser has it, else the one saved in the scene, otherwise one drawn
+ *  around the zone's tables. */
+function zonesFrom(
+  server: readonly ZoneLike[],
+  tables: readonly FloorTable[],
+  zoneOfTable: ReadonlyMap<string, string | null>,
+  areas: ZoneAreas,
+  local: readonly FloorZone[] | undefined
+): FloorZone[] {
   const pool = [...(local ?? [])];
   const out: FloorZone[] = [];
   for (const z of [...server].sort((a, b) => a.position - b.position)) {
@@ -401,9 +408,12 @@ function zonesFrom(server: readonly ZoneLike[], tables: readonly FloorTable[], z
     if (i < 0) i = pool.findIndex((l) => !isServerId(l.id) && sameName(l.name, z.name));
     const hit = i >= 0 ? pool.splice(i, 1)[0] : undefined;
     const around = boundsOf(tables.filter((t) => zoneOfTable.get(t.id) === z.id).map(tableRect));
+    const saved = areas.get(z.id);
     const rect = hit
       ? { x: hit.x, y: hit.y, w: hit.w, h: hit.h }
-      : around
+      : saved
+        ? saved
+        : around
         ? { x: Math.max(0, around.x - 0.5), y: Math.max(0, around.y - 0.5), w: around.w + 1, h: around.h + 1 }
         : { x: 1 + out.length * 2, y: 1 + out.length * 2, w: 10, h: 8 };
     out.push({ id: z.id, kind: "zone", name: z.name, color: zoneColorOf(z.color) ?? hit?.color ?? "slate", locked: hit?.locked ?? false, ...rect });
@@ -419,39 +429,71 @@ function zonesFrom(server: readonly ZoneLike[], tables: readonly FloorTable[], z
 // Text/Room) are coarser than the local `ObjectType` union, so a sub-type
 // that a kind's own payload can't carry round-trips through a value chosen to
 // be unambiguous on the way back (wall vs. halfWall by thickness; door vs.
-// doubleDoor by width, since the local presets are 3m and 4.4m — far enough
-// apart that a merchant's resize would have to be extreme to cross the 3.5m
-// line this reads it back on).
-const SCENE_LAYER = "default";
-const SCENE_LAYERS = [{ code: SCENE_LAYER, isVisible: true, isLocked: false }];
+// doubleDoor by width: the local presets are 3 and 4.4 grid units, and the
+// clearance is sent in metres, so it is read back against 3.7 units in metres).
+// The server only accepts layer codes the business has configured; these are
+// the platform defaults (FloorPlanOptions.SceneLayers). Each object goes on the
+// layer that matches what it is.
+function layerFor(type: ObjectType): string {
+  switch (type) {
+    case "wall":
+    case "halfWall":
+    case "door":
+    case "doubleDoor":
+      return "walls";
+    case "room":
+      return "rooms";
+    case "bar":
+    case "counter":
+    case "station":
+    case "hostStand":
+      return "counters";
+    case "text":
+      return "labels";
+    default:
+      return "decor";
+  }
+}
+const SCENE_LAYERS = ["walls", "rooms", "counters", "decor", "labels"].map((code) => ({ code, isVisible: true, isLocked: false }));
 const DOOR_TYPES: ReadonlySet<ObjectType> = new Set(["door", "doubleDoor"]);
+// Saved as the API's Counter kind, which (unlike Decor) carries the label —
+// so "Bar", "Coffee" or "Service" survive a round trip.
+const COUNTER_TYPES: ReadonlySet<ObjectType> = new Set(["bar", "counter", "station", "hostStand"]);
 
 function sceneElementOf(o: FloorObject, index: number): SceneElementDto {
   const bounds = { x: m(o.x), y: m(o.y), width: m(o.w), height: m(o.h), rotationDegrees: o.rotation };
-  const base = { id: o.id, layerCode: SCENE_LAYER, bounds, zIndex: index, isLocked: o.locked };
+  const base = { id: o.id, layerCode: layerFor(o.type), bounds, zIndex: index, isLocked: o.locked };
   if (WALL_TYPES.has(o.type)) {
-    return { ...base, kind: "Wall", wall: { fromX: bounds.x, fromY: bounds.y, toX: m(o.x + o.w), toY: bounds.y, thickness: o.type === "wall" ? 0.3 : 0.15 } };
+    // The wall's centre line runs along its long side — down the canvas for
+    // a vertical wall, across it for a horizontal one.
+    const thickness = o.type === "wall" ? 0.3 : 0.15;
+    const wall =
+      o.h > o.w
+        ? { fromX: m(o.x + o.w / 2), fromY: bounds.y, toX: m(o.x + o.w / 2), toY: m(o.y + o.h), thickness }
+        : { fromX: bounds.x, fromY: m(o.y + o.h / 2), toX: m(o.x + o.w), toY: m(o.y + o.h / 2), thickness };
+    return { ...base, kind: "Wall", wall };
   }
   if (DOOR_TYPES.has(o.type)) {
     return { ...base, kind: "Door", door: { swing: "None", clearance: bounds.width } };
   }
+  if (COUNTER_TYPES.has(o.type)) return { ...base, kind: "Counter", counter: { counterCode: o.type, label: o.label || null } };
   if (o.type === "text") return { ...base, kind: "Text", text: { text: o.label, fontSize: 14 } };
   if (o.type === "room") return { ...base, kind: "Room", room: { label: o.label || null, color: null } };
   return { ...base, kind: "Decor", decor: { decorCode: o.type } };
 }
 
 function objectFromScene(e: SceneElementDto): FloorObject {
-  const decor = e.decor?.decorCode ?? "";
+  const decor = e.decor?.decorCode ?? e.counter?.counterCode ?? "";
   const type: ObjectType =
     e.kind === "Wall"
       ? (e.wall && e.wall.thickness <= 0.2 ? "halfWall" : "wall")
       : e.kind === "Door"
-        ? (e.door && e.door.clearance >= 3.5 ? "doubleDoor" : "door")
+        ? (e.door && e.door.clearance >= m(3.7) ? "doubleDoor" : "door")
         : e.kind === "Text"
           ? "text"
           : e.kind === "Room"
             ? "room"
-            : e.kind === "Decor" && (OBJECT_TYPES as readonly string[]).includes(decor)
+            : (e.kind === "Decor" || e.kind === "Counter") && (OBJECT_TYPES as readonly string[]).includes(decor)
               ? (decor as ObjectType)
               : "counter";
   return {
@@ -463,7 +505,7 @@ function objectFromScene(e: SceneElementDto): FloorObject {
     w: units(e.bounds.width),
     h: units(e.bounds.height),
     rotation: (([0, 90, 180, 270] as number[]).includes(e.bounds.rotationDegrees) ? e.bounds.rotationDegrees : 0) as Rotation,
-    label: e.text?.text ?? e.room?.label ?? "",
+    label: e.text?.text ?? e.room?.label ?? e.counter?.label ?? "",
     locked: e.isLocked,
   };
 }
@@ -471,14 +513,37 @@ function objectFromScene(e: SceneElementDto): FloorObject {
 const rememberScene = (planId: string, elements: readonly SceneElementDto[]) =>
   sceneBase.set(planId, new Map(elements.map((e) => [e.id, JSON.stringify(e)])));
 
-async function pushObjects(businessId: string, planId: string, objects: readonly FloorObject[]): Promise<void> {
+// The API's zones have no geometry, so each zone's drawn rectangle rides in
+// the scene as a Room element whose id names the server zone. Read back, these
+// become zone rectangles again (never objects), so every device sees the zones
+// as drawn rather than as tight boxes around their tables.
+const ZONE_AREA_PREFIX = "zone-area-";
+
+function zoneAreaElement(serverZoneId: string, z: FloorZone, index: number): SceneElementDto {
+  return {
+    id: `${ZONE_AREA_PREFIX}${serverZoneId}`,
+    kind: "Room",
+    layerCode: "rooms",
+    bounds: { x: m(z.x), y: m(z.y), width: m(z.w), height: m(z.h), rotationDegrees: 0 },
+    zIndex: index,
+    isLocked: z.locked,
+    room: { label: null, color: null },
+  };
+}
+
+async function pushObjects(businessId: string, planId: string, objects: readonly FloorObject[], zones: readonly FloorZone[]): Promise<void> {
   const ids = objectIds.get(businessId);
+  const serverZone = zoneIds.get(businessId);
   // Element ids are the caller's own and the server keeps them, so a local
   // object keeps whatever id it was first saved (or read back) under.
   const elements = objects.map((o, i) => {
     const el = sceneElementOf(o, i);
     return { ...el, id: ids.get(o.id) ?? o.id };
   });
+  for (const z of zones) {
+    const sid = serverZone.get(z.id) ?? (isServerId(z.id) ? z.id : null);
+    if (sid) elements.push(zoneAreaElement(sid, z, elements.length));
+  }
   const base = sceneBase.get(planId);
   let saved: LayoutSceneResponse | null = null;
   if (base && !noScenePatch.has(planId)) {
@@ -500,15 +565,26 @@ async function pushObjects(businessId: string, planId: string, objects: readonly
   objects.forEach((o, i) => ids.set(o.id, elements[i].id));
 }
 
-async function pullObjects(businessId: string, planId: string): Promise<FloorObject[]> {
+type ZoneAreas = ReadonlyMap<string, { x: number; y: number; w: number; h: number }>;
+
+async function pullObjects(businessId: string, planId: string): Promise<{ objects: FloorObject[]; zoneAreas: ZoneAreas }> {
   try {
     const scene = await getLayoutScene(businessId, planId);
     rememberScene(planId, scene.elements);
-    return scene.elements.map(objectFromScene);
+    const zoneAreas = new Map<string, { x: number; y: number; w: number; h: number }>();
+    const objects: FloorObject[] = [];
+    for (const e of scene.elements) {
+      if (e.id.startsWith(ZONE_AREA_PREFIX)) {
+        zoneAreas.set(e.id.slice(ZONE_AREA_PREFIX.length), { x: units(e.bounds.x), y: units(e.bounds.y), w: units(e.bounds.width), h: units(e.bounds.height) });
+      } else {
+        objects.push(objectFromScene(e));
+      }
+    }
+    return { objects, zoneAreas };
   } catch {
     // No scene saved yet for this plan — draw nothing rather than fail the
     // whole pull over an empty canvas.
-    return [];
+    return { objects: [], zoneAreas: new Map() };
   }
 }
 
@@ -564,7 +640,7 @@ async function pushNow(businessId: string, doc: FloorPlanDoc, method: "quick" | 
 
   const membership = await pushZones(businessId, plan.id, doc);
   await pushSpots(businessId, plan.id, doc, membership);
-  await pushObjects(businessId, plan.id, doc.objects);
+  await pushObjects(businessId, plan.id, doc.objects, doc.zones);
 
   // Renamed in the builder: last, so a name clash never holds up the tables.
   const name = doc.name.trim();
@@ -793,7 +869,7 @@ export async function pullRecord(businessId: string, local: FloorPlanRecord): Pr
   // The background image still has nowhere on the API to live, so it stays
   // local; objects come from the scene — one shared canvas for both the draft
   // and the published snapshot, since the API keeps one scene per plan.
-  const objects = await pullObjects(businessId, plan.id);
+  const { objects, zoneAreas } = await pullObjects(businessId, plan.id);
   // Zones that fail to load leave the local rectangles as they are: reading
   // them as "none" would make the next push delete every zone.
   const [spots, zones] = await Promise.all([allSpots(businessId, plan.id), listZones(businessId, plan.id).catch(() => null)]);
@@ -812,7 +888,7 @@ export async function pullRecord(businessId: string, local: FloorPlanRecord): Pr
         height: units(snap.canvas.height),
         tables,
         objects,
-        zones: zonesFrom(snap.zones, tables, zoneOf, local.published?.doc.zones),
+        zones: zonesFrom(snap.zones, tables, zoneOf, zoneAreas, [...(local.published?.doc.zones ?? []), ...(local.draft?.doc.zones ?? [])]),
         background: local.published?.doc.background ?? null,
       },
       publishedAt: Date.parse(snap.publishedAtUtc) || Date.now(),
@@ -831,7 +907,7 @@ export async function pullRecord(businessId: string, local: FloorPlanRecord): Pr
         height: units(plan.canvas.height),
         tables,
         objects,
-        zones: zones ? zonesFrom(zones, tables, zoneOf, local.draft?.doc.zones ?? local.published?.doc.zones) : (local.draft?.doc.zones ?? []),
+        zones: zones ? zonesFrom(zones, tables, zoneOf, zoneAreas, local.draft?.doc.zones ?? local.published?.doc.zones) : (local.draft?.doc.zones ?? []),
         background: local.draft?.doc.background ?? null,
       },
       method: local.draft?.method ?? (plan.creationMethod === "QuickGrid" ? "quick" : "scratch"),

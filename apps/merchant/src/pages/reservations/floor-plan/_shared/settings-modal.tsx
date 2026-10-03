@@ -18,6 +18,7 @@ import {
 } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
+import { useI18n } from "@/app/providers/i18n-provider";
 import { useAdminText, type AdminTextKey } from "./admin-text";
 import { errorText } from "./api-error";
 import { ConfirmModal } from "./confirm-modal";
@@ -60,8 +61,20 @@ function NumberInput({ value, onChange, step = 1, label }: { value: number; onCh
   );
 }
 
+const SHAPE_KEYS: Record<string, string> = {
+  round: "floorPlan.shape.round",
+  square: "floorPlan.shape.square",
+  rectangle: "floorPlan.shape.rectangle",
+  long: "floorPlan.shape.long",
+  tabliya: "floorPlan.shape.tabliya",
+  majlis: "floorPlan.shape.majlisL",
+  majlisl: "floorPlan.shape.majlisL",
+  tent: "floorPlan.shape.tent",
+};
+
 export function FloorPlanSettingsModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (message: string) => void }) {
   const t = useAdminText();
+  const { t: tr } = useI18n();
   const { activeBusinessId } = useAuth();
   const [tab, setTab] = useState<Tab>("sizes");
   const [settings, setSettings] = useState<FloorPlanSettingsResponse | null>(null);
@@ -121,12 +134,19 @@ export function FloorPlanSettingsModal({ open, onClose, onSaved }: { open: boole
     }
   }
 
+  const shapeLabel = (code: string, fallback: string) => {
+    const key = SHAPE_KEYS[code.toLowerCase()];
+    return key ? tr(key as Parameters<typeof tr>[0]) : fallback;
+  };
   const shapes = settings?.shapes.filter((s) => s.isEnabled) ?? [];
   const max = settings?.platformMaximums;
 
   return (
     <>
-      <Modal open={open && !confirmReset} onClose={onClose} className="flex max-h-[90vh] max-w-[680px] flex-col p-0">
+      <Modal open={open && !confirmReset} onClose={onClose} className="max-w-[680px] !p-0">
+        {/* Modal wraps children in its own div, so the height cap and column
+            layout live here — that is what lets the body scroll internally. */}
+        <div className="flex max-h-[calc(100vh-2rem)] flex-col">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--octo-border-card)] px-6 py-4">
           <div className="flex items-center gap-2.5">
             <Settings2 size={20} className="text-[var(--octo-text-secondary)]" />
@@ -182,7 +202,7 @@ export function FloorPlanSettingsModal({ open, onClose, onSaved }: { open: boole
                       {!shapes.some((s) => s.code === preset.shapeCode) && <option value={preset.shapeCode}>{preset.shapeCode}</option>}
                       {shapes.map((s) => (
                         <option key={s.code} value={s.code}>
-                          {s.label}
+                          {shapeLabel(s.code, s.label)}
                         </option>
                       ))}
                     </select>
@@ -268,6 +288,7 @@ export function FloorPlanSettingsModal({ open, onClose, onSaved }: { open: boole
           >
             {busy ? t("common.saving") : t("settings.save")}
           </button>
+        </div>
         </div>
       </Modal>
 

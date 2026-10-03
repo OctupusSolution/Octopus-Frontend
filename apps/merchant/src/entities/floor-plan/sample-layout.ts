@@ -1,7 +1,9 @@
-// The restaurant the Floor Plan frames draw: a Terrace with its bar, the Main
-// Dining room, a Family Zone and a VIP Area. Offered in the builder as a
-// starting point, so a merchant can see a complete plan and edit it rather
-// than face an empty grid.
+// A complete restaurant offered in the builder as a starting point, so a
+// merchant can see a full plan and edit it rather than face an empty grid.
+// Laid out wide (about the shape of a landscape screen) so the live floor
+// shows it edge to edge, and it uses every table shape and every kind of
+// floor object: a Terrace, the Main Dining room, a Bar, the Lounge at the
+// entrance, a Family Majlis with floor seating and tents, and a VIP Area.
 import {
   createObject,
   createTable,
@@ -11,95 +13,140 @@ import {
   type FloorTable,
 } from "./model";
 
+export const SAMPLE_WIDTH = 96;
+export const SAMPLE_HEIGHT = 46;
+
 export function sampleLayout(name = "Main Dining"): FloorPlanDoc {
   const t = (number: string, x: number, y: number, extra: Partial<FloorTable> = {}): FloorTable => ({
     ...createTable(number, x, y, { seats: 4 }),
     ...extra,
   });
+  const o = createObject;
+  const plant = (x: number, y: number): FloorObject => o("plantSmall", x, y);
+  const outdoor = { area: "outdoor", smoking: "smoking" } as const;
 
+  // Every section is laid out on an even, centred grid: equal gaps between
+  // tables in a row and between the row and the section's walls.
   const tables: FloorTable[] = [
-    // Terrace
-    t("T4", 3, 4.5, { area: "outdoor", smoking: "smoking" }),
-    t("T5", 9.5, 4.5, { area: "outdoor", smoking: "smoking" }),
-    t("T6", 2, 13, { area: "outdoor" }),
-    t("T7", 8.5, 13, { area: "outdoor", blocked: true, reservable: false, note: "Umbrella repair" }),
-    t("T8", 1.5, 21, { area: "outdoor" }),
-    t("T9", 8.5, 21, { area: "outdoor" }),
+    // Terrace — open-air, smoking allowed.
+    t("T1", 3.3, 3, { ...outdoor, shape: "round", size: "small", seats: 2 }),
+    t("T2", 12.3, 3, { ...outdoor, shape: "round", size: "small", seats: 2 }),
+    t("T3", 2.9, 11, { ...outdoor }),
+    t("T4", 11.9, 11, { ...outdoor, blocked: true, reservable: false, note: "Umbrella repair" }),
+    t("T5", 2.05, 19.5, { ...outdoor, shape: "tent", seats: 6 }),
+    t("T6", 11.05, 19.5, { ...outdoor, shape: "tent", seats: 6 }),
+    t("T7", 2.98, 29.5, { ...outdoor, shape: "tabliya" }),
+    t("T8", 11.98, 29.5, { ...outdoor, shape: "tabliya" }),
+    t("T9", 2.9, 37.5, { ...outdoor, shape: "round", seats: 5 }),
+    t("T10", 11.9, 37.5, { ...outdoor, shape: "round", seats: 5 }),
     // Main Dining
-    t("T11", 17.5, 3),
-    t("T24", 24, 3),
-    t("T25", 30.5, 3),
-    t("T12", 17.5, 10),
-    t("T22", 24, 10),
-    t("T23", 30.5, 10),
-    t("T13", 17.5, 17.5, { seats: 6, size: "medium", shape: "square" }),
-    t("T20", 24, 17.5),
-    t("T21", 30.5, 17.5),
-    // Family Zone
-    t("T14", 17, 25.5, { largePartyOnly: false, seats: 6 }),
-    t("T19", 23, 25.5, { seats: 6 }),
-    t("T18", 29, 25.5, { walkIn: false, seats: 6 }),
-    t("T15", 17, 32, { seats: 6 }),
-    t("T16", 23, 32, { seats: 6 }),
-    t("T17", 29, 32, { seats: 6 }),
+    t("T11", 22.2, 2.5, { shape: "rectangle", seats: 6 }),
+    t("T12", 31.3, 2.5, { shape: "rectangle", seats: 6 }),
+    t("T13", 40.4, 2.5, { shape: "rectangle", seats: 6 }),
+    t("T14", 49.5, 2.9, { shape: "round", size: "small", seats: 2 }),
+    t("T15", 21.9, 10.5),
+    t("T16", 28.7, 10.5),
+    t("T17", 35.5, 10.5),
+    t("T18", 42.2, 10.5),
+    t("T19", 49, 10.5, { shape: "round", seats: 5 }),
+    t("T20", 22, 18.5, { shape: "long", seats: 10, largePartyOnly: true, joinable: true }),
+    t("T21", 39.4, 18.5, { shape: "long", seats: 10, joinable: true }),
+    // Bar — high tops facing the counter.
+    t("B1", 21.8, 38.5, { shape: "round", size: "small", seats: 2 }),
+    t("B2", 27.8, 38.5, { shape: "round", size: "small", seats: 2, reservable: false }),
+    t("B3", 33.8, 38.5, { shape: "round", size: "small", seats: 2 }),
+    // Lounge
+    t("L1", 45.8, 30, { shape: "round", size: "small", seats: 3 }),
+    t("L2", 45.8, 36, { size: "small", seats: 2 }),
+    // Family Majlis — Saudi floor seating.
+    t("M1", 57.4, 2, { shape: "majlisL", size: "large", seats: 10 }),
+    t("M2", 69.7, 4.1, { shape: "tent", seats: 6 }),
+    t("M3", 57.4, 16, { shape: "majlisL", seats: 8 }),
+    t("M4", 67.6, 16, { shape: "majlisL", seats: 8 }),
+    t("M5", 57.8, 28, { shape: "tabliya" }),
+    t("M6", 64.5, 28, { shape: "tabliya" }),
+    t("M7", 71.2, 28, { shape: "tabliya" }),
+    t("M8", 58.8, 35, { shape: "tent", seats: 6 }),
+    t("M9", 68.3, 35, { shape: "tent", seats: 6, blocked: true, reservable: false, note: "Private family booking" }),
     // VIP Area
-    t("T26", 38, 3, { area: "vip" }),
-    t("T27", 40.5, 10, { area: "vip" }),
-    t("T28", 38, 18, { area: "vip", blocked: true, reservable: false, note: "Private event setup" }),
-    t("T29", 40.5, 25.5, { area: "vip", largePartyOnly: true, seats: 6 }),
+    t("V1", 82.5, 2, { shape: "rectangle", size: "large", seats: 8, area: "vip" }),
+    t("V2", 80.5, 11.5, { shape: "round", area: "vip" }),
+    t("V3", 88.1, 11.5, { shape: "round", area: "vip" }),
+    t("V4", 80.3, 20, { shape: "long", size: "large", seats: 12, area: "vip", largePartyOnly: true }),
+    t("V5", 79.9, 30, { size: "large", seats: 6, area: "vip" }),
+    t("V6", 87.8, 30, { size: "large", seats: 6, area: "vip" }),
   ];
 
-  const plant = (x: number, y: number): FloorObject => createObject("plantSmall", x, y);
-
   const objects: FloorObject[] = [
-    // The building shell around the indoor rooms, open at the entrance.
-    createObject("wall", 16, 0, { w: 32, h: 0.3 }),
-    createObject("wall", 47.7, 0, { w: 0.3, h: 38 }),
-    createObject("wall", 16, 37.7, { w: 8.3, h: 0.3 }),
-    createObject("wall", 28.7, 37.7, { w: 19.3, h: 0.3 }),
-    // Main entrance: double doors swinging out of the Family Zone, a pot each side.
-    createObject("doubleDoor", 24.3, 37.85, { rotation: 180 }),
-    plant(22.5, 38.8), plant(29.1, 38.8),
+    // Building shell around the indoor rooms; the terrace is open-air.
+    o("wall", 20, 0, { w: 76, h: 0.3 }),
+    o("wall", 95.7, 0, { w: 0.3, h: 46 }),
+    o("wall", 19.85, 28, { w: 0.3, h: 17.7 }),
+    o("wall", 20, 45.7, { w: 24, h: 0.3 }),
+    o("wall", 48.4, 45.7, { w: 47.6, h: 0.3 }),
+    // Main entrance into the Lounge. A door draws its wall line along its
+    // bottom edge, so it sits flush on the wall's centre line in the gap.
+    o("doubleDoor", 44, 43.45),
 
-    // Terrace fence: hedge planters along its open edges and down the room line.
-    // Split around the zone's name tag, which sits centred on this edge.
-    createObject("planterBox", 1.2, 0, { w: 3.6, h: 1 }),
-    createObject("planterBox", 11.2, 0, { w: 3.6, h: 1 }),
-    createObject("planterBox", 0, 1.2, { w: 1, h: 18 }),
-    createObject("planterBox", 15.2, 1.4, { w: 0.8, h: 9.6 }),
-    createObject("planterBox", 15.2, 12.2, { w: 0.8, h: 13 }),
-    createObject("tree", 12.4, 9.9, { w: 2.6, h: 2.6 }),
-    plant(6.9, 21.6), plant(6.9, 23.4),
+    // Terrace: hedge planters around its open edges, gaps left for the
+    // zone's name tag and the path into the dining room.
+    o("planterBox", 1.2, 0, { w: 5, h: 1 }),
+    o("planterBox", 13.8, 0, { w: 5, h: 1 }),
+    o("planterBox", 0, 1.5, { w: 1, h: 43 }),
+    o("planterBox", 1.2, 45, { w: 17.6, h: 1 }),
+    o("planterBox", 19.2, 1.5, { w: 0.8, h: 12 }),
+    o("planterBox", 19.2, 16, { w: 0.8, h: 11.5 }),
+    plant(9.3, 40),
 
-    // A low partition between Main Dining and the Family Zone, open in the middle.
-    createObject("halfWall", 16.3, 23.85, { w: 5.8, h: 0.3 }),
-    createObject("halfWall", 30.6, 23.85, { w: 6.1, h: 0.3 }),
+    // Main Dining: a service station between the long tables, greenery at
+    // the end of the row, and a low partition screening the Bar.
+    o("station", 34.5, 19.9, { label: "Service" }),
+    plant(51.5, 20.2), plant(53.6, 20.2),
+    o("halfWall", 20.3, 27.85, { w: 17, h: 0.3 }),
 
-    // Greenery screening the VIP Area.
-    plant(35.6, 3), plant(35.6, 5), plant(35.6, 7),
-    plant(46.1, 3), plant(46.1, 5), plant(46.1, 7),
-    createObject("plantLarge", 38.2, 34.8),
-    createObject("plantLarge", 44.6, 34.8),
-    // A door draws its wall line along its bottom edge (top edge once turned
-    // 180°), so it sits flush on the wall's centre line in the gap between the
-    // wall pieces. The terrace door swings toward the bar, clear of T8.
-    createObject("door", 1.6, 27.15, { rotation: 180 }),
-    createObject("wall", 4.6, 27, { w: 11.4, h: 0.3 }),
-    createObject("wall", 0, 27, { w: 1.6, h: 0.3 }),
-    createObject("wall", 37, 33, { w: 6, h: 0.3 }),
-    createObject("door", 43, 30.55),
-    createObject("wall", 46, 33, { w: 2, h: 0.3 }),
-    createObject("bar", 1.5, 30.5, { w: 13, h: 5.5, label: "Bar" }),
+    // Bar
+    o("bar", 21.5, 30.5, { w: 13, h: 5.5, label: "Bar" }),
+    o("counter", 35.2, 30.5, { w: 4.4, h: 2, label: "Coffee" }),
+    plant(38.3, 43.8),
+
+    // Lounge: sofas and armchairs around low tables, the host at the door.
+    o("sofa", 41.2, 31.3),
+    o("sofa", 51, 31.3),
+    o("armchair", 43.2, 37.3),
+    o("armchair", 51, 37.3),
+    o("text", 41.5, 41.4, { label: "Welcome" }),
+    o("hostStand", 50.5, 42.2),
+    o("plantLarge", 53.2, 43.2),
+
+    // Wall between the Dining room / Lounge and the Majlis, open at the aisle.
+    o("wall", 55.85, 0.3, { w: 0.3, h: 11.7 }),
+    o("wall", 55.85, 18, { w: 0.3, h: 27.7 }),
+
+    // Family Majlis: floor cushions along the back wall.
+    o("majlisFloor", 58.05, 43.8),
+    o("majlisFloor", 67.95, 43.8),
+
+    // Wall between the Majlis and the VIP Area, open at the aisle.
+    o("wall", 77.85, 0.3, { w: 0.3, h: 19.7 }),
+    o("wall", 77.85, 26, { w: 0.3, h: 19.7 }),
+
+    // VIP Area: greenery flanking the head table, a sofa between two palms.
+    plant(79.6, 2.2), plant(79.6, 4.6), plant(79.6, 7),
+    plant(93, 2.2), plant(93, 4.6), plant(93, 7),
+    o("plantLarge", 79.2, 42.8),
+    o("sofa", 85.1, 42),
+    o("plantLarge", 92.8, 42.8),
   ];
 
   const zones = [
-    createZone("Terrace", "green", { x: 0, y: 0, w: 16, h: 38 }),
-    createZone("Main Dining", "blue", { x: 16, y: 0, w: 21, h: 24 }),
-    createZone("Family Zone", "amber", { x: 16, y: 24, w: 21, h: 14 }),
-    createZone("VIP Area", "violet", { x: 37, y: 0, w: 11, h: 38 }),
+    createZone("Terrace", "green", { x: 0, y: 0, w: 20, h: 46 }),
+    createZone("Main Dining", "blue", { x: 20, y: 0, w: 36, h: 28 }),
+    createZone("Bar", "slate", { x: 20, y: 28, w: 20, h: 18 }),
+    createZone("Lounge", "slate", { x: 40, y: 28, w: 16, h: 18 }),
+    createZone("Family Majlis", "amber", { x: 56, y: 0, w: 22, h: 46 }),
+    createZone("VIP Area", "violet", { x: 78, y: 0, w: 18, h: 46 }),
   ];
 
-  // Matches the blank canvas's own default size, so a merchant who starts
-  // from this sample has the same room to extend it that a blank plan does.
-  return { name, width: 54, height: 48, zones, tables, objects, background: null };
+  // The zones tile the whole canvas, so the plan has no empty margin.
+  return { name, width: SAMPLE_WIDTH, height: SAMPLE_HEIGHT, zones, tables, objects, background: null };
 }

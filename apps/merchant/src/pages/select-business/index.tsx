@@ -31,7 +31,7 @@ function BusinessCard({ business, onPick }: { business: TenantConfig; onPick: ()
     <button
       type="button"
       onClick={onPick}
-      className="flex flex-col rounded-2xl border border-[var(--octo-border-card)] border-s-4 border-s-[#0D6EFD] bg-[var(--octo-card)] px-4 pb-3 pt-4 text-start shadow-[0_6px_20px_-12px_rgba(15,23,42,0.25)] transition-shadow hover:shadow-[0_10px_28px_-12px_rgba(13,110,253,0.45)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0D6EFD]"
+      className="flex h-full w-full flex-col rounded-2xl border border-[var(--octo-border-card)] border-s-4 border-s-[#0D6EFD] bg-[var(--octo-card)] px-4 pb-3 pt-4 text-start shadow-[0_6px_20px_-12px_rgba(15,23,42,0.25)] transition-shadow hover:shadow-[0_10px_28px_-12px_rgba(13,110,253,0.45)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0D6EFD]"
     >
       <div className="flex items-start gap-3">
         {type ? (
@@ -128,7 +128,7 @@ export function SelectBusinessPage() {
         {businesses.length > 0 && (
           <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {businesses.map((business) => (
-              <div key={business.id} className={picking === business.id ? "opacity-60" : undefined} aria-busy={picking === business.id}>
+              <div key={business.id} className={picking === business.id ? "h-full opacity-60" : "h-full"} aria-busy={picking === business.id}>
                 <BusinessCard business={business} onPick={() => void pick(business)} />
               </div>
             ))}

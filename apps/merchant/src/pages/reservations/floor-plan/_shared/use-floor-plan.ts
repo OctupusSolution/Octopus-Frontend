@@ -43,6 +43,7 @@ import {
   type FloorPlanDoc,
   type FloorTable,
   type LiveOverrides,
+  trimToContent,
   type LiveTableState,
   type QuickStep,
   type WriteOutcome,
@@ -110,7 +111,10 @@ export function useFloorPlan() {
   }, [tenantId]);
 
   const publish = useCallback(
-    async (doc: FloorPlanDoc): Promise<WriteOutcome> => {
+    async (drawn: FloorPlanDoc): Promise<WriteOutcome> => {
+      // The published plan is exactly the restaurant's size, so the live floor
+      // fills its frame instead of showing unused canvas around the room.
+      const doc = trimToContent(drawn);
       if (activeBusinessId) {
         try {
           await publishDraft(activeBusinessId, doc);
@@ -121,7 +125,12 @@ export function useFloorPlan() {
           // what reservations can actually book against — booking a table
           // whose id was never a real spot id is what sent a bad `resourceId`
           // to the API before this existed.
-          const fresh = await pullRecord(activeBusinessId, readFloorPlan(tenantId));
+          // Pull against a record whose published doc is the one just sent,
+          // so the zone rectangles drawn here (which the API does not store)
+          // are matched back onto the server's zones instead of being redrawn
+          // as tight boxes around each zone's tables.
+          const local = { ...readFloorPlan(tenantId), published: { doc, publishedAt: Date.now(), publishedBy: author } };
+          const fresh = await pullRecord(activeBusinessId, local);
           if (fresh) return writeFloorPlan(tenantId, fresh);
         } catch (err) {
           setSyncError(describe(err));

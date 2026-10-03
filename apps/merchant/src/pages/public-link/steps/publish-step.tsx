@@ -28,6 +28,7 @@ import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
 import { GO_LIVE_ITEMS } from "../_shared/checklist";
 import { previewModelFromSite } from "../_shared/preview-model";
+import { siteHref } from "../_shared/site-href";
 import { SitePreview } from "../ui/site-preview";
 import { QrCode } from "../ui/qr-code";
 import { SitePreviewModal } from "../ui/site-preview-modal";
@@ -145,9 +146,11 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const model = previewModelFromSite(draft, "desktop", t, locale);
   // The claimed address (server hostname / slug), never the business name — see preview-model.ts.
   const liveUrl = `https://${model.url}`;
+  const menuUrl = `${liveUrl}/menu`;
   const connected = publicLinkSync.connected;
 
   const [copiedLive, setCopiedLive] = useState(false);
+  const [copiedMenu, setCopiedMenu] = useState(false);
   const [copiedSocial, setCopiedSocial] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -267,7 +270,15 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
             <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.yourPublicLink")}</p>
             <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.publicLinkNote")}</p>
             <div className="flex items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--octo-text-primary)]">{liveUrl}</span>
+              <a
+                href={siteHref(liveUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                dir="ltr"
+                className="min-w-0 flex-1 truncate text-start text-[12px] text-[var(--octo-text-primary)] hover:text-[#0D6EFD] hover:underline"
+              >
+                {liveUrl}
+              </a>
               {draft.publish.published && (
                 <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-[#16a34a]">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
@@ -285,14 +296,54 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
               >
                 {copiedLive ? t("publicLink.preview.copied") : t("publicLink.copyLink")}
               </Button>
-              <button type="button" onClick={() => setSiteView("desktop")} className={LINK_BUTTON}>
-                <ExternalLink size={13} />
-                {t("publicLink.openWebsite")}
-              </button>
+              {/* Live: the real site in a new tab. Not yet published there is nothing to open, so the preview stands in. */}
+              {draft.publish.published ? (
+                <a href={siteHref(liveUrl)} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>
+                  <ExternalLink size={13} />
+                  {t("publicLink.openWebsite")}
+                </a>
+              ) : (
+                <button type="button" onClick={() => setSiteView("desktop")} className={LINK_BUTTON}>
+                  <ExternalLink size={13} />
+                  {t("publicLink.openWebsite")}
+                </button>
+              )}
               <button type="button" onClick={() => setSiteView("mobile")} className={LINK_BUTTON}>
                 <Globe size={13} />
                 {t("publicLink.visitAsCustomer")}
               </button>
+            </div>
+          </div>
+
+          {/* Menu link: the site's own /menu page */}
+          <div className={CARD}>
+            <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("publicLink.menuLink")}</p>
+            <p className="-mt-1.5 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.menuLinkNote")}</p>
+            <div className="flex items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2">
+              <a
+                href={siteHref(liveUrl, "/menu")}
+                target="_blank"
+                rel="noopener noreferrer"
+                dir="ltr"
+                className="min-w-0 flex-1 truncate text-start text-[12px] text-[var(--octo-text-primary)] hover:text-[#0D6EFD] hover:underline"
+              >
+                {menuUrl}
+              </a>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<Copy size={13} />}
+                onClick={() => copyText(menuUrl, setCopiedMenu)}
+                className="flex-1 justify-center"
+              >
+                {copiedMenu ? t("publicLink.preview.copied") : t("publicLink.copyLink")}
+              </Button>
+              <a href={siteHref(liveUrl, "/menu")} target="_blank" rel="noopener noreferrer" className={LINK_BUTTON}>
+                <ExternalLink size={13} />
+                {t("publicLink.openMenu")}
+              </a>
             </div>
           </div>
 

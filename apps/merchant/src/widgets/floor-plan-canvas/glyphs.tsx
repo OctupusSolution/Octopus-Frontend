@@ -152,23 +152,49 @@ function TableBody({
   }
 
   if (table.shape === "tent") {
-    const peak = Math.min(0.9, h * 0.24);
-    const rx = Math.min(0.6, shortSide * 0.16);
+    // A Bedouin tent seen from above: a pyramid canopy in the status colour
+    // whose four panels catch the light differently,
+    // wooden poles at the corners, guy ropes pegged out at the
+    // corners, and the front flap rolled open onto a rug.
+    const hw = w / 2;
+    const hh = h / 2;
+    const rx = Math.min(0.45, shortSide * 0.1);
+    const trim = Math.min(0.42, shortSide * 0.11);
+    const pole = Math.min(0.2, shortSide * 0.055);
+    const wood = "#7C5A3A";
+    const rope = Math.min(0.7, shortSide * 0.16);
+    const flapW = w * 0.34;
+    const panel = (d: string, tone: number) => (
+      <path d={d} fill={shade(colors.fill, tone)} stroke={shade(colors.fill, -0.45)} strokeWidth={strokeWidth * 0.5} strokeLinejoin="round" />
+    );
     return (
       <g>
-        <Solid depth={depth} draw={(face) => <rect x={-w / 2} y={-h / 2} width={w} height={h} rx={rx} {...style(face)} />} />
-        {/* Canvas roof panels meeting at a ridge. */}
-        <path d={`M ${-w / 2} ${-h / 2} L 0 0 L ${w / 2} ${-h / 2} Z`} fill={shade(colors.fill, 0.25)} opacity={0.7} />
-        <path d={`M ${-w / 2} ${h / 2} L 0 0 L ${w / 2} ${h / 2} Z`} fill={shade(colors.fill, -0.12)} opacity={0.55} />
-        <path d={`M ${-w / 2} ${-h / 2} L ${w / 2} ${h / 2} M ${w / 2} ${-h / 2} L ${-w / 2} ${h / 2}`} stroke={ITEM_OUTLINE} strokeWidth={strokeWidth * 0.6} opacity={0.35} />
+        {/* Guy ropes from each corner out to a peg. */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sy]) => (
+          <g key={`${sx}${sy}`} opacity={0.75}>
+            <line x1={sx * hw} y1={sy * hh} x2={sx * (hw + rope)} y2={sy * (hh + rope)} stroke={wood} strokeWidth={strokeWidth * 0.6} />
+            <circle cx={sx * (hw + rope)} cy={sy * (hh + rope)} r={pole * 0.7} fill={wood} />
+          </g>
+        ))}
+        <Solid depth={depth} draw={(face) => <rect x={-hw} y={-hh} width={w} height={h} rx={rx} {...style(face)} />} />
+        {/* Canopy panels rising to the central pole. */}
+        {panel(`M ${-hw} ${-hh} L ${hw} ${-hh} L 0 0 Z`, 0.3)}
+        {panel(`M ${-hw} ${-hh} L 0 0 L ${-hw} ${hh} Z`, 0.12)}
+        {panel(`M ${hw} ${-hh} L ${hw} ${hh} L 0 0 Z`, -0.12)}
+        {panel(`M ${-hw} ${hh} L 0 0 L ${hw} ${hh} Z`, -0.02)}
+        {/* Front flap rolled open onto a rug. */}
         <path
-          d={`M ${-w / 2} ${-h / 2} L 0 ${-h / 2 - peak} L ${w / 2} ${-h / 2}`}
-          fill={shade(colors.fill, -0.2)}
+          d={`M ${-flapW / 2} ${hh} L 0 ${hh - h * 0.2} L ${flapW / 2} ${hh} Z`}
+          fill="#F5E6C8"
           stroke={ITEM_OUTLINE}
-          strokeWidth={strokeWidth}
+          strokeWidth={strokeWidth * 0.6}
           strokeLinejoin="round"
         />
-        <circle r={Math.min(0.18, shortSide * 0.05)} fill={ITEM_OUTLINE} />
+        <rect x={-flapW / 2 - 0.05} y={hh - 0.12} width={flapW + 0.1} height={0.24} rx={0.12} fill={shade(colors.fill, -0.35)} />
+        {/* Poles. */}
+        {[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sy]) => (
+          <circle key={`p${sx}${sy}`} cx={sx * (hw - trim / 2)} cy={sy * (hh - trim / 2)} r={pole} fill={wood} stroke={ITEM_OUTLINE} strokeWidth={strokeWidth * 0.4} />
+        ))}
       </g>
     );
   }
@@ -337,6 +363,21 @@ export const TableGlyph = memo(function TableGlyph({
         <TableBody table={table} body={body} colors={colors} strokeWidth={strokeWidth} dash={dash} shortSide={shortSide} />
       </g>
       {showLabel && (
+        // Every table number sits on a white badge so it reads against any
+        // table colour or shape.
+        <rect
+          x={labelX - fontSize * (0.25 + table.number.length * 0.32)}
+          y={labelY - fontSize * 0.58}
+          width={fontSize * (0.5 + table.number.length * 0.64)}
+          height={fontSize * 1.16}
+          rx={fontSize * 0.32}
+          fill="#FFFFFF"
+          stroke={colors.text}
+          strokeWidth={fontSize * 0.07}
+          opacity={0.95}
+        />
+      )}
+      {showLabel && (
         <text
           x={labelX}
           y={labelY}
@@ -344,7 +385,7 @@ export const TableGlyph = memo(function TableGlyph({
           dominantBaseline="central"
           fontSize={fontSize}
           fontWeight={700}
-          fill={colors.text}
+          fill="#111827"
           style={{ userSelect: "none" }}
         >
           {table.number}

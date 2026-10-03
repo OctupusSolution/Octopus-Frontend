@@ -382,7 +382,7 @@ export function BuildFromScratchPage() {
           >
             {isEmpty && !doc.background && (
               <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
-                <div className="pointer-events-auto flex max-w-[420px] flex-col items-center rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]/95 p-6 text-center shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur">
+                <div className="pointer-events-auto flex max-w-[420px] flex-col items-center rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-6 text-center shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur">
                   <span className="grid h-12 w-12 place-items-center rounded-full bg-[#6D28D9]/10 text-[#6D28D9]">
                     <Shapes size={24} />
                   </span>
@@ -417,7 +417,7 @@ export function BuildFromScratchPage() {
           )}
           <div className="pointer-events-none absolute inset-x-0 bottom-3 z-[5] flex justify-center px-3">
             <FloatingToolbar
-              className="pointer-events-auto !bg-[var(--octo-card)]/90 backdrop-blur"
+              className="pointer-events-auto !bg-[var(--octo-card)] backdrop-blur"
               tools={[
                 { id: "undo", label: t("floorPlan.toolbar.undo"), icon: <Undo2 size={18} />, shortcut: "Ctrl+Z", disabled: !editor.canUndo, onClick: editor.undo },
                 { id: "redo", label: t("floorPlan.toolbar.redo"), icon: <Redo2 size={18} />, shortcut: "Ctrl+Shift+Z", disabled: !editor.canRedo, onClick: editor.redo },
@@ -459,7 +459,7 @@ export function BuildFromScratchPage() {
             />
           </div>
           <ZoomControls
-            className="pointer-events-auto absolute bottom-3 end-3 z-[5] !bg-[var(--octo-card)]/90 backdrop-blur"
+            className="pointer-events-auto absolute bottom-3 end-3 z-[5] !bg-[var(--octo-card)] backdrop-blur"
             zoomPercent={Math.round((scale / ACTUAL_SIZE_SCALE) * 100)}
             onZoomIn={() => setScale((s) => Math.min(MAX_SCALE, s * 1.2))}
             onZoomOut={() => setScale((s) => Math.max(MIN_SCALE, s / 1.2))}

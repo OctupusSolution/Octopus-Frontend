@@ -8,7 +8,6 @@ import { Mail, Lock, Link2 } from "lucide-react";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthField, AuthButton } from "../_shared/auth-field";
-import { SocialRow } from "../_shared/social-row";
 import { AuthErrorDialog, useAuthError } from "../_shared/auth-error";
 import { fillText, useSessionText } from "../_shared/session-text";
 import {
@@ -122,7 +121,6 @@ export function LoginForm({ onForgotPassword }: { onForgotPassword: () => void }
         </div>
       ) : (
         <>
-          <SocialRow onCredential={(provider, credential, mail) => void social.signIn(provider, credential, mail)} busy={social.busy} />
           <AuthErrorDialog message={social.error} onClose={() => social.setError(null)} />
         </>
       )}

@@ -8,7 +8,6 @@ import { Mail, Lock, User, Building2 } from "lucide-react";
 import { register } from "@octopus/api-client";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuthField, AuthButton } from "../_shared/auth-field";
-import { SocialRow } from "../_shared/social-row";
 import { AuthErrorDialog, isEmailTaken, useAuthError } from "../_shared/auth-error";
 import { useExternalSignIn, type ExternalLinkRouteState } from "../_shared/use-external-sign-in";
 
@@ -103,11 +102,6 @@ export function SignUpForm({ onSubmitted }: { onSubmitted: (draft: SignUpDraft) 
         {t("auth.signUp.title")}
       </h1>
 
-      <SocialRow
-        intent="signup"
-        onCredential={(provider, credential, mail) => void social.signIn(provider, credential, mail)}
-        busy={social.busy}
-      />
       <AuthErrorDialog message={social.error} onClose={() => social.setError(null)} />
       {failure.dialog}
 

@@ -133,7 +133,7 @@
 | 3.6 | الحجوزات على الطاولات | 🔴 | مفيش حجوزات في الـ module. بتيجي من Reservation. |
 | 3.7 | `gridStep` بيتقرّب لرقمين عشريين | 🟢 | 0.375 بتبقى 0.38. بنحوّل الإحداثيات بثابت 0.375 عندنا. |
 | 3.8 | مفيش سجل إصدارات (Version History) للمخطط في الواجهة | 🟢 مش على الـ backend (اتحل 2026-09-22) | `listFloorPlanVersions`/`restoreVersionToDraft` كانوا جاهزين ومحدش بيناديهم. ضفنا زرار "Version History" وشاشة في `floor-plan-hub.tsx` (تظهر لما فيه published)، بيسترجع نسخة قديمة كمسودة جديدة (مش نشر مباشر) عشان التاجر يراجعها في المحرر الأول — نفس منطق Public Link مع نسخه (1b.11). |
-| 3.9 | قفل تعاوني (Edit Lock) لمنع اتنين يعدلوا نفس المخطط بنفس الوقت | 🔴 | `acquireFloorPlanEditLock`/`releaseFloorPlanEditLock` جاهزين بس لسه ما اتربطوش. محتاجة شاشة/حالة جديدة (قفل، مين ماسكه، Force takeover) في نقطتين دخول المحرر (`builder/scratch`، `builder/quick`) — شغل أكبر من مجرد نداء API، سبناه لحد قرار بتصميم الحالة دي. |
+| 3.9 | قفل تعاوني (Edit Lock) لمنع اتنين يعدلوا نفس المخطط بنفس الوقت | 🟢 مش على الـ backend (اتحل) | `builder/_shared/edit-lock.tsx` بياخد القفل ويجدده وهو فاتح المحرر (`builder/scratch` و`builder/quick`)، وبيعرض مين ماسكه مع Force takeover. |
 
 ---
 

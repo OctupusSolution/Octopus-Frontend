@@ -210,7 +210,8 @@ export function toMemberProfile(e: Employee): MemberProfile {
     employmentType: CONTRACT_TO_EMPLOYMENT_TYPE[e.contractType],
     assignedRole: ROLE_ASSIGNED_ROLE[e.role],
     accessLevel: ROLE_ACCESS_LEVEL[e.role],
-    modulesAccess: ROLE_MODULES_ACCESS[e.role],
+    // A role from the API (custom, renamed, or none) has no entry in the built-in map.
+    modulesAccess: ROLE_MODULES_ACCESS[e.role] ?? [],
     loginMethod: "PIN",
     pinCode: String(1000 + (hash % 9000)),
     twoFactorEnabled: e.role === "Owner" || e.role === "Branch Manager",

@@ -26,6 +26,9 @@ export interface PlanSvgProps {
   /** Pixels per grid unit. */
   scale: number;
   svgRef?: Ref<SVGSVGElement>;
+  /** The region of the plan to draw (plan units); defaults to the whole canvas.
+   *  May reach past the canvas edges — the paper and grid extend to cover it. */
+  view?: { x: number; y: number; w: number; h: number };
   className?: string;
   toneFor?: (table: FloorTable) => LiveStatus;
   showGrid?: boolean;
@@ -113,7 +116,9 @@ export function PlanSvg({
   onHandlePointerDown,
   onBackgroundPointerDown,
   overlay,
+  view,
 }: PlanSvgProps) {
+  const v = view ?? { x: 0, y: 0, w: doc.width, h: doc.height };
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const px = 1 / scale;
 
@@ -140,9 +145,9 @@ export function PlanSvg({
   return (
     <svg
       ref={svgRef}
-      width={doc.width * scale}
-      height={doc.height * scale}
-      viewBox={`0 0 ${doc.width} ${doc.height}`}
+      width={v.w * scale}
+      height={v.h * scale}
+      viewBox={`${v.x} ${v.y} ${v.w} ${v.h}`}
       className={className}
       style={{ display: "block", fontFamily: "inherit", touchAction: "none" }}
       onPointerDown={onBackgroundPointerDown}
@@ -160,7 +165,7 @@ export function PlanSvg({
         ))}
       </defs>
 
-      <rect width={doc.width} height={doc.height} fill={transparentPaper ? "transparent" : PAPER} />
+      <rect x={v.x} y={v.y} width={v.w} height={v.h} fill={transparentPaper ? "transparent" : PAPER} />
       {showBackground && doc.background?.mime.startsWith("image/") && (
         <image
           href={doc.background.dataUrl}
@@ -171,7 +176,7 @@ export function PlanSvg({
           pointerEvents="none"
         />
       )}
-      {showGrid && <rect width={doc.width} height={doc.height} fill={`url(#${uid}-grid)`} pointerEvents="none" />}
+      {showGrid && <rect x={v.x} y={v.y} width={v.w} height={v.h} fill={`url(#${uid}-grid)`} pointerEvents="none" />}
 
       {zones.map((zone) => (
         <g key={zone.id} {...bind(zone)} opacity={dimmedIds.has(zone.id) ? 0.35 : 1}>

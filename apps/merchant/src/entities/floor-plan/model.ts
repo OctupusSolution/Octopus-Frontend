@@ -405,6 +405,26 @@ function mapItems(doc: FloorPlanDoc, ids: ReadonlySet<string>, fn: (item: FloorI
   };
 }
 
+/** Shrinks the canvas to what is actually drawn on it (plus `margin` units),
+ *  shifting everything so the content starts at the margin. Leaves a plan with
+ *  a background image alone — the image is laid out against the full canvas. */
+export function trimToContent(doc: FloorPlanDoc, margin = 1): FloorPlanDoc {
+  if (doc.background) return doc;
+  const b = boundsOf([...doc.zones, ...doc.objects, ...doc.tables].map(itemRect));
+  if (!b) return doc;
+  const dx = round2(margin - b.x);
+  const dy = round2(margin - b.y);
+  const shift = <T extends { x: number; y: number }>(item: T): T => ({ ...item, x: round2(item.x + dx), y: round2(item.y + dy) });
+  return {
+    ...doc,
+    width: Math.ceil(b.w + margin * 2),
+    height: Math.ceil(b.h + margin * 2),
+    zones: doc.zones.map(shift),
+    objects: doc.objects.map(shift),
+    tables: doc.tables.map(shift),
+  };
+}
+
 /** Moves the unlocked items among `ids`, keeping each one fully on canvas. */
 export function moveItems(doc: FloorPlanDoc, ids: readonly string[], dx: number, dy: number): FloorPlanDoc {
   if (dx === 0 && dy === 0) return doc;

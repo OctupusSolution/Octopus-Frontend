@@ -105,7 +105,7 @@ export function UpdateTableForm({
         <div className={clsx("flex flex-col gap-4", !embedded && "mt-5")}>
           <div>
             <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">{t("floorPlan.live.detail.status")}</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
+            <div className={clsx("mt-2 grid grid-cols-2 gap-2", !embedded && "sm:grid-cols-4")} role="radiogroup">
               {EDITABLE_STATUSES.map((status) => {
                 const active = form.status === status;
                 const tone = TABLE_TONES[status];
@@ -156,7 +156,7 @@ export function UpdateTableForm({
         </div>
       )}
 
-      <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className={clsx("flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between", embedded ? "mt-4" : "mt-6")}>
         {!blocked ? (
           <Button variant="ghost" icon={<RotateCcw size={14} />} onClick={onReset} className="h-10 justify-center px-3 text-[13px]">
             {t("floorPlan.live.update.reset")}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw, Share2, SlidersHorizontal, Clock, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { AiInsightsPanel } from "@/widgets/ai-insights-panel";
 import {
   distributionCards,
@@ -18,7 +19,7 @@ import { LiveOrders } from "./_sections/live-orders";
 import { RecentActivity } from "./_sections/recent-activity";
 
 const outlineButton =
-  "flex h-11 items-center gap-2 rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-4 text-[15px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]";
+  "flex items-center gap-1 rounded-[8px] border border-[#cbd5e1] px-3 py-2 text-[14px] font-medium leading-[14px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]";
 
 export function DashboardPage() {
   const { t } = useI18n();
@@ -86,20 +87,18 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="px-4 pb-10 pt-6 sm:px-[26px] lg:ps-[50px] lg:pt-8">
+    <div className="px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-semibold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">
-            {t("dashboard.title")}
-          </h1>
-          <p className="mt-1.5 text-[13.5px] text-[var(--octo-text-secondary)] sm:text-[15px]">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-[24px] font-bold leading-[24px] text-[var(--octo-text-primary)]">{t("dashboard.title")}</h1>
+          <p className="text-[14px] font-medium leading-[14px] text-[var(--octo-text-secondary)]">
             {t("dashboard.subtitle").replace("{business}", businessLabel)}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="hidden items-center gap-2 text-[15px] text-[var(--octo-text-secondary)] md:flex">
-            <Clock size={21} strokeWidth={1.6} />
+          <span className="hidden items-center gap-2 text-[14px] font-medium leading-[14px] text-[var(--octo-text-secondary)] md:flex">
+            <ShellIcon name="clock.svg" />
             {t(labelKey(updatedLabel))}
           </span>
 
@@ -108,9 +107,9 @@ export function DashboardPage() {
             aria-label={t("common.refresh")}
             title={t("common.refresh")}
             onClick={handleRefresh}
-            className="grid h-11 w-11 place-items-center rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+            className="grid h-10 w-10 place-items-center rounded-[8px] border border-[#cbd5e1] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]"
           >
-            <RefreshCw size={20} strokeWidth={1.7} className={refreshing ? "animate-spin" : undefined} />
+            <ShellIcon name="refresh.svg" className={refreshing ? "animate-spin" : undefined} />
           </button>
 
           <div className="relative">
@@ -121,7 +120,7 @@ export function DashboardPage() {
               onClick={() => setShareOpen((v) => !v)}
               className={outlineButton}
             >
-              {shareCopied ? <Check size={19} className="text-[#16a34a]" /> : <Share2 size={19} strokeWidth={1.7} />}
+              {shareCopied ? <Check size={24} className="text-[#16a34a]" /> : <ShellIcon name="share.svg" />}
               {t(shareCopied ? "dashboard.share.copied" : "common.share")}
             </button>
 
@@ -145,7 +144,7 @@ export function DashboardPage() {
                     onClick={() => void handleShare()}
                     className="flex shrink-0 items-center gap-1 rounded-[7px] bg-[#0D6EFD] px-2.5 py-1 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90"
                   >
-                    {shareCopied ? <Check size={12} /> : <Share2 size={12} />}
+                    {shareCopied ? <Check size={12} /> : <ShellIcon name="share.svg" size={12} />}
                     {t(shareCopied ? "dashboard.share.copied" : "common.share")}
                   </button>
                 </div>
@@ -161,7 +160,7 @@ export function DashboardPage() {
               onClick={() => (filterOpen ? setFilterOpen(false) : openFilter())}
               className={outlineButton}
             >
-              <SlidersHorizontal size={19} strokeWidth={1.7} />
+              <ShellIcon name="filter.svg" />
               {t("dashboard.globalFilter")}
               {branches.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#0D6EFD]" />}
             </button>
@@ -230,18 +229,18 @@ export function DashboardPage() {
         <KpiCards />
       </div>
 
-      <div className="mt-12 grid grid-cols-1 gap-[25px] lg:grid-cols-[2.06fr_1fr]">
+      <div className="mt-12 grid grid-cols-1 gap-[23px] lg:grid-cols-[minmax(0,758fr)_minmax(0,367fr)]">
         <CustomersActivity />
         <AiInsightsPanel />
       </div>
 
-      <div className="mt-12 grid grid-cols-1 gap-[26px] lg:grid-cols-2">
+      <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
         {distributionCards.map((card) => (
           <DistributionCard key={card.id} data={card} branches={branches} />
         ))}
       </div>
 
-      <div className="mt-14">
+      <div className="mt-12">
         <LiveOrders branches={branches} />
       </div>
 

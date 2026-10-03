@@ -1,19 +1,31 @@
-// The method chooser. Two cards, both live: from scratch opens the builder,
-// upload with AI opens the import flow.
+// The method chooser (frame "ADD NEW MENU"). Two cards: from scratch opens the
+// builder; upload with AI is drawn disabled as "Coming Soon" — the import flow
+// stays reachable from the library header only.
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, CheckCircle2, Clock, Coins, Info, MapPin } from "lucide-react";
-import { Button } from "@ui/primitives";
+import clsx from "clsx";
 import { SEED_BRANCHES } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CREATE_FROM_SCRATCH_ART, UPLOAD_WITH_AI_ART } from "@/shared/lib/menu-assets";
+import { CREATE_FROM_SCRATCH_ART, UPLOAD_WITH_AI_ART, menuAsset } from "@/shared/lib/menu-assets";
+import { MenuIcon } from "../_shared/menu-icon";
+import { INFO_STRIP, LINE, PAGE_TITLE, SURFACE_BLUE, SURFACE_SUBTLE, TEXT, TEXT_GRAY, TEXT_SECONDARY } from "../_shared/theme";
 
-function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+const RESTAURANT_AVATAR = menuAsset("menu-restaurant-avatar.png");
+
+const ICON_BLUE = "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]";
+
+function Fact({ icon, avatar, label, value, last }: { icon?: string; avatar?: string; label: string; value: string; last?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-3">
-      <span className="text-[var(--octo-accent)]" aria-hidden>{icon}</span>
-      <span>
-        <span className="block text-[12px] text-[var(--octo-text-secondary)]">{label}</span>
-        <span className="block text-[14px] font-semibold text-[var(--octo-text-primary)]">{value}</span>
+    <div className={clsx("flex h-12 min-w-0 flex-1 items-center gap-2 p-2", !last && `border-b sm:border-b-0 sm:border-e ${LINE}`)}>
+      {avatar ? (
+        <img src={avatar} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+      ) : (
+        <span className={clsx("grid size-8 shrink-0 place-items-center rounded-full", SURFACE_BLUE, ICON_BLUE)}>
+          {icon && <MenuIcon name={icon} size={24} />}
+        </span>
+      )}
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className={clsx("text-[12px] font-medium leading-3", TEXT_GRAY)}>{label}</span>
+        <span className={clsx("truncate text-[14px] font-semibold leading-[14px]", TEXT)}>{value}</span>
       </span>
     </div>
   );
@@ -21,10 +33,79 @@ function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; va
 
 function Point({ children, tone }: { children: string; tone: string }) {
   return (
-    <li className="flex items-start gap-2 text-[14px] text-[var(--octo-text-secondary)]">
-      <CheckCircle2 size={18} className={`mt-px shrink-0 ${tone}`} aria-hidden />
+    <li className={clsx("flex items-center gap-1 text-[14px] font-medium leading-[14px]", TEXT)}>
+      <MenuIcon name="menu-done-circle.svg" size={24} className={tone} />
       {children}
     </li>
+  );
+}
+
+function MethodCard({
+  tone,
+  art,
+  artWidth,
+  badge,
+  title,
+  body,
+  points,
+  cta,
+  onClick,
+  disabled,
+}: {
+  tone: "violet" | "green";
+  art: string;
+  artWidth: number;
+  badge?: string;
+  title: string;
+  body: string;
+  points: string[];
+  cta: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  const violet = tone === "violet";
+  return (
+    <section
+      className={clsx(
+        "relative flex w-full max-w-[464px] flex-col gap-4 overflow-hidden rounded-[24px] border p-6",
+        violet
+          ? "border-[#6920d2] bg-[#f5f4fd] [[data-theme=dark]_&]:bg-[#6920d2]/10"
+          : "border-[#009a39] bg-[#f3f8f5] [[data-theme=dark]_&]:bg-[#009a39]/10"
+      )}
+    >
+      <div className="relative flex flex-col gap-6">
+        <img src={art} alt="" style={{ width: artWidth }} className="h-[208px] max-w-full object-contain object-left rtl:object-right" />
+        <div className="flex min-h-[169px] flex-col gap-3">
+          <div className="flex min-h-[69px] flex-col gap-2">
+            <h2 className={clsx("text-[20px] font-semibold leading-5", TEXT)}>{title}</h2>
+            <p className={clsx("text-[14px] font-medium leading-[1.4]", TEXT_GRAY)}>{body}</p>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {points.map((point) => (
+              <Point key={point} tone={violet ? "text-[#6920d2] [[data-theme=dark]_&]:text-[#a78bfa]" : "text-[#009a39]"}>
+                {point}
+              </Point>
+            ))}
+          </ul>
+        </div>
+        {badge && (
+          <span className="absolute end-0 top-0 rounded-full bg-[#6920d2] px-3 py-1 text-[16px] font-medium leading-4 text-white">
+            {badge}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={clsx(
+          "mt-auto flex h-10 w-full items-center justify-center rounded-[8px] px-3 text-[16px] font-bold leading-4 text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-50",
+          violet ? "bg-[#6920d2] hover:opacity-90" : "bg-[#009a39]"
+        )}
+      >
+        {cta}
+      </button>
+    </section>
   );
 }
 
@@ -39,80 +120,62 @@ export function CreateMenuPage() {
   });
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[26px] font-bold text-[var(--octo-text-primary)]">{t("menuNew.title")}</h1>
-          <p className="mt-1 text-[15px] text-[var(--octo-text-secondary)]">{t("menuNew.subtitle")}</p>
+    <div className="flex flex-col gap-8 px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
+      <header className="flex min-h-[50px] flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
+          <h1 className={PAGE_TITLE}>{t("menuNew.title")}</h1>
+          <p className={clsx("text-[14px] font-medium leading-[14px]", TEXT_SECONDARY)}>{t("menuNew.subtitle")}</p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-[10px] bg-[var(--octo-track)] px-3 py-[7px] text-[13px] font-medium text-[var(--octo-text-secondary)]">
-          <CalendarDays size={15} className="text-[var(--octo-text-muted)]" aria-hidden />
+        <span
+          className={clsx(
+            "inline-flex items-center gap-2 rounded-[4px] p-2 text-[14px] font-medium leading-[14px] text-[#16161d] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]",
+            SURFACE_SUBTLE
+          )}
+        >
+          <MenuIcon name="menu-calendar.svg" size={24} />
           {today}
         </span>
       </header>
 
-      <div className="mt-4 grid divide-y divide-[var(--octo-border-card)] rounded-[12px] border border-[var(--octo-border-card)] sm:grid-cols-4 sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse">
-        <Fact
-          icon={
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-[#0d2b21] font-serif text-[9px] leading-none tracking-[0.1em] text-white/80">
-              OV
-            </span>
-          }
-          label={t("menuNew.restaurant")}
-          value="Ocean View Restaurant"
-        />
-        <Fact icon={<MapPin size={18} />} label={t("menuNew.branch")} value={SEED_BRANCHES[0].label} />
-        <Fact icon={<Clock size={18} />} label={t("menuNew.timezone")} value="(GMT+03:00) ASIA/ RIYADH" />
-        <Fact icon={<Coins size={18} />} label={t("menuNew.currency")} value="SAR (Saudi Riyal)" />
+      <div className="flex flex-col gap-10">
+        <div className={clsx("flex flex-col rounded-[8px] border sm:flex-row sm:gap-6", LINE)}>
+          <Fact avatar={RESTAURANT_AVATAR} label={t("menuNew.restaurant")} value="Ocean View Restaurant" />
+          <Fact icon="menu-location.svg" label={t("menuNew.branch")} value={SEED_BRANCHES[0].label} />
+          <Fact icon="menu-clock.svg" label={t("menuNew.timezone")} value="(GMT+03:00) ASIA/ RIYADH" />
+          <Fact icon="menu-money.svg" label={t("menuNew.currency")} value="SAR (Saudi Riyal)" last />
+        </div>
+
+        <div className="flex flex-col items-center gap-8">
+          <div className="flex w-full flex-col items-center justify-center gap-6 lg:flex-row lg:items-stretch lg:gap-10">
+            <MethodCard
+              tone="violet"
+              art={CREATE_FROM_SCRATCH_ART}
+              artWidth={204}
+              badge={t("menuNew.recommended")}
+              title={t("menuNew.scratch.title")}
+              body={t("menuNew.scratch.body")}
+              points={[t("menuNew.scratch.p1"), t("menuNew.scratch.p2"), t("menuNew.scratch.p3")]}
+              cta={t("menuNew.scratch.cta")}
+              onClick={() => navigate("/menu/new/scratch")}
+            />
+            <MethodCard
+              tone="green"
+              art={UPLOAD_WITH_AI_ART}
+              artWidth={308}
+              title={t("menuNew.ai.title")}
+              body={t("menuNew.ai.body")}
+              points={[t("menuNew.ai.p1"), t("menuNew.ai.p2"), t("menuNew.ai.p3")]}
+              cta={t("menuNew.ai.comingSoon")}
+              disabled
+            />
+          </div>
+
+          <p className={clsx("flex min-h-8 w-full items-center justify-center gap-1 rounded-[8px] px-3 py-1 text-center text-[14px] font-medium leading-[1.3]", INFO_STRIP)}>
+            <MenuIcon name="menu-info-circle.svg" size={24} />
+            {t("menuNew.switchHint")}
+          </p>
+        </div>
       </div>
-
-      <div className="mx-auto mt-6 grid max-w-[970px] gap-6 lg:grid-cols-2 lg:gap-10">
-        <section className="relative flex flex-col rounded-[16px] border-2 border-[#7c3aed] bg-[#7c3aed]/5 p-6">
-          <span className="absolute end-6 top-6 rounded-full bg-[#7c3aed] px-3 py-1 text-[13px] font-semibold text-white">
-            {t("menuNew.recommended")}
-          </span>
-          <img src={CREATE_FROM_SCRATCH_ART} alt="" className="mx-auto h-[220px] object-contain" />
-          <h2 className="mt-5 text-[22px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuNew.scratch.title")}
-          </h2>
-          <p className="mt-2 text-[14px] text-[var(--octo-text-secondary)]">{t("menuNew.scratch.body")}</p>
-          <ul className="mb-5 mt-4 space-y-2.5">
-            <Point tone="text-[#7c3aed]">{t("menuNew.scratch.p1")}</Point>
-            <Point tone="text-[#7c3aed]">{t("menuNew.scratch.p2")}</Point>
-            <Point tone="text-[#7c3aed]">{t("menuNew.scratch.p3")}</Point>
-          </ul>
-          <Button
-            className="mt-auto h-11 w-full justify-center bg-[#7c3aed] text-[16px] font-semibold hover:bg-[#6d28d9]"
-            onClick={() => navigate("/menu/new/scratch")}
-          >
-            {t("menuNew.scratch.cta")}
-          </Button>
-        </section>
-
-        <section className="flex flex-col rounded-[16px] border-2 border-[#16a34a] bg-[#16a34a]/5 p-6">
-          <img src={UPLOAD_WITH_AI_ART} alt="" className="mx-auto h-[220px] object-contain" />
-          <h2 className="mt-5 text-[22px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuNew.ai.title")}
-          </h2>
-          <p className="mt-2 text-[14px] text-[var(--octo-text-secondary)]">{t("menuNew.ai.body")}</p>
-          <ul className="mb-5 mt-4 space-y-2.5">
-            <Point tone="text-[#16a34a]">{t("menuNew.ai.p1")}</Point>
-            <Point tone="text-[#16a34a]">{t("menuNew.ai.p2")}</Point>
-            <Point tone="text-[#16a34a]">{t("menuNew.ai.p3")}</Point>
-          </ul>
-          <Button
-            className="mt-auto h-11 w-full justify-center bg-[#16a34a] text-[16px] font-semibold hover:bg-[#15803d]"
-            onClick={() => navigate("/menu/import")}
-          >
-            {t("menuNew.ai.cta")}
-          </Button>
-        </section>
-      </div>
-
-      <p className="mx-auto mt-6 flex max-w-[970px] items-center justify-center gap-2 rounded-[10px] bg-[var(--octo-info-soft,var(--octo-hover))] px-4 py-3 text-[14px] text-[var(--octo-accent)]">
-        <Info size={16} aria-hidden />
-        {t("menuNew.switchHint")}
-      </p>
     </div>
   );
 }

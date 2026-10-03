@@ -7,27 +7,31 @@
 // is honest; a made-up form is not.
 import { useRef, useState } from "react";
 import clsx from "clsx";
-import { Grid2x2, List, Trash2, GalleryHorizontal } from "lucide-react";
 import { EmptyState } from "@ui/primitives";
 import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { MediaTile } from "@/shared/ui/media-tile";
 import type { DisplayStyle, Section } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { menuAsset } from "@/shared/lib/menu-assets";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FOCUS, LINE, PANEL, TEXT, TEXT_GRAY } from "../../_shared/theme";
 
 type Tab = "general" | "availability" | "advanced";
 const TABS: Tab[] = ["general", "availability", "advanced"];
 
-const STYLES: { id: DisplayStyle; icon: typeof List }[] = [
-  { id: "list", icon: List },
-  { id: "carousel", icon: GalleryHorizontal },
-  { id: "grid", icon: Grid2x2 },
+const STYLES: { id: DisplayStyle; icon: string }[] = [
+  { id: "list", icon: "menu-bars.svg" },
+  { id: "carousel", icon: "menu-carousel.svg" },
+  { id: "grid", icon: "menu-grid.svg" },
 ];
 
 // Five fixed swatches plus a custom picker, as the frame draws them.
-const COLORS = ["#a91d1d", "#d99400", "#d61f9c", "#0d6efd", "#7c3aed"];
+const COLORS = ["#ab0101", "#db9200", "#e700c1", "#1160fe", "#ae00e3"];
 
-const RAINBOW = "conic-gradient(#ef4444,#f59e0b,#22c55e,#0d6efd,#7c3aed,#ec4899,#ef4444)";
-const SELECTED_RING = "ring-2 ring-[var(--octo-accent)] ring-offset-2 ring-offset-[var(--octo-card)]";
+const COLOR_WHEEL = menuAsset("menu-color-wheel.png");
+const SELECTED_RING = "ring-2 ring-[#0D6EFD] ring-offset-2 ring-offset-[var(--octo-card)]";
+const LABEL = `text-[14px] font-medium leading-[14px] ${TEXT}`;
+const ACCENT_TEXT = "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]";
 
 export function SectionSettings({
   section,
@@ -43,69 +47,63 @@ export function SectionSettings({
   const picker = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
   const colorInput = useRef<HTMLInputElement>(null);
 
+  const title = <h2 className={clsx("text-[18px] font-bold leading-[18px]", TEXT)}>{t("menuWiz.sec.settingTitle")}</h2>;
+
   if (!section) {
     return (
-      <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-        <h2 className="text-[18px] font-semibold text-[var(--octo-text-primary)]">
-          {t("menuWiz.sec.settingTitle")}
-        </h2>
-        <div className="mt-6">
-          <EmptyState title={t("menuWiz.sec.buildHint")} />
-        </div>
+      <section className={clsx("flex flex-col gap-4", PANEL)}>
+        {title}
+        <EmptyState title={t("menuWiz.sec.buildHint")} />
       </section>
     );
   }
 
   // Anything not among the fixed swatches came from the custom picker.
-  const customColor =
-    section.color !== null && !COLORS.includes(section.color) ? section.color : null;
+  const color = section.color?.toLowerCase() ?? null;
+  const customColor = color !== null && !COLORS.includes(color) ? color : null;
 
   return (
-    <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <h2 className="text-[18px] font-semibold text-[var(--octo-text-primary)]">
-        {t("menuWiz.sec.settingTitle")}
-      </h2>
-      <p className="mt-1 text-[16px] font-medium text-[var(--octo-text-primary)]">{section.name}</p>
+    <section className={clsx("flex flex-col gap-4", PANEL)}>
+      {title}
 
-      <div className="mt-3 flex gap-5 border-b border-[var(--octo-border-card)]">
-        {TABS.map((id) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={clsx(
-              "-mb-px border-b-2 pb-2 text-[15px]",
-              tab === id
-                ? "border-[var(--octo-accent)] font-medium text-[var(--octo-accent)]"
-                : "border-transparent text-[var(--octo-text-secondary)]"
-            )}
-          >
-            {t(`menuWiz.sec.tab.${id}`)}
-          </button>
-        ))}
+      <div className="flex flex-col gap-4">
+        <p className={clsx("truncate text-[16px] font-medium leading-4", TEXT)}>{section.name}</p>
+        <div role="tablist" className="flex gap-8 border-b border-[#e2e8f0] [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
+          {TABS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={clsx(
+                "-mb-px border-b pb-[11px] pt-1 text-[14px] font-medium leading-[14px]",
+                tab === id ? "border-[#0D6EFD] text-[#0D6EFD]" : `border-transparent ${TEXT_GRAY}`
+              )}
+            >
+              {t(`menuWiz.sec.tab.${id}`)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab !== "general" ? (
-        <div className="mt-6">
-          <EmptyState title={t(`menuWiz.sec.tab.${tab}`)} />
-        </div>
+        <EmptyState title={t(`menuWiz.sec.tab.${tab}`)} />
       ) : (
-        <div className="mt-4 space-y-4">
-          <div>
-            <p className="text-[13px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuWiz.sec.image")}
-            </p>
-            <div className="mt-1.5 flex items-start gap-2.5">
-              <span className="h-[60px] w-[88px] shrink-0 overflow-hidden rounded-[8px] border border-dashed border-[var(--octo-border-input)] p-0.5">
-                <MediaTile src={section.image} rounded="rounded-[6px]" />
+        <>
+          <div className="flex flex-col gap-3">
+            <p className={clsx("text-[12px] font-medium leading-3", TEXT)}>{t("menuWiz.sec.image")}</p>
+            <div className="flex items-stretch gap-3">
+              <span className={clsx("h-[57px] w-[82px] shrink-0 rounded-[12px] border border-dashed p-1", LINE)}>
+                <MediaTile src={section.image} rounded="rounded-[8px]" />
               </span>
               {picker.input}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex items-start gap-2">
                   <button
                     type="button"
                     onClick={picker.open}
-                    className="h-9 min-w-0 flex-1 truncate rounded-[8px] border border-[var(--octo-accent)] px-3 text-[14px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
+                    className="h-9 min-w-0 flex-1 truncate rounded-[8px] border border-[#0D6EFD] px-3 text-[12px] font-bold leading-3 text-[#0D6EFD] hover:bg-[#f5f9ff] [[data-theme=dark]_&]:hover:bg-[#0d6efd]/15"
                   >
                     {t("menuWiz.sec.changeImage")}
                   </button>
@@ -113,129 +111,120 @@ export function SectionSettings({
                     type="button"
                     aria-label={t("menuWiz.sec.deleteImage")}
                     onClick={onClearImage}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] border border-error/40 bg-error/10 text-error hover:bg-error/15"
+                    className="grid size-9 shrink-0 place-items-center rounded-[8px] bg-[#fef0f0] text-[#d30202] hover:brightness-95 [[data-theme=dark]_&]:bg-[#d30202]/15 [[data-theme=dark]_&]:text-[#ff6b6b]"
                   >
-                    <Trash2 size={18} />
+                    <MenuIcon name="menu-trash.svg" size={24} />
                   </button>
                 </div>
-                <p className="mt-1 text-[12.5px] text-[var(--octo-text-muted)]">
-                  {t("menuWiz.sec.imageHint")}
-                </p>
+                <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuWiz.sec.imageHint")}</p>
               </div>
             </div>
             {picker.error && (
-              <p role="alert" className="mt-1.5 text-[12.5px] text-error">
+              <p role="alert" className="text-[12px] leading-[14px] text-[#d30202]">
                 {t(picker.error === "too-large" ? "menuWiz.sec.error.tooLarge" : "menuWiz.sec.error.unreadable")}
               </p>
             )}
           </div>
 
-          <label className="block">
-            <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuWiz.sec.description")}
-            </span>
+          <label className="flex flex-col gap-2">
+            <span className={LABEL}>{t("menuWiz.sec.description")}</span>
             <textarea
               rows={3}
               value={section.description}
               onChange={(e) => onPatch({ description: e.target.value })}
-              className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[14px] text-[var(--octo-text-primary)]"
+              className={clsx(
+                "w-full resize-y rounded-[12px] border bg-[var(--octo-card)] px-3 py-2 text-[12px] font-medium leading-[1.4]",
+                LINE,
+                TEXT,
+                FOCUS
+              )}
             />
           </label>
 
-          <fieldset>
-            <legend className="text-[15px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuWiz.sec.visibility")}
-            </legend>
-            <div className="mt-1.5 space-y-2">
-              {(["visible", "hidden"] as const).map((value) => (
-                <label key={value} className="flex items-center gap-2.5 text-[14px]">
+          <fieldset className="flex flex-col gap-2">
+            <legend className={clsx("mb-2", LABEL)}>{t("menuWiz.sec.visibility")}</legend>
+            {(["visible", "hidden"] as const).map((value) => {
+              const checked = section.visibility === value;
+              return (
+                <label key={value} className="flex cursor-pointer items-center gap-2">
                   <input
                     type="radio"
                     name={`visibility-${section.id}`}
-                    checked={section.visibility === value}
+                    checked={checked}
                     onChange={() => onPatch({ visibility: value })}
-                    className="h-4 w-4 accent-[var(--octo-accent)]"
+                    className="peer sr-only"
                   />
-                  <span
-                    className={clsx(
-                      "font-medium",
-                      section.visibility === value
-                        ? "text-[var(--octo-accent)]"
-                        : "text-[var(--octo-text-primary)]"
-                    )}
-                  >
-                    {t(`menuWiz.sec.${value}`)}
+                  <span className="inline-flex rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-[#0D6EFD]/40">
+                    <MenuIcon
+                      name={checked ? "menu-radio-on.svg" : "menu-radio-off.svg"}
+                      size={24}
+                      className={checked ? "text-[#0D6EFD]" : "text-[#64748b]"}
+                    />
                   </span>
-                  <span className="text-[var(--octo-text-secondary)]">
-                    ({t(`menuWiz.sec.${value}Hint`)})
+                  <span className={clsx("text-[14px] font-medium leading-[14px]", checked ? ACCENT_TEXT : TEXT_GRAY)}>
+                    {t(`menuWiz.sec.${value}`)} (<span className="text-[12px] leading-3">{t(`menuWiz.sec.${value}Hint`)})</span>
                   </span>
                 </label>
-              ))}
-            </div>
+              );
+            })}
           </fieldset>
 
-          <div>
-            <p className="text-[15px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuWiz.sec.displayStyle")}
-            </p>
-            <div className="mt-1.5 flex gap-2">
-              {STYLES.map(({ id, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={section.displayStyle === id}
-                  onClick={() => onPatch({ displayStyle: id })}
-                  className={clsx(
-                    "flex h-[75px] w-[66px] flex-col items-center justify-center gap-1 rounded-[6px] border text-[12px] font-medium",
-                    section.displayStyle === id
-                      ? "border-[var(--octo-accent)] text-[var(--octo-accent)]"
-                      : "border-[var(--octo-border-card)] text-[var(--octo-text-primary)]"
-                  )}
-                >
-                  <Icon size={36} strokeWidth={1.6} aria-hidden />
-                  {t(`menuWiz.sec.style.${id}`)}
-                </button>
-              ))}
+          <div className="flex flex-col gap-2">
+            <p className={LABEL}>{t("menuWiz.sec.displayStyle")}</p>
+            <div className="flex gap-2">
+              {STYLES.map(({ id, icon }) => {
+                const active = section.displayStyle === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onPatch({ displayStyle: id })}
+                    className={clsx(
+                      "flex min-w-[70px] flex-col items-center gap-2 rounded-[4px] border p-2 text-[12px] font-semibold leading-3",
+                      active ? "border-[#0D6EFD] text-[#0D6EFD]" : `${LINE} ${TEXT}`
+                    )}
+                  >
+                    <MenuIcon name={icon} size={40} />
+                    {t(`menuWiz.sec.style.${id}`)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div>
-            <p className="text-[15px] font-medium text-[var(--octo-text-primary)]">
+          <div className="flex flex-col gap-2">
+            <p className={LABEL}>
               {t("menuWiz.sec.color")}{" "}
-              <span className="text-[13px] font-normal text-[var(--octo-text-secondary)]">
-                ({t("menuWiz.sec.colorOptional")})
-              </span>
+              <span className={clsx("text-[12px] font-normal leading-3", TEXT_GRAY)}>({t("menuWiz.sec.colorOptional")})</span>
             </p>
-            <div className="mt-1.5 flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               {/* Pressing the selected swatch again clears it — the colour is
                   optional, so there has to be a way back to none. */}
-              {COLORS.map((color) => (
+              {COLORS.map((swatch) => (
                 <button
-                  key={color}
+                  key={swatch}
                   type="button"
-                  aria-label={color}
-                  aria-pressed={section.color === color}
-                  onClick={() => onPatch({ color: section.color === color ? null : color })}
-                  style={{ background: color }}
-                  className={clsx("h-7 w-7 rounded-full", section.color === color && SELECTED_RING)}
+                  aria-label={swatch}
+                  aria-pressed={color === swatch}
+                  onClick={() => onPatch({ color: color === swatch ? null : swatch })}
+                  style={{ background: swatch }}
+                  className={clsx("size-6 rounded-full", color === swatch && SELECTED_RING)}
                 />
               ))}
-              <span className="relative h-7 w-7">
+              <span className="relative size-6">
                 <button
                   type="button"
                   aria-label={t("menuWiz.sec.customColor")}
                   aria-pressed={customColor !== null}
                   onClick={() => colorInput.current?.click()}
-                  style={{ background: RAINBOW }}
-                  className={clsx(
-                    "grid h-7 w-7 place-items-center rounded-full",
-                    customColor && SELECTED_RING
-                  )}
+                  className={clsx("relative grid size-6 place-items-center rounded-full", customColor && SELECTED_RING)}
                 >
+                  <img src={COLOR_WHEEL} alt="" className="absolute inset-0 size-full rounded-full object-cover" />
                   {customColor && (
                     <span
                       aria-hidden
-                      className="h-3.5 w-3.5 rounded-full border-2 border-white"
+                      className="relative size-3 rounded-full border-2 border-white"
                       style={{ background: customColor }}
                     />
                   )}
@@ -254,7 +243,7 @@ export function SectionSettings({
               </span>
             </div>
           </div>
-        </div>
+        </>
       )}
     </section>
   );

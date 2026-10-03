@@ -3,8 +3,8 @@
 // Every figure comes from entities/menu/pricing.ts. Nothing on this tab is
 // typed except the offer price under the Fixed role, or the discount under the
 // Set a Discount role — which then derives the price.
+import { useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { Checkbox } from "@ui/primitives";
 import {
   discountedPrice,
   individualTotals,
@@ -15,7 +15,15 @@ import {
   type Offer,
 } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CheckBox } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_INVALID, FOCUS_WITHIN, LINE, SURFACE_BLUE, SURFACE_SUBTLE, TEXT, TEXT_GRAY, TEXT_SECONDARY } from "../../_shared/theme";
 import { OfferPriceQuote } from "./price-quote";
+import type { OfferTabValidation } from "./index";
+
+/** The platform's own quote ("Server price check") is not in the frame; flip
+ *  this to draw it under the roles again. */
+const SHOW_SERVER_QUOTE: boolean = false;
 
 const ROLES: { id: Offer["pricing"]["role"]; titleKey: string; hintKey: string }[] = [
   { id: "fixed", titleKey: "menuOffer.role.fixed", hintKey: "menuOffer.role.fixedHint" },
@@ -23,24 +31,45 @@ const ROLES: { id: Offer["pricing"]["role"]; titleKey: string; hintKey: string }
   { id: "dynamic", titleKey: "menuOffer.role.dynamic", hintKey: "menuOffer.role.dynamicHint" },
 ];
 
+const CARD = `rounded-[4px] border p-2 ${LINE}`;
+const CARD_TITLE = `text-[14px] font-bold leading-[14px] ${TEXT}`;
+const ACCENT_TEXT = "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]";
+const ERROR_TEXT = "text-[12px] leading-[14px] text-[#d30202]";
+
+function Row({ label, value, total }: { label: ReactNode; value: ReactNode; total?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-[14px] leading-[14px]">
+      <dt className={clsx("min-w-0 truncate font-medium", total ? TEXT : TEXT_GRAY)}>{label}</dt>
+      <dd className={clsx("shrink-0 whitespace-nowrap text-end", total ? `font-bold ${ACCENT_TEXT}` : `font-semibold ${TEXT}`)}>{value}</dd>
+    </div>
+  );
+}
+
 export function TabPricing({
   menu,
   offer,
   onPatch,
+  validation,
 }: {
   menu: Menu;
   offer: Offer;
   onPatch: (patch: Partial<Offer>) => void;
+  validation: OfferTabValidation;
 }) {
   const { t } = useI18n();
+  const { errors, onTouch } = validation;
   const lines = offerLines(menu, offer);
   const individual = individualTotals(menu, offer);
   const totals = offerTotals(offer);
   const savings = offerSavings(menu, offer);
   const percent = Number((offer.pricing.vatRate * 100).toFixed(2));
+  const vatLabel = t("menuOffer.vatLine").replace("{p}", String(percent));
   const { pricing } = offer;
   const isDiscount = pricing.role === "discount";
   const discount = pricing.discount ?? { type: "percent" as const, value: 0 };
+  // While the price field has focus it shows what is being typed; otherwise
+  // the frame's two-decimal figure.
+  const [priceDraft, setPriceDraft] = useState<string | null>(null);
 
   function setDiscount(next: NonNullable<Offer["pricing"]["discount"]>) {
     onPatch({
@@ -67,204 +96,192 @@ export function TabPricing({
     onPatch({ pricing: { ...pricing, role } });
   }
 
+  const priceError = errors.offerPrice ? t(errors.offerPrice).replace("{total}", `SAR ${individual.subTotal}`) : null;
+  const discountError = errors.discount ? t(errors.discount).replace("{total}", `SAR ${individual.subTotal}`) : null;
+
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-[10px] border border-[var(--octo-border-card)] p-4">
-          <h3 className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuOffer.individualTotal")}
-          </h3>
-          <dl className="mt-2.5 space-y-2 text-[15px]">
-            {lines.map((line) => (
-              <div key={line.name} className="flex items-center justify-between">
-                <dt className="text-[var(--octo-text-secondary)]">
-                  {line.name}
-                  {line.qty > 1 ? ` ×${line.qty}` : ""}:
-                </dt>
-                <dd className="text-[var(--octo-text-primary)]">SAR {line.price * line.qty}</dd>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <section className={clsx("flex flex-col gap-4", CARD)}>
+          <h3 className={CARD_TITLE}>{t("menuOffer.individualTotal")}</h3>
+          <div className="flex flex-col gap-4">
+            <dl className={clsx("flex flex-col gap-2 border-b pb-2", LINE)}>
+              {lines.map((line, index) => (
+                <Row
+                  key={`${line.name}-${index}`}
+                  label={`${line.name}${line.qty > 1 ? ` ×${line.qty}` : ""}:`}
+                  value={`SAR ${line.price * line.qty}`}
+                />
+              ))}
+              {lines.length === 0 && <p className={clsx("text-[14px] leading-[14px]", TEXT_GRAY)}>{t("menuOffer.noLines")}</p>}
+            </dl>
+            <dl className="flex flex-col gap-2">
+              <div className={clsx("flex flex-col gap-2 border-b pb-2", LINE)}>
+                <Row label={t("menuOffer.subTotal")} value={`SAR ${individual.subTotal}`} />
+                <Row label={vatLabel} value={`SAR ${individual.vat}`} />
               </div>
-            ))}
-            <div className="flex items-center justify-between border-t border-[var(--octo-border-card)] pt-2">
-              <dt className="text-[var(--octo-text-secondary)]">{t("menuOffer.subTotal")}</dt>
-              <dd className="text-[var(--octo-text-primary)]">SAR {individual.subTotal}</dd>
-            </div>
-            <div className="flex items-center justify-between">
-              <dt className="text-[var(--octo-text-secondary)]">
-                {t("menuOffer.vatLine").replace("{p}", String(percent))}
-              </dt>
-              <dd className="text-[var(--octo-text-primary)]">SAR {individual.vat}</dd>
-            </div>
-            <div className="flex items-center justify-between border-t border-[var(--octo-border-card)] pt-2">
-              <dt className="text-[var(--octo-text-primary)]">{t("menuOffer.total")}</dt>
-              <dd className="font-semibold text-[var(--octo-accent)]">SAR {individual.total}</dd>
-            </div>
-          </dl>
+              <Row total label={t("menuOffer.total")} value={`SAR ${individual.total}`} />
+            </dl>
+          </div>
         </section>
 
-        <div className="space-y-4">
-          <section className="rounded-[10px] border border-[var(--octo-border-card)] p-4">
-            <h3 className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
-              {t("menuOffer.offerPrice")}
-            </h3>
+        <div className="flex flex-col gap-3">
+          <section className={clsx("flex flex-col gap-3", CARD)}>
+            <h3 className={CARD_TITLE}>{t("menuOffer.offerPrice")}</h3>
             {/* The frame's big centred figure. Under Fixed it is the field the
                 merchant types into; under Discount it is derived, so it is
                 shown rather than offered for editing. */}
-            <div className="mt-2 flex items-center justify-center gap-1.5 rounded-[6px] bg-[var(--octo-selected)] px-3 py-1.5 text-[28px] font-semibold text-[var(--octo-accent)]">
+            <label
+              className={clsx(
+                "flex items-center justify-center gap-1 rounded-[4px] border border-transparent p-2 text-[20px] font-semibold leading-5 text-[#0D6EFD]",
+                SURFACE_BLUE,
+                !isDiscount && FOCUS_WITHIN,
+                priceError && FIELD_INVALID
+              )}
+            >
               <span>SAR</span>
               {isDiscount ? (
-                <span>{pricing.offerPrice}</span>
+                <span>{pricing.offerPrice.toFixed(2)}</span>
               ) : (
                 <input
-                  type="number"
-                  min={0}
+                  type="text"
+                  inputMode="decimal"
+                  dir="ltr"
                   aria-label={t("menuOffer.offerPrice")}
-                  value={pricing.offerPrice === 0 ? "" : pricing.offerPrice}
-                  placeholder="0"
-                  onChange={(e) =>
-                    onPatch({
-                      pricing: { ...pricing, offerPrice: Math.max(0, Number(e.target.value) || 0) },
-                    })
-                  }
-                  style={{ width: `${Math.max(1, String(pricing.offerPrice || "").length) + 0.6}ch` }}
-                  className="min-w-[2ch] bg-transparent text-start outline-none [appearance:textfield] placeholder:text-[var(--octo-accent)]/40 [&::-webkit-inner-spin-button]:appearance-none"
+                  aria-invalid={priceError ? true : undefined}
+                  value={priceDraft ?? pricing.offerPrice.toFixed(2)}
+                  onFocus={() => setPriceDraft(pricing.offerPrice === 0 ? "" : String(pricing.offerPrice))}
+                  onBlur={() => {
+                    setPriceDraft(null);
+                    onTouch("offerPrice");
+                  }}
+                  onChange={(e) => {
+                    // Digits and one decimal point; anything else is not a price.
+                    const text = e.target.value.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+                    setPriceDraft(text);
+                    onPatch({ pricing: { ...pricing, offerPrice: Math.max(0, Number(text) || 0) } });
+                  }}
+                  style={{ width: `${Math.max(4, (priceDraft ?? pricing.offerPrice.toFixed(2)).length) + 0.5}ch` }}
+                  className="min-w-0 bg-transparent text-start font-semibold outline-none"
                 />
               )}
-            </div>
-            <dl className="mt-2.5 space-y-2 text-[15px]">
-              <div className="flex items-center justify-between">
-                <dt className="text-[var(--octo-text-secondary)]">
-                  {t("menuOffer.vatLine").replace("{p}", String(percent))}
-                </dt>
-                <dd className="text-[var(--octo-text-primary)]">SAR {totals.vat}</dd>
+            </label>
+            {priceError && (
+              <p role="alert" className={clsx("-mt-1", ERROR_TEXT)}>
+                {priceError}
+              </p>
+            )}
+            <dl className="flex flex-col gap-2">
+              <div className={clsx("border-b pb-2", LINE)}>
+                <Row label={vatLabel} value={`SAR ${totals.vat}`} />
               </div>
-              <div className="flex items-center justify-between border-t border-[var(--octo-border-card)] pt-2">
-                <dt className="text-[var(--octo-text-primary)]">{t("menuOffer.total")}</dt>
-                <dd className="font-semibold text-[var(--octo-accent)]">SAR {totals.total}</dd>
-              </div>
+              <Row total label={t("menuOffer.total")} value={`SAR ${totals.total}`} />
             </dl>
           </section>
 
-          <section className="rounded-[10px] border border-[var(--octo-border-card)] p-4">
-            <h3 className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
-              {t("menuOffer.customerSaves")}
-            </h3>
-            <p className="mt-2 rounded-[6px] bg-[var(--octo-tone-success-bg)] py-1.5 text-center text-[28px] font-semibold text-[var(--octo-tone-success-text)]">
+          <section className={clsx("flex flex-col gap-3", CARD)}>
+            <h3 className={CARD_TITLE}>{t("menuOffer.customerSaves")}</h3>
+            <p className="rounded-[4px] bg-[#dcffef] p-2 text-center text-[18px] font-bold leading-[18px] text-[#009a39] [[data-theme=dark]_&]:bg-[#009a39]/15">
               SAR {savings.amount}
             </p>
-            <div className="mt-2.5 flex items-center justify-between text-[15px]">
-              <span className="text-[var(--octo-text-secondary)]">
-                {t("menuOffer.totalInclVat")}
-              </span>
-              <span className="font-semibold text-[var(--octo-tone-success-text)]">
-                {t("menuOffer.off").replace("{p}", String(savings.percent))}
-              </span>
+            <div className="flex items-center justify-between gap-2 text-[14px] font-medium leading-[14px]">
+              <span className={TEXT_GRAY}>{t("menuOffer.totalInclVat")}</span>
+              <span className="whitespace-nowrap text-end text-[#009a39]">{t("menuOffer.off").replace("{p}", String(savings.percent))}</span>
             </div>
           </section>
         </div>
       </div>
 
-      <section>
-        <h3 className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
-          {t("menuOffer.pricingRoles")}
-        </h3>
-        <div className="mt-2 grid gap-2.5 sm:grid-cols-3">
-          {ROLES.map(({ id, titleKey, hintKey }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={pricing.role === id}
-              onClick={() => chooseRole(id)}
-              className={clsx(
-                "rounded-[10px] border p-3 text-start",
-                pricing.role === id
-                  ? "border-[var(--octo-accent)] bg-[var(--octo-selected)]"
-                  : "border-[var(--octo-border-card)]"
-              )}
-            >
-              <span className="flex items-start gap-2">
-                <span
-                  aria-hidden
-                  className={clsx(
-                    "mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border",
-                    pricing.role === id
-                      ? "border-[var(--octo-accent)] bg-[var(--octo-accent)]"
-                      : "border-[var(--octo-border-input)]"
-                  )}
-                >
-                  {pricing.role === id && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+      <section className="flex flex-col gap-2">
+        <h3 className={clsx("text-[16px] font-medium leading-4", TEXT)}>{t("menuOffer.pricingRoles")}</h3>
+        <div role="radiogroup" aria-label={t("menuOffer.pricingRoles")} className="grid gap-3 sm:grid-cols-3">
+          {ROLES.map(({ id, titleKey, hintKey }) => {
+            const active = pricing.role === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => chooseRole(id)}
+                className={clsx(
+                  "flex items-start gap-2 rounded-[12px] border p-2 text-start text-[12px]",
+                  active ? `border-[#0D6EFD] ${SURFACE_BLUE}` : LINE
+                )}
+              >
+                <MenuIcon
+                  name={active ? "menu-radio-on.svg" : "menu-radio-off.svg"}
+                  size={24}
+                  className={active ? "text-[#0D6EFD]" : "text-[#64748b]"}
+                />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className={clsx("font-semibold leading-3", active ? ACCENT_TEXT : TEXT)}>{t(titleKey)}</span>
+                  <span className={clsx("leading-[1.2]", TEXT_GRAY)}>{t(hintKey)}</span>
                 </span>
-                <span className="min-w-0">
-                  <span
-                    className={clsx(
-                      "block text-[14px] font-medium",
-                      pricing.role === id
-                        ? "text-[var(--octo-accent)]"
-                        : "text-[var(--octo-text-primary)]"
-                    )}
-                  >
-                    {t(titleKey)}
-                  </span>
-                  <span className="block text-[13px] text-[var(--octo-text-secondary)]">
-                    {t(hintKey)}
-                  </span>
-                </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
 
+        {/* The frame shows the Fixed role selected; the discount's own two
+            fields appear with its role, in the module's field style. */}
         {isDiscount && (
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <div>
-              <p className="text-[13.5px] text-[var(--octo-text-primary)]">
-                {t("menuOffer.discountType")}
-              </p>
-              <div
-                role="radiogroup"
-                aria-label={t("menuOffer.discountType")}
-                className="mt-1.5 inline-flex rounded-[9px] border border-[var(--octo-border-input)] p-1"
-              >
-                {(["percent", "amount"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    role="radio"
-                    aria-checked={discount.type === type}
-                    onClick={() => setDiscount({ ...discount, type })}
-                    className={clsx(
-                      "min-w-[52px] rounded-[7px] px-3 py-1.5 text-[14px] font-medium",
-                      discount.type === type
-                        ? "bg-[var(--octo-accent)] text-white"
-                        : "text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
-                    )}
-                  >
-                    {type === "percent" ? "%" : "SAR"}
-                  </button>
-                ))}
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-2">
+                <p className={clsx("text-[12px] font-medium leading-3", TEXT)}>{t("menuOffer.discountType")}</p>
+                <div role="radiogroup" aria-label={t("menuOffer.discountType")} className={clsx("flex h-10 items-center gap-1 rounded-[12px] border p-1", LINE)}>
+                  {(["percent", "amount"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      role="radio"
+                      aria-checked={discount.type === type}
+                      onClick={() => {
+                        setDiscount({ ...discount, type });
+                        onTouch("discount");
+                      }}
+                      className={clsx(
+                        "h-full min-w-[52px] rounded-[8px] px-3 text-[14px] font-medium leading-[14px]",
+                        discount.type === type ? "bg-[#0D6EFD] text-white" : `${TEXT_GRAY} hover:bg-[var(--octo-hover)]`
+                      )}
+                    >
+                      {type === "percent" ? "%" : "SAR"}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <label className="block min-w-[200px] flex-1">
-              <span className="text-[13.5px] text-[var(--octo-text-primary)]">
-                {t("menuOffer.discountValue")}
-              </span>
-              <span className="mt-1.5 flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3">
-                <input
-                  type="number"
-                  min={0}
-                  max={discount.type === "percent" ? 100 : undefined}
-                  step="0.01"
-                  value={discount.value === 0 ? "" : discount.value}
-                  placeholder={t("menuOffer.discountPlaceholder")}
-                  onChange={(e) =>
-                    setDiscount({ ...discount, value: Math.max(0, Number(e.target.value) || 0) })
-                  }
-                  className="w-full bg-transparent py-2.5 text-[15px] text-[var(--octo-text-primary)] outline-none"
-                />
-                <span className="text-[14px] text-[var(--octo-text-secondary)]">
-                  {discount.type === "percent" ? "%" : "SAR"}
+              <label className="flex min-w-[160px] flex-1 flex-col gap-2">
+                <span className={clsx("text-[12px] font-medium leading-3", TEXT)}>{t("menuOffer.discountValue")}</span>
+                <span
+                  className={clsx(
+                    "flex h-10 items-center gap-2 rounded-[12px] border bg-[var(--octo-card)] px-2",
+                    LINE,
+                    FOCUS_WITHIN,
+                    discountError && FIELD_INVALID
+                  )}
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    max={discount.type === "percent" ? 100 : undefined}
+                    step="0.01"
+                    aria-invalid={discountError ? true : undefined}
+                    value={discount.value === 0 ? "" : discount.value}
+                    placeholder={t("menuOffer.discountPlaceholder")}
+                    onBlur={() => onTouch("discount", "offerPrice")}
+                    onChange={(e) => setDiscount({ ...discount, value: Number(e.target.value) || 0 })}
+                    className={clsx("w-full min-w-0 bg-transparent text-[14px] outline-none placeholder:text-[#687280]", TEXT)}
+                  />
+                  <span className={clsx("text-[14px]", TEXT_SECONDARY)}>{discount.type === "percent" ? "%" : "SAR"}</span>
                 </span>
-              </span>
-            </label>
+              </label>
+            </div>
+            {discountError && (
+              <p role="alert" className={ERROR_TEXT}>
+                {discountError}
+              </p>
+            )}
           </div>
         )}
 
@@ -272,25 +289,19 @@ export function TabPricing({
             1), so it is selectable and honest about itself rather than absent —
             the same posture /menu/import takes. */}
         {pricing.role === "dynamic" && (
-          <p className="mt-2.5 rounded-[9px] bg-[var(--octo-track)] px-3.5 py-2.5 text-[13.5px] text-[var(--octo-text-secondary)]">
+          <p className={clsx("mt-2 rounded-[8px] px-3 py-2 text-[12px] font-medium leading-[1.4]", SURFACE_SUBTLE, TEXT_GRAY)}>
             {t("menuOffer.role.dynamicSoon")}
           </p>
         )}
-
-        <label className="mt-3 flex items-start gap-2.5 text-[14px]">
-          <Checkbox
-            checked={pricing.excludeFromPromotions}
-            onChange={() =>
-              onPatch({
-                pricing: { ...pricing, excludeFromPromotions: !pricing.excludeFromPromotions },
-              })
-            }
-          />
-          <span className="text-[var(--octo-text-secondary)]">{t("menuOffer.excludePromos")}</span>
-        </label>
       </section>
 
-      <OfferPriceQuote offer={offer} />
+      <CheckBox
+        checked={pricing.excludeFromPromotions}
+        onChange={(next) => onPatch({ pricing: { ...pricing, excludeFromPromotions: next } })}
+        label={<span className={clsx("leading-[1.3]", pricing.excludeFromPromotions ? TEXT : TEXT_SECONDARY)}>{t("menuOffer.excludePromos")}</span>}
+      />
+
+      {SHOW_SERVER_QUOTE && <OfferPriceQuote offer={offer} />}
     </div>
   );
 }

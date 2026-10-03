@@ -1,9 +1,10 @@
-// The wizard's four-node rail. Every build frame draws it identically: a
-// numbered circle per step, joined by a line that fills in behind you.
+// The wizard's four-node rail. Every build frame draws it identically: a 24px
+// numbered circle per step over a 4px track that fills in behind you.
 //
 // Reached steps are buttons; the ones ahead are inert spans. A merchant cannot
 // jump to Review before there is anything to review, and rendering that as a
 // dead button rather than as plain text would invite the click.
+import { useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
 
@@ -17,6 +18,19 @@ const LABEL_KEYS: Record<WizardStep, string> = {
   review: "menuWiz.step.review",
 };
 
+const DOT = "grid size-6 place-items-center rounded-full text-[12px] font-semibold leading-3 transition-colors";
+const DOT_AHEAD =
+  "bg-[#f1f5f9] text-[#58606c] [[data-theme=dark]_&]:bg-[var(--octo-track)] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]";
+const DOT_CURRENT =
+  "border border-[#0D6EFD] bg-[#f1f5f9] text-[#0D6EFD] [[data-theme=dark]_&]:bg-[var(--octo-track)]";
+const DOT_DONE = "bg-[linear-gradient(135deg,#0D6EFD_0%,#6C4DFF_100%)] text-white";
+
+interface Track {
+  left: number;
+  width: number;
+  fill: number;
+}
+
 export function Stepper({
   current,
   furthest,
@@ -28,72 +42,99 @@ export function Stepper({
   furthest: number;
   onJump: (step: number) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const row = useRef<HTMLOListElement>(null);
+  const dots = useRef<(HTMLElement | null)[]>([]);
+  const [track, setTrack] = useState<Track | null>(null);
+
+  // The frames run the fill to the step you are on, and never shorter than the
+  // first segment — on step 1 the line already points at Items.
+  const fillTo = Math.min(WIZARD_STEPS.length, Math.max(current, 2));
+
+  // The labels have different widths in each language, so the track's ends
+  // (the centres of the first and last circle) are measured, not assumed.
+  useLayoutEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    const measure = () => {
+      const box = el.getBoundingClientRect();
+      const centres = dots.current.map((dot) => {
+        const r = dot?.getBoundingClientRect();
+        return r ? r.left + r.width / 2 - box.left : 0;
+      });
+      const first = centres[0] ?? 0;
+      const last = centres[WIZARD_STEPS.length - 1] ?? 0;
+      const target = centres[fillTo - 1] ?? first;
+      setTrack({ left: Math.min(first, last), width: Math.abs(last - first), fill: Math.abs(target - first) });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fillTo, locale]);
 
   return (
-    <ol className="mt-5 flex items-start">
-      {WIZARD_STEPS.map((step, index) => {
-        const n = index + 1;
-        const done = n < current;
-        const isCurrent = n === current;
-        const reachable = n <= furthest;
-        const isLast = index === WIZARD_STEPS.length - 1;
+    <div className="relative">
+      {track && (
+        <div
+          aria-hidden
+          style={{ left: track.left, width: track.width }}
+          className="absolute top-[10px] h-1 overflow-hidden rounded-full bg-[#f1f5f9] [[data-theme=dark]_&]:bg-[var(--octo-track)]"
+        >
+          <div
+            style={{ insetInlineStart: -20, width: track.fill + 20 }}
+            className="absolute inset-y-0 rounded-full bg-[#0D6EFD] transition-[width] duration-200"
+          />
+        </div>
+      )}
 
-        return (
-          <li key={step} className={clsx("flex items-start", !isLast && "flex-1")}>
-            <div className="flex flex-col items-center gap-2">
+      <ol ref={row} className="relative flex items-start justify-between">
+        {WIZARD_STEPS.map((step, index) => {
+          const n = index + 1;
+          const done = n < current;
+          const isCurrent = n === current;
+          const reachable = n <= furthest;
+          const tone = isCurrent ? DOT_CURRENT : done ? DOT_DONE : DOT_AHEAD;
+          const setDot = (el: HTMLElement | null) => {
+            dots.current[index] = el;
+          };
+
+          return (
+            <li
+              key={step}
+              // The frames pad the end steps so their circles sit inside the
+              // track's rounded ends rather than on the page edge.
+              className={clsx("flex flex-col items-center gap-2", index === 0 && "min-w-[93px]")}
+            >
               {reachable ? (
                 <button
                   type="button"
+                  ref={setDot}
                   onClick={() => onJump(n)}
-                  aria-current={n === current ? "step" : undefined}
-                  className={clsx(
-                    "grid h-[30px] w-[30px] place-items-center rounded-full text-[14px] font-semibold transition-colors",
-                    // The frames ring the step you are on and fill the ones
-                    // behind you, so "here" and "done" never look alike.
-                    isCurrent
-                      ? "border-2 border-[var(--octo-accent)] bg-[var(--octo-card)] text-[var(--octo-accent)]"
-                      : done
-                        ? "bg-[var(--octo-accent)] text-white"
-                        : "border border-[var(--octo-border-card)] bg-[var(--octo-card)] text-[var(--octo-text-muted)]"
-                  )}
+                  aria-current={isCurrent ? "step" : undefined}
+                  className={clsx(DOT, tone)}
                 >
                   {n}
                 </button>
               ) : (
-                <span
-                  className="grid h-[30px] w-[30px] place-items-center rounded-full border border-[var(--octo-border-card)] bg-[var(--octo-card)] text-[14px] font-semibold text-[var(--octo-text-muted)]"
-                  aria-disabled
-                >
+                <span ref={setDot} className={clsx(DOT, DOT_AHEAD)} aria-disabled>
                   {n}
                 </span>
               )}
               <span
                 className={clsx(
-                  "whitespace-nowrap text-[14px]",
+                  "whitespace-nowrap text-center text-[14px] font-medium leading-[14px]",
                   done || isCurrent
-                    ? "font-medium text-[var(--octo-accent)]"
-                    : "text-[var(--octo-text-muted)]"
+                    ? "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]"
+                    : "text-[#58606c] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]"
                 )}
               >
                 {t(LABEL_KEYS[step])}
               </span>
-            </div>
-
-            {!isLast && (
-              // The frames fill the connector leaving the current step too — the
-              // line points at where you are heading — and leave the rest grey.
-              <span
-                aria-hidden
-                className={clsx(
-                  "mt-[15px] h-[2px] flex-1",
-                  n <= current ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-border-card)]"
-                )}
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

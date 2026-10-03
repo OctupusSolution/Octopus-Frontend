@@ -1,41 +1,42 @@
 // The Allergies tab: which allergens this dish carries, plus free text for the
 // things a checkbox cannot say ("fried in the same oil as shellfish").
 import { useState } from "react";
-import { Check, Plus, Tags } from "lucide-react";
-import { Button, Modal } from "@ui/primitives";
+import clsx from "clsx";
+import { Modal } from "@ui/primitives";
 import { useMenuLabels, type Item } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { LabelsManager, useLabelName } from "../../labels-manager";
 import { useMenuCopy } from "../../copy";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FOCUS, LINE, MODAL_SUBMIT, TEXT, TEXT_GRAY } from "../../_shared/theme";
+import { ACCENT_TEXT, ADD_BUTTON, CheckGlyph, LABEL_14 } from "./ui";
+
+/** "Manage labels" opens the business's label manager. No frame draws it;
+ *  flip this to offer it again under the list. */
+const SHOW_MANAGE_LABELS: boolean = false;
 
 // The three the frame shows are listed by default; `Add Allergens` offers the
 // rest — the business's Advisory labels (GET /menu/labels, seeded + its own)
-// when they can be read, this fixed list only as the fallback. Anything already on the item is rendered whether or not it appears
-// here, so an allergen set elsewhere is never silently dropped.
+// when they can be read, this fixed list only as the fallback. Anything already
+// on the item is rendered whether or not it appears here, so an allergen set
+// elsewhere is never silently dropped.
 const DEFAULT_ROWS = ["gluten", "eggs", "dairy"] as const;
 const KNOWN = [
   ...DEFAULT_ROWS,
   "nuts", "peanuts", "soy", "fish", "shellfish", "sesame", "mustard", "celery",
 ] as const;
 
-/** A 22px checkbox — the primitive's 16px box reads as a speck beside the
- *  frame's 16px labels. The native input stays in place for a11y. */
-function BigCheck({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+/** One bordered row: the frame's 24px checkbox and a blue 14px label. The
+ *  native input stays in the tree for keyboard and screen readers. */
+function AllergenRow({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
-    <span className="relative inline-grid h-[22px] w-[22px] shrink-0 place-items-center">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="peer absolute inset-0 cursor-pointer appearance-none rounded-[4px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] checked:border-[var(--octo-accent)] checked:bg-[var(--octo-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--octo-accent)]"
-      />
-      <Check
-        size={15}
-        strokeWidth={3}
-        aria-hidden
-        className="pointer-events-none relative hidden text-white peer-checked:block"
-      />
-    </span>
+    <label className={clsx("flex cursor-pointer items-center gap-2 rounded-[4px] border p-2", LINE)}>
+      <input type="checkbox" checked={checked} onChange={onChange} className="peer sr-only" />
+      <span className="inline-flex rounded-[4px] peer-focus-visible:ring-2 peer-focus-visible:ring-[#0D6EFD]/40">
+        <CheckGlyph checked={checked} />
+      </span>
+      <span className={clsx("min-w-0 truncate text-[14px] font-semibold leading-[14px]", ACCENT_TEXT)}>{label}</span>
+    </label>
   );
 }
 
@@ -81,116 +82,87 @@ export function TabAllergies({
     });
   }
 
-  function addPicked() {
-    const fresh = picked.filter((id) => !selected.includes(id));
-    if (fresh.length) {
-      onPatch({ allergies: { ...item.allergies, allergens: [...selected, ...fresh] } });
-      setExtraRows((rows) => [...rows, ...fresh]);
-    }
+  function closePicker() {
     setPicked([]);
     setPickerOpen(false);
   }
 
-  return (
-    <div className="space-y-3">
-      {rows.map((id) => (
-        <label
-          key={id}
-          className="flex cursor-pointer items-center gap-3 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-3"
-        >
-          <BigCheck checked={selected.includes(id)} onChange={() => toggle(id)} />
-          <span className="text-[16px] font-medium text-[var(--octo-accent)]">{label(id)}</span>
-        </label>
-      ))}
+  function addPicked() {
+    const fresh = picked.filter((id) => !selected.includes(id));
+    if (fresh.length) {
+      onPatch({ allergies: { ...item.allergies, allergens: [...selected, ...fresh] } });
+      setExtraRows((prev) => [...prev, ...fresh]);
+    }
+    closePicker();
+  }
 
-      <button
-        type="button"
-        onClick={() => setPickerOpen(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--octo-accent)] bg-[var(--octo-card)] px-3 py-3 text-[16px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
-      >
-        <Plus size={20} aria-hidden />
-        {t("menuWiz.item.addAllergens")}
-      </button>
-      {labels.businessId && (
-        <button
-          type="button"
-          onClick={() => setManageOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
-        >
-          <Tags size={15} aria-hidden />
-          {c("labels.manage")}
+  return (
+    <>
+      <div className="flex flex-col gap-3">
+        {rows.map((id) => (
+          <AllergenRow key={id} checked={selected.includes(id)} onChange={() => toggle(id)} label={label(id)} />
+        ))}
+
+        <button type="button" onClick={() => setPickerOpen(true)} className={clsx(ADD_BUTTON, "h-10 w-full")}>
+          <MenuIcon name="menu-plus-line.svg" size={24} />
+          {t("menuWiz.item.addAllergens")}
         </button>
-      )}
+        {SHOW_MANAGE_LABELS && labels.businessId && (
+          <button
+            type="button"
+            onClick={() => setManageOpen(true)}
+            className="self-start rounded-[4px] px-2 py-1 text-[12px] font-medium leading-3 text-[#0D6EFD] hover:bg-[var(--octo-hover)]"
+          >
+            {c("labels.manage")}
+          </button>
+        )}
+      </div>
+
+      <label className="flex flex-col gap-2">
+        <span className={LABEL_14}>{t("menuWiz.item.allergenNote")}</span>
+        <textarea
+          rows={2}
+          value={item.allergies.note}
+          onChange={(e) => onPatch({ allergies: { ...item.allergies, note: e.target.value } })}
+          className={clsx(
+            "w-full resize-y rounded-[12px] border bg-[var(--octo-card)] px-3 py-2 text-[12px] font-medium leading-[1.4]",
+            LINE,
+            TEXT,
+            FOCUS
+          )}
+        />
+      </label>
 
       <Modal open={manageOpen} onClose={() => setManageOpen(false)} title={c("labels.manage")} className="max-w-[600px]">
         <LabelsManager initialKind="Advisory" />
       </Modal>
 
-      <label className="block pt-1">
-        <span className="text-[16px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuWiz.item.allergenNote")}
-        </span>
-        <textarea
-          rows={3}
-          value={item.allergies.note}
-          onChange={(e) => onPatch({ allergies: { ...item.allergies, note: e.target.value } })}
-          className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
-        />
-      </label>
-
-      <Modal
-        open={pickerOpen}
-        onClose={() => {
-          setPicked([]);
-          setPickerOpen(false);
-        }}
-        title={
-          <span className="text-[20px] font-bold text-[var(--octo-text-primary)]">
+      {/* The frames stop at the button; this dialog borrows the Add Modifier
+          dialogs' chrome so it reads as part of the same set. */}
+      <Modal open={pickerOpen} onClose={closePicker} backdropClassName="bg-black/60" className="!max-w-[738px] !rounded-[12px] !p-6 !shadow-none">
+        <div className="flex flex-col gap-6">
+          <h2 className="text-[24px] font-semibold leading-6 text-[#0e0e0e] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
             {t("menuWiz.item.addAllergens")}
-          </span>
-        }
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setPicked([]);
-                setPickerOpen(false);
-              }}
-            >
-              {t("menuWiz.cancel")}
-            </Button>
-            <Button disabled={picked.length === 0} onClick={addPicked}>
-              {t("menuWiz.item.allergenAdd")}
-            </Button>
-          </div>
-        }
-      >
-        {available.length === 0 ? (
-          <p className="text-[14px] text-[var(--octo-text-secondary)]">
-            {t("menuWiz.item.allergenAll")}
-          </p>
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {available.map((id) => (
-              <label
-                key={id}
-                className="flex cursor-pointer items-center gap-3 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-2.5"
-              >
-                <BigCheck
+          </h2>
+          {available.length === 0 ? (
+            <p className={clsx("text-[14px] leading-[1.4]", TEXT_GRAY)}>{t("menuWiz.item.allergenAll")}</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {available.map((id) => (
+                <AllergenRow
+                  key={id}
                   checked={picked.includes(id)}
-                  onChange={() =>
-                    setPicked((list) =>
-                      list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
-                    )
-                  }
+                  onChange={() => setPicked((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]))}
+                  label={label(id)}
                 />
-                <span className="text-[15px] text-[var(--octo-text-primary)]">{label(id)}</span>
-              </label>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+          <button type="button" className={MODAL_SUBMIT} disabled={picked.length === 0} onClick={addPicked}>
+            {t("menuWiz.item.allergenAdd")}
+          </button>
+        </div>
       </Modal>
-    </div>
+    </>
   );
 }

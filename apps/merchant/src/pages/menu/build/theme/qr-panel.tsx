@@ -1,26 +1,37 @@
-// The menu's real QR code, under the Theme step's preview: its active direct
-// access code (GET /access-codes), printed as `printableUrl`
+// The menu's real QR code, under the Theme step's preview — the frame's
+// "Scan to see our menu" card: its active direct access code
+// (GET /access-codes), printed as `printableUrl`
 // (Menu:PublicCodesBaseUri/c/{key}). A menu without one gets a Create button
-// (POST /access-codes, kind MenuDirect). The two large buttons the frame draws
-// beneath it open that address and a table tent for it.
+// (POST /access-codes, kind MenuDirect).
 //
 // The code is drawn from the Public Link Builder's own encoder rather than a
 // new dependency — one QR implementation in the app. Its symbol holds 78
 // bytes; a printable URL is the base (e.g. "https://menu.octopus.sa", 23) +
 // "/c/" + a 26-character key, and a table's "?l=Table%20NN" adds 13.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, Copy, Download, ExternalLink, Loader2, QrCode as QrIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import clsx from "clsx";
 import { createAccessCode, listAccessCodes, type AccessCodeResponse } from "@octopus/api-client";
-import { Modal, Select } from "@ui/primitives";
+import { Modal } from "@ui/primitives";
 import { QrCode } from "@/pages/public-link/ui/qr-code";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { isServerId } from "@/entities/menu";
+import { SelectBox } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { LINE, SURFACE_SUBTLE, TEXT, TEXT_GRAY } from "../../_shared/theme";
+
+/** The frame's card is a title, the code and one button. The printed address
+ *  with its copy button, and the "Public Link Preview" / "Table QR Preview"
+ *  pair (a hidden layer in the frame), are kept but not drawn. */
+const SHOW_QR_LINK: boolean = false;
+const SHOW_QR_ACTIONS: boolean = false;
 
 const TABLES = Array.from({ length: 30 }, (_, i) => i + 1);
 
-const ACCENT_OUTLINE =
-  "inline-flex items-center justify-center gap-2 rounded-[9px] border border-[var(--octo-accent)] bg-[var(--octo-card)] font-semibold text-[var(--octo-accent)] transition-colors hover:bg-[var(--octo-selected)]";
+/** The card's one button: 242×36, accent outline, 12px bold. */
+const CARD_BUTTON =
+  "inline-flex h-9 w-full max-w-[242px] items-center justify-center gap-2 rounded-[8px] border border-[#0D6EFD] px-3 text-[12px] font-bold leading-3 text-[#0D6EFD] hover:bg-[#f5f9ff] disabled:cursor-not-allowed disabled:opacity-60 [[data-theme=dark]_&]:hover:bg-[#0d6efd]/15";
+const NOTE = `text-center text-[12px] font-medium leading-[1.4] ${TEXT_GRAY}`;
 
 const newKey = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -63,16 +74,72 @@ function downloadQrPng(container: HTMLElement | null, filename: string, size = 1
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
 }
 
+function CardShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  return (
+    <section className="flex flex-col items-center gap-4 overflow-hidden rounded-[28px] bg-[var(--octo-card)] p-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.05)] [[data-theme=dark]_&]:border [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
+      <p className={clsx("text-center text-[16px] font-medium leading-4", TEXT)}>{t("menuTheme.scanTitle")}</p>
+      {children}
+    </section>
+  );
+}
+
+/** The frame's card for a menu that has its code: title, code, download. */
+export function MenuQrCard({ url }: { url: string }) {
+  const { t } = useI18n();
+  const menuQr = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard refused (permissions, insecure context): the URL is on screen to select.
+    }
+  }
+
+  return (
+    <CardShell>
+      {/* White ground in both themes: an inverted code does not scan. */}
+      <div ref={menuQr} className="grid h-[179px] w-[160px] place-items-center bg-white">
+        <QrCode value={url} size={160} />
+      </div>
+      {SHOW_QR_LINK && (
+        <div className="flex items-center justify-center gap-1">
+          <a href={url} target="_blank" rel="noopener noreferrer" className={clsx("break-all text-[12px] hover:underline", TEXT_GRAY)} dir="ltr">
+            {url}
+          </a>
+          <button
+            type="button"
+            onClick={() => void copy()}
+            aria-label={t("menuTheme.qr.copy")}
+            title={t("menuTheme.qr.copy")}
+            className={clsx("grid size-6 shrink-0 place-items-center rounded-[4px] hover:bg-[var(--octo-hover)]", TEXT_GRAY)}
+          >
+            <MenuIcon name={copied ? "menu-done-circle.svg" : "menu-copy.svg"} size={16} />
+          </button>
+        </div>
+      )}
+      <button type="button" onClick={() => downloadQrPng(menuQr.current, "menu-qr.png")} className={CARD_BUTTON}>
+        <span className="grid size-6 place-items-center">
+          <MenuIcon name="menu-download.svg" size={21.5} />
+        </span>
+        {t("menuTheme.downloadQr")}
+      </button>
+    </CardShell>
+  );
+}
+
 export function QrPanel({ menuId }: { menuId: string }) {
   const { t } = useI18n();
   const { activeBusinessId } = useAuth();
-  const menuQr = useRef<HTMLDivElement>(null);
   const tableQr = useRef<HTMLDivElement>(null);
   const [tableOpen, setTableOpen] = useState(false);
   const [table, setTable] = useState(1);
   const [code, setCode] = useState<AccessCodeResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "creating" | "error" | "unavailable" | "unsaved">("loading");
-  const [copied, setCopied] = useState(false);
   // Bumped by every request and by the effect's cleanup: a response whose
   // number is no longer current belongs to an earlier menu id (the local id a
   // first save replaces with the server's) or to an unmounted panel, and is dropped.
@@ -127,160 +194,113 @@ export function QrPanel({ menuId }: { menuId: string }) {
     }
   }
 
-  async function copy(url: string) {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard refused (permissions, insecure context): the URL is on screen to select.
-    }
-  }
-
   const url = code?.printableUrl ?? null;
 
   return (
     <>
-      <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4 text-center">
-        <p className="text-[17px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.scanTitle")}</p>
-
-        {url ? (
-          <>
-            {/* White ground in both themes: an inverted code does not scan. */}
-            <div ref={menuQr} className="mx-auto mt-3 w-fit rounded-[10px] bg-white p-1">
-              <QrCode value={url} size={168} />
-            </div>
-            <div className="mt-1 flex items-center justify-center gap-1.5">
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="break-all text-[11.5px] text-[var(--octo-text-muted)] hover:underline"
-                dir="ltr"
-              >
-                {url}
-              </a>
-              <button
-                type="button"
-                onClick={() => void copy(url)}
-                aria-label={t("menuTheme.qr.copy")}
-                title={t("menuTheme.qr.copy")}
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]"
-              >
-                {copied ? <Check size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => downloadQrPng(menuQr.current, "menu-qr.png")}
-              className={`${ACCENT_OUTLINE} mx-auto mt-3 w-full max-w-[280px] px-4 py-2 text-[14px]`}
-            >
-              <Download size={16} aria-hidden />
-              {t("menuTheme.downloadQr")}
-            </button>
-          </>
-        ) : state === "unsaved" ? (
-          <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.saveFirst")}</p>
+      {url ? (
+        <MenuQrCard url={url} />
+      ) : (
+        <CardShell>
+          {state === "unsaved" ? (
+          <p className={NOTE}>{t("menuTheme.qr.saveFirst")}</p>
         ) : state === "unavailable" ? (
-          <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.error")}</p>
+          <p className={NOTE}>{t("menuTheme.qr.error")}</p>
         ) : state === "error" ? (
           <>
-            <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.error")}</p>
-            <button
-              type="button"
-              onClick={() => void load()}
-              className={`${ACCENT_OUTLINE} mx-auto mt-3 w-full max-w-[280px] px-4 py-2 text-[14px]`}
-            >
+            <p role="alert" className={NOTE}>
+              {t("menuTheme.qr.error")}
+            </p>
+            <button type="button" onClick={() => void load()} className={CARD_BUTTON}>
               {t("menuTheme.qr.retry")}
             </button>
           </>
         ) : state === "ready" ? (
           <>
-            <p className="mt-3 text-[13.5px] text-[var(--octo-text-secondary)]">{t("menuTheme.qr.none")}</p>
-            <button
-              type="button"
-              onClick={() => void create()}
-              className={`${ACCENT_OUTLINE} mx-auto mt-3 w-full max-w-[280px] px-4 py-2 text-[14px]`}
-            >
-              <QrIcon size={16} aria-hidden />
+            <p className={NOTE}>{t("menuTheme.qr.none")}</p>
+            <button type="button" onClick={() => void create()} className={CARD_BUTTON}>
+              <MenuIcon name="menu-qr-code.svg" size={24} />
               {t("menuTheme.qr.create")}
             </button>
           </>
         ) : (
-          <p className="mt-3 inline-flex items-center gap-2 text-[13.5px] text-[var(--octo-text-muted)]">
-            <Loader2 size={15} className="animate-spin" aria-hidden />
-            {t("common.loading")}
+          <p className={clsx("inline-flex items-center gap-2", NOTE)}>
+            <MenuIcon name="menu-loading.svg" size={16} className="animate-spin" />
+            {t(state === "creating" ? "menuTheme.qr.creating" : "common.loading")}
           </p>
         )}
-      </section>
+        </CardShell>
+      )}
 
-      {url && (
-        <div className="grid gap-3 sm:grid-cols-2">
+      {SHOW_QR_ACTIONS && url && (
+        <div className="grid gap-6 sm:grid-cols-2">
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 text-[16px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+            className={clsx("inline-flex h-12 items-center justify-center gap-2 rounded-[8px] border px-3 text-[18px] font-bold leading-[18px] hover:bg-[var(--octo-hover)]", LINE, TEXT)}
           >
-            <ExternalLink size={19} aria-hidden />
+            <MenuIcon name="menu-link-external.svg" size={24} />
             {t("menuTheme.publicPreview")}
           </a>
           <button
             type="button"
             onClick={() => setTableOpen(true)}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-track)] px-3 text-[16px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+            className={clsx("inline-flex h-12 items-center justify-center gap-2 rounded-[8px] px-3 text-[18px] font-bold leading-[18px] hover:brightness-95", SURFACE_SUBTLE, TEXT)}
           >
-            <QrIcon size={19} aria-hidden />
+            <MenuIcon name="menu-qr-code.svg" size={24} />
             {t("menuTheme.tableQrPreview")}
           </button>
         </div>
       )}
 
       <Modal
-        open={tableOpen && url !== null}
+        open={SHOW_QR_ACTIONS && tableOpen && url !== null}
         onClose={() => setTableOpen(false)}
-        title={t("menuTheme.tableQrPreview")}
-        className="max-w-sm"
+        backdropClassName="bg-black/60"
+        className="!max-w-[420px] !rounded-[12px] !p-6 !shadow-none"
       >
-        <label className="block">
-          <span className="text-[13px] font-medium text-[var(--octo-text-secondary)]">{t("menuTheme.tableNumber")}</span>
-          <Select className="mt-1.5" value={String(table)} onChange={(e) => setTable(Number(e.target.value))}>
-            {TABLES.map((n) => (
-              <option key={n} value={n}>
-                {t("menuTheme.table")} {n}
-              </option>
-            ))}
-          </Select>
-        </label>
+        <div className="flex flex-col gap-6">
+          <h2 className="text-[24px] font-semibold leading-6 text-[#0e0e0e] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+            {t("menuTheme.tableQrPreview")}
+          </h2>
+          <label className="flex flex-col gap-3">
+            <span className={clsx("px-2 text-[16px] font-medium leading-4", TEXT)}>{t("menuTheme.tableNumber")}</span>
+            <SelectBox value={String(table)} ariaLabel={t("menuTheme.tableNumber")} onChange={(value) => setTable(Number(value))}>
+              {TABLES.map((n) => (
+                <option key={n} value={n}>
+                  {t("menuTheme.table")} {n}
+                </option>
+              ))}
+            </SelectBox>
+          </label>
 
-        {/* A table tent: what the diner actually sees on the table. */}
-        <div className="mt-4 rounded-[12px] border border-[var(--octo-border-card)] p-4 text-center">
-          <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuTheme.scanTitle")}</p>
-          <div ref={tableQr} className="mx-auto mt-2 w-fit rounded-[8px] bg-white p-1">
-            {url && <QrCode value={tableQrUrl(url, table)} size={176} />}
+          {/* A table tent: what the diner actually sees on the table. */}
+          <div className={clsx("flex flex-col items-center gap-4 rounded-[12px] border p-4", LINE)}>
+            <p className={clsx("text-[16px] font-medium leading-4", TEXT)}>{t("menuTheme.scanTitle")}</p>
+            <div ref={tableQr} className="bg-white">
+              {url && <QrCode value={tableQrUrl(url, table)} size={160} />}
+            </div>
+            <p className={clsx("text-[18px] font-bold leading-[18px]", TEXT)}>
+              {t("menuTheme.table")} {table}
+            </p>
           </div>
-          <p className="mt-2 text-[20px] font-bold text-[var(--octo-text-primary)]">
-            {t("menuTheme.table")} {table}
-          </p>
-        </div>
 
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={() => downloadQrPng(tableQr.current, `table-${table}-qr.png`)}
-            className={`${ACCENT_OUTLINE} flex-1 px-3 py-2 text-[13.5px]`}
-          >
-            <Download size={15} aria-hidden />
-            {t("menuTheme.downloadQr")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTableOpen(false)}
-            className="rounded-[9px] border border-[var(--octo-border-input)] px-4 py-2 text-[13.5px] font-medium text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-          >
-            {t("menuTheme.close")}
-          </button>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => downloadQrPng(tableQr.current, `table-${table}-qr.png`)} className={clsx(CARD_BUTTON, "!max-w-none flex-1")}>
+              <span className="grid size-6 place-items-center">
+                <MenuIcon name="menu-download.svg" size={21.5} />
+              </span>
+              {t("menuTheme.downloadQr")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTableOpen(false)}
+              className={clsx("h-9 rounded-[8px] px-4 text-[12px] font-bold leading-3 hover:brightness-95", SURFACE_SUBTLE, TEXT_GRAY)}
+            >
+              {t("menuTheme.close")}
+            </button>
+          </div>
         </div>
       </Modal>
     </>

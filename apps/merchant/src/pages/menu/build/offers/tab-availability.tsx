@@ -8,10 +8,12 @@
 // pre-filled with Sun–Sat 10–12 would be saved without anyone having chosen it.
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { CalendarDays, Clock } from "lucide-react";
-import { Checkbox } from "@ui/primitives";
-import { WEEKDAYS, type Offer, type Weekday } from "@/entities/menu";
+import { WEEKDAYS, type Offer, type OfferField, type Weekday } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CheckBox } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_BORDER, FIELD_INVALID, FOCUS, TEXT, TEXT_SECONDARY } from "../../_shared/theme";
+import type { OfferTabValidation } from "./index";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, "0")}:00`);
 
@@ -19,27 +21,25 @@ type Window = NonNullable<Offer["availability"]["window"]>;
 
 const EMPTY_WINDOW: Window = { days: [null, null], start: null, end: null };
 
-const fieldClass =
-  "h-[50px] w-full appearance-none rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] ps-3 pe-11 text-[15px] text-[var(--octo-text-primary)]";
+const FIELD_CLASS = `h-10 w-full appearance-none rounded-[12px] ${FIELD_BORDER} bg-[var(--octo-card)] pe-10 ps-2 text-[14px] ${FOCUS}`;
+const GROUP_TITLE = `text-[14px] font-medium leading-[14px] ${TEXT}`;
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Labelled({ label, error, children }: { label: string; error?: string | null; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="text-[14px] text-[var(--octo-text-primary)]">{label}</span>
-      <span className="relative mt-1.5 block">{children}</span>
+    <label className="flex min-w-0 flex-1 flex-col gap-2">
+      <span className={clsx("text-[12px] font-medium leading-3", TEXT)}>{label}</span>
+      <span className="relative block">{children}</span>
+      {error && (
+        <span role="alert" className="text-[12px] leading-[14px] text-[#d30202]">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
 
-function FieldIcon({ children }: { children: ReactNode }) {
-  return (
-    <span
-      aria-hidden
-      className="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[var(--octo-text-primary)]"
-    >
-      {children}
-    </span>
-  );
+function FieldIcon({ name }: { name: string }) {
+  return <MenuIcon name={name} size={24} className={clsx("pointer-events-none absolute end-2 top-1/2 -translate-y-1/2", TEXT)} />;
 }
 
 /** A native date input wearing the frame's placeholder. The browser's own
@@ -49,34 +49,43 @@ function DateField({
   label,
   placeholder,
   value,
+  min,
+  error,
   onChange,
+  onBlur,
 }: {
   label: string;
   placeholder: string;
   value: string | null;
+  min?: string;
+  error?: string | null;
   onChange: (value: string | null) => void;
+  onBlur: () => void;
 }) {
   return (
-    <Field label={label}>
+    <Labelled label={label} error={error}>
       <input
         type="date"
         value={value ?? ""}
+        min={min}
+        aria-label={label}
+        aria-invalid={error ? true : undefined}
         onChange={(e) => onChange(e.target.value || null)}
+        onBlur={onBlur}
         className={clsx(
-          fieldClass,
+          FIELD_CLASS,
           "relative [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0",
-          !value && "text-transparent"
+          value ? TEXT : "text-transparent",
+          error && FIELD_INVALID
         )}
       />
       {!value && (
-        <span className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-[15px] text-[var(--octo-text-muted)]">
+        <span className={clsx("pointer-events-none absolute inset-y-0 start-2 flex items-center text-[14px] leading-[14px]", TEXT_SECONDARY)}>
           {placeholder}
         </span>
       )}
-      <FieldIcon>
-        <CalendarDays size={20} />
-      </FieldIcon>
-    </Field>
+      <FieldIcon name="menu-calendar.svg" />
+    </Labelled>
   );
 }
 
@@ -86,21 +95,28 @@ function PickField({
   value,
   options,
   icon,
+  error,
   onChange,
+  onBlur,
 }: {
   label: string;
   placeholder: string;
   value: string | null;
   options: { value: string; label: string }[];
-  icon: ReactNode;
+  icon: string;
+  error?: string | null;
   onChange: (value: string) => void;
+  onBlur: () => void;
 }) {
   return (
-    <Field label={label}>
+    <Labelled label={label} error={error}>
       <select
         value={value ?? ""}
+        aria-label={label}
+        aria-invalid={error ? true : undefined}
         onChange={(e) => onChange(e.target.value)}
-        className={clsx(fieldClass, !value && "text-[var(--octo-text-muted)]")}
+        onBlur={onBlur}
+        className={clsx(FIELD_CLASS, value ? TEXT : TEXT_SECONDARY, error && FIELD_INVALID)}
       >
         <option value="" disabled>
           {placeholder}
@@ -111,21 +127,25 @@ function PickField({
           </option>
         ))}
       </select>
-      <FieldIcon>{icon}</FieldIcon>
-    </Field>
+      <FieldIcon name={icon} />
+    </Labelled>
   );
 }
 
 export function TabAvailability({
   offer,
   onPatch,
+  validation,
 }: {
   offer: Offer;
   onPatch: (patch: Partial<Offer>) => void;
+  validation: OfferTabValidation;
 }) {
   const { t } = useI18n();
+  const { errors, onTouch } = validation;
   const { availability } = offer;
   const win = availability.window;
+  const message = (field: OfferField) => (errors[field] ? t(errors[field] as string) : null);
 
   function setWindow(next: Partial<Window>) {
     onPatch({ availability: { ...availability, window: { ...(win ?? EMPTY_WINDOW), ...next } } });
@@ -135,46 +155,40 @@ export function TabAvailability({
   const hourOptions = HOURS.map((h) => ({ value: h, label: h }));
 
   return (
-    <div className="space-y-4">
-      <p className="text-[16px] font-medium text-[var(--octo-text-primary)]">
-        {t("menuOffer.available")}
-      </p>
-
-      <DateField
-        label={t("menuOffer.from")}
-        placeholder={t("menuOffer.startDay")}
-        value={availability.from}
-        onChange={(from) => onPatch({ availability: { ...availability, from } })}
-      />
-      <DateField
-        label={t("menuOffer.to")}
-        placeholder={t("menuOffer.endDay")}
-        value={availability.to}
-        onChange={(to) => onPatch({ availability: { ...availability, to } })}
-      />
-
-      <label className="flex items-center gap-2.5">
-        <Checkbox
-          className="[&_input]:h-5 [&_input]:w-5 [&>span]:h-5 [&>span]:w-5"
-          checked={win !== null}
-          onChange={() =>
-            win === null
-              ? setWindow({})
-              : onPatch({ availability: { ...availability, window: null } })
-          }
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <p className={GROUP_TITLE}>{t("menuOffer.available")}</p>
+        <DateField
+          label={t("menuOffer.from")}
+          placeholder={t("menuOffer.startDay")}
+          value={availability.from}
+          error={message("from")}
+          onChange={(from) => onPatch({ availability: { ...availability, from } })}
+          onBlur={() => onTouch("from", "to")}
         />
-        <span className="text-[15px] font-medium text-[var(--octo-accent)]">
-          {t("menuOffer.specificWindow")}
-        </span>
-      </label>
+        <DateField
+          label={t("menuOffer.to")}
+          placeholder={t("menuOffer.endDay")}
+          value={availability.to}
+          min={availability.from ?? undefined}
+          error={message("to")}
+          onChange={(to) => onPatch({ availability: { ...availability, to } })}
+          onBlur={() => onTouch("to")}
+        />
+      </div>
+
+      <CheckBox
+        checked={win !== null}
+        onChange={(next) => (next ? setWindow({}) : onPatch({ availability: { ...availability, window: null } }))}
+        label={<span className={win !== null ? "text-[#0D6EFD]" : undefined}>{t("menuOffer.specificWindow")}</span>}
+        className="self-start"
+      />
 
       {win && (
         <>
-          <div>
-            <p className="text-[16px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuOffer.daysSelector")}
-            </p>
-            <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <p className={GROUP_TITLE}>{t("menuOffer.daysSelector")}</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {([0, 1] as const).map((slot) => (
                 <PickField
                   key={slot}
@@ -182,7 +196,9 @@ export function TabAvailability({
                   placeholder={t(slot === 0 ? "menuOffer.startDay" : "menuOffer.endDay")}
                   value={win.days[slot]}
                   options={dayOptions}
-                  icon={<CalendarDays size={20} />}
+                  icon="menu-calendar.svg"
+                  error={message(slot === 0 ? "dayFrom" : "dayTo")}
+                  onBlur={() => onTouch(slot === 0 ? "dayFrom" : "dayTo")}
                   onChange={(value) => {
                     const days: Window["days"] = [...win.days];
                     days[slot] = value as Weekday;
@@ -193,17 +209,17 @@ export function TabAvailability({
             </div>
           </div>
 
-          <div>
-            <p className="text-[16px] font-medium text-[var(--octo-text-primary)]">
-              {t("menuOffer.timeSelector")}
-            </p>
-            <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-3">
+            <p className={GROUP_TITLE}>{t("menuOffer.timeSelector")}</p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <PickField
                 label={t("menuOffer.from")}
                 placeholder={t("menuOffer.startTime")}
                 value={win.start}
                 options={hourOptions}
-                icon={<Clock size={20} />}
+                icon="menu-clock.svg"
+                error={message("timeFrom")}
+                onBlur={() => onTouch("timeFrom")}
                 onChange={(start) => setWindow({ start })}
               />
               <PickField
@@ -211,7 +227,9 @@ export function TabAvailability({
                 placeholder={t("menuOffer.endTime")}
                 value={win.end}
                 options={hourOptions}
-                icon={<Clock size={20} />}
+                icon="menu-clock.svg"
+                error={message("timeTo")}
+                onBlur={() => onTouch("timeTo")}
                 onChange={(end) => setWindow({ end })}
               />
             </div>

@@ -1,26 +1,30 @@
 // Offer Info — the first of the offer editor's five tabs.
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
-import { Select } from "@ui/primitives";
 import { checkOfferSlugAvailability } from "@octopus/api-client";
 import { useFilePicker } from "@/shared/ui/use-file-picker";
-import { MediaTile } from "@/shared/ui/media-tile";
-import type { Offer } from "@/entities/menu";
+import { OFFER_NAME_MAX, OFFER_SLUG_MAX, normalizeOfferSlug, type Offer } from "@/entities/menu";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { Field, SelectBox, Switch } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_INVALID, FOCUS, LINE, TEXT, TEXT_GRAY, TEXT_INPUT_CLASS, TEXT_SECONDARY } from "../../_shared/theme";
+import type { OfferTabValidation } from "./index";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** The API takes lowercase words joined by hyphens; this mirrors
- *  entities/menu/offers-sync.ts's own toSlug, which is what actually gets
- *  sent on save, not the underscored value the field shows while typing. */
-const toApiSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 const DEBOUNCE_MS = 400;
+
+/** The frame draws no "checking… / available" line under the slug. The check
+ *  still runs — a slug the server says is taken is reported as the field's
+ *  error — but its progress is not drawn; flip this to draw it again. */
+const SHOW_SLUG_STATUS: boolean = false;
 
 type SlugCheck = "idle" | "checking" | "available" | "taken" | "error";
 
-const inputClass =
-  "mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]";
+/** The frame's inputs on this tab have a 4px corner, not the module's 12px. */
+const INPUT = `${TEXT_INPUT_CLASS} !rounded-[4px]`;
+const LABEL = `text-[16px] font-medium leading-4 ${TEXT}`;
+const ERROR_TEXT = "text-[12px] leading-[14px] text-[#d30202]";
 
 /** Mirrors entities/menu/draft.ts's own slugify, which owns the value at
  *  creation. Kept in step deliberately: if they diverged, typing a name would
@@ -35,41 +39,21 @@ const BADGES = [
   { value: "Popular", key: "menuOffer.badge.popular" },
 ];
 
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onChange}
-      className={clsx(
-        "h-[22px] w-[40px] shrink-0 rounded-full p-[2px] transition-colors",
-        checked ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-switch-off)]"
-      )}
-    >
-      <span
-        className={clsx(
-          "block h-[18px] w-[18px] rounded-full bg-[var(--octo-knob)] transition-transform",
-          checked && "translate-x-[18px] rtl:-translate-x-[18px]"
-        )}
-      />
-    </button>
-  );
-}
-
 export function TabInfo({
   offer,
   onPatch,
+  validation,
 }: {
   offer: Offer;
   onPatch: (patch: Partial<Offer>) => void;
+  validation: OfferTabValidation;
 }) {
   const { t } = useI18n();
   const { activeBusinessId } = useAuth();
+  const { errors, onTouch } = validation;
   const picker = useFilePicker((dataUrl) => onPatch({ image: dataUrl }));
 
-  const apiSlug = toApiSlug(offer.slug);
+  const apiSlug = normalizeOfferSlug(offer.slug);
   const [slugCheck, setSlugCheck] = useState<SlugCheck>("idle");
 
   useEffect(() => {
@@ -96,15 +80,30 @@ export function TabInfo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBusinessId, apiSlug]);
 
+  const nameError = errors.name ? t(errors.name).replace("{n}", String(OFFER_NAME_MAX)) : null;
+  // The server's verdict needs no blur to be worth saying: the merchant typed
+  // the slug and the business already has it.
+  const slugError = errors.slug
+    ? t(errors.slug).replace("{n}", String(OFFER_SLUG_MAX))
+    : slugCheck === "taken"
+      ? t("menuOffer.slugCheck.taken")
+      : null;
+  const pickError = picker.error
+    ? t(picker.error === "too-large" ? "menuWiz.sec.error.tooLarge" : "menuWiz.sec.error.unreadable")
+    : null;
+  const imageError = pickError ?? (errors.image ? t(errors.image) : null);
+
   return (
-    <div className="max-w-[720px] space-y-4">
-      <label className="block">
-        <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuOffer.name")} <span className="text-error">*</span>
-        </span>
+    <div className="flex flex-col gap-4">
+      <Field label={t("menuOffer.name")} required error={nameError}>
         <input
-          className={inputClass}
+          className={clsx(INPUT, nameError && FIELD_INVALID)}
           value={offer.name}
+          aria-label={t("menuOffer.name")}
+          aria-invalid={nameError ? true : undefined}
+          maxLength={OFFER_NAME_MAX + 20}
+          placeholder={t("menuOffer.namePlaceholder")}
+          onBlur={() => onTouch("name")}
           // The slug follows the name until the merchant edits it themselves,
           // then it is theirs. Leaving it empty made a required field the
           // merchant had no reason to look at, and the Next Step gate refused
@@ -115,113 +114,131 @@ export function TabInfo({
             onPatch(untouched ? { name, slug: slugify(name) } : { name });
           }}
         />
-      </label>
+      </Field>
 
-      <label className="block">
-        <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuOffer.slug")} <span className="text-error">*</span>
-        </span>
+      <Field label={t("menuOffer.slug")} required error={slugError}>
         <input
-          className={inputClass}
+          className={clsx(INPUT, slugError && FIELD_INVALID)}
+          dir="ltr"
           value={offer.slug}
+          aria-label={t("menuOffer.slug")}
+          aria-invalid={slugError ? true : undefined}
+          maxLength={OFFER_SLUG_MAX + 20}
+          placeholder={t("menuOffer.slugPlaceholder")}
+          onBlur={() => onTouch("slug")}
           onChange={(e) => onPatch({ slug: e.target.value })}
         />
-        {slugCheck !== "idle" && (
-          <p
-            className={clsx(
-              "mt-1.5 flex items-center gap-1.5 text-[12.5px]",
-              slugCheck === "available" && "text-[var(--octo-tone-success-text)]",
-              slugCheck === "taken" && "text-error",
-              (slugCheck === "checking" || slugCheck === "error") && "text-[var(--octo-text-muted)]"
-            )}
-          >
-            {slugCheck === "checking" && <Loader2 size={13} className="animate-spin" aria-hidden />}
-            {slugCheck === "available" && <Check size={13} aria-hidden />}
-            {slugCheck === "taken" && <X size={13} aria-hidden />}
+        {SHOW_SLUG_STATUS && slugCheck !== "idle" && slugCheck !== "taken" && (
+          <p className={clsx("-mt-1 flex items-center gap-1 px-2 text-[12px] leading-[14px]", slugCheck === "available" ? "text-[#009a39]" : TEXT_GRAY)}>
+            {slugCheck === "checking" && <MenuIcon name="menu-loading.svg" size={14} className="animate-spin" />}
             {t(`menuOffer.slugCheck.${slugCheck}`)}
           </p>
         )}
-      </label>
+      </Field>
 
-      <div>
-        <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuOffer.image")} <span className="text-error">*</span>
-        </p>
-        <div className="relative mt-1.5 h-[480px] overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]">
-          <MediaTile src={offer.image} />
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          <p className={LABEL}>
+            {t("menuOffer.image")}
+            <span className="text-[#d30202]"> *</span>
+          </p>
           {picker.input}
-          <div className="absolute end-2.5 top-2.5 flex gap-2">
+          {offer.image ? (
+            <div className={clsx("relative flex aspect-[496/344] w-full flex-col rounded-[12px] border border-dashed p-4", LINE, imageError && FIELD_INVALID)}>
+              <img src={offer.image} alt="" className="min-h-0 w-full flex-1 rounded-[8px] object-cover" />
+              <div className="absolute end-6 top-6 flex items-center gap-3">
+                <button
+                  type="button"
+                  aria-label={t("menuOffer.changeImage")}
+                  onClick={picker.open}
+                  className={clsx("grid size-9 place-items-center rounded-[8px] bg-white hover:brightness-95", "text-[#0f172a]")}
+                >
+                  <MenuIcon name="menu-edit.svg" size={24} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("menuOffer.removeImage")}
+                  onClick={() => {
+                    onPatch({ image: null });
+                    onTouch("image");
+                  }}
+                  className="grid size-9 place-items-center rounded-[8px] bg-[#fef0f0] text-[#d30202] hover:brightness-95"
+                >
+                  <MenuIcon name="menu-trash.svg" size={24} />
+                </button>
+              </div>
+            </div>
+          ) : (
             <button
               type="button"
-              aria-label={t("menuOffer.image")}
               onClick={picker.open}
-              className="rounded-[8px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 text-[var(--octo-text-secondary)]"
+              onBlur={() => onTouch("image")}
+              aria-invalid={imageError ? true : undefined}
+              className={clsx(
+                "flex aspect-[496/344] w-full flex-col items-center justify-center gap-3 rounded-[12px] border border-dashed p-4 text-[14px] leading-[14px] hover:bg-[var(--octo-hover)]",
+                LINE,
+                FOCUS,
+                TEXT_GRAY,
+                imageError && FIELD_INVALID
+              )}
             >
-              <Pencil size={15} />
+              <span className="grid size-6 place-items-center">
+                <MenuIcon name="menu-upload.svg" size={21.5} />
+              </span>
+              {t("menuOffer.imageUpload")}
             </button>
-            <button
-              type="button"
-              aria-label={t("menuOffer.image")}
-              onClick={() => onPatch({ image: null })}
-              className="rounded-[8px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 text-error"
-            >
-              <Trash2 size={15} />
-            </button>
-          </div>
+          )}
         </div>
-        <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">
-          {t("menuOffer.imageHint")}
-        </p>
+        <p className={clsx("text-[12px] leading-3", TEXT_GRAY)}>{t("menuOffer.imageHint")}</p>
+        {imageError && (
+          <p role="alert" className={ERROR_TEXT}>
+            {imageError}
+          </p>
+        )}
       </div>
 
-      <div>
-        <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-          {t("menuOffer.status")}
-        </p>
-        <div className="mt-1.5 flex items-center gap-2.5">
+      <div className="flex flex-col gap-2">
+        <p className={LABEL}>{t("menuOffer.status")}</p>
+        <div className="flex items-center gap-2">
           <Switch
             checked={offer.status === "active"}
-            label={t("menuOffer.active")}
-            onChange={() =>
-              onPatch({ status: offer.status === "active" ? "inactive" : "active" })
-            }
+            label={t("menuOffer.status")}
+            onChange={(on) => onPatch({ status: on ? "active" : "inactive" })}
           />
-          <span className="text-[14px] text-[var(--octo-text-primary)]">
-            {t("menuOffer.active")}
+          <span className={clsx("text-[14px] font-medium leading-[14px]", TEXT)}>
+            {t(offer.status === "active" ? "menuOffer.active" : "menuOffer.inactive")}
           </span>
         </div>
       </div>
 
-      <label className="block">
-        <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
+      <div className="flex flex-col gap-2">
+        <p className={LABEL}>
           {t("menuOffer.badge")}{" "}
-          <span className="font-normal text-[var(--octo-text-secondary)]">
-            ({t("menuOffer.badgeOptional")})
-          </span>
-        </span>
-        <Select
-          className="mt-1.5"
+          <span className={clsx("text-[12px] font-normal", TEXT_SECONDARY)}>({t("menuOffer.badgeOptional")})</span>
+        </p>
+        <SelectBox
           value={offer.badge ?? ""}
-          onChange={(e) => onPatch({ badge: e.target.value === "" ? null : e.target.value })}
+          ariaLabel={t("menuOffer.badge")}
+          placeholderShown={!offer.badge}
+          onChange={(value) => onPatch({ badge: value === "" ? null : value })}
         >
-          <option value="">—</option>
+          <option value="">{t("menuOffer.badgeNone")}</option>
           {BADGES.map(({ value, key }) => (
             <option key={value} value={value}>
               {t(key)}
             </option>
           ))}
-        </Select>
-      </label>
-
-      <div className="flex items-center gap-2.5">
-        <Switch
-          checked={offer.showSavingBadge}
-          label={t("menuOffer.showSaving")}
-          onChange={() => onPatch({ showSavingBadge: !offer.showSavingBadge })}
-        />
-        <span className="text-[14px] text-[var(--octo-text-primary)]">
-          {t("menuOffer.showSaving")}
-        </span>
+          {/* A badge saved outside the three presets stays selectable. */}
+          {offer.badge && !BADGES.some((b) => b.value === offer.badge) && <option value={offer.badge}>{offer.badge}</option>}
+        </SelectBox>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={offer.showSavingBadge}
+            label={t("menuOffer.showSaving")}
+            onChange={(on) => onPatch({ showSavingBadge: on })}
+          />
+          <span className={clsx("text-[14px] font-medium leading-[14px]", TEXT)}>{t("menuOffer.showSaving")}</span>
+        </div>
       </div>
     </div>
   );

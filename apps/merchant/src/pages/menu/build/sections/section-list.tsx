@@ -7,10 +7,13 @@
 // part of the menu's shape, so it neither moves nor offers Delete.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { Eye, EyeOff, GripVertical, MoreVertical, Plus } from "lucide-react";
+import { EyeOff } from "lucide-react";
 import { OFFERS_SECTION_ID, type Section } from "@/entities/menu";
 import { MediaTile } from "@/shared/ui/media-tile";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { StatusPill } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { LINE, PANEL, SURFACE_BLUE, TEXT, TEXT_GRAY, TEXT_SECONDARY } from "../../_shared/theme";
 import { SectionRowMenu } from "./section-row-menu";
 
 export function SectionList({
@@ -26,7 +29,7 @@ export function SectionList({
   onRestore,
   onDelete,
 }: {
-  /** Rendered under the card title — the step puts the menu-name field here. */
+  /** Rendered under the card title. The frames put nothing here. */
   header?: ReactNode;
   sections: Section[];
   selectedId: string | null;
@@ -64,16 +67,14 @@ export function SectionList({
   }
 
   return (
-    <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <h2 className="text-[18px] font-semibold text-[var(--octo-text-primary)]">
-        {t("menuWiz.sec.buildTitle")}
-      </h2>
-      <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">
-        {t("menuWiz.sec.buildHint")}
-      </p>
-      {header && <div className="mt-3">{header}</div>}
+    <section className={clsx("flex flex-col gap-4", PANEL)}>
+      <div className={clsx("flex flex-col gap-3 border-b pb-2", LINE)}>
+        <h2 className={clsx("text-[18px] font-bold leading-[18px]", TEXT)}>{t("menuWiz.sec.buildTitle")}</h2>
+        <p className={clsx("text-[14px] font-medium leading-[14px]", TEXT_SECONDARY)}>{t("menuWiz.sec.buildHint")}</p>
+      </div>
+      {header}
 
-      <ul className="mt-3 divide-y divide-[var(--octo-border-card)] border-y border-[var(--octo-border-card)]">
+      <ul className={clsx("border-b", LINE)}>
         {sections.map((section, index) => {
           const fixed = section.id === OFFERS_SECTION_ID;
           const archived = section.visibility === "archived";
@@ -103,8 +104,9 @@ export function SectionList({
               }}
               onDragEnd={endDrag}
               className={clsx(
-                "relative flex items-center gap-3 px-1.5 py-2.5",
-                selectedId === section.id && "bg-[var(--octo-hover)]",
+                "relative flex items-center justify-between gap-2 border-t p-2",
+                LINE,
+                selectedId === section.id && SURFACE_BLUE,
                 dragFrom === index && "opacity-50"
               )}
             >
@@ -112,90 +114,86 @@ export function SectionList({
                 <span
                   aria-hidden
                   className={clsx(
-                    "pointer-events-none absolute inset-x-0 h-[3px] rounded-full bg-[var(--octo-accent)]",
+                    "pointer-events-none absolute inset-x-0 h-[3px] rounded-full bg-[#0D6EFD]",
                     dragFrom < index ? "-bottom-[2px]" : "-top-[2px]"
                   )}
                 />
               )}
 
-              {fixed ? (
-                <span className="w-[22px] shrink-0" aria-hidden />
-              ) : (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {fixed ? (
+                  <span className="size-6 shrink-0" aria-hidden />
+                ) : (
+                  <button
+                    type="button"
+                    ref={(el) => {
+                      if (el) grips.current.set(section.id, el);
+                      else grips.current.delete(section.id);
+                    }}
+                    aria-label={t("menuWiz.sec.reorderHint").replace("{name}", section.name)}
+                    onKeyDown={(e) => {
+                      if (!e.altKey) return;
+                      const to =
+                        e.key === "ArrowUp" ? index - 1 : e.key === "ArrowDown" ? index + 1 : null;
+                      if (to === null) return;
+                      e.preventDefault();
+                      if (to < 0 || to > lastMovable) return;
+                      onReorder(index, to);
+                      setRefocus(section.id);
+                    }}
+                    className="grid size-6 shrink-0 cursor-grab place-items-center rounded-[4px] text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0D6EFD] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]"
+                  >
+                    <MenuIcon name="menu-drag.svg" size={12} />
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  ref={(el) => {
-                    if (el) grips.current.set(section.id, el);
-                    else grips.current.delete(section.id);
-                  }}
-                  aria-label={t("menuWiz.sec.reorderHint").replace("{name}", section.name)}
-                  onKeyDown={(e) => {
-                    if (!e.altKey) return;
-                    const to =
-                      e.key === "ArrowUp" ? index - 1 : e.key === "ArrowDown" ? index + 1 : null;
-                    if (to === null) return;
-                    e.preventDefault();
-                    if (to < 0 || to > lastMovable) return;
-                    onReorder(index, to);
-                    setRefocus(section.id);
-                  }}
-                  className="shrink-0 cursor-grab rounded-[6px] text-[var(--octo-text-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--octo-accent)]"
+                  onClick={() => onSelect(section.id)}
+                  aria-current={selectedId === section.id ? "true" : undefined}
+                  className={clsx("flex min-w-0 flex-1 items-center gap-2 text-start", archived && "opacity-55")}
                 >
-                  <GripVertical size={22} aria-hidden />
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => onSelect(section.id)}
-                className={clsx(
-                  "flex min-w-0 flex-1 items-center gap-3 text-start",
-                  archived && "opacity-55"
-                )}
-              >
-                <span className="h-[54px] w-[54px] shrink-0 overflow-hidden rounded-[8px]">
-                  <MediaTile src={section.image} rounded="rounded-[8px]" />
-                </span>
-                <span className="min-w-0">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate text-[16px] font-medium text-[var(--octo-text-primary)]">
-                      {section.name}
+                  <span className="size-12 shrink-0 overflow-hidden rounded-[4px]">
+                    <MediaTile src={section.image} rounded="rounded-[4px]" />
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-2">
+                    <span className="flex items-center gap-2">
+                      <span className={clsx("truncate text-[14px] font-medium leading-[14px]", TEXT)}>{section.name}</span>
+                      {archived && <StatusPill tone="slate">{t("menuWiz.sec.archivedTag")}</StatusPill>}
                     </span>
-                    {archived && (
-                      <span className="shrink-0 rounded-full bg-[var(--octo-hover)] px-2 py-0.5 text-[12px] font-medium text-[var(--octo-text-secondary)]">
-                        {t("menuWiz.sec.archivedTag")}
-                      </span>
-                    )}
+                    <span className={clsx("text-[12px] font-medium leading-3", TEXT_GRAY)}>
+                      {t("menuWiz.sec.itemCount").replace("{n}", String(section.entries.length))}
+                    </span>
                   </span>
-                  <span className="block text-[14px] text-[var(--octo-text-secondary)]">
-                    {t("menuWiz.sec.itemCount").replace("{n}", String(section.entries.length))}
-                  </span>
-                </span>
-              </button>
+                </button>
+              </div>
 
-              {/* Locked while archived: Restore is the one way back, so the eye
-                  cannot quietly republish a parked section. */}
-              <button
-                type="button"
-                aria-label={`${t("menuWiz.sec.visibility")}: ${section.name}`}
-                aria-pressed={visible}
-                disabled={archived}
-                onClick={() => onToggleVisibility(section.id)}
-                className="shrink-0 rounded-[8px] p-1 text-[var(--octo-accent)] hover:bg-[var(--octo-hover)] disabled:cursor-not-allowed disabled:text-[var(--octo-text-faint)] disabled:hover:bg-transparent"
-              >
-                {visible ? <Eye size={22} /> : <EyeOff size={22} />}
-              </button>
+              <div className="flex shrink-0 items-center gap-6">
+                {/* Locked while archived: Restore is the one way back, so the
+                    eye cannot quietly republish a parked section. */}
+                <button
+                  type="button"
+                  aria-label={`${t("menuWiz.sec.visibility")}: ${section.name}`}
+                  aria-pressed={visible}
+                  disabled={archived}
+                  onClick={() => onToggleVisibility(section.id)}
+                  className="grid size-6 place-items-center rounded-[4px] text-[#0D6EFD] disabled:cursor-not-allowed disabled:text-[#cbd5e1]"
+                >
+                  {/* The frames draw only the open eye; the closed one has no
+                      frame glyph to take. */}
+                  {visible ? <MenuIcon name="menu-eye.svg" size={24} /> : <EyeOff size={24} strokeWidth={1.5} aria-hidden />}
+                </button>
 
-              <button
-                type="button"
-                aria-label={`${section.name} actions`}
-                aria-haspopup="menu"
-                onClick={(e) =>
-                  setMenuFor({ section, anchor: e.currentTarget.getBoundingClientRect() })
-                }
-                className="shrink-0 rounded-[8px] p-1 text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-              >
-                <MoreVertical size={22} />
-              </button>
+                <button
+                  type="button"
+                  aria-label={t("menuWiz.sec.actionsFor").replace("{name}", section.name)}
+                  aria-haspopup="menu"
+                  onClick={(e) => setMenuFor({ section, anchor: e.currentTarget.getBoundingClientRect() })}
+                  className={clsx("grid size-6 place-items-center rounded-[4px] hover:bg-[var(--octo-hover)]", TEXT)}
+                >
+                  <MenuIcon name="menu-more-vertical-fill.svg" size={24} />
+                </button>
+              </div>
             </li>
           );
         })}
@@ -204,9 +202,12 @@ export function SectionList({
       <button
         type="button"
         onClick={onAdd}
-        className="mt-3 flex w-full items-center justify-center gap-2 rounded-[6px] border border-[var(--octo-accent)] bg-transparent px-3 py-3 text-[16px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
+        className={clsx(
+          "flex h-[42px] w-full items-center justify-center gap-3 rounded-[4px] border border-[#0D6EFD] p-2 text-[14px] font-semibold leading-[14px] text-[#0D6EFD] hover:brightness-95",
+          SURFACE_BLUE
+        )}
       >
-        <Plus size={20} aria-hidden />
+        <MenuIcon name="menu-plus-line.svg" size={24} />
         {t("menuWiz.sec.addNew")}
       </button>
 

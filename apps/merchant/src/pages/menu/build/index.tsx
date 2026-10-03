@@ -8,18 +8,18 @@
 // The draft lives in memory (see the spec's Persistence section), so a step
 // reached by refresh or by a pasted link finds no menu and redirects to /menu
 // rather than rendering an empty wizard over a menu that is not there.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
-import clsx from "clsx";
 import { SEED_BRANCHES, blankMenu, saveBuilderStep, useMenuLibrary, type Menu } from "@/entities/menu";
 import { useAuth } from "@/app/providers/auth-provider";
 import { pullSections } from "@/entities/menu/menu-sync";
 import { applyIds, foldBrandMedia, pushMenu, type IdMap } from "@/entities/menu/menu-sync";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ERROR_STRIP } from "../_shared/theme";
 import { DraftProvider } from "./use-draft";
 import { Stepper, WIZARD_STEPS, type WizardStep } from "./stepper";
 import { WizardHeader } from "./wizard-header";
+import { WizardFooter, type FooterAction } from "./wizard-footer";
 import { SectionsStep } from "./sections";
 import { ItemsStep } from "./items";
 import { ThemeStep } from "./theme";
@@ -54,36 +54,6 @@ export function NewMenuRedirect() {
   return null;
 }
 
-/** The three footer weights the frames use: a grey quiet action, a tinted
- *  secondary one, and the solid step forward. */
-function FooterButton({
-  tone,
-  onClick,
-  disabled,
-  children,
-}: {
-  tone: "quiet" | "tinted" | "primary";
-  onClick: () => void;
-  disabled?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={clsx(
-        "inline-flex h-12 items-center justify-center gap-2 rounded-[10px] px-4 text-[16px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        tone === "quiet" && "bg-[var(--octo-track)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]",
-        tone === "tinted" && "bg-[var(--octo-selected)] text-[var(--octo-accent)] hover:brightness-95",
-        tone === "primary" && "bg-[var(--octo-accent)] text-white hover:brightness-110"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
 export function MenuBuilderPage() {
   const { t, locale } = useI18n();
   const navigate = useNavigate();
@@ -107,14 +77,22 @@ export function MenuBuilderPage() {
   const stepIndex = WIZARD_STEPS.indexOf(step) + 1;
   // A step opened by link has been reached, and so has everything before it.
   const [furthest, setFurthest] = useState(stepIndex);
-  const [blocked, setBlocked] = useState<{ step: WizardStep; on: boolean }>({ step, on: false });
+  const [blocked, setBlocked] = useState<{ step: WizardStep; on: boolean; message: string | null }>({
+    step,
+    on: false,
+    message: null,
+  });
   // A block belongs to the step that raised it, so leaving that step lifts it.
   const nextBlocked = blocked.on && blocked.step === step;
   // Stable, and a no-op when nothing changed: steps call this from effects, so
   // a fresh function or a fresh state object each render would loop forever.
   const setNextBlocked = useCallback(
-    (on: boolean) =>
-      setBlocked((prev) => (prev.on === on && prev.step === step ? prev : { step, on })),
+    (on: boolean, message?: string | null) => {
+      const text = on ? (message ?? null) : null;
+      setBlocked((prev) =>
+        prev.on === on && prev.step === step && prev.message === text ? prev : { step, on, message: text }
+      );
+    },
     [step]
   );
 
@@ -202,72 +180,66 @@ export function MenuBuilderPage() {
     navigate("/menu");
   }
 
-  const next = (
-    <FooterButton tone="primary" onClick={() => goTo(stepIndex + 1)} disabled={nextBlocked}>
-      {t("menuWiz.nextStep")}
-      <ArrowRight size={18} className="rtl:rotate-180" aria-hidden />
-    </FooterButton>
-  );
+  // Each frame words its footer differently. Review has none: its publish
+  // card is the way forward, and a disabled Next Step there reads as broken.
+  const footerActions: Record<WizardStep, FooterAction[] | null> = {
+    sections: [
+      { label: t("menuWiz.cancel"), onClick: () => navigate("/menu") },
+      { label: t("menuWiz.saveDraft"), tone: "tinted", onClick: saveAndLeave },
+    ],
+    items: [
+      { label: t("menuWiz.item.saveDraft"), onClick: saveAndLeave },
+      {
+        label: t("menuWiz.item.saveAndAdd"),
+        tone: "tintedAccent",
+        onClick: () => {
+          save();
+          addAnother.current?.();
+        },
+      },
+    ],
+    theme: [{ label: t("menuWiz.item.saveDraft"), onClick: saveAndLeave }],
+    review: null,
+  };
+  const actions = footerActions[step];
 
   const title = step === "sections" && !isNew ? "menuWiz.sections.editTitle" : TITLES[step].title;
 
   return (
     <DraftProvider value={{ draft, setDraft, save, addAnother, setNextBlocked }}>
-      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-        <WizardHeader
-          titleKey={title}
-          subtitleKey={TITLES[step].subtitle}
-          branchLabel={branchLabel}
-          onChangeBranch={() => navigate("/settings/branches")}
-        />
+      <div className="flex flex-col gap-6 px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
+        <div className="flex flex-col gap-8">
+          <WizardHeader
+            titleKey={title}
+            subtitleKey={TITLES[step].subtitle}
+            branchLabel={branchLabel}
+            onChangeBranch={() => navigate("/settings/branches")}
+          />
 
-        {saveError && (
-          <div role="alert" className="mt-3 rounded-[10px] bg-error/10 px-4 py-3 text-[14px] text-error">
-            {saveError}
-          </div>
-        )}
+          {saveError && (
+            <div role="alert" className={`rounded-[12px] px-3 py-2 text-[14px] font-medium ${ERROR_STRIP}`}>
+              {saveError}
+            </div>
+          )}
 
-        <Stepper current={stepIndex} furthest={furthest} onJump={goTo} />
-
-        <div className="mt-5">
-          <Routes>
-            <Route index element={<Navigate to="sections" replace />} />
-            <Route path="sections" element={<SectionsStep />} />
-            <Route path="items" element={<ItemsStep />} />
-            <Route path="theme" element={<ThemeStep />} />
-            <Route path="review" element={<ReviewStep />} />
-          </Routes>
+          <Stepper current={stepIndex} furthest={furthest} onJump={goTo} />
         </div>
 
-        {/* Each frame draws its own footer. Review has none: its publish card
-            is the way forward, and a disabled Next Step there reads as broken. */}
-        {step === "sections" && (
-          <footer className="mt-5 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)_minmax(0,3.3fr)]">
-            <FooterButton tone="quiet" onClick={() => navigate("/menu")}>{t("menuWiz.cancel")}</FooterButton>
-            <FooterButton tone="tinted" onClick={saveAndLeave}>{t("menuWiz.saveDraft")}</FooterButton>
-            {next}
-          </footer>
-        )}
-        {step === "items" && (
-          <footer className="mt-5 grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,2.1fr)_minmax(0,3.3fr)]">
-            <FooterButton tone="quiet" onClick={saveAndLeave}>{t("menuWiz.item.saveDraft")}</FooterButton>
-            <FooterButton
-              tone="tinted"
-              onClick={() => {
-                save();
-                addAnother.current?.();
-              }}
-            >
-              {t("menuWiz.item.saveAndAdd")}
-            </FooterButton>
-            {next}
-          </footer>
-        )}
-        {step === "theme" && (
-          <footer className="mt-5 grid gap-2.5 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <FooterButton tone="quiet" onClick={saveAndLeave}>{t("menuWiz.item.saveDraft")}</FooterButton>
-            {next}
-          </footer>
+        <Routes>
+          <Route index element={<Navigate to="sections" replace />} />
+          <Route path="sections" element={<SectionsStep />} />
+          <Route path="items" element={<ItemsStep />} />
+          <Route path="theme" element={<ThemeStep />} />
+          <Route path="review" element={<ReviewStep />} />
+        </Routes>
+
+        {actions && (
+          <WizardFooter
+            className="mt-4"
+            actions={actions}
+            next={{ label: t("menuWiz.nextStep"), onClick: () => goTo(stepIndex + 1), disabled: nextBlocked }}
+            error={nextBlocked ? blocked.message : null}
+          />
         )}
       </div>
     </DraftProvider>

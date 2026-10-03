@@ -2,14 +2,12 @@
 // memory (draftMenuDocument), so every edit shows before Save. Falls back to the builder's own drawing (PreviewRail) when
 // the storefront canvas does not answer within 8 s.
 import { useMemo, useState } from "react";
-import clsx from "clsx";
-import { Monitor, Smartphone } from "lucide-react";
 import type { MenuRenderPayload } from "@octopus/api-client";
 import { useMenuCurrency, type Menu } from "@/entities/menu";
 import type { SiteDraft } from "@/entities/site-draft";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { StorefrontFrame, type FrameDevice } from "@/widgets/storefront-frame";
-import { PreviewRail } from "../preview-rail";
+import { PreviewCard, PreviewRail } from "../preview-rail";
 import { canvasOrigin } from "./canvas-origin";
 import { draftMenuDocument } from "./draft-menu-document";
 import { MENU_CANVAS_CHANNEL } from "./menu-canvas-channel";
@@ -69,38 +67,10 @@ export function MenuPreviewFrame({ menu, selectedSectionId = null, onSelectSecti
   }
 
   return (
-    <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-[16px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuWiz.preview.title")}
-            {ready && (
-              <span className="rounded-full bg-[#16a34a]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[#16a34a]">{t("menuWiz.preview.real")}</span>
-            )}
-          </h2>
-          <p className="mt-0.5 text-[12.5px] text-[var(--octo-text-secondary)]">{t("menuWiz.preview.hint")}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-[9px] border border-[var(--octo-border-card)] p-1">
-          {(
-            [
-              ["desktop", Monitor],
-              ["mobile", Smartphone],
-            ] as const
-          ).map(([id, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              aria-label={id}
-              aria-pressed={device === id}
-              onClick={() => setDevice(id)}
-              className={clsx("rounded-[7px] p-1.5", device === id ? "bg-[var(--octo-selected)] text-[var(--octo-accent)]" : "text-[var(--octo-text-muted)]")}
-            >
-              <Icon size={16} aria-hidden />
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="mt-3">
+    <PreviewCard device={device} onDeviceChange={setDevice}>
+      {/* The frames carry no "your real menu" badge; `ready` is still tracked
+          so it can come back without rewiring the canvas. */}
+      <div data-ready={ready || undefined}>
         <StorefrontFrame
           channel={MENU_CANVAS_CHANNEL}
           origin={origin}
@@ -120,6 +90,6 @@ export function MenuPreviewFrame({ menu, selectedSectionId = null, onSelectSecti
           title={menu.name}
         />
       </div>
-    </section>
+    </PreviewCard>
   );
 }

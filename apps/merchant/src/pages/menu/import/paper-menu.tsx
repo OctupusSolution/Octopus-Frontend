@@ -14,11 +14,20 @@ import clsx from "clsx";
 import {
   bandFor,
   splitBalanced,
+  type Band,
   type DetectedSection,
   type DetectionResult,
 } from "@/entities/menu/ai-import";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { BAND_TONE } from "./ai-style";
+
+/** The overlays as the frames draw them: square 2px dashed boxes, green for a
+ *  confident read and amber for anything that needs a look. The legend has no
+ *  third colour for items, so medium and low share the amber. */
+const BOX: Record<Band, string> = {
+  high: "border-[#009a39]",
+  medium: "border-[#f59e0b]",
+  low: "border-[#f59e0b]",
+};
 
 function Leaves({ className }: { className: string }) {
   return (
@@ -62,6 +71,8 @@ export interface PaperMenuProps {
   /** Draws only the first N items per section — the upload screen's preview
    *  is a glimpse that sits beside three cards, not the full page. */
   maxItems?: number;
+  /** The per-item percentage chip. Not in the frames, so off unless asked. */
+  showConfidence?: boolean;
   className?: string;
 }
 
@@ -80,6 +91,7 @@ export function PaperMenu({
   onSelect,
   outlineSections,
   maxItems,
+  showConfidence = false,
   className,
 }: PaperMenuProps) {
   const { t } = useI18n();
@@ -92,7 +104,7 @@ export function PaperMenu({
     <div
       dir="ltr"
       className={clsx(
-        "relative overflow-hidden rounded-[10px] px-5 pb-6 pt-5 text-[#2b2520] shadow-[inset_0_0_60px_rgb(120_90_50/0.18)] sm:px-7",
+        "relative overflow-hidden px-5 pb-6 pt-5 text-[#2b2520] shadow-[inset_0_0_60px_rgb(120_90_50/0.18)] sm:px-7",
         "bg-[radial-gradient(ellipse_at_30%_20%,#fbf6ec_0%,#f3eadb_55%,#eadcc6_100%)]",
         className
       )}
@@ -128,8 +140,8 @@ export function PaperMenu({
                 <div
                   key={section.id}
                   className={clsx(
-                    "rounded-[8px] transition-colors",
-                    outlineSections && sectionShown && "border-2 border-dashed border-[rgb(124_58_237/0.35)] p-1.5"
+                    "transition-colors",
+                    outlineSections && sectionShown && "border-2 border-dashed border-[#64748b] p-1.5"
                   )}
                 >
                   <h3 className="border-b border-[#d9c7a6] pb-1 font-serif text-[15px] font-semibold uppercase tracking-[0.06em] text-[#8a5a2b]">
@@ -139,7 +151,7 @@ export function PaperMenu({
                     {(maxItems ? section.items.slice(0, maxItems) : section.items).map((item) => {
                       const shown = !revealed || revealed.has(item.id);
                       const band = bandFor(item.confidence);
-                      const tone = BAND_TONE[outlineSections && band === "low" ? "medium" : band];
+                      const ink = band === "high" ? "text-[#009a39]" : "text-[#b45309]";
                       const selected = selectedId === item.id;
                       const price =
                         item.price === null ? t("menuAi.paper.priceUnclear") : `SAR ${item.price}`;
@@ -154,12 +166,12 @@ export function PaperMenu({
                               {item.description}
                             </span>
                           )}
-                          {shown && !outlineSections && (
+                          {shown && showConfidence && (
                             <span
                               className={clsx(
                                 "mt-1 ms-auto block w-fit rounded-[4px] border bg-white/80 px-1.5 text-[9.5px] font-semibold tabular-nums",
-                                tone.ink,
-                                selected ? "border-[#3D1DF3]/40" : "border-current/20"
+                                ink,
+                                selected ? "border-[#0D6EFD]/40" : "border-current/20"
                               )}
                             >
                               {item.confidence}%
@@ -168,10 +180,9 @@ export function PaperMenu({
                         </>
                       );
                       const boxClass = clsx(
-                        "block w-full rounded-[6px] border-[1.5px] border-dashed px-2 py-1.5 text-start transition-all",
-                        shown ? tone.box : "border-transparent opacity-45",
-                        selected &&
-                          "border-solid !border-[#3D1DF3] !bg-[rgb(61_29_243/0.1)] shadow-[0_2px_10px_rgb(61_29_243/0.25)]"
+                        "block w-full border-2 border-dashed px-2 py-1.5 text-start transition-colors",
+                        shown ? BOX[band] : "border-transparent opacity-45",
+                        selected && "!border-[#0D6EFD] !bg-[rgb(13_110_253/0.08)]"
                       );
                       return (
                         <li key={item.id}>
@@ -181,7 +192,7 @@ export function PaperMenu({
                               data-paper-item={item.id}
                               aria-pressed={selected}
                               onClick={() => onSelect(item.id)}
-                              className={clsx(boxClass, "hover:shadow-[0_2px_8px_rgb(61_29_243/0.18)]")}
+                              className={clsx(boxClass, "hover:bg-[rgb(13_110_253/0.05)]")}
                             >
                               {body}
                             </button>

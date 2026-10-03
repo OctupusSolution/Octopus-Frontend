@@ -47,7 +47,13 @@ export function OnboardingPage() {
 
   return (
     <SetupWizard
-      chrome={<OnboardingHeader onLogoClick={() => navigate("/select-business")} logoLabel={t("businessPicker.back")} />}
+      chrome={(welcome) => (
+        <OnboardingHeader
+          variant={welcome ? "welcome" : "minimal"}
+          onLogoClick={() => navigate("/select-business")}
+          logoLabel={t("businessPicker.back")}
+        />
+      )}
       containerClassName="min-h-screen bg-[var(--octo-page-bg)]"
       onFinish={handleFinish}
     />

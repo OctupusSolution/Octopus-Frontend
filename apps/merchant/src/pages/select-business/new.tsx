@@ -36,10 +36,11 @@ export function NewBusinessPage() {
 
   return (
     <SetupWizard
-      chrome={<OnboardingHeader onLogoClick={() => navigate("/select-business")} logoLabel={t("businessPicker.back")} />}
+      chrome={<OnboardingHeader variant="minimal" onLogoClick={() => navigate("/select-business")} logoLabel={t("businessPicker.back")} />}
       containerClassName="min-h-screen bg-[var(--octo-page-bg)]"
       onFinish={handleFinish}
       finishLabelKey="businessPicker.wizard.open"
+      skipWelcome
     />
   );
 }

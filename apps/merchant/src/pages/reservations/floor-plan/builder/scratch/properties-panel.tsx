@@ -44,7 +44,8 @@ function MeterField({ label, units, onChange, min = 0, max }: { label: string; u
   return (
     <label className="flex min-w-0 flex-col gap-1.5">
       <span className="text-[12.5px] font-medium text-[var(--octo-text-secondary)]">{label}</span>
-      <span className="relative">
+      {/* LTR on the wrapper, not the input alone: the unit suffix and the room kept for it have to agree on which side is the end. */}
+      <span className="relative" dir="ltr">
         <input
           inputMode="decimal"
           value={shown}
@@ -55,7 +56,6 @@ function MeterField({ label, units, onChange, min = 0, max }: { label: string; u
             if (event.key === "Escape") setText(null);
           }}
           className="h-10 w-full rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-7 ps-3 text-[13.5px] tabular-nums text-[var(--octo-text-primary)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/20"
-          dir="ltr"
         />
         <span className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[12px] text-[var(--octo-text-muted)]">m</span>
       </span>

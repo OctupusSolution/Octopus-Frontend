@@ -541,7 +541,10 @@ export function PreviewStep({ draft, dispatch, publicLinkSync }: StepProps) {
                       sendInvitation();
                     }
                   }}
-                  className={plFieldClass(Boolean(emailError), "h-14 ps-10 pe-2 rtl:text-end")}
+                  // The address is typed left-to-right, but the icon sits on the page's start side: the
+                  // room for it is therefore physical (left in LTR pages, right in RTL ones), not `ps-`,
+                  // which inside this LTR field would always mean left.
+                  className={plFieldClass(Boolean(emailError), "h-14 !pl-10 !pr-2 [[dir=rtl]_&]:!pl-2 [[dir=rtl]_&]:!pr-10 [[dir=rtl]_&]:text-right")}
                 />
               </span>
               <PlFieldError id={emailErrorId}>{emailError}</PlFieldError>

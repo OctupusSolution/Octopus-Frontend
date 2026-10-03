@@ -182,8 +182,9 @@ export const PlInput = forwardRef<HTMLInputElement, PlInputProps>(function PlInp
   if (!leading) {
     return <input ref={ref} aria-invalid={invalid || undefined} className={plFieldClass(invalid, className)} {...props} />;
   }
+  // `dir` goes on the wrapper too, so the icon and the room kept for it stay on the same side.
   return (
-    <span className="relative flex items-center">
+    <span className="relative flex items-center" dir={props.dir}>
       <span className="pointer-events-none absolute start-3 flex items-center text-[var(--pl-text-3)]">{leading}</span>
       <input ref={ref} aria-invalid={invalid || undefined} className={plFieldClass(invalid, clsx("ps-10", className))} {...props} />
     </span>
@@ -223,7 +224,7 @@ export const PlSelect = forwardRef<HTMLSelectElement, PlSelectProps>(function Pl
       <select
         ref={ref}
         aria-invalid={invalid || undefined}
-        className={plFieldClass(invalid, clsx("cursor-pointer appearance-none pe-11 font-medium", className))}
+        className={plFieldClass(invalid, clsx("pl-select cursor-pointer appearance-none pe-11 font-medium", className))}
         {...props}
       >
         {children}

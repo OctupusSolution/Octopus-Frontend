@@ -93,9 +93,46 @@ body {
   font-family: var(--font-family-active);
 }
 
-/* TODO: self-host font files.
- *   Inter:      https://fonts.google.com/specimen/Inter       (weights 100-900, variable)
- *   Readex Pro: https://fonts.google.com/specimen/Readex+Pro  (weights 200-700, variable)
- * Add @font-face rules here once the .woff2 files are vendored into
- * packages/ui/src/fonts/, instead of loading from Google Fonts at runtime.
+/*
+ * Self-hosted variable fonts (packages/ui/src/fonts/, SIL Open Font License),
+ * so nothing is fetched from a third party at runtime. Each file is one
+ * script subset; the browser downloads only the ones a page actually uses.
+ *   Inter:      weights 100-900
+ *   Readex Pro: weights 200-700
  */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("../fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Readex Pro";
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: swap;
+  src: url("../fonts/readex-pro-arabic.woff2") format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E,
+    U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC;
+}
+@font-face {
+  font-family: "Readex Pro";
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: swap;
+  src: url("../fonts/readex-pro-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

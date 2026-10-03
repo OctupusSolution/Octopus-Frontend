@@ -240,11 +240,11 @@ export function OrderRowCard({
         <OrderIdBlock order={order} onOpenDetails={onOpenDetails} />
       </div>
 
-      <div className={`min-h-[36px] min-w-[120px] flex-1 border-e px-2 ${LINE}`}>
+      <div className={`min-h-[36px] min-w-[96px] flex-1 border-e px-2 ${LINE}`}>
         <TableAndGuests order={order} />
       </div>
 
-      <div className={`min-w-[120px] flex-1 border-e px-2 ${LINE}`}>
+      <div className={`min-w-[112px] flex-1 border-e px-2 ${LINE}`}>
         <AmountAndPayment order={order} />
       </div>
 
@@ -252,12 +252,13 @@ export function OrderRowCard({
         <Stepper order={order} />
       </div>
 
-      {/* Four buttons spread across the cell as in the frame; the fifth makes
-          them wrap, where spreading would scatter them. */}
+      {/* Four buttons sit on one line as in the frame. A fifth (Record Payment)
+          folds the group onto two lines inside its own cell until the screen is
+          wide enough, so the row itself never breaks. */}
       <OrderActionButtons
         order={order}
         onAction={onAction}
-        className="min-h-[60px] shrink-0 justify-end ps-1"
+        className={`min-h-[60px] shrink-0 justify-end ps-1 ${owesPayment(order) ? "max-w-[300px] min-[1700px]:max-w-none" : ""}`}
       />
     </div>
   );

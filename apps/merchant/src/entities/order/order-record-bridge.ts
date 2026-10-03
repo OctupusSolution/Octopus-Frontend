@@ -10,16 +10,26 @@ import { TIMELINE_STAGES } from "@/pages/orders-list/_shared/types";
 // timeline in one direction (Voided has no stage of its own) and thinner in
 // another (no "Accepted" pill exists, folded into the timeline itself). See
 // [[order-module-status-mismatch]] for the note this leaves in the gaps doc.
-const LAST_STAGE_BY_STATUS: Record<OrderAdminStatus, TimelineStage> = {
+const STAGE_BY_STATUS: Partial<Record<OrderAdminStatus, TimelineStage>> = {
   New: "New",
   Accepted: "Accepted",
   Preparing: "Preparing",
   Ready: "Ready",
   Served: "Served",
   Completed: "Completed",
-  Cancelled: "New",
-  Voided: "Preparing",
 };
+
+// A called-off order's status no longer says how far it got, so the stage is
+// read back from the timestamps the order and its lines collected on the way.
+function lastStageOf(order: OrderResponse): TimelineStage {
+  const live = STAGE_BY_STATUS[order.status];
+  if (live) return live;
+  if (order.completedAtUtc) return "Completed";
+  if (order.lines.some((line) => line.servedAtUtc)) return "Served";
+  if (order.lines.some((line) => line.readyAtUtc)) return "Ready";
+  if (order.lines.some((line) => line.preparingAtUtc)) return "Preparing";
+  return order.acceptedAtUtc ? "Accepted" : "New";
+}
 
 const SOURCE_BY_CODE: Record<string, OrderSource> = {
   pos: "POS Order",
@@ -29,6 +39,11 @@ const SOURCE_BY_CODE: Record<string, OrderSource> = {
 };
 
 function paymentStatusOf(order: OrderResponse): PaymentStatus {
+  // Calling an order off zeroes its total, which the backend reports as
+  // "Paid" (nothing owed) even when no money was ever taken.
+  const calledOff = order.status === "Cancelled" || order.status === "Voided";
+  if (calledOff && order.capturedTotal.amount === 0) return "Unpaid";
+
   switch (order.paymentState) {
     case "Paid":
     case "Overpaid":
@@ -49,7 +64,7 @@ function timelineUpTo(lastStage: TimelineStage, placedAtUtc: string): Partial<Re
 }
 
 export function mapRealOrderToRecord(order: OrderResponse): OrderRecord {
-  const lastStage = LAST_STAGE_BY_STATUS[order.status];
+  const lastStage = lastStageOf(order);
   const state = order.status === "Cancelled" ? "Canceled" : order.status === "Voided" ? "Voided" : lastStage;
 
   return {

@@ -5,7 +5,7 @@ import { Modal } from "@ui/primitives";
 import { formatSar, type DuplicateOrderTemplateResponse } from "@octopus/api-client";
 import { OrderWorkspacePanel } from "@/features/order/manage-order";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { OrderActionButtons, TableGlyph } from "./order-row";
+import { OrderActionButtons, TableGlyph, guestsLabel } from "./order-row";
 import { Stepper, STATE_LABEL_KEY } from "./stepper";
 import { STATE_STYLE } from "./theme";
 import type { OrderAction } from "./theme";
@@ -105,7 +105,7 @@ export function OrderDetailsModal({
           <MetaItem
             icon={<Users size={14} />}
             label={t("orders.details.guestNo")}
-            value={t("orders.row.guests").replace("{n}", String(order.guests))}
+            value={guestsLabel(t, order.guests)}
           />
         )}
         {order.waiter && <MetaItem icon={<ChefHat size={14} />} label={t("orders.details.waiter")} value={order.waiter} />}

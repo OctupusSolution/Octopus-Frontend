@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
+import clsx from "clsx";
 
 const logoUrl = new URL("../../../../assets/Logo/OCTOPUS LOGO.svg", import.meta.url).href;
 
@@ -34,11 +35,10 @@ export function PageTransition({ children }: { children: ReactNode }) {
   return (
     <div className="relative h-full min-h-0">
       <div
-        className={
-          phase === "out"
-            ? "opacity-0 transition-opacity duration-200 ease-in"
-            : "opacity-100 transition-opacity duration-300 ease-out"
-        }
+        className={clsx(
+          "h-full min-h-0",
+          phase === "out" ? "opacity-0 transition-opacity duration-200 ease-in" : "opacity-100 transition-opacity duration-300 ease-out"
+        )}
       >
         {children}
       </div>

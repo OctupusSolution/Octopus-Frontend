@@ -1,52 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { RefreshCw, Share2, SlidersHorizontal, Clock, Check, X, ChevronDown } from "lucide-react";
-import { StatCard } from "@/widgets/sales-summary-chart";
-import { RevenueChannelChart } from "@/widgets/revenue-channel-chart";
-import { OrderChannelDonut } from "@/widgets/order-channel-donut";
+import { RefreshCw, Share2, SlidersHorizontal, Clock, Check, X } from "lucide-react";
 import { AiInsightsPanel } from "@/widgets/ai-insights-panel";
-import { PerformanceHeatmap } from "@/widgets/performance-heatmap";
-import { BranchDistribution } from "@/widgets/branch-distribution";
 import {
-  kpiCards,
+  distributionCards,
   lastUpdatedLabel,
   updatedJustNowLabel,
-  dashboardRangeOptions,
   dashboardBranchOptions,
-  type DashboardRangeOption,
-  type DashboardBranchOption,
 } from "@/shared/api/mock-dashboard";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import { labelKey } from "@/shared/lib/labels";
 import { Checkbox } from "@ui/primitives";
+import { KpiCards } from "./_sections/kpi-cards";
+import { CustomersActivity } from "./_sections/customers-activity";
+import { DistributionCard } from "./_sections/distribution-card";
+import { LiveOrders } from "./_sections/live-orders";
+import { RecentActivity } from "./_sections/recent-activity";
 
-const DEFAULT_RANGE = "all";
-const DEFAULT_BRANCHES: string[] = [];
+const outlineButton =
+  "flex h-11 items-center gap-2 rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-4 text-[15px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]";
 
-/** KPI card id -> drill-down route */
-const KPI_ROUTES: Record<string, string> = {
-  "orders-today": "/orders",
-  reservations: "/reservations",
-  revenue: "/reports/sales",
-  "avg-order": "/orders",
-};
-
-// Natural document flow — the parent `.octo-scroll` container (see app.tsx)
-// owns the scroll. Rows are NOT given a fixed height: grid rows auto-size to
-// their tallest card and `align-items: stretch` (default) matches the rest —
-// a fixed row height here previously caused cards with more content (e.g.
-// AI Insights text wrapping at narrower widths) to overflow into the row
-// below. RevenueChannelChart still sets its own fixed height internally
-// since its bar chart needs a definite height to resolve percentages.
 export function DashboardPage() {
   const { t } = useI18n();
   const { activeBusiness } = useTenantConfig();
-  const navigate = useNavigate();
 
-  // The subtitle used to name someone else's company outright. It now names
-  // the business the merchant actually created, with the generic label as the
-  // fallback for an unprovisioned session.
   const businessLabel = activeBusiness?.businessName?.trim() || t("sidebar.accountFallback");
 
   const [refreshing, setRefreshing] = useState(false);
@@ -54,14 +31,9 @@ export function DashboardPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [rangeId, setRangeId] = useState<string>(DEFAULT_RANGE);
-  const [branches, setBranches] = useState<string[]>(DEFAULT_BRANCHES);
-  const [draftRangeId, setDraftRangeId] = useState<string>(DEFAULT_RANGE);
-  const [draftBranches, setDraftBranches] = useState<string[]>(DEFAULT_BRANCHES);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [draftBranches, setDraftBranches] = useState<string[]>([]);
   const filterRef = useRef<HTMLDivElement>(null);
-
-  const activeRange = dashboardRangeOptions.find((r) => r.id === rangeId) ?? dashboardRangeOptions[0];
-  const isFiltered = rangeId !== DEFAULT_RANGE || branches.length > 0;
 
   const handleRefresh = () => {
     if (refreshing) return;
@@ -73,9 +45,8 @@ export function DashboardPage() {
   };
 
   const handleShare = async () => {
-    const url = window.location.href;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(window.location.href);
       setShareCopied(true);
     } catch {
       setShareCopied(false);
@@ -89,7 +60,6 @@ export function DashboardPage() {
     return () => window.clearTimeout(id);
   }, [shareCopied]);
 
-  // Close the filter panel on outside click / Escape.
   useEffect(() => {
     if (!filterOpen) return;
     const onPointer = (e: MouseEvent) => {
@@ -107,48 +77,29 @@ export function DashboardPage() {
   }, [filterOpen]);
 
   const openFilter = () => {
-    setDraftRangeId(rangeId);
     setDraftBranches(branches);
     setFilterOpen(true);
   };
 
-  const applyFilter = () => {
-    setRangeId(draftRangeId);
-    setBranches(draftBranches);
-    setFilterOpen(false);
-  };
-
-  const resetFilter = () => {
-    setDraftRangeId(DEFAULT_RANGE);
-    setDraftBranches(DEFAULT_BRANCHES);
-    setRangeId(DEFAULT_RANGE);
-    setBranches(DEFAULT_BRANCHES);
-    setFilterOpen(false);
-  };
-
   const toggleBranch = (id: string) => {
-    setDraftBranches((prev) =>
-      prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]
-    );
+    setDraftBranches((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
   };
-
-  const isShareOpen = shareOpen || shareCopied;
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+    <div className="px-4 pb-10 pt-6 sm:px-[26px] lg:ps-[50px] lg:pt-8">
+      <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
+          <h1 className="text-[22px] font-semibold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">
             {t("dashboard.title")}
           </h1>
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">
+          <p className="mt-1.5 text-[13.5px] text-[var(--octo-text-secondary)] sm:text-[15px]">
             {t("dashboard.subtitle").replace("{business}", businessLabel)}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="hidden items-center gap-1.5 text-[11.5px] text-[var(--octo-text-muted)] md:flex">
-            <Clock size={13} />
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="hidden items-center gap-2 text-[15px] text-[var(--octo-text-secondary)] md:flex">
+            <Clock size={21} strokeWidth={1.6} />
             {t(labelKey(updatedLabel))}
           </span>
 
@@ -157,29 +108,27 @@ export function DashboardPage() {
             aria-label={t("common.refresh")}
             title={t("common.refresh")}
             onClick={handleRefresh}
-            className="grid h-[30px] w-[30px] place-items-center rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+            className="grid h-11 w-11 place-items-center rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
           >
-            <RefreshCw size={13} className={refreshing ? "animate-spin" : undefined} />
+            <RefreshCw size={20} strokeWidth={1.7} className={refreshing ? "animate-spin" : undefined} />
           </button>
 
           <div className="relative">
             <button
               type="button"
               aria-haspopup="dialog"
-              aria-expanded={isShareOpen}
+              aria-expanded={shareOpen}
               onClick={() => setShareOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+              className={outlineButton}
             >
-              {shareCopied ? <Check size={13} className="text-[#16a34a]" /> : <Share2 size={13} />}
+              {shareCopied ? <Check size={19} className="text-[#16a34a]" /> : <Share2 size={19} strokeWidth={1.7} />}
               {t(shareCopied ? "dashboard.share.copied" : "common.share")}
             </button>
 
             {shareOpen && (
               <div className="absolute end-0 top-[calc(100%+6px)] z-30 w-64 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3 shadow-lg">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-                    {t("dashboard.share.title")}
-                  </p>
+                  <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("dashboard.share.title")}</p>
                   <button
                     type="button"
                     aria-label={t("common.cancel")}
@@ -190,9 +139,7 @@ export function DashboardPage() {
                   </button>
                 </div>
                 <div className="mt-2.5 flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-hover)] px-2.5 py-2">
-                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--octo-text-muted)]">
-                    {typeof window !== "undefined" ? window.location.href : ""}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-[var(--octo-text-muted)]">{window.location.href}</span>
                   <button
                     type="button"
                     onClick={() => void handleShare()}
@@ -212,67 +159,27 @@ export function DashboardPage() {
               aria-haspopup="dialog"
               aria-expanded={filterOpen}
               onClick={() => (filterOpen ? setFilterOpen(false) : openFilter())}
-              className="flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+              className={outlineButton}
             >
-              <SlidersHorizontal size={13} />
+              <SlidersHorizontal size={19} strokeWidth={1.7} />
               {t("dashboard.globalFilter")}
-              {isFiltered && <span className="h-1.5 w-1.5 rounded-full bg-[#0D6EFD]" />}
-              <ChevronDown size={12} className={`transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+              {branches.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[#0D6EFD]" />}
             </button>
 
             {filterOpen && (
               <div
                 role="dialog"
                 aria-label={t("dashboard.globalFilter")}
-                className="absolute end-0 top-[calc(100%+6px)] z-30 w-[300px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 shadow-lg"
+                className="absolute end-0 top-[calc(100%+6px)] z-30 w-[280px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 shadow-lg"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
-                    {t("dashboard.globalFilter")}
-                  </p>
-                  <button
-                    type="button"
-                    aria-label={t("common.cancel")}
-                    onClick={() => setFilterOpen(false)}
-                    className="text-[var(--octo-text-faint)] transition-colors hover:text-[var(--octo-text-secondary)]"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                <p className="mt-3 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
-                  {t("dashboard.filter.period")}
-                </p>
-                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                  {dashboardRangeOptions.map((opt: DashboardRangeOption) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setDraftRangeId(opt.id)}
-                      aria-pressed={draftRangeId === opt.id}
-                      className={
-                        draftRangeId === opt.id
-                          ? "rounded-[9px] border border-[#0D6EFD] bg-[#eaf2ff] px-2 py-1.5 text-[11.5px] font-medium text-[#0D6EFD]"
-                          : "rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1.5 text-[11.5px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
-                      }
-                    >
-                      {t(labelKey(opt.label))}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-3 flex items-center justify-between">
+                <div className="flex items-center justify-between">
                   <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
                     {t("dashboard.filter.branches")}
                   </p>
                   <button
                     type="button"
                     onClick={() =>
-                      setDraftBranches(
-                        draftBranches.length === dashboardBranchOptions.length
-                          ? []
-                          : dashboardBranchOptions.map((b) => b.id)
-                      )
+                      setDraftBranches(draftBranches.length === dashboardBranchOptions.length ? [] : dashboardBranchOptions.map((b) => b.id))
                     }
                     className="text-[11px] font-medium text-[#0D6EFD] hover:underline"
                   >
@@ -280,10 +187,10 @@ export function DashboardPage() {
                   </button>
                 </div>
                 <div className="mt-2 flex flex-col gap-2">
-                  {dashboardBranchOptions.map((opt: DashboardBranchOption) => (
+                  {dashboardBranchOptions.map((opt) => (
                     <Checkbox
                       key={opt.id}
-                      label={opt.label}
+                      label={t(opt.labelKey)}
                       checked={draftBranches.includes(opt.id)}
                       onChange={() => toggleBranch(opt.id)}
                     />
@@ -293,14 +200,21 @@ export function DashboardPage() {
                 <div className="mt-4 flex items-center gap-2 border-t border-[var(--octo-divider)] pt-3">
                   <button
                     type="button"
-                    onClick={resetFilter}
+                    onClick={() => {
+                      setDraftBranches([]);
+                      setBranches([]);
+                      setFilterOpen(false);
+                    }}
                     className="flex-1 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
                   >
                     {t("dashboard.filter.reset")}
                   </button>
                   <button
                     type="button"
-                    onClick={applyFilter}
+                    onClick={() => {
+                      setBranches(draftBranches);
+                      setFilterOpen(false);
+                    }}
                     className="flex-1 rounded-[9px] bg-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-white transition-opacity hover:opacity-90"
                   >
                     {t("dashboard.filter.apply")}
@@ -312,24 +226,27 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* KPI row */}
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpiCards.map((card) => (
-          <StatCard key={card.id} data={card} onClick={KPI_ROUTES[card.id] ? () => navigate(KPI_ROUTES[card.id]) : undefined} />
-        ))}
+      <div className="mt-10">
+        <KpiCards />
       </div>
 
-      {/* Main analytics row */}
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.55fr_1fr_1fr] lg:items-stretch">
-        <RevenueChannelChart quarters={activeRange.quarters} rangeLabel={`dashboard.range.${activeRange.id}`} />
-        <OrderChannelDonut />
+      <div className="mt-12 grid grid-cols-1 gap-[25px] lg:grid-cols-[2.06fr_1fr]">
+        <CustomersActivity />
         <AiInsightsPanel />
       </div>
 
-      {/* Bottom analytics row */}
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.15fr_1fr] lg:items-stretch">
-        <PerformanceHeatmap branches={branches} />
-        <BranchDistribution branches={branches} />
+      <div className="mt-12 grid grid-cols-1 gap-[26px] lg:grid-cols-2">
+        {distributionCards.map((card) => (
+          <DistributionCard key={card.id} data={card} branches={branches} />
+        ))}
+      </div>
+
+      <div className="mt-14">
+        <LiveOrders branches={branches} />
+      </div>
+
+      <div className="mt-12">
+        <RecentActivity />
       </div>
     </div>
   );

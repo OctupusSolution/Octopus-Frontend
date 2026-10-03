@@ -1,21 +1,26 @@
-// What this tenant actually bought — the vertical, business type, enabled
-// modules and branch count chosen during onboarding.
+// The businesses this account owns, and the one the console is working in.
 //
-// This is the entitlement source of truth: the sidebar and route guards read
-// it to decide what exists for this merchant. A cloud kitchen genuinely has
-// no Reservations section, rather than a greyed-out one.
+// Source of truth is now the backend: GET /v1/businesses lists the account's
+// businesses, and the ACTIVE one is whichever business the session holds a
+// business token for (auth-provider's `activeBusinessId`, minted by
+// POST /v1/auth/business-session). Picking a business therefore does two
+// things at once — it changes what the sidebar shows AND what every
+// tenant-scoped request is authorised for.
 //
-// An account can hold more than one business (e.g. a restaurant and a salon)
-// — `businesses` is the full list, `activeTenantId` picks which one drives
-// the sidebar and module gating right now. Only name/vertical/type/modules
-// change on switch; every other page still reads the same shared mock data
-// regardless of which business is active (see docs/superpowers/specs/
-// 2026-08-17-multi-business-switcher-design.md).
-//
-// MOCK PERSISTENCE — the backend does not exist yet, so config is written to
-// localStorage, mirroring auth-provider. Swap for GET /tenants + GET
-// /tenants/active later.
+// What the backend does NOT give us yet, and how this file fills the gap (each
+// is a known mismatch, not a silent guess):
+//   - modules: the local catalog (14 modules from the Restaurants SRS) and the
+//     backend's (GET /v1/businesses/{id} moduleCodes) are different taxonomies.
+//     Only the codes in PURCHASABLE_MODULE have a local counterpart, so only
+//     those hide a module when not purchased; every other local module stays
+//     enabled and the backend still enforces entitlements per request (403
+//     `entitlements.feature-disabled`). See FRONTEND_INTEGRATION_GAPS.md 2.2.
+//   - branch count: no branch concept in the Businesses API yet — always 1.
+//   - restaurant type: only the two restaurant variants the backend seeds map
+//     onto a local type (fine-dining -> T1, quick-service -> T3).
+// `price` and `updateModules` stay local: they drive the mock pricing UI only.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ApiError, getBusiness, listBusinesses, type BusinessSummaryResponse } from "@octopus/api-client";
 import {
   baseModuleIds,
   catalogModules,
@@ -25,12 +30,10 @@ import {
   type TypeCode,
   type VerticalId,
 } from "@/shared/catalog";
-
-const TENANTS_KEY = "octopus.tenants";
-const ACTIVE_ID_KEY = "octopus.activeTenantId";
-const LEGACY_SINGLE_KEY = "octopus.tenant";
+import { useAuth } from "@/app/providers/auth-provider";
 
 export interface TenantConfig {
+  /** The real business GUID (BusinessSummaryResponse.businessId). */
   id: string;
   vertical: VerticalId;
   businessType: TypeCode;
@@ -41,158 +44,171 @@ export interface TenantConfig {
 }
 
 interface TenantConfigContextValue {
-  /** Every business this account owns, most recently created last. */
+  /** Every Active business this account owns. */
   businesses: TenantConfig[];
   /** The business currently driving the sidebar and module gating. */
   activeBusiness: TenantConfig | null;
   activeTenantId: string | null;
-  /** True once onboarding has produced at least one business. */
+  /** True once the account has at least one Active business. */
   isProvisioned: boolean;
+  /** True while the business list is being fetched. */
+  loading: boolean;
+  /** Set when the list could not be loaded; cleared by the next reload. */
+  error: string | null;
   isModuleEnabled: (id: ModuleId) => boolean;
   price: PriceBreakdown;
-  /** Adds a new business, generating its id, and makes it the active one. */
+  /** Re-reads the list from the backend (e.g. after a setup finishes). */
+  reload: () => Promise<void>;
+  /** Makes `id` the active business: mints its business token, then it drives
+   *  the console. Throws ApiError if the business is not accessible. */
+  switchBusiness: (id: string) => Promise<void>;
+  /** Kept for the onboarding wizard's call sites; creation itself now happens
+   *  through the Business Setup API, so this only refreshes the list. */
   createBusiness: (config: Omit<TenantConfig, "id" | "createdAt">) => void;
-  switchBusiness: (id: string) => void;
   updateModules: (modules: ModuleId[]) => void;
   resetConfig: () => void;
 }
 
 const TenantConfigContext = createContext<TenantConfigContextValue | null>(null);
 
-/**
- * Every module, used as the fallback when no business exists. An
- * unprovisioned session — an existing user from before onboarding shipped,
- * or someone landing on a deep link — must see the full console, never an
- * empty one.
- */
 const ALL_MODULE_IDS: ModuleId[] = catalogModules.map((m) => m.id);
 
-function generateTenantId(): string {
-  return `tenant-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+// Backend module code -> the local module it gates.
+const PURCHASABLE_MODULE: Record<string, ModuleId> = {
+  staff: "hr",
+  loyalty: "loyalty",
+};
+
+const VARIANT_TO_TYPE: Record<string, TypeCode> = {
+  "fine-dining": "T1",
+  "quick-service": "T3",
+};
+
+function toTenantConfig(business: BusinessSummaryResponse): TenantConfig {
+  return {
+    id: business.businessId,
+    vertical: business.businessTypeCode === "restaurant" ? "restaurants" : "other",
+    // Anything the local catalog has no picture for falls back to "casual" —
+    // only restaurant variants are surfaced by the UI today.
+    businessType: VARIANT_TO_TYPE[business.businessVariantCode] ?? "T2",
+    enabledModules: ALL_MODULE_IDS,
+    branchCount: 1,
+    businessName: business.name,
+    createdAt: business.activatedAtUtc ?? business.createdAtUtc,
+  };
 }
 
-/** A stored business with no modules would lock the merchant out of their
- * own console, so it is treated as corrupt and dropped rather than trusted. */
-function isValidTenant(value: unknown): value is TenantConfig {
-  const t = value as Partial<TenantConfig> | null;
-  return !!t && typeof t.id === "string" && Array.isArray(t.enabledModules) && t.enabledModules.length > 0;
-}
-
-/** Wraps a pre-multi-business session (a single `octopus.tenant` object)
- * into the list shape, so existing demo sessions keep working unchanged. */
-function migrateLegacyTenant(): TenantConfig[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(LEGACY_SINGLE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Omit<TenantConfig, "id"> & { id?: string };
-    if (!Array.isArray(parsed.enabledModules) || parsed.enabledModules.length === 0) return [];
-    return [{ ...parsed, id: parsed.id ?? generateTenantId() }];
-  } catch {
-    return [];
-  }
-}
-
-function readState(): { businesses: TenantConfig[]; activeTenantId: string | null } {
-  if (typeof window === "undefined") return { businesses: [], activeTenantId: null };
-
-  try {
-    const raw = window.localStorage.getItem(TENANTS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as unknown[];
-      const businesses = parsed.filter(isValidTenant);
-      const storedActiveId = window.localStorage.getItem(ACTIVE_ID_KEY);
-      const activeTenantId = businesses.some((b) => b.id === storedActiveId)
-        ? storedActiveId
-        : businesses[0]?.id ?? null;
-      return { businesses, activeTenantId };
-    }
-  } catch {
-    // fall through to the legacy migration below
-  }
-
-  const migrated = migrateLegacyTenant();
-  return { businesses: migrated, activeTenantId: migrated[0]?.id ?? null };
+function describe(err: unknown): string {
+  return err instanceof ApiError ? err.problem?.errorCode ?? err.message : "businesses.load-failed";
 }
 
 export function TenantConfigProvider({ children }: { children: ReactNode }) {
-  // Read once — readState() migrates the legacy single-tenant session by
-  // generating a fresh id, so calling it twice (once per useState below)
-  // would mint two different ids and leave activeTenantId pointing at a
-  // business that was never actually added to the list.
-  const [initial] = useState(readState);
-  const [businesses, setBusinesses] = useState<TenantConfig[]>(initial.businesses);
-  const [activeTenantId, setActiveTenantId] = useState<string | null>(initial.activeTenantId);
+  const { isAuthenticated, user, activeBusinessId, selectBusiness } = useAuth();
+  const [businesses, setBusinesses] = useState<TenantConfig[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const email = user?.email ?? null;
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await listBusinesses();
+      // A business is only usable once provisioning has finished; Provisioning
+      // ones would fail business-session, so they are not offered.
+      setBusinesses(result.items.filter((b) => b.status === "Active").map(toTenantConfig));
+    } catch (err) {
+      setError(describe(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load on sign-in (and when a different account signs in); clear on sign-out.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setBusinesses([]);
+      setError(null);
+      return;
+    }
+    void reload();
+    // Keyed on the account, not the tokens: tokens rotate every ~15 minutes and
+    // a refetch (which would drop local module edits) is not wanted for that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, email]);
+
+  // What the active business actually purchased. Null until loaded (or if the
+  // read fails), in which case nothing is hidden.
+  const [purchasedModuleCodes, setPurchasedModuleCodes] = useState<string[] | null>(null);
 
   useEffect(() => {
-    if (businesses.length > 0) {
-      window.localStorage.setItem(TENANTS_KEY, JSON.stringify(businesses));
-      window.localStorage.removeItem(LEGACY_SINGLE_KEY);
-    } else {
-      window.localStorage.removeItem(TENANTS_KEY);
-    }
-  }, [businesses]);
+    setPurchasedModuleCodes(null);
+    if (!isAuthenticated || !activeBusinessId) return;
+    let cancelled = false;
+    getBusiness(activeBusinessId)
+      .then((business) => {
+        if (!cancelled) setPurchasedModuleCodes(business.moduleCodes);
+      })
+      .catch(() => {
+        // Keep everything visible; the backend still gates each request.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, activeBusinessId]);
 
-  useEffect(() => {
-    if (activeTenantId) {
-      window.localStorage.setItem(ACTIVE_ID_KEY, activeTenantId);
-    } else {
-      window.localStorage.removeItem(ACTIVE_ID_KEY);
-    }
-  }, [activeTenantId]);
-
-  const activeBusiness = useMemo(
-    () => businesses.find((b) => b.id === activeTenantId) ?? null,
-    [businesses, activeTenantId]
-  );
+  const activeBusiness = useMemo(() => {
+    const business = businesses.find((b) => b.id === activeBusinessId) ?? null;
+    if (!business || !purchasedModuleCodes) return business;
+    const notPurchased = new Set(
+      Object.entries(PURCHASABLE_MODULE)
+        .filter(([code]) => !purchasedModuleCodes.includes(code))
+        .map(([, moduleId]) => moduleId)
+    );
+    return { ...business, enabledModules: business.enabledModules.filter((id) => !notPurchased.has(id)) };
+  }, [businesses, activeBusinessId, purchasedModuleCodes]);
 
   const activeModules = useMemo<ModuleId[]>(() => {
     if (!activeBusiness) return ALL_MODULE_IDS;
-    // Base modules are part of the subscription and can never be missing,
-    // even if a stale stored config somehow omits them.
+    // Base modules are part of the subscription and can never be missing.
     return Array.from(new Set([...baseModuleIds, ...activeBusiness.enabledModules]));
   }, [activeBusiness]);
 
-  const isModuleEnabled = useCallback(
-    (id: ModuleId) => activeModules.includes(id),
-    [activeModules]
-  );
+  const isModuleEnabled = useCallback((id: ModuleId) => activeModules.includes(id), [activeModules]);
 
   const price = useMemo(
     () => computePrice(activeModules, activeBusiness?.branchCount ?? 1),
     [activeModules, activeBusiness?.branchCount]
   );
 
-  const createBusiness = useCallback((config: Omit<TenantConfig, "id" | "createdAt">) => {
-    const next: TenantConfig = { ...config, id: generateTenantId(), createdAt: new Date().toISOString() };
-    setBusinesses((prev) => [...prev, next]);
-    setActiveTenantId(next.id);
-  }, []);
+  const switchBusiness = useCallback((id: string) => selectBusiness(id), [selectBusiness]);
 
-  const switchBusiness = useCallback((id: string) => {
-    setActiveTenantId(id);
-  }, []);
+  const createBusiness = useCallback(() => {
+    void reload();
+  }, [reload]);
 
-  const updateModules = useCallback((modules: ModuleId[]) => {
-    setBusinesses((prev) =>
-      prev.map((b) => (b.id === activeTenantId ? { ...b, enabledModules: modules } : b))
-    );
-  }, [activeTenantId]);
+  const updateModules = useCallback(
+    (modules: ModuleId[]) => {
+      setBusinesses((prev) => prev.map((b) => (b.id === activeBusinessId ? { ...b, enabledModules: modules } : b)));
+    },
+    [activeBusinessId]
+  );
 
-  const resetConfig = useCallback(() => {
-    setBusinesses([]);
-    setActiveTenantId(null);
-  }, []);
+  const resetConfig = useCallback(() => setBusinesses([]), []);
 
   const value: TenantConfigContextValue = {
     businesses,
     activeBusiness,
-    activeTenantId,
+    activeTenantId: activeBusinessId,
     isProvisioned: businesses.length > 0,
+    loading,
+    error,
     isModuleEnabled,
     price,
-    createBusiness,
+    reload,
     switchBusiness,
+    createBusiness,
     updateModules,
     resetConfig,
   };

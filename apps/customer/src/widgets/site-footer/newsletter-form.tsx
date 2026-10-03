@@ -40,7 +40,7 @@ export function NewsletterForm() {
         />
         <button
           type="submit"
-          className="shrink-0 bg-[#0D6EFD] px-6 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
+          className="shrink-0 bg-[var(--octo-brand)] px-6 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90"
         >
           {t("store.footer.newsletterSubmit")}
         </button>

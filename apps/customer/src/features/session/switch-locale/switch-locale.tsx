@@ -9,18 +9,30 @@ import { LOCALE_COOKIE_NAME } from "@/shared/lib/locale-cookie-name";
 
 export interface SwitchLocaleProps {
   locale: Locale;
+  /** The languages the published site offers; omitted for the sample storefront (both). */
+  languages?: string[];
+  /** Builder canvas only: report the switch instead of setting the cookie and reloading. */
+  onSwitch?: (language: string) => void;
 }
 
 /** One pill, not a segmented control: the design shows the *current* language
  *  and switching is a single toggle between the two the platform supports. */
-export function SwitchLocale({ locale }: SwitchLocaleProps) {
+export function SwitchLocale({ locale, languages, onSwitch }: SwitchLocaleProps) {
   const router = useRouter();
   const { t } = useI18n();
   const [pending, startTransition] = useTransition();
 
-  const next: Locale = locale === "ar" ? "en" : "ar";
+  const offered = languages ?? ["ar", "en"];
+  const next = offered.find((code) => code !== locale);
+
+  // A site published in one language has nothing to switch to.
+  if (!next) return null;
 
   function handleClick() {
+    if (onSwitch) {
+      onSwitch(next!);
+      return;
+    }
     document.cookie = `${LOCALE_COOKIE_NAME}=${next}; path=/; max-age=31536000`;
     startTransition(() => {
       router.refresh();

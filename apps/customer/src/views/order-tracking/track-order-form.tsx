@@ -33,7 +33,7 @@ export function TrackOrderForm() {
         <button
           type="submit"
           disabled={orderId.trim() === ""}
-          className="shrink-0 bg-[#0D6EFD] px-5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="shrink-0 bg-[var(--octo-brand)] px-5 text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {t("store.track.submit")}
         </button>

@@ -7,3 +7,6 @@ dist
 .claude
 *.tsbuildinfo
 .superpowers
+
+# Local git worktrees (superpowers subagent-driven-development)
+.worktrees/

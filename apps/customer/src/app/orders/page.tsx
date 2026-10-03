@@ -1,9 +1,9 @@
+import { loadLocale } from "@/entities/tenant/load";
 import { createTranslator } from "@/shared/i18n/translate";
-import { readLocaleCookie } from "@/shared/lib/locale-cookie";
 import { TrackOrderForm } from "@/views/order-tracking";
 
-export default function OrdersPage() {
-  const t = createTranslator(readLocaleCookie());
+export default async function OrdersPage() {
+  const t = createTranslator(await loadLocale());
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">

@@ -1,18 +1,9 @@
-// The account gate in front of payment. MOCK: nothing is sent anywhere and the
-// social buttons only fill in a demo address, the same shortcut the login
-// screen takes — they do not authenticate against Google, Apple or Microsoft.
+// The account gate in front of payment. MOCK: nothing is sent anywhere.
 import { useState } from "react";
 import { Building2, CheckCircle2, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { Button, Input, Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { GoogleIcon, AppleIcon, MicrosoftIcon } from "@/features/session/login/social-icons";
 import type { AccountFields } from "../_shared/draft";
-
-const PROVIDERS = [
-  { id: "google", Icon: GoogleIcon, labelKey: "login.google" },
-  { id: "apple", Icon: AppleIcon, labelKey: "login.apple" },
-  { id: "microsoft", Icon: MicrosoftIcon, labelKey: "login.microsoft" },
-] as const;
 
 export function CreateAccountModal({
   open, account, created, onPatch, onCreate, onContinue,
@@ -48,28 +39,6 @@ export function CreateAccountModal({
 
   return (
     <Modal open={open} onClose={() => undefined} title={t("onboarding.account.title")}>
-      <div className="grid grid-cols-3 gap-2">
-        {PROVIDERS.map(({ id, Icon, labelKey }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onPatch({ email: account.email || `owner@${id}.demo` })}
-            className="flex items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-2.5 text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
-            <Icon size={16} />
-            <span className="hidden sm:inline">{t(labelKey)}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="my-4 flex items-center gap-3">
-        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.07em] text-[var(--octo-text-faint)]">
-          {t("onboarding.account.or")}
-        </span>
-        <span className="h-px flex-1 bg-[var(--octo-divider)]" />
-      </div>
-
       <div className="flex flex-col gap-3">
         <Input
           label={t("onboarding.account.fullName")}

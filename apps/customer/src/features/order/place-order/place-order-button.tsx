@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@ui/primitives";
 import { createOrder, useOrderingSession } from "@/entities/order";
 import type { GuestInfo } from "@/entities/customer";
+import { toOrderChannel } from "@/shared/lib/fulfillment";
 import { formatSar } from "@/shared/lib/pricing";
 
 export interface PlaceOrderButtonProps {
@@ -31,7 +32,7 @@ export function PlaceOrderButton({ guest, canSubmit, subtotalSar, discountSar, t
       const order = await createOrder({
         tenantId: state.tenantId,
         branchId: state.branchId,
-        channel: state.channel,
+        channel: toOrderChannel(state.channel),
         customerName: guest.name,
         customerPhone: guest.phone,
         deliveryAddress: state.deliveryAddress,

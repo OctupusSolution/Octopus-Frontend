@@ -29,7 +29,7 @@ export function CategoryChipRail({ groups, activeGroup, onSelect }: CategoryChip
               >
                 <span
                   className={`grid h-[74px] w-[74px] place-items-center overflow-hidden rounded-full bg-[var(--octo-card)] transition-shadow ${
-                    active ? "ring-2 ring-[#0D6EFD]" : "ring-1 ring-transparent"
+                    active ? "ring-2 ring-[var(--octo-brand)]" : "ring-1 ring-transparent"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -43,7 +43,7 @@ export function CategoryChipRail({ groups, activeGroup, onSelect }: CategoryChip
 
                 <span
                   className={`truncate text-[12px] font-bold ${
-                    active ? "text-[#0D6EFD]" : "text-[var(--octo-text-primary)]"
+                    active ? "text-[var(--octo-brand)]" : "text-[var(--octo-text-primary)]"
                   }`}
                 >
                   {t(`store.group.${group.id}`)}

@@ -13,13 +13,15 @@ import { useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { Segmented } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { PublicLinkPreview } from "./public-link-preview";
+import { StorefrontPreview } from "@/widgets/storefront-preview";
+import { previewModelFromOnboarding } from "./public-link-model";
 import { PublicLinkSections } from "./public-link-sections";
 import type { StepProps } from "../_shared/steps";
 
 export function PublicLinkStep({ draft, dispatch }: StepProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [view, setView] = useState<"desktop" | "mobile">("desktop");
+  const model = previewModelFromOnboarding(draft, view === "mobile" ? "mobile" : "desktop", t, locale);
 
   return (
     <div className="flex flex-col gap-4">
@@ -53,7 +55,7 @@ export function PublicLinkStep({ draft, dispatch }: StepProps) {
         </div>
 
         <div className="mt-4">
-          <PublicLinkPreview draft={draft} mobile={view === "mobile"} />
+          <StorefrontPreview model={model} />
         </div>
       </section>
 

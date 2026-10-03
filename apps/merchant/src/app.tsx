@@ -1,12 +1,16 @@
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AppSidebar } from "@/widgets/app-sidebar";
 import { TopBar } from "@/widgets/top-bar";
 import { PageTransition } from "@/widgets/page-transition";
 import { routes } from "@/app/routes/registry";
 import { LoginPage } from "@/pages/login";
+import { SignUpPage } from "@/pages/signup";
 import { OnboardingPage } from "@/pages/onboarding";
 import { SetPasswordPage } from "@/pages/set-password";
+import { SelectBusinessPage } from "@/pages/select-business";
+import { NewBusinessPage } from "@/pages/select-business/new";
+import { AcceptInvitationPage, hasPendingInvitation } from "@/pages/accept-invitation";
 import { AuthProvider, useAuth } from "@/app/providers/auth-provider";
 import { ThemeProvider } from "@/app/providers/theme-provider";
 import { TenantConfigProvider } from "@/app/providers/tenant-config-provider";
@@ -29,9 +33,12 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, needsPassword } = useAuth();
+  const { isAuthenticated, needsPassword, activeBusinessId } = useAuth();
   const { pathname } = useLocation();
   const { t } = useI18n();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 900 : false
+  );
 
   // Onboarding runs before there is a session, and renders its own full-screen
   // chrome — the sidebar it would sit next to has not been provisioned yet.
@@ -39,14 +46,21 @@ function AppShell() {
     return <OnboardingPage />;
   }
 
-  // Route guard: unauthenticated users land on /login with no sidebar or top bar.
+  // Needs no business, and handles the signed-out case itself.
+  if (pathname === "/accept-invitation") return <AcceptInvitationPage />;
+
+  // Route guard: unauthenticated users land on /login with no sidebar or top
+  // bar. /signup is the one other door in — without this exception the
+  // "Create Account" link would bounce straight back to sign-in.
   if (!isAuthenticated) {
-    return pathname === "/login" ? <LoginPage /> : <Navigate to="/login" replace />;
+    if (pathname === "/login") return <LoginPage />;
+    if (pathname === "/signup") return <SignUpPage />;
+    return <Navigate to="/login" replace />;
   }
 
-  // An authenticated user has no business on the sign-in screen.
-  if (pathname === "/login") {
-    return <Navigate to="/" replace />;
+  // Every sign-in lands on the business picker, even with a single business.
+  if (pathname === "/login" || pathname === "/signup") {
+    return <Navigate to={hasPendingInvitation() ? "/accept-invitation" : "/select-business"} replace />;
   }
 
   // Skipped the password at signup — block the shell until one is set,
@@ -55,28 +69,34 @@ function AppShell() {
     return <SetPasswordPage />;
   }
 
+  if (pathname === "/select-business") return <SelectBusinessPage />;
+  if (pathname === "/select-business/new") return <NewBusinessPage />;
+
+  // Every tenant-scoped request needs the business token minted when a business
+  // is picked, so the console itself is unreachable until one is.
+  if (!activeBusinessId) return <Navigate to="/select-business" replace />;
+
   return (
-    <div className="flex h-screen items-center justify-center overflow-hidden bg-[var(--octo-page-bg)] p-2 sm:p-6">
-      <div
-        className="flex h-full w-full max-w-[1400px] gap-2 rounded-2xl bg-[var(--octo-shell)] p-2 sm:gap-2.5 sm:rounded-[22px] sm:p-2.5"
-        style={{ boxShadow: "0 24px 60px rgba(20,20,30,.10)" }}
-      >
-        <AppSidebar />
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl bg-[var(--octo-card)]">
-          <TopBar />
-          <div className="octo-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-            <PageTransition>
-              <Suspense fallback={<div className="p-6 text-[12.5px] text-[var(--octo-text-muted)]">{t("common.loading")}</div>}>
-                <Routes>
-                  {routes.map((r) => (
-                    <Route key={r.id} path={r.path} element={<r.element />} />
-                  ))}
-                </Routes>
-              </Suspense>
-            </PageTransition>
-          </div>
-        </main>
-      </div>
+    // The shell paints the page surface every routed page sits on. It has to
+    // come from the theme token, not a literal: hardcoding white here covered
+    // the themed <body> and left dark mode with a white page behind dark
+    // cards, so page-level headings (near-white in dark) vanished.
+    <div className="flex h-screen overflow-hidden bg-[var(--octo-app-bg)]">
+      <AppSidebar collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
+      <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopBar onToggleSidebar={() => setSidebarCollapsed((c) => !c)} />
+        <div className="octo-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+          <PageTransition>
+            <Suspense fallback={<div className="p-6 text-[12.5px] text-[var(--octo-text-muted)]">{t("common.loading")}</div>}>
+              <Routes>
+                {routes.map((r) => (
+                  <Route key={r.id} path={r.path} element={<r.element />} />
+                ))}
+              </Routes>
+            </Suspense>
+          </PageTransition>
+        </div>
+      </main>
     </div>
   );
 }

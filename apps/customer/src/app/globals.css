@@ -7,6 +7,9 @@
 :root {
   color-scheme: light;
 
+  /* The business's brand colour; layout.tsx overrides it from the public site. */
+  --octo-brand: #0D6EFD;
+
   --octo-page-bg: #e9eaec;
   --octo-shell: #f4f4f5;
   --octo-card: #ffffff;
@@ -26,6 +29,18 @@
   --octo-store-footer: #e7edf4;
   --octo-store-notice: #fff6e8;
 
+  /* Fulfillment screens. Straight from the Figma design-system variables
+     (cards/*, interactive/*, Text/*) — the shared palette has no equivalent
+     for the dashed selection cards or the deeper price blue. */
+  --octo-store-select: #ebf3ff;
+  --octo-store-select-border: #abcdff;
+  --octo-store-select-label: #58606c;
+  --octo-store-tile: #f3f3f3;
+  --octo-store-price: #004bb9;
+  --octo-store-body: #687280;
+  --octo-store-select-soft: #f5f9ff;
+  --octo-store-select-text: #0058da;
+
   --octo-text-primary: #16161d;
   --octo-text-secondary: #6b6b74;
   --octo-text-muted: #8b8b93;
@@ -37,4 +52,11 @@
 
 body {
   @apply bg-[var(--octo-store-page)] text-[var(--octo-text-primary)] antialiased;
+}
+
+/* A published site's titles face (brand-theme.ts); unset, headings keep the body face. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading, inherit);
 }

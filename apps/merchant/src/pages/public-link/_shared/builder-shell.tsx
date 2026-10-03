@@ -95,7 +95,7 @@ export function BuilderShell({
   // bar, where every other page shows the search field.
   const topBarSlot = typeof document === "undefined" ? null : document.getElementById(TOP_BAR_SLOT_ID);
   const heading = (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="pl-builder flex min-w-0 items-center gap-2">
       <h1 className="truncate text-[24px] font-bold leading-[24px] text-[var(--pl-text)]">{t("publicLink.title")}</h1>
       {savedLabel && (
         <span className="flex shrink-0 items-center gap-1.5 rounded-[8px] bg-[var(--pl-success-soft)] px-2 py-1 text-[14px] font-medium leading-[14px] text-[var(--pl-success)]">

@@ -374,3 +374,23 @@ body {
     display: none;
   }
 }
+
+/* ---- Public Link Builder (pages/public-link) ---------------------------- */
+
+/* A native <select> opens its list on the browser's own white sheet unless the
+   options are painted: in the dark theme that left the builder's near-white
+   option text unreadable. */
+.pl-builder select option,
+select.pl-select option {
+  background-color: var(--pl-surface);
+  color: var(--pl-text);
+}
+
+/* The frames set Latin text with line-height equal to the font size (14/14,
+   20/20…). Arabic letterforms are taller than that box — their dots and tails
+   were being cut off wherever a label truncates — so right-to-left text in the
+   builder gets room to breathe instead. */
+[dir="rtl"] .pl-builder [class*="leading-["],
+[dir="rtl"] .pl-builder[class*="leading-["] {
+  line-height: 1.5;
+}

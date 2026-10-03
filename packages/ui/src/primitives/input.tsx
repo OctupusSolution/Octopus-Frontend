@@ -22,7 +22,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           {label}
         </span>
       )}
-      <span className="relative flex items-center">
+      {/* With an icon, a forced `dir` applies to the wrapper too: the icon and the padding kept for it must agree on which side is the start. */}
+      <span className="relative flex items-center" dir={icon ? props.dir : undefined}>
         {icon && (
           <span className="pointer-events-none absolute start-3 flex items-center text-[var(--octo-text-muted)]">
             {icon}

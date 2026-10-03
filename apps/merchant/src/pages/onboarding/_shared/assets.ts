@@ -22,6 +22,12 @@ export const SETUP_HERO_URL = url("Setup/octopus.png");
 export const PAYMENT_SPINNER_URL = url("Setup/loading (3) 1.png");
 export const PAYMENT_STAMP_URL = url("login/stamp.gif");
 
+/** `apps/assets/Setup/icons/<file>` — the Setup frames' own icons, exported
+ *  from Figma at the size and colour they are drawn in. */
+export function setupIcon(file: string): string {
+  return url(`Setup/icons/${file}`);
+}
+
 /** `apps/assets/onboarding-Business/<file>` — vertical cards, step 2. */
 export function verticalIcon(file: string): string {
   return url(`onboarding-Business/${file}`);

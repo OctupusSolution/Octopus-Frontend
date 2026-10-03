@@ -75,7 +75,7 @@ function RowTimeline({ order }: { order: OrderRecord }) {
               className={`relative block h-6 w-6 ${stage.done ? "" : "[[data-theme=dark]_&]:opacity-40"}`}
             />
             <span
-              className={`whitespace-nowrap text-[12px] font-medium leading-[12px] ${
+              className={`whitespace-nowrap text-[11px] font-medium leading-[12px] min-[1536px]:text-[12px] ${
                 stage.done ? "text-[var(--octo-text-primary)]" : "text-[var(--octo-text-secondary)]"
               }`}
             >

@@ -755,6 +755,8 @@ export const ar = {
   "orders.payment.unpaid": "غير مدفوع",
   "orders.payment.partial": "مدفوع جزئيًا",
   "orders.row.guests": "{n} ضيوف",
+  "orders.row.guestOne": "ضيف واحد",
+  "orders.row.guestsTwo": "ضيفان",
   "orders.action.void": "إبطال",
   "orders.action.refund": "استرداد",
   "orders.action.recordPayment": "تسجيل دفعة",

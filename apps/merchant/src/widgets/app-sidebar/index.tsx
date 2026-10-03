@@ -1,11 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  LayoutDashboard, ClipboardList, CalendarClock, UtensilsCrossed,
-  Users, UserCog, Settings, HelpCircle,
-  ChevronDown, Search, PanelLeft, LogOut,
-  Clock3, Armchair, CreditCard, Link2, KeyRound,
-} from "lucide-react";
+import { HelpCircle, LogOut, KeyRound } from "lucide-react";
 import clsx from "clsx";
 import { ApprovalPinDialog, useApprovalPinTitle } from "@/features/session/approval-pin";
 import { routes } from "@/app/routes/registry";
@@ -14,6 +9,7 @@ import { useAuth } from "@/app/providers/auth-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
 import type { ModuleId } from "@/shared/catalog";
 import { labelKey } from "@/shared/lib/labels";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 
 // Navigation content is the OCTOPUS Restaurants SRS, Section 18.1
 // ("Navigation Model — Manager & Owner Console"), verbatim. The section
@@ -22,7 +18,8 @@ import { labelKey } from "@/shared/lib/labels";
 interface NavGroup {
   id: string;
   label: string;
-  icon: React.ElementType;
+  /** A file in apps/assets/Dashboard/icons — the frame's own nav icon. */
+  icon: string;
   items?: string[];
   /** Destination for a group whose id is not itself a route id — the entries
    *  promoted out of a parent group (Wait list, Floor Plan, Promotions,
@@ -36,56 +33,56 @@ interface NavSection {
   groups: NavGroup[];
 }
 
-// The frame promotes five pages out of their parent groups and onto the top
-// level. They MOVE rather than duplicate: Reservations no longer lists Floor
-// Plan or Waitlist, Marketing no longer lists Promotions, Finance no longer
-// lists Payments. One page, one place in the nav.
+// The frame's nav, in the frame's order: four unlabelled blocks separated only
+// by a gap. Pages promoted out of a parent group (Wait list, Floor Plan,
+// Payments) MOVE rather than duplicate — one page, one place in the nav.
 const SECTIONS: NavSection[] = [
   {
     label: "Overview",
-    groups: [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    groups: [{ id: "dashboard", label: "Dashboard", icon: "nav-home.svg" }],
   },
   {
     label: "Operations",
     groups: [
-      // No sub-items: Live Orders is the only Orders page, so the entry
-      // navigates straight to it rather than opening a dropdown.
-      { id: "orders", label: "Orders", icon: ClipboardList },
       // No sub-items: Reservations is a single page, so the entry navigates
       // straight to it rather than opening a dropdown.
-      { id: "reservations", label: "Reservations", icon: CalendarClock },
-      { id: "waitlist", label: "Wait list", icon: Clock3, path: "/reservations/waitlist" },
+      { id: "reservations", label: "Reservations", icon: "nav-reservations.svg" },
+      { id: "waitlist", label: "Wait list", icon: "nav-waitlist.svg", path: "/reservations/waitlist" },
       // A group with its own path: the Live Floor Plan and the Builder are two
       // views of one floor, and every builder route sits under this path so
       // the group stays lit while the merchant is inside any of them.
-      { id: "floor-plan", label: "Floor Plan", icon: Armchair, path: "/reservations/floor-plan",
+      { id: "floor-plan", label: "Floor Plan", icon: "nav-floor-plan.svg", path: "/reservations/floor-plan",
         items: ["Live Floor Plan", "Floor Plan Builder"] },
-      { id: "public-link", label: "Public Link Builder", icon: Link2, path: "/public-link" },
-      // No sub-items: a menu is now the root entity and /menu is the library
-      // of them, so the entry navigates straight there rather than opening a
-      // dropdown onto six sibling tables. Same shape as Reservations above.
-      { id: "menu", label: "Menu", icon: UtensilsCrossed },
+      { id: "public-link", label: "Public Link Builder", icon: "nav-link.svg", path: "/public-link" },
     ],
   },
   {
     label: "Business",
     groups: [
-      // No sub-items: Customer CRM is now a single list+detail page, so the
-      // entry navigates straight to it rather than opening a dropdown. Same
-      // shape as Orders/Reservations/Menu/Staff above.
-      { id: "customers", label: "Customer CRM", icon: Users },
-      { id: "payments", label: "Payments", icon: CreditCard, path: "/finance/payments" },
-      // No sub-items: Staff is now a single tabbed page (Staff / Roles &
-      // Permissions / Shifts), so the entry navigates straight there rather
-      // than opening a dropdown. Same shape as Reservations and Menu above.
-      { id: "staff", label: "Staff", icon: UserCog },
+      // No sub-items: a menu is the root entity and /menu is the library of
+      // them, so the entry navigates straight there.
+      { id: "menu", label: "Menu", icon: "nav-menu.svg" },
+      // No sub-items: Live Orders is the only Orders page.
+      { id: "orders", label: "Orders", icon: "nav-orders.svg" },
+      // No sub-items: Customer CRM is a single list+detail page.
+      { id: "customers", label: "Customer CRM", icon: "nav-customers.svg" },
+      { id: "pos", label: "POS", icon: "nav-pos.svg", placeholder: true },
     ],
   },
-];
-
-const FOOTER_GROUPS: NavGroup[] = [
-  { id: "settings", label: "Settings", icon: Settings,
-    items: ["Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
+  {
+    label: "Manage",
+    groups: [
+      { id: "settings", label: "Settings", icon: "nav-settings.svg",
+        items: ["Business & Legal Entities", "Branches & Sections", "Devices & Printers", "Roles & Permissions", "Tax Profile", "Restaurant Type & Modules"] },
+      { id: "reports", label: "Reports", icon: "nav-reports.svg", placeholder: true },
+      { id: "integrations", label: "Integrations", icon: "nav-integrations.svg", placeholder: true },
+      // No sub-items: Staff is a single tabbed page (Staff / Roles &
+      // Permissions / Shifts).
+      { id: "staff", label: "Staff", icon: "nav-staff.svg" },
+      { id: "promotions", label: "Promotions", icon: "nav-promotions.svg", placeholder: true },
+      { id: "payments", label: "Payments", icon: "nav-payments.svg", path: "/finance/payments" },
+    ],
+  },
 ];
 
 // Which module owns each nav group. A group whose module the tenant did not
@@ -100,6 +97,7 @@ const GROUP_MODULE: Record<string, ModuleId> = {
   "floor-plan": "bookings",
   customers: "customers",
   payments: "payments",
+  pos: "orders",
   staff: "hr",
   settings: "core",
 };
@@ -127,7 +125,7 @@ const ITEM_PATHS: Record<string, string> = {
 
 // Where each top-level group goes. Most groups are named after their own
 // route id; the promoted ones carry an explicit `path` instead.
-const ALL_GROUPS: NavGroup[] = [...SECTIONS.flatMap((s) => s.groups), ...FOOTER_GROUPS];
+const ALL_GROUPS: NavGroup[] = SECTIONS.flatMap((s) => s.groups);
 const GROUP_PATH: Record<string, string> = Object.fromEntries(
   ALL_GROUPS.map((g) => [g.id, g.path ?? ROUTES[g.id]]).filter(([, path]) => !!path) as [string, string][]
 );
@@ -172,19 +170,10 @@ function initialsOf(name: string): string {
   );
 }
 
-function OctopusMark({ size = 32 }: { size?: number }) {
+function OctopusMark({ size = 30 }: { size?: number }) {
   const logoUrl = new URL("../../../../assets/Logo/OCTOPUS LOGO.svg", import.meta.url).href;
 
-  return (
-    <img
-      src={logoUrl}
-      alt="OCTOPUS logo"
-      width={size}
-      height={size}
-      className="rounded-full object-cover"
-      style={{ width: size, height: size }}
-    />
-  );
+  return <img src={logoUrl} alt="OCTOPUS logo" width={size} height={size} className="shrink-0 object-contain" style={{ width: size, height: size }} />;
 }
 
 // Hoisted to module scope on purpose: defining these INSIDE AppSidebar's
@@ -210,7 +199,6 @@ function GroupButton({
   onMouseEnter: () => void;
   setRef: (el: HTMLButtonElement | null) => void;
 }) {
-  const Icon = group.icon;
   const { t } = useI18n();
   const label = t(labelKey(group.label));
   const disabled = !!group.placeholder;
@@ -223,35 +211,21 @@ function GroupButton({
       disabled={disabled}
       title={disabled ? `${label} — ${t("sidebar.comingSoon")}` : collapsed ? label : undefined}
       className={clsx(
-        "group flex w-full items-center gap-2.5 rounded-full text-start text-[13px] font-medium transition-colors",
-        collapsed ? "justify-center px-0 py-2" : "px-3.5 py-2",
+        "flex w-full items-center gap-2 rounded-[12px] p-2 text-start text-[14px] font-medium leading-[14px] transition-colors",
+        collapsed && "justify-center",
         disabled
           ? "cursor-default text-white/40"
           : isActive
-            ? "bg-[#F5F9FF] text-ocean-blue hover:bg-[#F5F9FF] hover:text-ocean-blue"
-            : "text-white/85 hover:bg-white/10 hover:text-white"
+            ? "bg-[#f5f9ff] text-[#004bb9]"
+            : "text-white hover:bg-white/10"
       )}
     >
-      <Icon
-        size={17}
-        strokeWidth={1.8}
-        className={clsx(
-          "shrink-0",
-          disabled ? "text-white/40" : isActive ? "text-ocean-blue" : "text-white/85 group-hover:text-white"
-        )}
-      />
+      <ShellIcon name={group.icon} size={16} />
       {!collapsed && (
         <>
-          <span className="flex-1">{label}</span>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
           {group.items && (
-            <ChevronDown
-              size={15}
-              className={clsx(
-                "transition-transform duration-300",
-                isActive ? "text-ocean-blue" : "text-white/70 group-hover:text-white",
-                isOpen && "rotate-180"
-              )}
-            />
+            <ShellIcon name="nav-arrow-down.svg" size={16} className={clsx("transition-transform duration-300", isOpen && "rotate-180")} />
           )}
         </>
       )}
@@ -296,7 +270,7 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
         open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"
       )}
     >
-      <div className="relative ms-[24px] mt-0.5 flex flex-col gap-0.5 border-s border-white/20 ps-3 pb-1">
+      <div className="relative ms-4 mt-0.5 flex flex-col gap-0.5 border-s border-white/20 ps-3 pb-1">
         {group.items.map((item) => {
           const path = ITEM_PATHS[item];
           const isActive = !!path && path === bestMatchPath;
@@ -308,10 +282,10 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
                 if (path) navigate(path);
               }}
               className={clsx(
-                "relative rounded-full px-2.5 py-1.5 text-start text-[12px] transition-colors",
+                "relative rounded-[12px] px-2.5 py-1.5 text-start text-[12px] transition-colors",
                 "before:absolute before:start-[-13px] before:top-1/2 before:h-px before:w-2.5 before:bg-white/20",
                 isActive
-                  ? "bg-[#F5F9FF] font-medium text-ocean-blue hover:bg-[#F5F9FF] hover:text-ocean-blue"
+                  ? "bg-[#f5f9ff] font-medium text-[#004bb9]"
                   : "text-white/65 hover:bg-white/10 hover:text-white"
               )}
             >
@@ -360,16 +334,16 @@ function FooterCard({
         aria-label={ariaLabel}
         aria-expanded={open}
         className={clsx(
-          "flex w-full items-center gap-2.5 rounded-full py-1.5 pe-2.5 ps-1.5 text-start transition-colors",
-          open ? "bg-white/15" : "bg-white/[0.08] hover:bg-white/[0.14]"
+          "flex w-full items-center gap-2 rounded-[24px] p-2 text-start text-white transition-colors",
+          open ? "bg-white/15" : "bg-white/10 hover:bg-white/[0.14]"
         )}
       >
         {thumb}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[12.5px] font-semibold leading-tight text-white">{title}</p>
-          <p className="truncate text-[10.5px] leading-tight text-white/60">{subtitle}</p>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="truncate text-[14px] font-medium leading-[14px] text-white">{title}</p>
+          <p className="truncate text-[12px] leading-[12px] text-[#f1f5f9]">{subtitle}</p>
         </div>
-        <ChevronDown size={15} className={clsx("shrink-0 text-white/70 transition-transform duration-200", open && "rotate-180")} />
+        <ShellIcon name="nav-arrow-down.svg" size={16} className={clsx("transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
         <div className="absolute bottom-full start-0 z-50 mb-2 w-full min-w-[224px] rounded-2xl border border-white/10 bg-[#001E4B] p-1.5 shadow-xl">
@@ -416,11 +390,6 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
         ...section,
         groups: filterGroups(section.groups, isModuleEnabled),
       })).filter((section) => section.groups.length > 0),
-    [isModuleEnabled]
-  );
-
-  const visibleFooterGroups = useMemo(
-    () => filterGroups(FOOTER_GROUPS, isModuleEnabled),
     [isModuleEnabled]
   );
 
@@ -518,7 +487,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
 
   function renderGroup(group: NavGroup) {
     return (
-      <div key={group.id} className="mb-0.5">
+      <div key={group.id}>
         <GroupButton
           group={group}
           collapsed={collapsed}
@@ -545,48 +514,45 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
       data-theme="dark"
       className={clsx(
         "relative flex shrink-0 flex-col overflow-hidden transition-[width] bg-[#001E4B]",
-        collapsed ? "w-[64px]" : "w-[248px]"
+        collapsed ? "w-[64px]" : "w-[220px]"
       )}
       onMouseLeave={() => collapsed && setFlyout(null)}
     >
-      <div className={clsx("flex items-center border-b border-white/12 py-4", collapsed ? "justify-center px-0" : "justify-between px-4")}>
-        <div className="flex items-center gap-2">
-          <OctopusMark size={28} />
-          {!collapsed && <span className="text-[15px] font-extrabold tracking-tight text-white">OCTOPUS</span>}
-        </div>
-        {!collapsed && (
+      <div className={clsx("flex h-[81px] shrink-0 items-center border-b border-[#f1f5f9] px-3 py-2", collapsed ? "justify-center" : "justify-between")}>
+        {collapsed ? (
           <button
-            onClick={() => { userToggled.current = true; setCollapsed(true); }}
-            className="grid h-7 w-7 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label={t("sidebar.collapse")}
+            onClick={() => { userToggled.current = true; setCollapsed(false); }}
+            className="grid h-8 w-8 place-items-center rounded-[8px] text-white transition-colors hover:bg-white/10"
+            aria-label={t("sidebar.expand")}
           >
-            <PanelLeft size={18} strokeWidth={1.8} />
+            <ShellIcon name="nav-toggle.svg" />
           </button>
+        ) : (
+          <>
+            <div className="flex items-center gap-0.5">
+              <OctopusMark />
+              <span className="text-[14px] font-bold leading-[14px] text-white">OCTOPUS</span>
+            </div>
+            <button
+              onClick={() => { userToggled.current = true; setCollapsed(true); }}
+              className="grid h-6 w-6 place-items-center rounded-[6px] text-white transition-colors hover:bg-white/10"
+              aria-label={t("sidebar.collapse")}
+            >
+              <ShellIcon name="nav-toggle.svg" />
+            </button>
+          </>
         )}
       </div>
 
-      {collapsed && (
-        <button
-          onClick={() => { userToggled.current = true; setCollapsed(false); }}
-          className="mx-auto my-1.5 grid h-8 w-8 place-items-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-          aria-label={t("sidebar.expand")}
-        >
-          <Search size={16} strokeWidth={1.8} />
-        </button>
-      )}
-
       {/* The frame drops the uppercase section captions — the sections survive
           purely as the vertical gaps that still group the nav. */}
-      <nav className={clsx("octo-scroll min-h-0 flex-1 overflow-y-auto overflow-x-visible pb-2 pt-2.5", collapsed ? "px-2" : "px-2.5")}>
+      <nav className="octo-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-visible px-2 pb-2 pt-4">
         {visibleSections.map((section) => (
-          <div key={section.label} className="mb-3">
-            {section.groups.map(renderGroup)}
-          </div>
+          <div key={section.label}>{section.groups.map(renderGroup)}</div>
         ))}
-        {visibleFooterGroups.map(renderGroup)}
       </nav>
 
-      <div ref={footerRef} className={clsx("flex flex-col gap-1.5 pb-3 pt-1", collapsed ? "px-2" : "px-2.5")}>
+      <div ref={footerRef} className={clsx("flex flex-col pb-6 pt-2", collapsed ? "px-2" : "px-4")}>
         <FooterCard
           collapsed={collapsed}
           ariaLabel={t("sidebar.accountMenu")}
@@ -595,7 +561,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: { collapsed: boolea
           title={userName}
           subtitle={roleLabel}
           thumb={
-            <div className="grid h-[34px] w-[34px] shrink-0 place-items-center rounded-full bg-ocean-blue text-[12px] font-semibold text-white">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0d6efd] text-[14px] font-bold leading-[14px] text-white">
               {userInitials}
             </div>
           }

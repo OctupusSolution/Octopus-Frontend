@@ -84,7 +84,7 @@ function AppShell() {
     <div className="flex h-screen overflow-hidden bg-[var(--octo-app-bg)]">
       <AppSidebar collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
       <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-        <TopBar onToggleSidebar={() => setSidebarCollapsed((c) => !c)} />
+        <TopBar />
         <div className="octo-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           <PageTransition>
             <Suspense fallback={<div className="p-6 text-[12.5px] text-[var(--octo-text-muted)]">{t("common.loading")}</div>}>

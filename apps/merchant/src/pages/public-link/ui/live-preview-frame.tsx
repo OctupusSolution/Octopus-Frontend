@@ -8,10 +8,9 @@
 // selected page; clicking a link in the preview changes it). Clicking a section in the framed site
 // selects it for editing, and the selected section is outlined there.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Globe, Monitor, Smartphone, Tablet } from "lucide-react";
+import clsx from "clsx";
 import { previewMenuDraft, type BuilderMenuDocument } from "@octopus/api-client";
 import type { Locale } from "@i18n/index";
-import { Card, Segmented } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { I18nScope, useI18n } from "@/app/providers/i18n-provider";
 import { ensureFontLoaded, type PublicLinkSync, type SiteAction, type SiteDraft } from "@/entities/site-draft";
@@ -22,9 +21,9 @@ import { draftPublicRead, liveSiteFromRead, mediaIdsOf, type LiveMenu } from "..
 import { builderMenuDocument, menuFromDocument, menuMediaIds } from "../_shared/preview-menu";
 import { storefrontOrigin } from "../_shared/preview-url";
 import { SITE_CANVAS_CHANNEL } from "../_shared/site-canvas-channel";
+import { PlDeviceSwitch, PlIcon, plCard, plText } from "./kit";
 import { LiveSiteCanvas, VIEWPORT_WIDTH, type LiveDevice } from "./live-site-canvas";
 
-const DEVICE_ICON: Readonly<Record<LiveDevice, typeof Monitor>> = { desktop: Monitor, tablet: Tablet, mobile: Smartphone };
 const DEVICE_LABEL_KEY: Readonly<Record<LiveDevice, string>> = {
   desktop: "publicLink.device.desktop",
   tablet: "publicLink.device.tablet",
@@ -250,7 +249,7 @@ export function LivePreviewFrame({
   const scopeLocale: Locale = site.language === "ar" ? "ar" : "en";
 
   const mirror = (
-    <div ref={viewportRef} className="octo-scroll relative overflow-y-auto overflow-x-hidden rounded-xl border border-[var(--octo-border-card)] bg-[#f7f8fa]" style={{ height }}>
+    <div ref={viewportRef} className="octo-scroll relative overflow-y-auto overflow-x-hidden rounded-[20px] bg-[#f7f8fa] shadow-[0_0_8px_0_rgba(0,0,0,0.08)]" style={{ height }}>
       {zoom > 0 && (
         <div className="mx-auto" style={{ width: VIEWPORT_WIDTH[device], zoom }}>
           <I18nScope locale={scopeLocale}>
@@ -280,21 +279,24 @@ export function LivePreviewFrame({
       />
     ) : (
       <div className="flex flex-col gap-2">
-        {origin && frameFailed && <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.live.fallback")}</p>}
-        {!origin && <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.live.noAddress")}</p>}
+        {origin && frameFailed && <p className={plText.hint}>{t("publicLink.live.fallback")}</p>}
+        {!origin && <p className={plText.hint}>{t("publicLink.live.noAddress")}</p>}
         {mirror}
       </div>
     );
 
+  const controlField =
+    "relative flex h-8 items-center gap-1 rounded-[8px] border border-[var(--pl-g300)] p-2 text-[14px] font-medium leading-[14px] text-[var(--pl-text)] focus-within:ring-2 focus-within:ring-[#0D6EFD]/40";
+
   const controls = (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-3">
       {site.pages.length > 1 && (
-        <label className="flex h-8 max-w-[180px] items-center rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-1 ps-2 text-[12px] text-[var(--octo-text-primary)]">
+        <label className={clsx(controlField, "max-w-[180px]")}>
           <span className="sr-only">{t("publicLink.live.page")}</span>
           <select
             value={site.page?.pageId ?? wantedId ?? ""}
             onChange={(e) => dispatch({ type: "selectPage", pageId: e.target.value })}
-            className="min-w-0 cursor-pointer truncate bg-transparent pe-1 text-[12px] font-medium focus:outline-none"
+            className="min-w-0 cursor-pointer appearance-none truncate bg-transparent pe-5 text-[14px] font-medium focus:outline-none"
           >
             {site.pages.map((p) => (
               <option key={p.pageId} value={p.pageId}>
@@ -302,32 +304,20 @@ export function LivePreviewFrame({
               </option>
             ))}
           </select>
+          <PlIcon name="chevron-16" size={16} className="pointer-events-none absolute end-2" />
         </label>
       )}
       {devices.length > 1 && (
-        <Segmented
-          options={devices.map((id) => {
-            const Icon = DEVICE_ICON[id];
-            return {
-              id,
-              label: (
-                <>
-                  <Icon size={14} />
-                  <span className="sr-only">{t(DEVICE_LABEL_KEY[id])}</span>
-                </>
-              ),
-            };
-          })}
-          value={device}
-          onChange={(id) => onDevice(id as LiveDevice)}
-        />
+        <PlDeviceSwitch devices={devices} value={device} onChange={(id) => onDevice(id as LiveDevice)} label={(id) => t(DEVICE_LABEL_KEY[id])} />
       )}
       {actions}
       {enabled.length > 1 && (
-        <label className="flex h-8 items-center gap-1 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-1 ps-2 text-[12px] text-[var(--octo-text-primary)]">
-          <Globe size={13} className="shrink-0 text-[var(--octo-text-muted)]" aria-hidden />
+        <label className={controlField}>
+          <PlIcon name="language" size={16} />
           <span className="sr-only">{t("publicLink.preview.language")}</span>
-          <select value={site.language} onChange={(e) => setLanguage(e.target.value)} className="cursor-pointer bg-transparent pe-1 text-[12px] font-medium focus:outline-none">
+          <span aria-hidden>{site.language.toUpperCase()}</span>
+          <PlIcon name="chevron-16" size={16} />
+          <select value={site.language} onChange={(e) => setLanguage(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0">
             {enabled.map((code) => (
               <option key={code} value={code}>
                 {code.toUpperCase()}
@@ -349,21 +339,21 @@ export function LivePreviewFrame({
   }
 
   return (
-    <Card className="p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="flex items-center gap-2 text-[13px] font-medium text-[var(--octo-text-primary)]">
+    <div className={clsx(plCard, "flex min-w-0 flex-col gap-6")}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className={clsx("flex items-center gap-2", subtitle ? "text-[20px] font-medium leading-[20px] text-[var(--pl-text)]" : plText.h5)}>
             {title ?? t("publicLink.livePreview")}
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#16a34a]/10 px-2 py-0.5 text-[10.5px] font-semibold text-[#16a34a]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#16a34a]" aria-hidden />
+            <span className="inline-flex items-center gap-1 rounded-[4px] bg-[var(--pl-success-soft)] px-1.5 py-1 text-[10px] font-medium leading-[10px] text-[var(--pl-success)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--pl-success)]" aria-hidden />
               {framed && frameReady ? t("publicLink.live.connected") : t("publicLink.live.badge")}
             </span>
           </p>
-          {subtitle && <p className="text-[11.5px] text-[var(--octo-text-muted)]">{subtitle}</p>}
+          {subtitle && <p className={plText.sub}>{subtitle}</p>}
         </div>
         {controls}
       </div>
-      <div className="mt-4">{canvas}</div>
-    </Card>
+      {canvas}
+    </div>
   );
 }

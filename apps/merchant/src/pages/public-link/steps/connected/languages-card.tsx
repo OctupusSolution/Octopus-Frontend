@@ -27,8 +27,8 @@ export function LanguagesCard({ sync }: { sync: PublicLinkSync }) {
   }
 
   return (
-    <section className="flex flex-col gap-3 border-t border-[var(--octo-divider)] pt-4">
-      <p className="text-[16px] font-semibold text-[var(--octo-text-primary)]">{tx("pl.languages.title")}</p>
+    <section className="flex flex-col gap-4 border-t border-[var(--pl-g200)] pt-4">
+      <p className="text-[20px] font-medium leading-[20px] text-[var(--pl-text)]">{tx("pl.languages.title")}</p>
       <p className={CARD_NOTE + " mt-0"}>{tx("pl.languages.note")}</p>
       <div className="flex flex-col gap-2">
         {languages.map((language) => {
@@ -37,24 +37,24 @@ export function LanguagesCard({ sync }: { sync: PublicLinkSync }) {
           return (
             <div
               key={language.code}
-              className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2"
+              className="flex min-h-10 flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--pl-g300)] px-3 py-2"
             >
-              <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">
-                {name(language.code)} <span className="text-[11px] text-[var(--octo-text-faint)]">({language.direction})</span>
+              <span className="text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">
+                {name(language.code)} <span className="text-[12px] font-normal text-[var(--pl-text-3)]">({language.direction})</span>
               </span>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
+                <label className="flex items-center gap-1.5 text-[12px] text-[var(--pl-text-3)]">
                   <input
                     type="radio"
                     name="pl-default-language"
                     checked={isDefault}
                     disabled={busy !== null}
                     onChange={() => save(language.code, enabledLanguages)}
-                    className="accent-[#0D6EFD]"
+                    className="h-4 w-4 accent-[#0D6EFD]"
                   />
                   {tx("pl.languages.default")}
                 </label>
-                <span className="flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
+                <span className="flex items-center gap-1.5 text-[12px] text-[var(--pl-text-3)]">
                   {tx("pl.languages.enabled")}
                   <Switch
                     checked={enabled}

@@ -8,15 +8,17 @@
 // bound to, its display settings, whether it is shown.
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { Link2, Pencil, Plus } from "lucide-react";
-import { Button, EmptyState, Modal, Select } from "@ui/primitives";
+import { Link2 } from "lucide-react";
+import { EmptyState, Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { PublicLinkSync, SiteAction, SiteDraft } from "@/entities/site-draft";
 import { usePlText } from "../../_shared/texts";
 import { catalogueText } from "../../_shared/catalogue-text";
-import { ReorderList } from "../../ui/reorder-list";
+import { PlButton, PlSelect, plText } from "../../ui/kit";
+import { ReorderHint, ReorderList } from "../../ui/reorder-list";
 import { Switch } from "../../ui/switch";
-import { CARD, CARD_TITLE, orderedPages, pageTitle, useBusy } from "./common";
+import { AddSectionOption, SECTION_ROWS, SectionEditButton, SectionsHeader, sectionNameClass } from "../customize/controls";
+import { orderedPages, pageTitle, useBusy } from "./common";
 import { FieldsInspector } from "./fields-inspector";
 import { ModuleSectionInspector } from "./module-section-inspector";
 
@@ -88,8 +90,8 @@ export function ServerSectionsList({
   }
 
   return (
-    <div className={CARD}>
-      <Select
+    <div className="flex min-w-0 flex-col gap-3">
+      <PlSelect
         aria-label={tx("pl.sections.page")}
         value={pageId ?? ""}
         onChange={(e) => {
@@ -102,24 +104,18 @@ export function ServerSectionsList({
             {pageTitle(p, locale, sync.editLanguage)}
           </option>
         ))}
-      </Select>
-      <div className="flex items-center justify-between gap-2">
-        <p className={CARD_TITLE}>{t("publicLink.customize.homepageSections")}</p>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={<Plus size={13} />}
-          disabled={!page || full}
-          onClick={() => setAdding(true)}
-          className="border-[#0D6EFD] text-[#0D6EFD] hover:bg-[#0D6EFD]/5"
-        >
-          {t("publicLink.customize.addSection")}
-        </Button>
-      </div>
+      </PlSelect>
+      <SectionsHeader
+        title={t("publicLink.customize.homepageSections")}
+        addLabel={t("publicLink.customize.addSection")}
+        disabled={!page || full}
+        onAdd={() => setAdding(true)}
+      />
 
-      {page && sections.length === 0 && <p className="text-[12px] text-[var(--octo-text-muted)]">{tx("pl.sections.empty")}</p>}
+      {page && sections.length === 0 && <p className={plText.hint}>{tx("pl.sections.empty")}</p>}
       {page && (
         <ReorderList
+          className={SECTION_ROWS}
           items={sections}
           getId={(s) => s.sectionId}
           getLabel={(s) => label(s.source?.sourceKey ?? s.type)}
@@ -129,26 +125,18 @@ export function ServerSectionsList({
             return (
               <>
                 {grip}
-                {section.source && <Link2 size={13} className="shrink-0 text-[var(--octo-text-faint)]" />}
+                {section.source && (
+                  <Link2 size={16} className={clsx("shrink-0", selected === section.sectionId ? "text-[var(--pl-primary)]" : "text-[var(--pl-text)]")} />
+                )}
                 <button
                   type="button"
                   onClick={() => onSelect(section.sectionId)}
-                  className={clsx(
-                    "min-w-0 flex-1 truncate text-start text-[12.5px]",
-                    selected === section.sectionId ? "font-medium text-[#0D6EFD]" : "text-[var(--octo-text-primary)]"
-                  )}
+                  className={clsx(sectionNameClass(selected === section.sectionId), "rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40")}
                 >
                   {name}
                   {section.sourceState === "unavailable" && " ⚠"}
                 </button>
-                <button
-                  type="button"
-                  aria-label={`${name} — ${t("publicLink.customize.selectedSection")}`}
-                  onClick={() => onSelect(section.sectionId)}
-                  className="shrink-0 rounded p-1 text-[var(--octo-text-faint)] hover:text-[var(--octo-text-secondary)]"
-                >
-                  <Pencil size={13} />
-                </button>
+                <SectionEditButton label={`${name} — ${t("publicLink.customize.selectedSection")}`} onClick={() => onSelect(section.sectionId)} />
                 <Switch
                   checked={section.enabled}
                   onChange={() => {
@@ -162,29 +150,22 @@ export function ServerSectionsList({
           }}
         />
       )}
-      <p className="rounded-[10px] border border-dashed border-[var(--octo-border-input)] px-3 py-2.5 text-center text-[11px] text-[var(--octo-text-faint)]">
-        {t("publicLink.reorder.hint")}
-      </p>
+      <ReorderHint>{t("publicLink.reorder.hint")}</ReorderHint>
 
       <Modal open={adding} onClose={() => setAdding(false)} title={t("publicLink.customize.addSection")}>
         {types.length === 0 && sources.length === 0 ? (
           <EmptyState title={t("publicLink.customize.addSection")} />
         ) : (
-          <ul className="flex flex-col gap-1.5">
+          <ul className="flex flex-col gap-2">
             {types.map((type) => {
               const count = sections.filter((s) => s.type === type.key).length;
               const blocked = type.maxPerPage !== null && count >= type.maxPerPage;
               return (
                 <li key={type.key}>
-                  <button
-                    type="button"
-                    disabled={blocked || busy !== null}
-                    onClick={() => add(type.key, { type: type.key })}
-                    className="flex w-full items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] transition-colors hover:border-[#0D6EFD] hover:text-[#0D6EFD] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <AddSectionOption disabled={blocked || busy !== null} onClick={() => add(type.key, { type: type.key })}>
                     {label(type.key)}
-                    {busy === type.key && <span className="ms-auto text-[11px]">{tx("pl.common.saving")}</span>}
-                  </button>
+                    {busy === type.key && <span className="ms-auto text-[12px] font-normal">{tx("pl.common.saving")}</span>}
+                  </AddSectionOption>
                 </li>
               );
             })}
@@ -193,16 +174,13 @@ export function ServerSectionsList({
                 const id = `${source.sourceKey}:${item.contentKey}`;
                 return (
                   <li key={id}>
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => add(id, { source: { sourceKey: source.sourceKey, contentKey: item.contentKey } })}
-                      className="flex w-full items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] transition-colors hover:border-[#0D6EFD] hover:text-[#0D6EFD] disabled:opacity-50"
-                    >
-                      <Link2 size={13} className="shrink-0" />
-                      {label(source.sourceKey)} · {item.displayNames?.[locale] ?? item.displayName}
-                      {busy === id && <span className="ms-auto text-[11px]">{tx("pl.common.saving")}</span>}
-                    </button>
+                    <AddSectionOption disabled={busy !== null} onClick={() => add(id, { source: { sourceKey: source.sourceKey, contentKey: item.contentKey } })}>
+                      <Link2 size={16} className="shrink-0" />
+                      <span className="min-w-0 truncate">
+                        {label(source.sourceKey)} · {item.displayNames?.[locale] ?? item.displayName}
+                      </span>
+                      {busy === id && <span className="ms-auto text-[12px] font-normal">{tx("pl.common.saving")}</span>}
+                    </AddSectionOption>
                   </li>
                 );
               })
@@ -237,7 +215,7 @@ export function ServerSectionInspector({
   const page = pageId ? server.pages[pageId] : undefined;
   const section = page?.sections.find((s) => s.sectionId === sectionId);
 
-  if (!page || !section) return <p className="text-[12px] text-[var(--octo-text-muted)]">{tx("pl.sections.select")}</p>;
+  if (!page || !section) return <p className={plText.hint}>{tx("pl.sections.select")}</p>;
   const type = server.catalogues?.sectionTypes.find((st) => st.key === section.type);
 
   return (
@@ -255,14 +233,15 @@ export function ServerSectionInspector({
         <FieldsInspector key={section.sectionId} sync={sync} page={page} section={section} type={type} />
       )}
       {!section.primary && (
-        <Button
-          variant="ghost"
+        <PlButton
+          variant="dangerSoft"
+          size="lg"
           disabled={busy !== null}
-          className="w-full justify-center bg-[#EF4444]/5 text-[#EF4444] hover:bg-[#EF4444]/10"
+          className="w-full !text-[16px] !leading-[16px]"
           onClick={() => void act("delete", () => sync.removeSection(page.pageId, section.sectionId)).then((ok) => ok && onDeleted())}
         >
           {t("publicLink.customize.deleteSection")}
-        </Button>
+        </PlButton>
       )}
     </div>
   );

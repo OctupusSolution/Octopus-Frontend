@@ -3,12 +3,12 @@
 // until the first publish.
 import { useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { Info, Sparkles } from "lucide-react";
-import { Badge, Button } from "@ui/primitives";
+import { Sparkles } from "lucide-react";
 import type { PublicLinkSync, SiteAction, SiteDraft } from "@/entities/site-draft";
 import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { usePlText } from "../../_shared/texts";
-import type { ThemeCardProps } from "../theme-step";
+import { PlButton, PlInfoBanner } from "../../ui/kit";
+import { THEME_CHIP, THEME_CHIP_BAR, THEME_CHIP_OFF, THEME_CHIP_ON, THEME_GRID, type ThemeCardProps } from "../theme-step";
 import { CARD, CARD_NOTE, CARD_TITLE, useBusy } from "./common";
 
 const STYLE_FOR: Record<string, "elegant" | "modern" | "warm"> = { default: "modern", warm: "warm", midnight: "elegant" };
@@ -38,23 +38,21 @@ export function ServerThemeGrid({
   const themes = catalogues.themes.filter((theme) => filter === "all" || theme.category === filter);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2">
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className={clsx(THEME_CHIP_BAR, "!justify-start")}>
         {["all", ...categories].map((id) => (
           <button
             key={id}
             type="button"
+            aria-pressed={filter === id}
             onClick={() => dispatch({ type: "patchTheme", patch: { filter: id } })}
-            className={clsx(
-              "rounded-[9px] border px-3 py-[7px] text-[12px] font-medium transition-colors",
-              filter === id ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-card)] text-[var(--octo-text-muted)]"
-            )}
+            className={clsx(THEME_CHIP, filter === id ? THEME_CHIP_ON : THEME_CHIP_OFF)}
           >
             {id === "all" ? tx("pl.theme.category.all") : title(id)}
           </button>
         ))}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className={THEME_GRID}>
         {themes.map((theme) =>
           renderCard({
             key: theme.key,
@@ -81,10 +79,7 @@ export function ServerThemeGrid({
           })
         )}
       </div>
-      <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[12px] text-[#0D6EFD]">
-        <Info size={14} className="shrink-0" />
-        {tx("pl.theme.serverNote")}
-      </p>
+      <PlInfoBanner>{tx("pl.theme.serverNote")}</PlInfoBanner>
     </div>
   );
 }
@@ -101,27 +96,31 @@ export function StarterCard({ sync }: { sync: PublicLinkSync }) {
   return (
     <div className={CARD}>
       <p className={clsx(CARD_TITLE, "flex items-center gap-2")}>
-        <Sparkles size={15} className="text-[#0D6EFD]" />
+        <Sparkles size={16} className="text-[var(--pl-primary)]" />
         {tx("pl.starter.title")}
       </p>
       <p className={CARD_NOTE}>{tx("pl.starter.note")}</p>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {server.catalogues.starters.map((starter) => (
-          <div key={starter.key} className="flex flex-col gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-3">
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{title(starter.key)}</span>
-              {starter.key === recommended && <Badge tone="info">{tx("pl.starter.recommended")}</Badge>}
-              {starter.key === applied && <Badge tone="success">{tx("pl.theme.applied")}</Badge>}
+          <div key={starter.key} className="flex flex-col gap-3 rounded-[12px] border border-[var(--pl-g300)] bg-[var(--pl-g50)] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">{title(starter.key)}</span>
+              {starter.key === recommended && (
+                <span className="rounded-[4px] bg-[var(--pl-primary)] p-1 text-[8px] font-medium leading-[8px] text-white">{tx("pl.starter.recommended")}</span>
+              )}
+              {starter.key === applied && (
+                <span className="rounded-[4px] bg-[var(--pl-success-soft)] p-1 text-[10px] font-medium leading-[10px] text-[var(--pl-success)]">{tx("pl.theme.applied")}</span>
+              )}
             </div>
-            <span className="text-[11.5px] text-[var(--octo-text-muted)]">
+            <span className="text-[12px] leading-[1.4] text-[var(--pl-text-3)]">
               {tx("pl.starter.pages", { n: starter.pages.length })} · {title(starter.themeKey)}
             </span>
             {confirming === starter.key ? (
-              <div role="alertdialog" className="flex flex-col gap-2 rounded-[9px] border border-[#F59E0B]/40 bg-[#F59E0B]/10 px-2.5 py-2">
-                <span className="text-[12px] text-[var(--octo-text-primary)]">{tx("pl.starter.confirm")}</span>
+              <div role="alertdialog" className="flex flex-col gap-2 rounded-[8px] border border-[#F59E0B]/40 bg-[#F59E0B]/10 p-2">
+                <span className="text-[12px] leading-[1.4] text-[var(--pl-text)]">{tx("pl.starter.confirm")}</span>
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
+                  <PlButton
+                    size="xs"
                     disabled={busy !== null}
                     onClick={() => {
                       setConfirming(null);
@@ -129,16 +128,16 @@ export function StarterCard({ sync }: { sync: PublicLinkSync }) {
                     }}
                   >
                     {tx("pl.starter.apply")}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+                  </PlButton>
+                  <PlButton size="xs" variant="plain" onClick={() => setConfirming(null)}>
                     {tx("pl.common.cancel")}
-                  </Button>
+                  </PlButton>
                 </div>
               </div>
             ) : (
-              <Button size="sm" variant="secondary" disabled={busy !== null} onClick={() => setConfirming(starter.key)} className="w-fit">
+              <PlButton size="xs" variant="outline" disabled={busy !== null} onClick={() => setConfirming(starter.key)} className="w-fit">
                 {busy === starter.key ? tx("pl.common.saving") : tx("pl.starter.apply")}
-              </Button>
+              </PlButton>
             )}
           </div>
         ))}

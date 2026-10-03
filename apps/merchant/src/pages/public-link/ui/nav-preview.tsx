@@ -6,10 +6,14 @@
 // pages-enabled count beneath `DrawerNavPreview` is the one piece of real
 // information, so it alone stays outside the aria-hidden block.
 import { ExternalLink, FileText, type LucideIcon } from "lucide-react";
+import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PAGE_MODULES, type PageModule } from "../_shared/page-catalog";
 import type { SiteDraft } from "../_shared/site-draft";
+import { PlIcon } from "./kit";
 
+/** The drawer mock's logo, as the Pages frame draws it (30px, on navy). */
+const drawerLogoUrl = new URL("../../../../../assets/PublicLink/pages-octopus-logo.svg", import.meta.url).href;
 const octopusLogoUrl = new URL("../../../../../assets/Logo/OCTOPUS LOGO.svg", import.meta.url).href;
 
 function modulesInNav(draft: SiteDraft): readonly PageModule[] {
@@ -46,46 +50,86 @@ function navEntries(draft: SiteDraft, t: (key: string) => string, where: "all" |
   return modules.map((module) => ({ id: module.id, label: t(module.labelKey), icon: module.icon }));
 }
 
-/** The dark sidebar mock from the Pages step: the drawer a customer opens on
- *  the storefront, showing only the pages the merchant has switched into
- *  navigation. */
+/** The frames' own 16px page icons (apps/assets/PublicLink/icons), by page
+ *  module id. The Pages step's table and its drawer mock both draw these.
+ *  `size` is the exported artwork's own box where it is not the full 16px. */
+export const PL_PAGE_ICON: Readonly<Record<string, { name: string; size?: number }>> = {
+  home: { name: "pages-home" },
+  menu: { name: "pages-menu-board" },
+  reservations: { name: "pages-calendar-add" },
+  waitlist: { name: "pages-clipboard-text" },
+  offers: { name: "pages-discount", size: 14.33 },
+  events: { name: "pages-calendar-check" },
+  loyalty: { name: "pages-heart-tick" },
+  about: { name: "pages-about" },
+  contact: { name: "pages-call" },
+};
+
+/** A 16px slot holding one of `PL_PAGE_ICON`; a page the frames draw no icon
+ *  for (a custom server page) falls back to a document glyph. */
+export function PlPageIcon({ id, className }: { id: string | undefined; className?: string }) {
+  const icon = id ? PL_PAGE_ICON[id] : undefined;
+  return (
+    <span aria-hidden className={clsx("grid h-4 w-4 shrink-0 place-items-center", className)}>
+      {icon ? <PlIcon name={icon.name} size={icon.size ?? 16} /> : <FileText size={16} strokeWidth={1.5} />}
+    </span>
+  );
+}
+
+/** What the Pages step's drawer mock lists: every server menu entry while
+ *  connected (literal labels), else the page modules switched into nav. Kept
+ *  apart from `navEntries`, which the Navigation step's previews own. */
+function drawerEntries(draft: SiteDraft, t: (key: string) => string): { id: string; label: string; iconId?: string }[] {
+  if (draft.remote) {
+    return draft.remote.navItems.map((item, index) => ({ id: `${index}:${item.label}`, label: item.label }));
+  }
+  return modulesInNav(draft).map((module) => ({ id: module.id, label: t(module.labelKey), iconId: module.id }));
+}
+
+/** The "Navigation Preview" card from the Pages step: the dark drawer a
+ *  customer opens on the storefront, showing only the pages the merchant has
+ *  switched into navigation, and the pages-enabled count under it. */
 export function DrawerNavPreview({ draft }: { draft: SiteDraft }) {
   const { t } = useI18n();
-  const modules = navEntries(draft, t, "all");
+  const entries = drawerEntries(draft, t);
   const total = draft.remote ? draft.remote.visiblePages : draft.pages.length;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div aria-hidden className="flex flex-col gap-4 rounded-xl bg-[#081026] px-[18px] py-[15px]">
-        <div className="flex items-center gap-2">
-          <img src={octopusLogoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-          <span className="text-[13px] font-semibold text-white">OCTOPUS</span>
+    <div className="flex flex-col gap-3">
+      <div aria-hidden className="flex min-h-[520px] w-[220px] max-w-full flex-col items-center gap-8 overflow-hidden bg-[#001e4b] pb-6">
+        <div className="flex w-full flex-col gap-4">
+          <div className="flex h-[81px] w-full items-center justify-between border-b border-[#f1f5f9] px-3 py-2">
+            <span className="flex min-w-0 items-center gap-0.5">
+              <img src={drawerLogoUrl} alt="" width={30} height={30} className="h-[30px] w-[30px] shrink-0" />
+              <span className="text-[14px] font-bold leading-[14px] text-white">OCTOPUS</span>
+            </span>
+            <PlIcon name="pages-grid-4" className="text-white" />
+          </div>
+
+          <ul className="flex w-full flex-col gap-1">
+            {entries.map((entry) => (
+              <li key={entry.id} className="flex items-center gap-2 rounded-[12px] p-2 text-white">
+                <PlPageIcon id={entry.iconId} />
+                <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-[14px]">{entry.label}</span>
+                {entry.iconId === "menu" && <PlIcon name="chevron-16" size={16} className="-rotate-90 rtl:rotate-90" />}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <ul className="flex flex-col gap-1">
-          {modules.map((module) => {
-            const Icon: LucideIcon = module.icon;
-            return (
-              <li key={module.id} className="flex items-center gap-2 rounded-[8px] px-2 py-1.5 text-[12.5px] text-white/80">
-                <Icon size={14} />
-                {module.label}
-              </li>
-            );
-          })}
-        </ul>
-
-        <div className="flex flex-col gap-2 pt-2">
-          <span className="rounded-[9px] bg-white px-3 py-2 text-center text-[12px] font-medium text-[#081026]">
+        <div className="flex w-[188px] max-w-full flex-col gap-4">
+          <span className="flex h-10 items-center justify-center rounded-[24px] bg-white p-2 text-[14px] font-bold leading-[14px] text-[#0f172a]">
             {t("publicLink.nav.bookTable")}
           </span>
-          <span className="rounded-[9px] bg-white/10 px-3 py-2 text-center text-[12px] font-medium text-white">
+          <span className="flex h-10 items-center justify-center rounded-[24px] bg-white/10 p-2 text-[14px] font-bold leading-[14px] text-white">
             {t("publicLink.nav.viewMenu")}
           </span>
         </div>
       </div>
 
-      <p className="text-[11.5px] text-[var(--octo-text-muted)]">
-        {t("publicLink.pages.enabledCount").replace("{n}", String(modules.length)).replace("{total}", String(total))}
+      <p className="flex items-center gap-2 text-[12px] font-bold leading-[12px] text-[var(--pl-text-3)]">
+        <PlIcon name="pages-about" size={16} />
+        {t("publicLink.pages.enabledCount").replace("{n}", String(entries.length)).replace("{total}", String(total))}
       </p>
     </div>
   );
@@ -126,19 +170,21 @@ export function WebNavPreview({ draft }: { draft: SiteDraft }) {
   );
 }
 
-/** The phone-shaped drawer beside it: the same navigation, stacked the way it
- *  opens on a mobile storefront, with icons carried over from the drawer
- *  mock so the pair reads as one navigation shown at two sizes. Honours both
- *  "Show in Drawer Menu" (stands in for the whole drawer being switched off)
- *  and "Show Icons" (final review finding F5 — both had no consumer at all
- *  before this fix). */
+/** The phone-shaped drawer beside it, drawn as the Figma "Mobile Drawer
+ *  Preview" tile: a 110×253 white sheet with the logo, the navigation stacked
+ *  the way it opens on a mobile storefront, and the language pill at its foot.
+ *  Honours "Show in Drawer Menu" (stands in for the whole drawer being
+ *  switched off), "Show Icons", the active page indicator and the new-tab
+ *  glyph (final review finding F5). */
+const DRAWER_TILE = "mx-auto h-[253px] w-[110px] shrink-0 overflow-hidden rounded-[8px] shadow-[0_0_8px_rgba(0,0,0,0.08)]";
+
 export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   if (!draft.navigation.showInDrawer) {
     return (
       <div
         aria-hidden
-        className="mx-auto flex w-[140px] items-center justify-center rounded-[20px] border border-dashed border-[var(--octo-border-input)] bg-[var(--octo-card)] p-3 text-center text-[10.5px] text-[var(--octo-text-faint)]"
+        className={`${DRAWER_TILE} flex items-center justify-center border border-dashed border-[var(--pl-g300)] bg-[var(--pl-g50)] p-2 text-center text-[8px] font-medium leading-[1.4] text-[var(--pl-text-3)] shadow-none`}
       >
         {t("publicLink.navigation.drawerPreviewOff")}
       </div>
@@ -150,15 +196,9 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
   const primary = draft.brand.colors.primary;
 
   return (
-    <div
-      aria-hidden
-      className="mx-auto flex w-[140px] flex-col gap-3 rounded-[20px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3"
-    >
-      <div className="flex items-center gap-1.5">
-        <img src={octopusLogoUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
-        <span className="text-[10.5px] font-semibold text-[var(--octo-text-primary)]">OCTOPUS</span>
-      </div>
-      <ul className="flex flex-col gap-1.5">
+    <div aria-hidden className={`${DRAWER_TILE} flex flex-col gap-2 bg-[var(--pl-surface)] px-2 pb-2 pt-3`}>
+      <img src={octopusLogoUrl} alt="" className="ms-1 h-[14px] w-[14px] shrink-0 object-contain" />
+      <ul className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden">
         {modules.map((module, index) => {
           const Icon: LucideIcon = module.icon;
           // The first visible page is the one a customer lands on, so it
@@ -168,20 +208,24 @@ export function MobileDrawerPreview({ draft }: { draft: SiteDraft }) {
           return (
             <li
               key={module.id}
-              className="flex items-center gap-1.5 rounded-[6px] px-1 py-0.5 text-[10.5px]"
+              className="flex h-[18px] shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[7px] font-medium leading-none"
               style={
                 active
-                  ? { color: primary, fontWeight: 600, backgroundColor: `color-mix(in srgb, ${primary} 10%, transparent)` }
-                  : { color: "var(--octo-text-secondary)" }
+                  ? { color: primary, fontWeight: 600, backgroundColor: `color-mix(in srgb, ${primary} 8%, transparent)` }
+                  : { color: "var(--pl-text)" }
               }
             >
-              {showIcons && <Icon size={11} className={active ? undefined : "text-[var(--octo-text-faint)]"} />}
+              {showIcons && <Icon size={9} className="shrink-0" />}
               <span className="min-w-0 flex-1 truncate">{module.label}</span>
-              {!draft.navigation.sameTab && <ExternalLink size={8} className="shrink-0 opacity-60" />}
+              {!draft.navigation.sameTab && <ExternalLink size={7} className="shrink-0 opacity-60" />}
             </li>
           );
         })}
       </ul>
+      <span className="flex h-[16px] shrink-0 items-center justify-center gap-1 rounded-full border border-[var(--pl-g200)] text-[6.5px] font-medium leading-none text-[var(--pl-text)]">
+        <PlIcon name="language" size={8} />
+        {locale === "ar" ? "العربية" : "English"}
+      </span>
     </div>
   );
 }

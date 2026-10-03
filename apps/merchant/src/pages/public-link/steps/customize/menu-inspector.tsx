@@ -5,36 +5,43 @@
 // service-area Edit opens a one-area-per-line editor.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
-import { Button, Input, Modal, Segmented, Select, Textarea } from "@ui/primitives";
-import { useI18n } from "@/app/providers/i18n-provider";
+import { Modal } from "@ui/primitives";
 import { savedMenus } from "@/shared/api/mock-site-menus";
 import type { MenuSettings, SiteAction, SiteDraft } from "../../_shared/site-draft";
-import { CheckCard, FieldRow, NumberedHeading, RadioCard, ToggleRow } from "./controls";
+import { usePlText } from "../../_shared/texts";
+import { rules, useTouched, useValidation } from "../../_shared/validation";
+import { PlButton, PlField, PlFieldError, PlInput, PlTextarea, plText } from "../../ui/kit";
+import { CheckCard, NumberedHeading, RadioCard, ToggleRow } from "./controls";
+import { amountOnly, FieldGroup, OptionSelect, RadioPills, SelectCard, SoftButton, StatusLine } from "./inspector-parts";
 
 const DISPLAY_OPTIONS = [
-  { id: "highlighted", labelKey: "publicLink.menu.displayHighlighted", noteKey: "publicLink.menu.displayHighlightedNote" },
-  { id: "categories", labelKey: "publicLink.menu.displayCategories", noteKey: "publicLink.menu.displayCategoriesNote" },
-  { id: "preview", labelKey: "publicLink.menu.displayPreview", noteKey: "publicLink.menu.displayPreviewNote" },
-  { id: "full", labelKey: "publicLink.menu.displayFull", noteKey: "publicLink.menu.displayFullNote" },
+  { id: "highlighted", labelKey: "pl.customize.menu.highlighted", noteKey: "pl.customize.menu.highlightedNote" },
+  { id: "categories", labelKey: "pl.customize.menu.categories", noteKey: "pl.customize.menu.categoriesNote" },
+  { id: "preview", labelKey: "pl.customize.menu.preview", noteKey: "pl.customize.menu.previewNote" },
+  { id: "full", labelKey: "pl.customize.menu.full", noteKey: "pl.customize.menu.fullNote" },
 ] as const;
 
 const PRIMARY_ACTION_OPTIONS = [
-  { id: "menuPage", labelKey: "publicLink.menu.openMenuPage", noteKey: "publicLink.menu.openMenuPageNote" },
-  { id: "menuDrawer", labelKey: "publicLink.menu.openMenuDrawer", noteKey: "publicLink.menu.openMenuDrawerNote" },
-  { id: "ordering", labelKey: "publicLink.menu.openOrdering", noteKey: "publicLink.menu.openOrderingNote" },
+  { id: "menuPage", labelKey: "pl.customize.menu.openPage", noteKey: "pl.customize.menu.openPageNote" },
+  { id: "menuDrawer", labelKey: "pl.customize.menu.openDrawer", noteKey: "pl.customize.menu.openDrawerNote" },
+  { id: "ordering", labelKey: "pl.customize.menu.openOrdering", noteKey: "pl.customize.menu.openOrderingNote" },
 ] as const;
 
 const ORDERING_MODE_OPTIONS = [
-  { id: "ordering", labelKey: "publicLink.menu.ordering" },
-  { id: "reservation", labelKey: "publicLink.menu.reservation" },
-  { id: "view", labelKey: "publicLink.menu.view" },
+  { id: "ordering", labelKey: "pl.customize.menu.modeOrdering" },
+  { id: "reservation", labelKey: "pl.customize.menu.modeReservation" },
+  { id: "view", labelKey: "pl.customize.menu.modeView" },
 ] as const;
 
-const TAX_OPTIONS = [
-  { id: "inclusive", labelKey: "publicLink.menu.taxInclusive" },
-  { id: "exclusive", labelKey: "publicLink.menu.taxExclusive" },
-] as const;
+const TAX_OPTIONS = ["inclusive", "exclusive"] as const;
+const TAX_LABEL: Readonly<Record<(typeof TAX_OPTIONS)[number], string>> = {
+  inclusive: "pl.customize.menu.taxInclusive",
+  exclusive: "pl.customize.menu.taxExclusive",
+};
+
+const MAX_MIN_ORDER = 100000;
+const MAX_PREP_TIME_LENGTH = 40;
+const MAX_AREAS_LENGTH = 200;
 
 /** Areas are stored as one comma-separated string; the editor shows one per
  *  line, which is how a merchant actually lists neighbourhoods. */
@@ -55,12 +62,27 @@ function linesToAreas(lines: string): string {
 }
 
 export function MenuInspector({ draft, dispatch }: { draft: SiteDraft; dispatch: (action: SiteAction) => void }) {
-  const { t } = useI18n();
+  const tx = usePlText();
   const navigate = useNavigate();
+  const { check } = useValidation();
+  const { touched, touch } = useTouched();
   const settings = draft.sectionSettings.menu;
   const connectedMenu = savedMenus.find((menu) => menu.id === settings.connectedMenuId) ?? null;
   const [areasOpen, setAreasOpen] = useState(false);
   const [areasDraft, setAreasDraft] = useState("");
+
+  // The prep time is promised to customers at checkout, so it is needed as
+  // soon as the section takes orders.
+  const prepTimeNeeded = settings.orderAhead || settings.orderingMode === "ordering";
+  const errors = {
+    menu: check(settings.connectedMenuId, [rules.required()]),
+    minOrder: check(settings.minOrder, [rules.amount({ min: 0, max: MAX_MIN_ORDER })]),
+    prepTime: check(settings.prepTime, [...(prepTimeNeeded ? [rules.required()] : []), rules.maxLength(MAX_PREP_TIME_LENGTH)]),
+    serviceAreas: check(settings.serviceAreas, [rules.maxLength(MAX_AREAS_LENGTH)]),
+    taxDisplay: check(settings.taxDisplay, [rules.required()]),
+  };
+  const shown = (name: keyof typeof errors) => (touched(name) ? errors[name] : undefined);
+  const areasDraftError = check(linesToAreas(areasDraft), [rules.maxLength(MAX_AREAS_LENGTH)]);
 
   function patch(patch: Partial<MenuSettings>) {
     dispatch({ type: "patchSection", section: "menu", patch });
@@ -77,158 +99,177 @@ export function MenuInspector({ draft, dispatch }: { draft: SiteDraft; dispatch:
   }
 
   function saveAreas() {
+    if (areasDraftError) return;
     patch({ serviceAreas: linesToAreas(areasDraft) });
+    touch("serviceAreas");
     setAreasOpen(false);
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <NumberedHeading n={1} title={t("publicLink.menu.connectSaved")} note={t("publicLink.menu.connectNote")} />
-      <FieldRow label={t("publicLink.menu.selectMenu")}>
-        <Select value={settings.connectedMenuId} onChange={(e) => patch({ connectedMenuId: e.target.value })}>
-          <option value="" disabled>
-            {t("publicLink.select.placeholder")}
-          </option>
-          {savedMenus.map((menu) => (
-            <option key={menu.id} value={menu.id}>
-              {menu.name} — {t("publicLink.menu.updatedAgo").replace("{n}", String(menu.updatedDaysAgo))} · {t("publicLink.menu.itemCount").replace("{n}", String(menu.itemCount))}
-            </option>
-          ))}
-        </Select>
-      </FieldRow>
-      {connectedMenu && (
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-input)] p-2.5">
-            <img
-              src={connectedMenu.thumbnail}
-              alt=""
-              className="h-12 w-12 shrink-0 rounded-[8px] bg-[var(--octo-hover)] object-contain"
+      <NumberedHeading n={1} title={tx("pl.customize.menu.connect")} note={tx("pl.customize.menu.connectNote")} />
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
+          <PlField label={tx("pl.customize.menu.select")} error={shown("menu")}>
+            <SelectCard
+              label={tx("pl.customize.menu.select")}
+              value={settings.connectedMenuId}
+              placeholder={tx("publicLink.select.placeholder")}
+              invalid={Boolean(shown("menu"))}
+              options={savedMenus.map((menu) => ({
+                id: menu.id,
+                title: menu.name,
+                note: tx("pl.customize.menu.meta", { days: menu.updatedDaysAgo, items: menu.itemCount }),
+                image: menu.thumbnail,
+              }))}
+              onChange={(connectedMenuId) => patch({ connectedMenuId })}
+              onBlur={() => touch("menu")}
             />
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{connectedMenu.name}</span>
-              <span className="text-[11px] text-[var(--octo-text-muted)]">
-                {t("publicLink.menu.updatedAgo").replace("{n}", String(connectedMenu.updatedDaysAgo))} ·{" "}
-                {t("publicLink.menu.itemCount").replace("{n}", String(connectedMenu.itemCount))}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-1.5 text-[12px] font-medium text-[#16a34a]">
-              <CheckCircle2 size={14} />
-              {t("publicLink.menu.connected")}
-            </span>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/menu")}>
-              {t("publicLink.menu.manageMenus")}
-            </Button>
-          </div>
+          </PlField>
+          {connectedMenu && <StatusLine>{tx("publicLink.menu.connected")}</StatusLine>}
         </div>
-      )}
+        <SoftButton onClick={() => navigate("/menu")}>{tx("publicLink.menu.manageMenus")}</SoftButton>
+      </div>
 
-      <NumberedHeading n={2} title={t("publicLink.reservations.menuDisplay")} />
-      <div className="grid grid-cols-2 gap-3">
+      <NumberedHeading n={2} title={tx("pl.customize.insp.displayOnHomepage")} note={tx("pl.customize.menu.displayNote")} />
+      <div className="flex flex-col gap-3">
         {DISPLAY_OPTIONS.map((option) => (
           <CheckCard
             key={option.id}
-            title={t(option.labelKey)}
-            note={t(option.noteKey)}
+            title={tx(option.labelKey)}
+            note={tx(option.noteKey)}
             checked={settings.homepageDisplay.includes(option.id)}
             onToggle={() => toggleDisplay(option.id)}
           />
         ))}
       </div>
 
-      <NumberedHeading n={3} title={t("publicLink.menu.primaryActionMenu")} />
-      <div className="flex flex-col gap-2.5">
+      <NumberedHeading n={3} title={tx("pl.customize.insp.primaryAction")} note={tx("pl.customize.menu.primaryNote")} />
+      <div className="flex flex-col gap-3">
         {PRIMARY_ACTION_OPTIONS.map((option) => (
           <RadioCard
             key={option.id}
-            title={t(option.labelKey)}
-            note={t(option.noteKey)}
+            title={tx(option.labelKey)}
+            note={tx(option.noteKey)}
             selected={settings.primaryAction === option.id}
             onSelect={() => patch({ primaryAction: option.id })}
           />
         ))}
       </div>
 
-      <NumberedHeading n={4} title={t("publicLink.menu.moduleSetting")} />
-      <FieldRow label={t("publicLink.menu.orderingMode")}>
-        <Segmented
-          options={ORDERING_MODE_OPTIONS.map((option) => ({ id: option.id, label: t(option.labelKey) }))}
+      <NumberedHeading n={4} title={tx("pl.customize.menu.moduleSetting")} note={tx("pl.customize.menu.moduleSettingNote")} />
+      <FieldGroup label={tx("pl.customize.menu.orderingMode")}>
+        <RadioPills
+          label={tx("pl.customize.menu.orderingMode")}
+          options={ORDERING_MODE_OPTIONS.map((option) => ({ id: option.id, label: tx(option.labelKey) }))}
           value={settings.orderingMode}
-          onChange={(id) => patch({ orderingMode: id as MenuSettings["orderingMode"] })}
+          onChange={(orderingMode) => patch({ orderingMode })}
         />
-      </FieldRow>
+      </FieldGroup>
 
-      <FieldRow label={t("publicLink.menu.minOrder")}>
-        <Input
-          type="number"
-          min={0}
-          placeholder={t("publicLink.menu.enterPrice")}
+      <PlField
+        label={
+          <>
+            {tx("pl.customize.menu.minOrder")} <span className="text-[12px] font-normal leading-[12px]">{tx("pl.customize.menu.minOrderUnit")}</span>
+          </>
+        }
+        error={shown("minOrder")}
+      >
+        <PlInput
+          inputMode="decimal"
+          aria-label={tx("pl.customize.menu.minOrder")}
+          placeholder={tx("pl.customize.menu.enterPrice")}
           value={settings.minOrder}
-          onChange={(e) => patch({ minOrder: e.target.value })}
+          invalid={Boolean(shown("minOrder"))}
+          onChange={(e) => patch({ minOrder: amountOnly(e.target.value) })}
+          onBlur={() => touch("minOrder")}
         />
-      </FieldRow>
+      </PlField>
 
       <ToggleRow
-        label={t("publicLink.menu.orderAhead")}
-        note={t("publicLink.menu.orderAheadNote")}
+        label={tx("pl.customize.menu.orderAhead")}
+        note={tx("pl.customize.menu.orderAheadNote")}
         checked={settings.orderAhead}
         onChange={() => patch({ orderAhead: !settings.orderAhead })}
       />
 
-      <FieldRow label={t("publicLink.menu.prepTime")}>
-        <>
-          <Input value={settings.prepTime} onChange={(e) => patch({ prepTime: e.target.value })} />
-          <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.menu.prepTimeNote")}</p>
-        </>
-      </FieldRow>
+      <PlField label={tx("pl.customize.menu.prepTime")} required={prepTimeNeeded} hint={tx("pl.customize.menu.prepTimeNote")} error={shown("prepTime")}>
+        <PlInput
+          aria-label={tx("pl.customize.menu.prepTime")}
+          placeholder={tx("pl.customize.menu.prepTimePlaceholder")}
+          maxLength={MAX_PREP_TIME_LENGTH}
+          value={settings.prepTime}
+          invalid={Boolean(shown("prepTime"))}
+          onChange={(e) => patch({ prepTime: e.target.value })}
+          onBlur={() => touch("prepTime")}
+        />
+      </PlField>
 
-      <FieldRow label={t("publicLink.menu.serviceAreas")}>
-        <div className="flex items-center gap-2">
-          <Input className="flex-1" value={settings.serviceAreas} onChange={(e) => patch({ serviceAreas: e.target.value })} />
-          <Button variant="secondary" size="sm" onClick={openAreas}>
-            {t("publicLink.menu.edit")}
-          </Button>
-        </div>
-      </FieldRow>
+      <div className="flex items-start gap-4">
+        <PlField
+          className="flex-1"
+          label={
+            <>
+              {tx("pl.customize.menu.serviceAreas")} <span className="text-[10px] font-normal leading-[10px]">{tx("pl.customize.menu.serviceAreasUnit")}</span>
+            </>
+          }
+          error={shown("serviceAreas")}
+        >
+          <PlInput
+            aria-label={tx("pl.customize.menu.serviceAreas")}
+            placeholder={tx("pl.customize.menu.serviceAreasPlaceholder")}
+            value={settings.serviceAreas}
+            invalid={Boolean(shown("serviceAreas"))}
+            onChange={(e) => patch({ serviceAreas: e.target.value })}
+            onBlur={() => touch("serviceAreas")}
+          />
+        </PlField>
+        <button
+          type="button"
+          onClick={openAreas}
+          className="shrink-0 rounded-[2px] text-[12px] font-semibold leading-[12px] text-[var(--pl-primary)] underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40"
+        >
+          {tx("publicLink.menu.edit")}
+        </button>
+      </div>
 
-      <FieldRow label={t("publicLink.menu.taxDisplay")}>
-        <>
-          <Select value={settings.taxDisplay} onChange={(e) => patch({ taxDisplay: e.target.value })}>
-            <option value="" disabled>
-              {t("publicLink.select.placeholder")}
-            </option>
-            {TAX_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {t(option.labelKey)}
-              </option>
-            ))}
-          </Select>
-          <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.menu.taxNote")}</p>
-        </>
-      </FieldRow>
+      <PlField label={tx("pl.customize.menu.taxDisplay")} hint={tx("pl.customize.menu.taxNote")} error={shown("taxDisplay")}>
+        <OptionSelect
+          label={tx("pl.customize.menu.taxDisplay")}
+          value={settings.taxDisplay}
+          options={TAX_OPTIONS}
+          labelFor={(id) => tx(TAX_LABEL[id])}
+          placeholder={tx("publicLink.select.placeholder")}
+          invalid={Boolean(shown("taxDisplay"))}
+          onChange={(taxDisplay) => patch({ taxDisplay })}
+          onBlur={() => touch("taxDisplay")}
+        />
+      </PlField>
 
       <Modal
         open={areasOpen}
         onClose={() => setAreasOpen(false)}
-        title={t("publicLink.menu.serviceAreasTitle")}
+        title={tx("publicLink.menu.serviceAreasTitle")}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setAreasOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={saveAreas}>{t("common.save")}</Button>
+            <PlButton variant="neutral" size="md" onClick={() => setAreasOpen(false)}>
+              {tx("common.cancel")}
+            </PlButton>
+            <PlButton size="md" disabled={Boolean(areasDraftError)} onClick={saveAreas}>
+              {tx("common.save")}
+            </PlButton>
           </div>
         }
       >
-        <div className="flex flex-col gap-1.5">
-          <Textarea
+        <div className="flex flex-col gap-2">
+          <PlTextarea
             rows={6}
             value={areasDraft}
+            invalid={Boolean(areasDraftError)}
             onChange={(e) => setAreasDraft(e.target.value)}
-            aria-label={t("publicLink.menu.serviceAreasTitle")}
+            aria-label={tx("publicLink.menu.serviceAreasTitle")}
           />
-          <p className="text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.menu.serviceAreasHint")}</p>
+          {areasDraftError ? <PlFieldError>{areasDraftError}</PlFieldError> : <p className={plText.hint}>{tx("publicLink.menu.serviceAreasHint")}</p>}
         </div>
       </Modal>
     </div>

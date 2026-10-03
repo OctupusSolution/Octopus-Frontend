@@ -42,11 +42,13 @@ export function usePreviewEdit(
   useEffect(() => () => setPreviewEdit(sectionId, null), [sectionId, setPreviewEdit]);
 }
 
-export const CARD = "flex flex-col gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-[18px] py-[15px]";
-export const CARD_TITLE = "text-[13px] font-semibold text-[var(--octo-text-primary)]";
-export const CARD_NOTE = "-mt-1.5 text-[11px] text-[var(--octo-text-muted)]";
+// Drawn with the builder's Figma palette (`--pl-*`, ui/kit.tsx) so the connected
+// panels read as the same screens as the sample ones.
+export const CARD = "flex flex-col gap-4 rounded-[12px] bg-[var(--pl-surface)] px-3 py-4 shadow-[shadow:var(--pl-shadow-card)]";
+export const CARD_TITLE = "text-[16px] font-medium leading-[16px] text-[var(--pl-text)]";
+export const CARD_NOTE = "-mt-2 text-[12px] leading-[1.4] text-[var(--pl-text-3)]";
 export const SMALL_BUTTON =
-  "inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-input)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[var(--pl-g300)] px-2.5 text-[12px] font-medium text-[var(--pl-text)] transition-colors hover:bg-[var(--pl-g50)] disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Runs a sync action with a busy flag; a rejection is already reported by the sync hook. */
 export function useBusy() {

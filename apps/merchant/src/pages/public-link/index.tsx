@@ -52,7 +52,7 @@ export function PublicLinkBuilderPage() {
   const { status, error } = publicLinkSync;
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
+    <div className="px-4 pb-8 pt-6 sm:px-6 sm:pt-8">
       {(error || status === "loading") && (
         <div
           role={error ? "alert" : "status"}

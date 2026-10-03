@@ -2,20 +2,26 @@
 // Module carries the enable card, homepage display, the primary action ("Open
 // waitlist drawer"), availability preview and the next-available label and
 // format; Setting carries queue method, party size, wait-time display, update
-// interval and auto-remove. Policies and Notifications, named but not drawn in
-// the frames, hold the waitlist's rules and its guest/staff alerts.
+// interval, the notification channels and auto-remove. Policies and
+// Notifications, named but not drawn in the frames, hold the waitlist's rules
+// and its guest/staff alerts.
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
-import { Button, Input, Select, Textarea } from "@ui/primitives";
-import { useI18n } from "@/app/providers/i18n-provider";
 import type { SiteAction, SiteDraft, WaitlistSettings } from "../../_shared/site-draft";
-import { CheckCard, FieldRow, NumberedHeading, RadioCard, ToggleRow, InspectorTabs } from "./controls";
+import { usePlText } from "../../_shared/texts";
+import { rangeFailures, rules, useTouched, useValidation } from "../../_shared/validation";
+import { PlField, PlInput, PlTextarea } from "../../ui/kit";
+import { CheckCard, NumberedHeading, RadioCard, ToggleRow, InspectorTabs } from "./controls";
+import { digitsOnly, EnableCard, FieldGroup, MiniToggleRow, OptionSelect, SelectCard, SoftButton, SubField } from "./inspector-parts";
 
 const TARGET_IDS = ["waitlist", "reservations", "menu", "contact"] as const;
 const UPDATE_INTERVAL_OPTIONS = ["5", "10", "15"] as const;
 const AUTO_REMOVE_OPTIONS = ["10", "20", "30"] as const;
 const FORMAT_OPTIONS = ["30min", "1h"] as const;
 const MAX_WAIT_OPTIONS: readonly WaitlistSettings["maxWaitMinutes"][] = ["30", "60", "90"];
+
+const PARTY_BOUNDS = { min: 1, max: 100 } as const;
+const MAX_LABEL_LENGTH = 40;
+const MAX_POLICY_NOTE_LENGTH = 300;
 
 const TABS = [
   { id: "module", labelKey: "publicLink.inspector.module" },
@@ -26,259 +32,282 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** Module scope: a component redefined on every render would remount on every
- *  keystroke elsewhere in this panel. Opens on a real placeholder rather than a
- *  blank row. */
-function OptionSelect<T extends string>({
-  value,
-  options,
-  labelFor,
-  onChange,
-}: {
-  value: string;
-  options: readonly T[];
-  labelFor: (id: T) => string;
-  onChange: (id: T) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <Select value={value} onChange={(e) => onChange(e.target.value as T)}>
-      <option value="" disabled>
-        {t("publicLink.select.placeholder")}
-      </option>
-      {options.map((id) => (
-        <option key={id} value={id}>
-          {labelFor(id)}
-        </option>
-      ))}
-    </Select>
-  );
-}
-
 export function WaitlistInspector({ draft, dispatch }: { draft: SiteDraft; dispatch: (action: SiteAction) => void }) {
-  const { t } = useI18n();
+  const tx = usePlText();
+  const { check, message } = useValidation();
+  const { touched, touch } = useTouched();
   const [tab, setTab] = useState<TabId>("module");
   const settings = draft.sectionSettings.waitlist;
+  const placeholder = tx("publicLink.select.placeholder");
+
+  const party = rangeFailures(settings.minParty, settings.maxParty, PARTY_BOUNDS);
+  const errors = {
+    primaryAction: check(settings.primaryAction, [rules.required()]),
+    // The label is printed beside the estimated wait, so it is needed only
+    // while that preview is on.
+    label: check(settings.nextAvailableLabel, [...(settings.availabilityPreview ? [rules.required()] : []), rules.maxLength(MAX_LABEL_LENGTH)]),
+    format: check(settings.format, [rules.required()]),
+    minParty: message(party.min),
+    maxParty: message(party.max),
+    updateInterval: check(settings.updateInterval, [rules.required()]),
+    autoRemove: check(settings.autoRemove, [rules.required()]),
+    maxWait: check(settings.maxWaitMinutes, [rules.required()]),
+    policyNote: check(settings.policyNote, [rules.maxLength(MAX_POLICY_NOTE_LENGTH)]),
+  };
+  const shown = (name: keyof typeof errors) => (touched(name) ? errors[name] : undefined);
 
   function patch(patch: Partial<WaitlistSettings>) {
     dispatch({ type: "patchSection", section: "waitlist", patch });
   }
 
+  const channels = (
+    <div className="flex flex-col gap-2">
+      <MiniToggleRow label={tx("pl.customize.insp.whatsapp")} checked={settings.notifyWhatsapp} onChange={() => patch({ notifyWhatsapp: !settings.notifyWhatsapp })} />
+      <MiniToggleRow label={tx("pl.customize.insp.sms")} checked={settings.notifySms} onChange={() => patch({ notifySms: !settings.notifySms })} />
+      <MiniToggleRow label={tx("pl.customize.insp.email")} checked={settings.notifyEmail} onChange={() => patch({ notifyEmail: !settings.notifyEmail })} />
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <InspectorTabs
-        items={TABS.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
+        items={TABS.map((entry) => ({ id: entry.id, label: tx(entry.labelKey) }))}
         value={tab}
         onChange={(id) => setTab(id as TabId)}
       />
 
       {tab === "module" && (
         <div className="flex flex-col gap-4">
-          <NumberedHeading n={1} title={t("publicLink.waitlist.waitlistModule")} note={t("publicLink.waitlist.waitlistModuleNote")} />
+          <NumberedHeading n={1} title={tx("pl.customize.wl.module")} note={tx("pl.customize.wl.moduleNote")} />
 
-          <div className="flex flex-col gap-2.5 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2.5">
-            <ToggleRow
-              label={t("publicLink.waitlist.enableWaitlist")}
-              note={t("publicLink.waitlist.enableWaitlistNote")}
+          <div className="flex flex-col gap-3">
+            <EnableCard
+              title={tx("pl.customize.wl.enable")}
+              note={tx("pl.customize.wl.enableNote")}
+              status={tx("pl.customize.wl.active")}
               checked={settings.enabled}
               onChange={() => patch({ enabled: !settings.enabled })}
             />
-            {settings.enabled && (
-              <span className="flex items-center gap-1.5 text-[11.5px] text-[#16a34a]">
-                <CheckCircle2 size={13} />
-                {t("publicLink.reservations.moduleActive")}
-              </span>
-            )}
+            <SoftButton onClick={() => setTab("setting")}>{tx("pl.customize.insp.moduleSetting")}</SoftButton>
           </div>
 
-          <Button
-            variant="ghost"
-            className="w-full justify-center bg-[#0D6EFD]/5 text-[#0D6EFD] hover:bg-[#0D6EFD]/10"
-            onClick={() => setTab("setting")}
-          >
-            {t("publicLink.waitlist.moduleSetting")}
-          </Button>
-
-          <NumberedHeading n={2} title={t("publicLink.reservations.menuDisplay")} note={t("publicLink.reservations.menuDisplayNote")} />
-          <div className="grid grid-cols-2 gap-3">
+          <NumberedHeading n={2} title={tx("pl.customize.insp.displayOnHomepage")} note={tx("pl.customize.res.displayNote")} />
+          <div className="flex flex-col gap-3">
             <CheckCard
-              title={t("publicLink.reservations.reservationWidget")}
-              note={t("publicLink.reservations.reservationWidgetNote")}
+              title={tx("pl.customize.insp.widget")}
+              note={tx("pl.customize.insp.widgetNote")}
               checked={settings.homepageDisplay === "widget"}
               onToggle={() => patch({ homepageDisplay: "widget" })}
             />
             <CheckCard
-              title={t("publicLink.reservations.buttonLink")}
-              note={t("publicLink.reservations.buttonLinkNote")}
+              title={tx("pl.customize.insp.button")}
+              note={tx("pl.customize.insp.buttonNote")}
               checked={settings.homepageDisplay === "button"}
               onToggle={() => patch({ homepageDisplay: "button" })}
             />
           </div>
 
-          <NumberedHeading n={3} title={t("publicLink.waitlist.primaryAction")} note={t("publicLink.waitlist.primaryActionNote")} />
-          <OptionSelect
+          <NumberedHeading n={3} title={tx("pl.customize.insp.primaryAction")} note={tx("pl.customize.wl.primaryNote")} />
+          <SelectCard
+            label={tx("pl.customize.insp.primaryAction")}
             value={settings.primaryAction}
-            options={TARGET_IDS}
-            labelFor={(id) => t(id === "waitlist" ? "publicLink.waitlist.openDrawer" : `publicLink.target.${id}`)}
+            placeholder={placeholder}
+            invalid={Boolean(shown("primaryAction"))}
+            options={TARGET_IDS.map((id) =>
+              id === "waitlist"
+                ? { id, title: tx("pl.customize.wl.openDrawer"), note: tx("pl.customize.wl.openDrawerNote") }
+                : { id, title: tx(`publicLink.target.${id}`), note: tx("pl.customize.insp.targetNote") }
+            )}
             onChange={(primaryAction) => patch({ primaryAction })}
+            onBlur={() => touch("primaryAction")}
           />
 
           <ToggleRow
-            label={t("publicLink.reservations.availabilityPreview")}
-            note={t("publicLink.waitlist.availabilityNote")}
+            label={tx("pl.customize.insp.availability")}
+            note={tx("pl.customize.wl.availabilityNote")}
             checked={settings.availabilityPreview}
             onChange={() => patch({ availabilityPreview: !settings.availabilityPreview })}
           />
 
-          <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.reservations.showNextAvailable")}</p>
-          <div className="-mt-2 grid grid-cols-2 gap-3">
-            <FieldRow label={t("publicLink.reservations.label")}>
-              <Input
-                placeholder={t("publicLink.waitlist.labelPlaceholder")}
-                value={settings.nextAvailableLabel}
-                onChange={(e) => patch({ nextAvailableLabel: e.target.value })}
-              />
-            </FieldRow>
-            <FieldRow label={t("publicLink.waitlist.format")}>
-              <OptionSelect
-                value={settings.format}
-                options={FORMAT_OPTIONS}
-                labelFor={(id) => t(`publicLink.waitlist.format.${id}`)}
-                onChange={(format) => patch({ format })}
-              />
-            </FieldRow>
-          </div>
+          <FieldGroup label={tx("pl.customize.insp.nextAvailable")}>
+            <div className="grid grid-cols-2 items-start gap-3">
+              <SubField label={tx("pl.customize.insp.label")} error={shown("label")}>
+                <PlInput
+                  aria-label={tx("pl.customize.insp.label")}
+                  placeholder={tx("pl.customize.insp.labelPlaceholder")}
+                  maxLength={MAX_LABEL_LENGTH}
+                  value={settings.nextAvailableLabel}
+                  invalid={Boolean(shown("label"))}
+                  onChange={(e) => patch({ nextAvailableLabel: e.target.value })}
+                  onBlur={() => touch("label")}
+                />
+              </SubField>
+              <SubField label={tx("pl.customize.wl.format")} error={shown("format")}>
+                <OptionSelect
+                  label={tx("pl.customize.wl.format")}
+                  value={settings.format}
+                  options={FORMAT_OPTIONS}
+                  labelFor={(id) => tx(`pl.customize.wl.format.${id}`)}
+                  placeholder={placeholder}
+                  invalid={Boolean(shown("format"))}
+                  onChange={(format) => patch({ format })}
+                  onBlur={() => touch("format")}
+                />
+              </SubField>
+            </div>
+          </FieldGroup>
         </div>
       )}
 
       {tab === "setting" && (
         <div className="flex flex-col gap-4">
-          <FieldRow label={t("publicLink.waitlist.queueMethod")}>
-            <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-4">
+            <span className="text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">{tx("pl.customize.wl.queueMethod")}</span>
+            <div className="flex flex-col gap-3">
               <RadioCard
-                title={t("publicLink.waitlist.fifo")}
-                note={t("publicLink.waitlist.fifoNote")}
+                title={tx("pl.customize.wl.fifo")}
+                note={tx("pl.customize.wl.fifoNote")}
                 selected={settings.queueMethod === "fifo"}
                 onSelect={() => patch({ queueMethod: "fifo" })}
               />
               <RadioCard
-                title={t("publicLink.waitlist.priority")}
-                note={t("publicLink.waitlist.priorityNote")}
+                title={tx("pl.customize.wl.priority")}
+                note={tx("pl.customize.wl.priorityNote")}
                 selected={settings.queueMethod === "priority"}
                 onSelect={() => patch({ queueMethod: "priority" })}
               />
             </div>
-          </FieldRow>
+          </div>
 
-          <FieldRow label={t("publicLink.reservations.partySize")}>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                type="number"
-                min={1}
-                label={t("publicLink.reservations.min")}
-                value={settings.minParty}
-                onChange={(e) => patch({ minParty: e.target.value })}
-              />
-              <Input
-                type="number"
-                min={1}
-                label={t("publicLink.reservations.max")}
-                value={settings.maxParty}
-                onChange={(e) => patch({ maxParty: e.target.value })}
-              />
+          <FieldGroup label={tx("pl.customize.insp.partySize")}>
+            <div className="grid grid-cols-2 items-start gap-3">
+              <SubField label={tx("pl.customize.insp.min")} error={shown("minParty")}>
+                <PlInput
+                  inputMode="numeric"
+                  aria-label={`${tx("pl.customize.insp.partySize")} — ${tx("pl.customize.insp.min")}`}
+                  placeholder={tx("pl.customize.insp.enterNumber")}
+                  value={settings.minParty}
+                  invalid={Boolean(shown("minParty"))}
+                  onChange={(e) => patch({ minParty: digitsOnly(e.target.value) })}
+                  onBlur={() => touch("minParty")}
+                />
+              </SubField>
+              <SubField label={tx("pl.customize.insp.max")} error={shown("maxParty")}>
+                <PlInput
+                  inputMode="numeric"
+                  aria-label={`${tx("pl.customize.insp.partySize")} — ${tx("pl.customize.insp.max")}`}
+                  placeholder={tx("pl.customize.insp.enterNumber")}
+                  value={settings.maxParty}
+                  invalid={Boolean(shown("maxParty"))}
+                  onChange={(e) => patch({ maxParty: digitsOnly(e.target.value) })}
+                  onBlur={() => touch("maxParty")}
+                />
+              </SubField>
             </div>
-          </FieldRow>
+          </FieldGroup>
 
           <ToggleRow
-            label={t("publicLink.waitlist.waitTimeDisplay")}
-            note={t("publicLink.waitlist.waitTimeDisplayNote")}
+            label={tx("pl.customize.wl.waitTime")}
+            note={tx("pl.customize.wl.waitTimeNote")}
             checked={settings.showWaitTime}
             onChange={() => patch({ showWaitTime: !settings.showWaitTime })}
           />
 
-          <FieldRow label={t("publicLink.waitlist.updateInterval")}>
+          <SubField label={tx("pl.customize.wl.updateInterval")} error={shown("updateInterval")}>
             <OptionSelect
+              label={tx("pl.customize.wl.updateInterval")}
               value={settings.updateInterval}
               options={UPDATE_INTERVAL_OPTIONS}
-              labelFor={(id) => t(`publicLink.waitlist.updateInterval.${id}`)}
+              labelFor={(id) => tx(`publicLink.waitlist.updateInterval.${id}`)}
+              placeholder={placeholder}
+              invalid={Boolean(shown("updateInterval"))}
               onChange={(updateInterval) => patch({ updateInterval })}
+              onBlur={() => touch("updateInterval")}
             />
-          </FieldRow>
+          </SubField>
 
-          <FieldRow label={t("publicLink.waitlist.autoRemove")}>
-            <>
-              <OptionSelect
-                value={settings.autoRemove}
-                options={AUTO_REMOVE_OPTIONS}
-                labelFor={(id) => t(`publicLink.waitlist.autoRemove.${id}`)}
-                onChange={(autoRemove) => patch({ autoRemove })}
-              />
-              <p className="mt-1 text-[11px] text-[var(--octo-text-muted)]">{t("publicLink.waitlist.autoRemoveNote")}</p>
-            </>
-          </FieldRow>
+          <div className="flex flex-col gap-2">
+            <span className="text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">{tx("pl.customize.wl.notifications")}</span>
+            {channels}
+          </div>
+
+          <SubField label={tx("pl.customize.wl.autoRemove")} note={tx("pl.customize.wl.autoRemoveNote")} error={shown("autoRemove")}>
+            <OptionSelect
+              label={tx("pl.customize.wl.autoRemove")}
+              value={settings.autoRemove}
+              options={AUTO_REMOVE_OPTIONS}
+              labelFor={(id) => tx(`publicLink.waitlist.autoRemove.${id}`)}
+              placeholder={placeholder}
+              invalid={Boolean(shown("autoRemove"))}
+              onChange={(autoRemove) => patch({ autoRemove })}
+              onBlur={() => touch("autoRemove")}
+            />
+          </SubField>
         </div>
       )}
 
       {tab === "policies" && (
         <div className="flex flex-col gap-4">
-          <FieldRow label={t("publicLink.waitlist.maxWait")}>
+          <PlField label={tx("publicLink.waitlist.maxWait")} error={shown("maxWait")}>
             <OptionSelect
+              label={tx("publicLink.waitlist.maxWait")}
               value={settings.maxWaitMinutes}
               options={MAX_WAIT_OPTIONS}
-              labelFor={(id) => t(`publicLink.waitlist.maxWait.${id}`)}
+              labelFor={(id) => tx(`publicLink.waitlist.maxWait.${id}`)}
+              placeholder={placeholder}
+              invalid={Boolean(shown("maxWait"))}
               onChange={(maxWaitMinutes) => patch({ maxWaitMinutes })}
+              onBlur={() => touch("maxWait")}
             />
-          </FieldRow>
+          </PlField>
 
           <ToggleRow
-            label={t("publicLink.waitlist.requirePhone")}
-            note={t("publicLink.waitlist.requirePhoneNote")}
+            label={tx("publicLink.waitlist.requirePhone")}
+            note={tx("publicLink.waitlist.requirePhoneNote")}
             checked={settings.requirePhone}
             onChange={() => patch({ requirePhone: !settings.requirePhone })}
           />
 
           <ToggleRow
-            label={t("publicLink.waitlist.allowSelfCancel")}
-            note={t("publicLink.waitlist.allowSelfCancelNote")}
+            label={tx("publicLink.waitlist.allowSelfCancel")}
+            note={tx("publicLink.waitlist.allowSelfCancelNote")}
             checked={settings.allowSelfCancel}
             onChange={() => patch({ allowSelfCancel: !settings.allowSelfCancel })}
           />
 
-          <FieldRow label={t("publicLink.waitlist.policyNote")}>
-            <Textarea
+          <PlField label={tx("publicLink.waitlist.policyNote")} error={shown("policyNote")}>
+            <PlTextarea
               rows={3}
-              placeholder={t("publicLink.waitlist.policyNotePlaceholder")}
+              aria-label={tx("publicLink.waitlist.policyNote")}
+              placeholder={tx("publicLink.waitlist.policyNotePlaceholder")}
               value={settings.policyNote}
+              invalid={Boolean(shown("policyNote"))}
               onChange={(e) => patch({ policyNote: e.target.value })}
+              onBlur={() => touch("policyNote")}
             />
-          </FieldRow>
+          </PlField>
         </div>
       )}
 
       {tab === "notifications" && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2.5">
-            <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("publicLink.waitlist.notifications")}</p>
-            <ToggleRow label={t("publicLink.waitlist.whatsapp")} checked={settings.notifyWhatsapp} onChange={() => patch({ notifyWhatsapp: !settings.notifyWhatsapp })} />
-            <ToggleRow label={t("publicLink.waitlist.sms")} checked={settings.notifySms} onChange={() => patch({ notifySms: !settings.notifySms })} />
-            <ToggleRow label={t("publicLink.waitlist.email")} checked={settings.notifyEmail} onChange={() => patch({ notifyEmail: !settings.notifyEmail })} />
-          </div>
+          <FieldGroup label={tx("pl.customize.wl.notifications")}>{channels}</FieldGroup>
 
           <ToggleRow
-            label={t("publicLink.waitlist.notifyReady")}
-            note={t("publicLink.waitlist.notifyReadyNote")}
+            label={tx("publicLink.waitlist.notifyReady")}
+            note={tx("publicLink.waitlist.notifyReadyNote")}
             checked={settings.notifyReady}
             onChange={() => patch({ notifyReady: !settings.notifyReady })}
           />
           <ToggleRow
-            label={t("publicLink.waitlist.reminder")}
-            note={t("publicLink.waitlist.reminderNote")}
+            label={tx("publicLink.waitlist.reminder")}
+            note={tx("publicLink.waitlist.reminderNote")}
             checked={settings.reminderEnabled}
             onChange={() => patch({ reminderEnabled: !settings.reminderEnabled })}
           />
           <ToggleRow
-            label={t("publicLink.reservations.notifyStaff")}
-            note={t("publicLink.waitlist.notifyStaffNote")}
+            label={tx("publicLink.reservations.notifyStaff")}
+            note={tx("publicLink.waitlist.notifyStaffNote")}
             checked={settings.notifyStaff}
             onChange={() => patch({ notifyStaff: !settings.notifyStaff })}
           />

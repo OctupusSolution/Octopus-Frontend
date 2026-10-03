@@ -10,9 +10,9 @@
 // scope="col">` headers is what that step's row of toggles needs to stay
 // labelled, and a flex div wrapping <td>s is not valid HTML.
 import { useState, type ReactNode } from "react";
-import { GripVertical } from "lucide-react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { PlIcon } from "./kit";
 
 export interface ReorderListProps<T> {
   items: readonly T[];
@@ -74,9 +74,9 @@ export function ReorderList<T>({ items, getId, onReorder, renderRow, getLabel, c
           e.preventDefault();
           moveTo(id, index + (e.key === "ArrowUp" ? -1 : 1));
         }}
-        className="shrink-0 cursor-grab rounded p-0.5 text-[var(--octo-text-faint)] transition-colors hover:text-[var(--octo-text-secondary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 active:cursor-grabbing"
+        className="grid h-6 w-6 shrink-0 cursor-grab place-items-center rounded text-[var(--pl-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 active:cursor-grabbing"
       >
-        <GripVertical size={13} />
+        <PlIcon name="drag-grip" width={7.5} height={12} />
       </button>
     );
 
@@ -112,12 +112,27 @@ export function ReorderList<T>({ items, getId, onReorder, renderRow, getLabel, c
   }
 
   return (
-    <ul className={clsx("flex flex-col gap-1.5", className)}>
+    <ul className={clsx("flex flex-col", className)}>
       {rows.map((row) => (
         <li key={row.id} {...row.dragProps} className={clsx("flex items-center gap-2 transition-opacity", row.dimmed && "opacity-40")}>
           {row.content}
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The dashed "Drag to reorder …" strip the frames put under every list. */
+export function ReorderHint({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={clsx(
+        "flex h-11 items-center justify-center gap-3 rounded-[8px] border border-dashed border-[var(--pl-g300)] bg-[var(--pl-g50)] px-[10px] text-[14px] font-normal leading-[14px] text-[var(--pl-text-3)]",
+        className
+      )}
+    >
+      <PlIcon name="drag-move" />
+      {children}
+    </div>
   );
 }

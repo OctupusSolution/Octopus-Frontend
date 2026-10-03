@@ -112,10 +112,53 @@
   --octo-tone-completed-bg: rgb(0 154 57 / 0.1);
   --octo-tone-completed-text: #00832f;
   --octo-tone-completed-dot: #009a39;
+
+  /* Public Link Builder — the Figma file's own palette (Octopus-UI-Design,
+     "Public Link" frames). Kept apart from --octo-* because those frames use
+     the slate scale rather than the console's neutral one. */
+  --pl-text: #0f172a;
+  --pl-text-2: #687280;
+  --pl-text-3: #58606c;
+  --pl-primary: #0d6efd;
+  --pl-primary-text: #0058da;
+  --pl-primary-deep: #004bb9;
+  --pl-primary-soft: #f5f9ff;
+  --pl-info-bg: #f0f4ff;
+  --pl-surface: #ffffff;
+  --pl-g50: #fbfafc;
+  --pl-g100: #f1f5f9;
+  --pl-g200: #e2e8f0;
+  --pl-g300: #cbd5e1;
+  --pl-success: #009a39;
+  --pl-success-soft: #f4fff8;
+  --pl-error: #d30202;
+  --pl-error-soft: #fef0f0;
+  --pl-shadow-card: 0 0 8px 0 rgb(0 0 0 / 0.05);
+  --pl-shadow-raised: 0 0 12px 0 rgb(0 0 0 / 0.12);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
+
+  --pl-text: #e9ebf2;
+  --pl-text-2: #a7adbb;
+  --pl-text-3: #8b93a3;
+  --pl-primary: #0d6efd;
+  --pl-primary-text: #6ea8ff;
+  --pl-primary-deep: #8bb9ff;
+  --pl-primary-soft: #16233a;
+  --pl-info-bg: #16233a;
+  --pl-surface: #1a1f2b;
+  --pl-g50: #1d2330;
+  --pl-g100: #232a37;
+  --pl-g200: #2a3140;
+  --pl-g300: #333b4d;
+  --pl-success: #4ade80;
+  --pl-success-soft: rgb(0 154 57 / 0.15);
+  --pl-error: #f87171;
+  --pl-error-soft: rgb(211 2 2 / 0.16);
+  --pl-shadow-card: 0 0 8px 0 rgb(0 0 0 / 0.3);
+  --pl-shadow-raised: 0 0 12px 0 rgb(0 0 0 / 0.4);
 
   --octo-page-bg: #0d1017;
   --octo-app-bg: #0d1017;

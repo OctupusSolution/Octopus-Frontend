@@ -7,21 +7,30 @@
 // the preview's own switcher can never disagree about what is on screen.
 import { useState } from "react";
 import clsx from "clsx";
-import { Info, Monitor, Smartphone } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { themeThumb } from "@/shared/lib/storefront-assets";
 import type { PreviewDevice } from "@/widgets/storefront-preview";
 import { previewModelFromSite } from "../_shared/preview-model";
 import { SITE_THEMES, THEME_FILTERS, type SiteTheme } from "../_shared/theme-catalog";
 import { DeviceFrame } from "../ui/device-frame";
+import { PlButton, PlDeviceSwitch, PlInfoBanner } from "../ui/kit";
 import { SitePreview } from "../ui/site-preview";
 import type { StepProps } from "../_shared/steps";
+import { usePlText } from "../_shared/texts";
 import { ServerThemeGrid, StarterCard } from "./connected/theme-panel";
 
-const CARD_DEVICES = [
-  { id: "desktop", Icon: Monitor },
-  { id: "mobile", Icon: Smartphone },
-] as const;
+const CARD_DEVICES: readonly PreviewDevice[] = ["desktop", "mobile"];
+
+/** A filter chip as the frames draw it: 8px padding, 4px radius, 14px medium. */
+export const THEME_CHIP =
+  "shrink-0 rounded-[4px] border p-2 text-[14px] font-medium leading-[14px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40";
+export const THEME_CHIP_ON = "border-[var(--pl-primary)] bg-[var(--pl-primary-soft)] text-[var(--pl-primary)]";
+export const THEME_CHIP_OFF = "border-[var(--pl-g200)] bg-[var(--pl-surface)] text-[var(--pl-text-2)] hover:border-[var(--pl-g300)]";
+/** The bar the chips sit in: 48px, grey-50 on a grey-200 hairline. */
+export const THEME_CHIP_BAR =
+  "octo-scroll flex min-h-12 items-center justify-between gap-2 overflow-x-auto rounded-[12px] border border-[var(--pl-g200)] bg-[var(--pl-g50)] p-2";
+/** Three 171px cards on a 24px gap. */
+export const THEME_GRID = "grid grid-cols-2 gap-6 sm:grid-cols-3";
 
 export type ThemeCardProps = Parameters<typeof ThemeCard>[0];
 
@@ -65,70 +74,51 @@ function ThemeCard({
   return (
     <div
       className={clsx(
-        "flex flex-col overflow-hidden rounded-xl border bg-[var(--octo-card)] transition-all",
-        active ? "border-[#0D6EFD] ring-1 ring-[#0D6EFD]/20" : "border-[var(--octo-border-card)]"
+        "flex min-w-0 flex-col gap-3 overflow-hidden rounded-[12px] border bg-[var(--pl-g50)] pb-2 transition-colors",
+        active ? "border-[var(--pl-primary)]" : "border-[var(--pl-g300)]"
       )}
     >
       <button
         type="button"
         onClick={onSelect}
         aria-label={t(theme.nameKey)}
-        className="relative block focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40"
+        className="relative block h-[137px] w-full overflow-hidden border-b-[0.5px] border-[var(--pl-g200)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40"
       >
-        <img src={thumb ?? undefined} alt="" className="h-28 w-full object-cover" />
+        <img src={thumb ?? undefined} alt="" className="h-full w-full object-cover object-top" />
         {theme.recommended && (
-          <span className="absolute start-2 top-2 rounded-full bg-[#0D6EFD] px-2 py-0.5 text-[10px] font-medium text-white">
+          <span className="absolute start-2 top-2 rounded-[4px] bg-[var(--pl-primary)] p-1 text-[8px] font-medium leading-[8px] text-white drop-shadow-[0_0_6px_rgba(0,0,0,0.12)]">
             {t("publicLink.theme.recommended")}
           </span>
         )}
       </button>
 
-      <div className="flex flex-1 flex-col gap-1 px-3.5 pb-3.5 pt-3">
-        <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t(theme.nameKey)}</p>
-        <p className="text-[12px] text-[var(--octo-text-muted)]">{t(theme.descKey)}</p>
+      <div className="flex flex-1 flex-col gap-2 px-2">
+        <div className="flex flex-col gap-2">
+          <p className="truncate text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">{t(theme.nameKey)}</p>
+          <p className="truncate text-[10px] font-normal leading-[10px] text-[var(--pl-text-3)]">{t(theme.descKey)}</p>
+        </div>
         {swatches && swatches.length > 0 && (
-          <span className="mt-1 flex gap-1" aria-hidden>
+          <span className="flex gap-1" aria-hidden>
             {swatches.map((color) => (
-              <span key={color} className="h-4 w-4 rounded-[4px] border border-[var(--octo-border-card)]" style={{ background: color }} />
+              <span key={color} className="h-3 w-3 rounded-[3px] border border-[var(--pl-g200)]" style={{ background: color }} />
             ))}
           </span>
         )}
 
-        <div className="mt-auto flex items-center gap-2 pt-2">
-          <div className="flex shrink-0 overflow-hidden rounded-[9px] border border-[var(--octo-border-input)]">
-            {CARD_DEVICES.map(({ id, Icon }) => {
-              const on = active && previewDevice === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  aria-label={`${t(theme.nameKey)} — ${t(`publicLink.device.${id}`)}`}
-                  aria-pressed={on}
-                  onClick={() => {
-                    onSelect();
-                    onPreviewDevice(id);
-                  }}
-                  className={clsx(
-                    "grid h-8 w-8 place-items-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40",
-                    on ? "bg-[#0D6EFD]/10 text-[#0D6EFD]" : "text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]",
-                    id === "mobile" && "border-s border-[var(--octo-border-input)]"
-                  )}
-                >
-                  <Icon size={14} />
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={onSelect}
-            className={clsx(
-              "h-8 flex-1 rounded-[9px] px-3 text-[12px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-              active ? "bg-[#0D6EFD] text-white" : "border border-[#0D6EFD] text-[#0D6EFD] hover:bg-[#0D6EFD]/5"
-            )}
-          >
+        <div className="mt-auto flex items-start gap-2">
+          <PlDeviceSwitch
+            size="sm"
+            devices={CARD_DEVICES}
+            value={active && CARD_DEVICES.includes(previewDevice) ? previewDevice : null}
+            onChange={(id) => {
+              onSelect();
+              onPreviewDevice(id);
+            }}
+            label={(id) => `${t(theme.nameKey)} — ${t(`publicLink.device.${id}`)}`}
+          />
+          <PlButton size="xs" variant={active ? "primary" : "outline"} onClick={onSelect} aria-pressed={active} className="min-w-0 flex-1 !px-1">
             {t("publicLink.theme.use")}
-          </button>
+          </PlButton>
         </div>
       </div>
     </div>
@@ -137,6 +127,8 @@ function ThemeCard({
 
 export function ThemeStep({ draft, dispatch, publicLinkSync }: StepProps) {
   const { t, locale } = useI18n();
+  // Above the connected early return: hooks must run in the same order on every render.
+  const tx = usePlText();
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const activeFilter = draft.theme.filter;
   const catalogues = publicLinkSync.server?.catalogues ?? null;
@@ -145,7 +137,7 @@ export function ThemeStep({ draft, dispatch, publicLinkSync }: StepProps) {
   if (publicLinkSync.connected && catalogues && catalogues.themes.length > 0) {
     return (
       <div className="flex flex-col gap-4">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
+        <div className="grid items-start gap-6 lg:grid-cols-2">
           <ServerThemeGrid
             sync={publicLinkSync}
             draft={draft}
@@ -176,28 +168,27 @@ export function ThemeStep({ draft, dispatch, publicLinkSync }: StepProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_520px]">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2">
+      {/* Two 562px columns on a 24px gap. */}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className={THEME_CHIP_BAR}>
             {THEME_FILTERS.map((filter) => {
               const active = activeFilter === filter.id;
               return (
                 <button
                   key={filter.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => dispatch({ type: "patchTheme", patch: { filter: filter.id } })}
-                  className={clsx(
-                    "rounded-[9px] border px-3 py-[7px] text-[12px] font-medium transition-colors",
-                    active ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-card)] text-[var(--octo-text-muted)]"
-                  )}
+                  className={clsx(THEME_CHIP, active ? THEME_CHIP_ON : THEME_CHIP_OFF)}
                 >
-                  {t(filter.labelKey)}
+                  {filter.id === "all" ? tx("pl.theme.allThemes") : t(filter.labelKey)}
                 </button>
               );
             })}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className={THEME_GRID}>
             {visibleThemes.map((theme) => (
               <ThemeCard
                 key={theme.id}
@@ -222,10 +213,7 @@ export function ThemeStep({ draft, dispatch, publicLinkSync }: StepProps) {
       </div>
 
       {/* Full width under both columns, as the frame places it. */}
-      <p className="flex items-center gap-1.5 rounded-[10px] bg-[#0D6EFD]/5 px-3 py-2.5 text-[12px] text-[#0D6EFD]">
-        <Info size={14} className="shrink-0" />
-        {t("publicLink.theme.keepsContent")}
-      </p>
+      <PlInfoBanner>{t("publicLink.theme.keepsContent")}</PlInfoBanner>
     </div>
   );
 }

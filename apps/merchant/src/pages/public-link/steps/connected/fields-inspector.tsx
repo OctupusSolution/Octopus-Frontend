@@ -10,9 +10,13 @@
 //
 // A failed image upload keeps the previous image and says so; it never blocks
 // saving the rest of the section.
+//
+// What the catalogue declares about a field (required, max length, number
+// bounds) and what a link needs to work (a full address, a valid email) is
+// checked here: a field reports its error once it was left, and Save is refused
+// — every error shown — while one remains.
 import { useEffect, useRef, useState } from "react";
-import { Upload, X } from "lucide-react";
-import { Button, Input, Segmented, Select, Textarea } from "@ui/primitives";
+import { X } from "lucide-react";
 import type {
   CatalogueFieldDefinition,
   CatalogueSectionType,
@@ -31,8 +35,10 @@ import type { SiteMediaPurpose } from "@/shared/api/media";
 import { readLogoFile } from "@/pages/onboarding/_shared/logo-file";
 import { isRichTextEmpty } from "../../_shared/rich-text";
 import { humanizeKey, usePlText } from "../../_shared/texts";
+import { firstFailure, rules, useTouched, useValidation, type RuleFailure } from "../../_shared/validation";
+import { PlButton, PlFieldError, PlInput, PlSelect, PlTextarea, plText } from "../../ui/kit";
 import { Switch } from "../../ui/switch";
-import { FieldRow } from "../customize/controls";
+import { FieldRow, IMAGE_ACCEPT, ImageSlot, imageFileFailure, SegmentedChips, ToggleRow } from "../customize/controls";
 import { orderedPages, pageTitle, SMALL_BUTTON, useBusy, usePreviewEdit } from "./common";
 import { ALL_PURPOSES, MediaLibraryButton } from "./media-library";
 import { RichTextEditor } from "./rich-text-editor";
@@ -45,6 +51,61 @@ const newId = () =>
     ? crypto.randomUUID()
     : "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, () => Math.floor(Math.random() * 16).toString(16));
 
+const HEX = /^#[0-9a-f]{6}$/i;
+const PHONE = /^\+?[0-9\s().-]{6,20}$/;
+const REQUIRED: RuleFailure = { key: "pl.v.required" };
+const REMOVE_BUTTON =
+  "grid h-6 w-6 shrink-0 place-items-center rounded text-[var(--pl-text-3)] transition-colors hover:text-[var(--pl-error)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40";
+
+// ---- validation ---------------------------------------------------------------------------------
+
+function linkFailure(target: SectionLinkTarget): RuleFailure | null {
+  if (target.kind === "external") return firstFailure(target.url, [rules.required(), rules.url()]);
+  if (target.kind === "email") return firstFailure(target.address, [rules.required(), rules.email()]);
+  if (target.kind === "phone") {
+    if (!target.number.trim()) return REQUIRED;
+    return PHONE.test(target.number.trim()) ? null : { key: "pl.navigation.phoneInvalid" };
+  }
+  return null;
+}
+
+/** What a field's own value breaks, or null. A translated field is "filled" when any language
+ *  has it (the other languages are edited one at a time); the length cap is per language. */
+export function fieldFailure(field: CatalogueFieldDefinition, value: SectionFieldValue | undefined, lang: string): RuleFailure | null {
+  const kind = kindOf(field);
+  if (kind === "toggle") return null;
+  if (kind === "text") {
+    const text = value && value.kind === "text" ? value.text : {};
+    if (field.required && !Object.values(text).some((entry) => entry && entry.trim())) return REQUIRED;
+    return field.maxLength ? firstFailure(text[lang] ?? "", [rules.maxLength(field.maxLength)]) : null;
+  }
+  if (kind === "number") {
+    if (!value || value.kind !== "number") return field.required ? REQUIRED : null;
+    const n = value.value;
+    if (field.step != null && Number.isInteger(field.step) && !Number.isInteger(n)) return { key: "pl.v.integer" };
+    if (field.min != null && n < field.min) return { key: "pl.v.min", vars: { min: field.min } };
+    if (field.max != null && n > field.max) return { key: "pl.v.max", vars: { max: field.max } };
+    return null;
+  }
+  if (kind === "link") {
+    if (!value || value.kind !== "link") return field.required ? REQUIRED : null;
+    return linkFailure(value.target);
+  }
+  if (kind === "list") {
+    const items = value && value.kind === "list" ? value.items : [];
+    return field.required && items.length === 0 ? REQUIRED : null;
+  }
+  // richtext, media, choice, color: present or not.
+  return field.required && !value ? REQUIRED : null;
+}
+
+/** Whether a field, or anything inside its list items, is invalid. */
+function fieldInvalid(field: CatalogueFieldDefinition, value: SectionFieldValue | undefined, lang: string): boolean {
+  if (fieldFailure(field, value, lang)) return true;
+  if (kindOf(field) !== "list" || !value || value.kind !== "list") return false;
+  return value.items.some((item) => field.itemFields.some((inner) => fieldInvalid(inner, item.fields[inner.key], lang)));
+}
+
 // ---- one field ----------------------------------------------------------------------------------
 
 interface FieldEditorProps {
@@ -55,14 +116,20 @@ interface FieldEditorProps {
   page: PageDraftResponse;
   lang: string;
   purposeHint: SiteMediaPurpose;
+  /** The field is reporting an error: its control is drawn invalid. */
+  invalid?: boolean;
+  /** Save was pressed: the fields inside list items report their errors too. */
+  showErrors?: boolean;
 }
 
-function MediaEditor({ field, value, onChange, sync, purposeHint }: FieldEditorProps) {
+function MediaEditor({ field, value, onChange, sync, purposeHint, invalid }: FieldEditorProps) {
   const tx = usePlText();
+  const { message } = useValidation();
   const fileRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [fileFailure, setFileFailure] = useState<RuleFailure | null>(null);
   const current = value && value.kind === "media" ? value : undefined;
 
   useEffect(() => {
@@ -99,20 +166,33 @@ function MediaEditor({ field, value, onChange, sync, purposeHint }: FieldEditorP
       .finally(() => setUploading(false));
   }
 
+  // PNG / JPG / WebP up to the builder's size cap; a refused file keeps the current image.
+  function choose(file: File | undefined) {
+    if (!file) return;
+    const failure = imageFileFailure(file, tx("pl.customize.hero.imageTypes"));
+    setFileFailure(failure);
+    if (!failure) readLogoFile(file, pick);
+  }
+
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-3">
-        {url ? (
-          <img src={url} alt="" className="h-14 w-24 rounded-[9px] object-cover" />
-        ) : (
-          <span className="flex h-14 w-24 items-center justify-center rounded-[9px] border border-dashed border-[var(--octo-border-input)] text-[var(--octo-text-faint)]">
-            <Upload size={14} />
-          </span>
-        )}
-        <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={(e) => readLogoFile(e.target.files?.[0], pick)} />
-        <Button variant="secondary" size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
+    <div className="flex flex-col gap-2">
+      <ImageSlot src={url} empty={tx("pl.customize.noImage")} invalid={invalid || fileFailure !== null} />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => {
+            choose(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+        <PlButton variant="outline" size="xs" className="rounded-[8px]" disabled={uploading} onClick={() => fileRef.current?.click()}>
           {uploading ? tx("pl.common.saving") : tx("pl.field.upload")}
-        </Button>
+        </PlButton>
         <MediaLibraryButton
           sync={sync}
           purposes={(accepted.length ? accepted : [purpose]) as ApiSiteMediaPurpose[]}
@@ -124,17 +204,17 @@ function MediaEditor({ field, value, onChange, sync, purposeHint }: FieldEditorP
           }}
         />
         {current && (
-          <button type="button" aria-label={tx("pl.common.remove")} className="rounded p-1 text-[var(--octo-text-faint)] hover:text-[#EF4444]" onClick={() => onChange(undefined)}>
-            <X size={14} />
+          <button type="button" aria-label={tx("pl.common.remove")} className={REMOVE_BUTTON} onClick={() => onChange(undefined)}>
+            <X size={16} />
           </button>
         )}
       </div>
-      {failed && <span className="text-[11px] text-[#DC2626]">{tx("pl.field.uploadFailed")}</span>}
+      <PlFieldError>{message(fileFailure) ?? (failed ? tx("pl.field.uploadFailed") : undefined)}</PlFieldError>
     </div>
   );
 }
 
-function LinkEditor({ field, value, onChange, sync, page, lang }: FieldEditorProps) {
+function LinkEditor({ field, value, onChange, sync, page, lang, invalid }: FieldEditorProps) {
   const tx = usePlText();
   const { locale } = useI18n();
   const current = value && value.kind === "link" ? value : undefined;
@@ -167,25 +247,25 @@ function LinkEditor({ field, value, onChange, sync, page, lang }: FieldEditorPro
 
   return (
     <div className="flex flex-col gap-2">
-      <Select aria-label={tx("pl.field.linkKind")} value={target?.kind ?? ""} onChange={(e) => changeKind(e.target.value)}>
+      <PlSelect aria-label={tx("pl.field.linkKind")} invalid={invalid && !target} value={target?.kind ?? ""} onChange={(e) => changeKind(e.target.value)}>
         <option value="">{tx("pl.field.link.none")}</option>
         {kinds.map((k) => (
           <option key={k} value={k}>
             {tx(`pl.field.link.${k}`)}
           </option>
         ))}
-      </Select>
+      </PlSelect>
       {target?.kind === "page" && (
-        <Select aria-label={tx("pl.field.link.page")} value={target.pageId} onChange={(e) => setTarget({ kind: "page", pageId: e.target.value })}>
+        <PlSelect aria-label={tx("pl.field.link.page")} value={target.pageId} onChange={(e) => setTarget({ kind: "page", pageId: e.target.value })}>
           {pages.map((p) => (
             <option key={p.pageId} value={p.pageId}>
               {pageTitle(p, locale, lang)}
             </option>
           ))}
-        </Select>
+        </PlSelect>
       )}
       {target?.kind === "anchor" && (
-        <Select
+        <PlSelect
           aria-label={tx("pl.field.link.anchor")}
           value={target.sectionId}
           onChange={(e) => setTarget({ kind: "anchor", pageId: page.pageId, sectionId: e.target.value })}
@@ -195,27 +275,28 @@ function LinkEditor({ field, value, onChange, sync, page, lang }: FieldEditorPro
               {i + 1}. {s.anchor ?? s.type}
             </option>
           ))}
-        </Select>
+        </PlSelect>
       )}
       {target?.kind === "external" && (
         <>
-          <Input dir="ltr" aria-label="URL" value={target.url} onChange={(e) => setTarget({ ...target, url: e.target.value.trim() })} />
-          <label className="flex items-center gap-2 text-[12px] text-[var(--octo-text-secondary)]">
+          <PlInput dir="ltr" type="url" inputMode="url" aria-label="URL" invalid={invalid} value={target.url} onChange={(e) => setTarget({ ...target, url: e.target.value.trim() })} />
+          <label className="flex items-center gap-2 text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">
             <Switch checked={target.openInNewTab} onChange={() => setTarget({ ...target, openInNewTab: !target.openInNewTab })} label={tx("pl.field.newTab")} />
             {tx("pl.field.newTab")}
           </label>
         </>
       )}
       {target?.kind === "email" && (
-        <Input dir="ltr" type="email" aria-label={tx("pl.field.link.email")} value={target.address} onChange={(e) => setTarget({ kind: "email", address: e.target.value.trim() })} />
+        <PlInput dir="ltr" type="email" inputMode="email" aria-label={tx("pl.field.link.email")} invalid={invalid} value={target.address} onChange={(e) => setTarget({ kind: "email", address: e.target.value.trim() })} />
       )}
       {target?.kind === "phone" && (
-        <Input dir="ltr" type="tel" aria-label={tx("pl.field.link.phone")} value={target.number} onChange={(e) => setTarget({ kind: "phone", number: e.target.value })} />
+        <PlInput dir="ltr" type="tel" inputMode="tel" aria-label={tx("pl.field.link.phone")} invalid={invalid} value={target.number} onChange={(e) => setTarget({ kind: "phone", number: e.target.value })} />
       )}
       {target && (
-        <Input
+        <PlInput
           aria-label={tx("pl.field.linkLabel")}
           placeholder={tx("pl.field.linkLabel")}
+          maxLength={60}
           value={label[lang] ?? ""}
           onChange={(e) => onChange({ kind: "link", target, label: withText(label, lang, e.target.value) })}
         />
@@ -224,9 +305,69 @@ function LinkEditor({ field, value, onChange, sync, page, lang }: FieldEditorPro
   );
 }
 
+/** A hex colour typed by hand: the text is kept while it is being typed, the value follows only
+ *  once it is a full #RRGGBB (an empty box clears it). */
+function ColorEditor({ field, value, onChange, invalid }: FieldEditorProps) {
+  const { check } = useValidation();
+  const hex = value && value.kind === "color" ? value.color.hex ?? "" : "";
+  const [text, setText] = useState(hex);
+  const [left, setLeft] = useState(false);
+
+  // Another write (the swatch, a reload) replaces what was typed.
+  useEffect(() => {
+    setText((current) => (current.toUpperCase() === hex.toUpperCase() ? current : hex));
+  }, [hex]);
+
+  const error = left ? check(text, [rules.hexColor()]) : undefined;
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="flex items-center gap-2">
+        <input
+          type="color"
+          className="h-10 w-10 shrink-0 cursor-pointer rounded-[8px] border border-[var(--pl-g300)] bg-transparent p-1"
+          value={HEX.test(hex) ? hex : "#000000"}
+          onChange={(e) => onChange({ kind: "color", color: { hex: e.target.value.toUpperCase() } })}
+          aria-label={labelOf(field)}
+        />
+        <PlInput
+          dir="ltr"
+          aria-label={labelOf(field)}
+          placeholder="#000000"
+          maxLength={7}
+          invalid={invalid || Boolean(error)}
+          value={text}
+          onBlur={() => setLeft(true)}
+          onChange={(e) => {
+            const next = e.target.value.trim();
+            setText(next);
+            if (HEX.test(next)) onChange({ kind: "color", color: { hex: next.toUpperCase() } });
+            else if (!next) onChange(undefined);
+          }}
+        />
+      </span>
+      <PlFieldError>{error}</PlFieldError>
+    </div>
+  );
+}
+
+/** A field under its label; a toggle sits beside its label instead, as the frames draw one. */
+function FieldBlock({ error, ...props }: FieldEditorProps & { error?: string }) {
+  const { field, value, onChange } = props;
+  if (kindOf(field) === "toggle") {
+    const on = value && value.kind === "toggle" ? value.value : field.default === true;
+    return <ToggleRow label={labelOf(field)} checked={on} onChange={() => onChange({ kind: "toggle", value: !on })} />;
+  }
+  return (
+    <FieldRow label={labelOf(field)} required={field.required} error={error}>
+      <FieldEditor {...props} invalid={Boolean(error)} />
+    </FieldRow>
+  );
+}
+
 function FieldEditor(props: FieldEditorProps) {
   const tx = usePlText();
-  const { field, value, onChange, lang } = props;
+  const { message } = useValidation();
+  const { field, value, onChange, lang, invalid } = props;
   const kind = kindOf(field);
 
   if (kind === "text") {
@@ -236,9 +377,9 @@ function FieldEditor(props: FieldEditorProps) {
       onChange(Object.keys(next).length ? { kind: "text", text: next } : undefined);
     };
     return field.multiline ? (
-      <Textarea rows={3} maxLength={field.maxLength ?? undefined} value={text[lang] ?? ""} onChange={(e) => set(e.target.value)} />
+      <PlTextarea aria-label={labelOf(field)} rows={3} invalid={invalid} maxLength={field.maxLength ?? undefined} value={text[lang] ?? ""} onChange={(e) => set(e.target.value)} />
     ) : (
-      <Input maxLength={field.maxLength ?? undefined} value={text[lang] ?? ""} onChange={(e) => set(e.target.value)} />
+      <PlInput aria-label={labelOf(field)} invalid={invalid} maxLength={field.maxLength ?? undefined} value={text[lang] ?? ""} onChange={(e) => set(e.target.value)} />
     );
   }
   if (kind === "richtext") {
@@ -264,14 +405,19 @@ function FieldEditor(props: FieldEditorProps) {
   if (kind === "link") return <LinkEditor {...props} />;
   if (kind === "choice") {
     return (
-      <Select value={value && value.kind === "choice" ? value.key : ""} onChange={(e) => onChange(e.target.value ? { kind: "choice", key: e.target.value } : undefined)}>
+      <PlSelect
+        aria-label={labelOf(field)}
+        invalid={invalid}
+        value={value && value.kind === "choice" ? value.key : ""}
+        onChange={(e) => onChange(e.target.value ? { kind: "choice", key: e.target.value } : undefined)}
+      >
         <option value="">—</option>
         {field.choices.map((c) => (
           <option key={c.key} value={c.key}>
             {humanizeKey(c.labelKey || c.key)}
           </option>
         ))}
-      </Select>
+      </PlSelect>
     );
   }
   if (kind === "toggle") {
@@ -280,8 +426,11 @@ function FieldEditor(props: FieldEditorProps) {
   }
   if (kind === "number") {
     return (
-      <Input
+      <PlInput
         type="number"
+        inputMode="decimal"
+        aria-label={labelOf(field)}
+        invalid={invalid}
         min={field.min ?? undefined}
         max={field.max ?? undefined}
         step={field.step ?? undefined}
@@ -290,42 +439,34 @@ function FieldEditor(props: FieldEditorProps) {
       />
     );
   }
-  if (kind === "color") {
-    const hex = value && value.kind === "color" ? value.color.hex ?? "" : "";
-    return (
-      <span className="flex items-center gap-2">
-        <input type="color" value={/^#[0-9a-f]{6}$/i.test(hex) ? hex : "#000000"} onChange={(e) => onChange({ kind: "color", color: { hex: e.target.value.toUpperCase() } })} aria-label={labelOf(field)} />
-        <Input dir="ltr" value={hex} onChange={(e) => onChange(/^#[0-9a-f]{6}$/i.test(e.target.value) ? { kind: "color", color: { hex: e.target.value.toUpperCase() } } : undefined)} />
-      </span>
-    );
-  }
+  if (kind === "color") return <ColorEditor {...props} />;
   if (kind === "list") {
     const items = value && value.kind === "list" ? value.items : [];
     const setItems = (next: typeof items) => onChange(next.length ? { kind: "list", items: next } : undefined);
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {items.map((item, index) => (
-          <div key={item.id} className="flex flex-col gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2.5">
+          <div key={item.id} className="flex flex-col gap-4 rounded-[12px] border border-[var(--pl-g300)] p-3">
             <div className="flex items-center justify-between">
-              <span className="text-[11.5px] font-medium text-[var(--octo-text-muted)]">{tx("pl.field.item", { n: index + 1 })}</span>
-              <button type="button" aria-label={tx("pl.common.remove")} className="rounded p-1 text-[var(--octo-text-faint)] hover:text-[#EF4444]" onClick={() => setItems(items.filter((_i, n) => n !== index))}>
-                <X size={13} />
+              <span className="text-[12px] font-medium leading-[12px] text-[var(--pl-text-2)]">{tx("pl.field.item", { n: index + 1 })}</span>
+              <button type="button" aria-label={tx("pl.common.remove")} className={REMOVE_BUTTON} onClick={() => setItems(items.filter((_i, n) => n !== index))}>
+                <X size={16} />
               </button>
             </div>
             {field.itemFields.map((inner) => (
-              <FieldRow key={inner.key} label={labelOf(inner)}>
-                <FieldEditor
-                  {...props}
-                  field={inner}
-                  value={item.fields[inner.key]}
-                  onChange={(v) => {
-                    const fields = { ...item.fields };
-                    if (v) fields[inner.key] = v;
-                    else delete fields[inner.key];
-                    setItems(items.map((it, n) => (n === index ? { ...it, fields } : it)));
-                  }}
-                />
-              </FieldRow>
+              <FieldBlock
+                key={inner.key}
+                {...props}
+                field={inner}
+                value={item.fields[inner.key]}
+                error={props.showErrors ? message(fieldFailure(inner, item.fields[inner.key], lang)) : undefined}
+                onChange={(v) => {
+                  const fields = { ...item.fields };
+                  if (v) fields[inner.key] = v;
+                  else delete fields[inner.key];
+                  setItems(items.map((it, n) => (n === index ? { ...it, fields } : it)));
+                }}
+              />
             ))}
           </div>
         ))}
@@ -337,7 +478,7 @@ function FieldEditor(props: FieldEditorProps) {
       </div>
     );
   }
-  return <span className="text-[11px] text-[var(--octo-text-muted)]">{field.kind}</span>;
+  return <span className={plText.hint}>{field.kind}</span>;
 }
 
 // ---- style (shared by built-in and bound sections) ---------------------------------------------
@@ -363,23 +504,25 @@ export function StyleEditor({
 }) {
   const tx = usePlText();
   return (
-    <div className="flex flex-col gap-3 border-t border-[var(--octo-divider)] pt-3">
-      <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{tx("pl.sections.style")}</p>
+    <div className="flex flex-col gap-4 border-t border-[var(--pl-g200)] pt-4">
+      <p className={plText.h6}>{tx("pl.sections.style")}</p>
       {type && type.variants.length > 0 && (
         <FieldRow label={tx("pl.sections.variant")}>
-          <Select value={style.variant ?? ""} onChange={(e) => onStyle({ ...style, variant: e.target.value || null })}>
+          <PlSelect aria-label={tx("pl.sections.variant")} value={style.variant ?? ""} onChange={(e) => onStyle({ ...style, variant: e.target.value || null })}>
             <option value="">{tx("pl.sections.default")}</option>
             {type.variants.map((v) => (
               <option key={v.key} value={v.key}>
                 {humanizeKey(v.labelKey || v.key)}
               </option>
             ))}
-          </Select>
+          </PlSelect>
         </FieldRow>
       )}
       {type && (
         <FieldRow label={tx("pl.sections.alignment")}>
-          <Segmented
+          <SegmentedChips
+            label={tx("pl.sections.alignment")}
+            className="!justify-start"
             options={[
               { id: "", label: tx("pl.sections.default") },
               ...(["start", "center", "end"] as const).map((id) => ({ id, label: tx(`pl.sections.align.${id}`) })),
@@ -394,7 +537,7 @@ export function StyleEditor({
           {DEVICES.map((device) => {
             const on = hiddenOn.includes(device);
             return (
-              <label key={device} className="flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
+              <label key={device} className="flex items-center gap-2 text-[14px] font-medium leading-[14px] text-[var(--pl-text)]">
                 <Switch
                   checked={on}
                   onChange={() => onHiddenOn(on ? hiddenOn.filter((d) => d !== device) : [...hiddenOn, device])}
@@ -407,7 +550,7 @@ export function StyleEditor({
         </div>
       </FieldRow>
       <FieldRow label={tx("pl.sections.anchor")}>
-        <Input dir="ltr" value={anchor} maxLength={40} onChange={(e) => onAnchor(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^[^a-z]+/, ""))} />
+        <PlInput dir="ltr" aria-label={tx("pl.sections.anchor")} value={anchor} maxLength={40} onChange={(e) => onAnchor(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^[^a-z]+/, ""))} />
       </FieldRow>
     </div>
   );
@@ -427,8 +570,12 @@ export function FieldsInspector({
   type: CatalogueSectionType;
 }) {
   const tx = usePlText();
+  const { message } = useValidation();
+  const { touched, touch, touchAll } = useTouched();
   const { act, busy } = useBusy();
   const lang = sync.editLanguage;
+  // Save was pressed while something was invalid: every field (list items included) reports.
+  const [blocked, setBlocked] = useState(false);
   const [fields, setFields] = useState<SectionFields>(section.fields ?? {});
   const [style, setStyle] = useState<SectionStyle>(section.style ?? {});
   const [hiddenOn, setHiddenOn] = useState<DeviceClass[]>(section.hiddenOn ?? []);
@@ -446,8 +593,15 @@ export function FieldsInspector({
   // The live preview shows these edits as they are typed, before Save.
   usePreviewEdit(sync, page, section, { fields, style, hiddenOn, anchor });
 
+  const invalid = type.fields.some((field) => fieldInvalid(field, fields[field.key], lang));
+
   function save() {
     setSaved(false);
+    if (invalid) {
+      touchAll();
+      setBlocked(true);
+      return;
+    }
     void act("save", () =>
       sync.updateSection(page.pageId, section.sectionId, { fields, style, hiddenOn, anchor: anchor.replace(/-+$/, "") || null })
     ).then((ok) => setSaved(ok));
@@ -458,10 +612,13 @@ export function FieldsInspector({
   return (
     <div className="flex flex-col gap-4">
       {type.fields.map((field) => (
-        <FieldRow key={field.key} label={labelOf(field) + (field.required ? " *" : "")}>
-          <FieldEditor
+        // Leaving any control of a field marks it as visited (blur bubbles in React).
+        <div key={field.key} onBlur={() => touch(field.key)}>
+          <FieldBlock
             field={field}
             value={fields[field.key]}
+            error={touched(field.key) ? message(fieldFailure(field, fields[field.key], lang)) : undefined}
+            showErrors={blocked}
             onChange={(v) =>
               setFields((f) => {
                 const next = { ...f };
@@ -475,14 +632,15 @@ export function FieldsInspector({
             lang={lang}
             purposeHint={purposeHint}
           />
-        </FieldRow>
+        </div>
       ))}
       <StyleEditor type={type} style={style} hiddenOn={hiddenOn} anchor={anchor} onStyle={setStyle} onHiddenOn={setHiddenOn} onAnchor={setAnchor} />
-      <div className="flex items-center gap-3">
-        <Button onClick={save} disabled={busy !== null}>
+      <div className="flex flex-col gap-2">
+        <PlButton size="md" className="w-full" onClick={save} disabled={busy !== null}>
           {busy ? tx("pl.common.saving") : tx("pl.common.save")}
-        </Button>
-        {saved && <span className="text-[11.5px] text-[#16a34a]">{tx("pl.sections.saved")}</span>}
+        </PlButton>
+        {blocked && invalid && <PlFieldError>{tx("pl.customize.fixFields")}</PlFieldError>}
+        {saved && <span className="text-[12px] leading-[1.4] text-[var(--pl-success)]">{tx("pl.sections.saved")}</span>}
       </div>
     </div>
   );

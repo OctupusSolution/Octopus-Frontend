@@ -4,11 +4,12 @@
 // components themselves (`SITE_STEPS[n].Component`) own none of this — they
 // only ever render their own body between the rail and the footer.
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, CheckCircle2, HelpCircle } from "lucide-react";
-import { Button } from "@ui/primitives";
+import { createPortal } from "react-dom";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { StepRail } from "@/pages/onboarding/_shared/step-rail";
+import { TOP_BAR_SLOT_ID } from "@/widgets/top-bar";
+import { BuilderRail } from "../ui/builder-rail";
 import { HelpModal } from "../ui/help-modal";
+import { PlButton, PlIcon, plText } from "../ui/kit";
 import { SITE_STEPS } from "./steps";
 import type { SiteAction, SiteDraft } from "./site-draft";
 
@@ -90,79 +91,62 @@ export function BuilderShell({
     setNote(t("publicLink.draftSaved"));
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-3">
-        <h1 className="text-[21px] font-bold text-[var(--octo-text-primary)]">{t("publicLink.title")}</h1>
-        {savedLabel && (
-          <span className="flex items-center gap-1.5 rounded-full bg-[#16a34a]/10 px-2.5 py-1 text-[12px] font-medium text-[#16a34a]">
-            <CheckCircle2 size={13} />
-            {savedLabel}
-          </span>
-        )}
-      </div>
+  // The frames put the page title and the autosave chip in the console's top
+  // bar, where every other page shows the search field.
+  const topBarSlot = typeof document === "undefined" ? null : document.getElementById(TOP_BAR_SLOT_ID);
+  const heading = (
+    <div className="flex min-w-0 items-center gap-2">
+      <h1 className="truncate text-[24px] font-bold leading-[24px] text-[var(--pl-text)]">{t("publicLink.title")}</h1>
+      {savedLabel && (
+        <span className="flex shrink-0 items-center gap-1.5 rounded-[8px] bg-[var(--pl-success-soft)] px-2 py-1 text-[14px] font-medium leading-[14px] text-[var(--pl-success)]">
+          <PlIcon name="completed" size={16} />
+          {savedLabel}
+        </span>
+      )}
+    </div>
+  );
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-[21px] font-bold text-[var(--octo-text-primary)]">{t(current.titleKey)}</p>
-          {current.subtitleKey && (
-            <p className="text-[13px] text-[var(--octo-text-muted)]">{t(current.subtitleKey)}</p>
-          )}
+  return (
+    <div className="flex flex-col gap-12">
+      {topBarSlot ? createPortal(heading, topBarSlot) : heading}
+
+      <div className="flex flex-col gap-6 overflow-x-auto [scrollbar-width:none] xl:flex-row xl:items-start xl:justify-between xl:overflow-visible">
+        <div className="flex min-w-0 flex-col gap-3">
+          <p className={plText.h3Bold}>{t(current.titleKey)}</p>
+          {current.subtitleKey && <p className={plText.sub}>{t(current.subtitleKey)}</p>}
         </div>
-        <div className="lg:max-w-[520px] lg:flex-1">
-          <StepRail step={draft.step} labelKeys={LABEL_KEYS} />
-        </div>
+        <BuilderRail step={draft.step} labelKeys={LABEL_KEYS} onStep={(step) => dispatch({ type: "goTo", step })} />
       </div>
 
       {children}
 
       <div className="flex flex-col gap-2">
         {note && (
-          <p role="status" className="text-[11.5px] text-[var(--octo-text-muted)]">
+          <p role="status" className={plText.hint}>
             {note}
           </p>
         )}
-        {primaryDisabled && primaryHint && (
-          <p className="text-[11.5px] text-[var(--octo-text-muted)]">{primaryHint}</p>
-        )}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          {draft.step > 1 && (
-            <Button variant="ghost" onClick={() => dispatch({ type: "back" })} className="h-10 shrink-0">
-              {t("publicLink.back")}
-            </Button>
-          )}
-          {/* The frames lay the footer out as one full-width row — Help,
-              Save Draft and Next Step sharing the content column at roughly
-              235/505/570px — rather than three shrink-to-fit buttons
-              clustered to either side. The ratio only applies at `lg`, where
-              the column is wide enough to hold it; below that the three
-              stack (then sit three-across at `sm`) so labels never get
-              crushed. Help and Save Draft are filled light-grey, borderless
-              chips in the frame (`ghost` + an explicit fill), matched to the
-              same ~40px height as Next Step. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex-1 lg:[grid-template-columns:235fr_505fr_570fr]">
-            <Button
-              variant="ghost"
-              icon={<HelpCircle size={14} />}
-              onClick={() => setHelpOpen(true)}
-              className="h-10 w-full justify-center bg-[var(--octo-hover)]"
-            >
-              {t("publicLink.help")}
-            </Button>
-            <Button variant="ghost" onClick={handleSaveDraft} className="h-10 w-full justify-center bg-[var(--octo-hover)]">
-              {t("publicLink.saveDraft")}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={primaryDisabled}
-              title={primaryDisabled ? primaryHint : undefined}
-              onClick={onPrimaryClick ?? (() => dispatch({ type: "next" }))}
-              className="h-10 w-full justify-center"
-            >
-              {primaryLabel ?? t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
-              <ArrowRight size={14} className="rtl:rotate-180" />
-            </Button>
-          </div>
+        {primaryDisabled && primaryHint && <p className={plText.hint}>{primaryHint}</p>}
+        {/* One full-width row, as the frames lay it out: Help 171, Save Draft
+            367, Next Step 562 on a 24px gap — kept as that ratio so it holds
+            at any content width, and stacked below `sm`. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6 lg:[grid-template-columns:171fr_367fr_562fr]">
+          <PlButton variant="neutral" onClick={() => setHelpOpen(true)}>
+            <PlIcon name="help-circle" />
+            {t("publicLink.help")}
+          </PlButton>
+          <PlButton variant="soft" onClick={handleSaveDraft}>
+            {t("publicLink.saveDraft")}
+          </PlButton>
+          <PlButton
+            variant="primary"
+            disabled={primaryDisabled}
+            title={primaryDisabled ? primaryHint : undefined}
+            onClick={onPrimaryClick ?? (() => dispatch({ type: "next" }))}
+          >
+            {primaryLabel ?? t(isLast ? "publicLink.publishNow" : "publicLink.nextStep")}
+            <PlIcon name="arrow-right" className="rtl:rotate-180" />
+          </PlButton>
         </div>
       </div>
 

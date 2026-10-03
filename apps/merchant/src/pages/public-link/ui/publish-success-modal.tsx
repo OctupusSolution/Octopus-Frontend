@@ -3,9 +3,9 @@
 // the whole builder and deserves an unmistakable confirmation with the link
 // ready to copy or open.
 import { useEffect, useState } from "react";
-import { Check, Copy, PartyPopper } from "lucide-react";
-import { Button, Modal } from "@ui/primitives";
+import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { PlButton, PlIcon } from "./kit";
 
 const COPY_RESET_MS = 2000;
 
@@ -46,25 +46,33 @@ export function PublishSuccessModal({
       title={t("publicLink.publishSuccess.title")}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onViewSite}>
+          <PlButton variant="outline" size="md" onClick={onViewSite}>
             {t("publicLink.publishSuccess.viewSite")}
-          </Button>
-          <Button onClick={onClose}>{t("publicLink.publishSuccess.done")}</Button>
+          </PlButton>
+          <PlButton size="md" onClick={onClose}>
+            {t("publicLink.publishSuccess.done")}
+          </PlButton>
         </div>
       }
     >
-      <div className="flex flex-col items-center gap-3 py-2 text-center">
-        <span className="grid h-14 w-14 place-items-center rounded-full bg-[#22C55E]/10 text-[#16a34a]">
-          <PartyPopper size={26} />
+      <div className="flex flex-col items-center gap-4 py-2 text-center">
+        <span className="grid size-14 place-items-center rounded-full bg-[#dcffef] text-[#009a39]">
+          <PlIcon name="publish-completed-solid" size={28} />
         </span>
-        <p className="text-[13px] text-[var(--octo-text-secondary)]">{t("publicLink.publishSuccess.body")}</p>
-        <div className="flex w-full items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3 py-2">
-          <span dir="ltr" className="min-w-0 flex-1 select-all truncate text-start text-[12.5px] text-[var(--octo-text-primary)]">
+        <p className="text-[14px] font-medium leading-[1.3] text-[var(--pl-text-2)]">{t("publicLink.publishSuccess.body")}</p>
+        {/* The Publish step's "Your live URL" field, with its Copy Link button. */}
+        <div className="flex w-full items-center justify-between gap-2 rounded-[12px] border border-[var(--pl-g300)] bg-[var(--pl-primary-soft)] px-3 py-2">
+          <span dir="ltr" className="min-w-0 flex-1 select-all truncate text-start text-[14px] font-semibold leading-[20px] text-[var(--pl-primary)]">
             {url}
           </span>
-          <Button size="sm" variant="secondary" icon={copied ? <Check size={13} /> : <Copy size={13} />} onClick={copy}>
-            {copied ? t("publicLink.preview.copied") : t("publicLink.copyLink")}
-          </Button>
+          <button
+            type="button"
+            onClick={copy}
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-[4px] bg-[var(--pl-surface)] p-2 text-[14px] font-medium leading-[14px] text-[var(--pl-primary)] transition-colors hover:brightness-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40"
+          >
+            <PlIcon name="publish-copy" size={16} />
+            <span aria-live="polite">{copied ? t("publicLink.preview.copied") : t("publicLink.copyLink")}</span>
+          </button>
         </div>
       </div>
     </Modal>

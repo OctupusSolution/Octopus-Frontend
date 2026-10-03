@@ -71,7 +71,7 @@ export function PaymentLinkModal({
   ];
 
   return (
-    <Modal open onClose={handleClose} title={t("customers.paymentLink.title")} className={`max-w-[760px] max-h-[94vh] overflow-y-auto octo-scroll ${CRM_MODAL_CLASS}`}>
+    <Modal open onClose={handleClose} title={t("customers.paymentLink.title")} className={`max-w-[760px] flex max-h-[calc(100dvh-2rem)] flex-col [&>div]:-mx-1 [&>div]:min-h-0 [&>div]:flex-1 [&>div]:overflow-y-auto [&>div]:px-1 [&>div]:[scrollbar-width:none] [&>div::-webkit-scrollbar]:hidden ${CRM_MODAL_CLASS}`}>
       <div className="flex items-center gap-4 rounded-xl border border-[var(--octo-border-card)] p-3">
         <Avatar name={name} photo={customer.avatarUrl} size={80} />
         <div className="min-w-0">

@@ -1,6 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/filter-pills.tsx
 import { useI18n } from "@/app/providers/i18n-provider";
-import { STATE_STYLE } from "./theme";
+import { ALL_PILL_TINT, PILL_TINT, TINT_CLASS, tintVars, type Tint } from "./theme";
 import { STATE_LABEL_KEY } from "./stepper";
 import { FILTER_PILL_STATES, type OrderState } from "./types";
 
@@ -17,12 +17,14 @@ export function OrderFilterPills({
 }) {
   const { t } = useI18n();
 
+  // `contents` lets the pills wrap in the same line box as the filter icon
+  // beside them instead of dropping below it as one block.
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="contents">
       <PillButton
         active={selected === null}
         onClick={() => onSelect(null)}
-        tone="#0D6EFD"
+        tint={ALL_PILL_TINT}
         label={t("orders.pill.all")}
         count={countAll}
       />
@@ -31,7 +33,7 @@ export function OrderFilterPills({
           key={state}
           active={selected === state}
           onClick={() => onSelect(state)}
-          tone={STATE_STYLE[state].dot}
+          tint={PILL_TINT[state]}
           label={t(STATE_LABEL_KEY[state])}
           count={countByState(state)}
         />
@@ -40,19 +42,19 @@ export function OrderFilterPills({
   );
 }
 
-// Every pill carries its own state's colour as a tint — a 10%-alpha fill with
-// the full-strength colour on the dot and the label — and the selected pill
-// inverts to that colour solid with white text.
+// Every pill carries its own state's colour as a pastel fill with the
+// full-strength colour on the dot, label and count; the selected pill inverts
+// to that colour solid with white text, as the frame's "All Orders" does.
 function PillButton({
   active,
   onClick,
-  tone,
+  tint,
   label,
   count,
 }: {
   active: boolean;
   onClick: () => void;
-  tone: string;
+  tint: Tint;
   label: string;
   count: number;
 }) {
@@ -61,25 +63,17 @@ function PillButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className="flex items-center gap-1.5 rounded-full px-3 py-[7px] text-[12.5px] font-medium transition-opacity hover:opacity-85"
-      style={{
-        backgroundColor: active ? tone : `${tone}1A`,
-        color: active ? "#FFFFFF" : tone,
-      }}
+      className={`flex h-[42px] items-center gap-1 whitespace-nowrap rounded-[4px] p-2 text-[14px] font-medium leading-[14px] transition-[filter] hover:brightness-[0.97] ${
+        active ? "bg-[var(--tint-fg)] text-white" : TINT_CLASS
+      }`}
+      style={tintVars(tint)}
     >
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: active ? "#FFFFFF" : tone }}
-      />
-      {label}
-      <span
-        className="rounded-full px-1.5 py-px text-[10.5px] font-semibold"
-        style={{
-          backgroundColor: active ? "rgba(255,255,255,0.22)" : `${tone}26`,
-          color: active ? "#FFFFFF" : tone,
-        }}
-      >
-        {count}
+      <span className="h-2 w-2 shrink-0 rounded-full bg-current" />
+      <span className="flex items-center gap-2">
+        {label}
+        <span className="grid h-[26px] min-w-[26px] place-items-center rounded-full bg-white p-1 text-[10px] leading-[10px] text-[color:var(--tint-fg)] [[data-theme=dark]_&]:bg-[var(--octo-card)] [[data-theme=dark]_&]:text-[color:color-mix(in_srgb,var(--tint-fg)_55%,white)]">
+          {count}
+        </span>
       </span>
     </button>
   );

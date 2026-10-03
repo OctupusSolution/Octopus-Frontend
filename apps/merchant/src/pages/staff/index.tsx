@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { BriefcaseBusiness, CalendarPlus, Plus, Settings } from "lucide-react";
+import { BriefcaseBusiness, Settings } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PageTabs } from "./_shared/page-tabs";
 import { StaffStoreProvider, useStaffStore } from "./_shared/staff-store";
 import { buttonClass } from "./_shared/buttons";
+import { StaffIcon } from "./_shared/icon";
 import { StaffTab } from "./staff-tab";
 import { RolesPermissionsTab } from "./roles-permissions-tab";
 import { ShiftsTab, type ShiftsDialog, type ShiftsSubTab } from "./shifts-tab";
@@ -14,6 +15,11 @@ import { useTx } from "./_shared/text";
 
 type TabId = "staff" | "roles" | "shifts";
 const TAB_IDS: readonly TabId[] = ["staff", "roles", "shifts"];
+
+// Job titles & departments and the shift settings are real features the frames
+// give no button to, so they sit beside the frames' own actions as a square
+// icon-only button of the same height.
+const ICON_BUTTON = "w-12 px-0";
 
 export function StaffPage() {
   return (
@@ -54,10 +60,14 @@ function StaffPageContent() {
     setParams(next);
   };
 
+  const importCsvKey = "staff.header.importCsv";
+  const importCsv = t(importCsvKey);
+  const catalogsLabel = tx("Job titles & departments", "المسميات والأقسام");
+
   return (
-    <div className="px-4 pb-10 pt-5 sm:px-[26px]">
+    <div className="px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
       {store.syncError && (
-        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
+        <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[8px] bg-[#fef0f0] px-4 py-2.5 text-[14px] text-[#d30202] [[data-theme=dark]_&]:bg-[#d30202]/20 [[data-theme=dark]_&]:text-[#f87171]">
           <span>{store.syncError}</span>
           <button type="button" className="shrink-0 underline" onClick={store.dismissSyncError}>
             OK
@@ -65,59 +75,71 @@ function StaffPageContent() {
         </div>
       )}
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[24px]">{header[tab].title}</h1>
-          <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)]">{header[tab].subtitle}</p>
+        <div className="flex min-w-0 flex-col gap-3">
+          <h1 className="text-[24px] font-bold leading-6 text-[var(--octo-text-primary)]">{header[tab].title}</h1>
+          <p className="text-[14px] font-medium leading-[14px] text-[#687280] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]">{header[tab].subtitle}</p>
         </div>
         {tab === "staff" && (
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => setCatalogsOpen(true)} className={buttonClass("outline", "lg")}>
-              <BriefcaseBusiness size={20} />
-              {tx("Job titles & departments", "المسميات والأقسام")}
+          <div className="flex flex-wrap items-center justify-end gap-4">
+            <button
+              type="button"
+              onClick={() => setCatalogsOpen(true)}
+              aria-label={catalogsLabel}
+              title={catalogsLabel}
+              className={buttonClass("outline", "lg", ICON_BUTTON)}
+            >
+              <BriefcaseBusiness size={24} strokeWidth={1.5} />
             </button>
+            {/* Drawn in the frames, but there is no staff import endpoint yet — inert, like the CRM's. */}
+            {!memberId && (
+              <button type="button" disabled className={buttonClass("outline", "lg", "disabled:opacity-100")}>
+                <StaffIcon name="staff-import.svg" size={24} className="text-[#0058da]" />
+                {importCsv === importCsvKey ? "Import CSV" : importCsv}
+              </button>
+            )}
             <button type="button" onClick={() => setAddOpen(true)} className={buttonClass("primary", "lg")}>
-              <Plus size={20} strokeWidth={2.5} />
+              <StaffIcon name="crm-plus.svg" size={24} />
               {t("staff.header.addNewMember")}
             </button>
           </div>
         )}
         {tab === "shifts" && shiftsSub === "schedule" && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
               aria-label={t("staff.settings.title")}
               title={t("staff.settings.title")}
-              className={buttonClass("outline", "lg")}
+              className={buttonClass("outline", "lg", ICON_BUTTON)}
             >
-              <Settings size={20} />
+              <Settings size={24} strokeWidth={1.5} />
             </button>
             <button type="button" onClick={() => setShiftsDialog("bulkAssign")} className={buttonClass("outline", "lg")}>
-              <CalendarPlus size={20} />
               {t("staff.shiftsTab.bulkAssignShift")}
             </button>
             <button type="button" onClick={() => setShiftsDialog("assign")} className={buttonClass("primary", "lg")}>
-              <Plus size={20} strokeWidth={2.5} />
               {t("staff.assignShift.submit")}
             </button>
           </div>
         )}
         {tab === "shifts" && shiftsSub === "shiftRoles" && hasShiftRoles && (
           <button type="button" onClick={() => setShiftsDialog("addShiftRole")} className={buttonClass("primary", "lg")}>
-            <Plus size={20} strokeWidth={2.5} />
+            <StaffIcon name="crm-plus.svg" size={24} />
             {t("staff.shiftRoles.add")}
           </button>
         )}
         {tab === "shifts" && shiftsSub === "timeOff" && (
           <button type="button" onClick={() => setShiftsDialog("addTimeOff")} className={buttonClass("primary", "lg")}>
-            <Plus size={20} strokeWidth={2.5} />
+            <StaffIcon name="crm-plus.svg" size={24} />
             {t("staff.timeOff.add")}
           </button>
         )}
       </header>
 
+      {/* The Shifts frames draw only their own row (Schedule / Shift Roles / …);
+          this one stays above it so Staff and Roles remain one click away. */}
       <PageTabs
-        className="mt-6"
+        className="mt-8"
         ariaLabel={t("staff.tabs.ariaLabel")}
         value={tab}
         onChange={changeTab}
@@ -128,7 +150,7 @@ function StaffPageContent() {
         ]}
       />
 
-      <div className="mt-6">
+      <div className={tab === "staff" && memberId ? "mt-6" : tab === "shifts" ? "mt-6" : "mt-4"}>
         {tab === "staff" && (
           <StaffTab addOpen={addOpen} onAddOpenChange={setAddOpen} selectedId={memberId} onSelect={setMemberId} />
         )}

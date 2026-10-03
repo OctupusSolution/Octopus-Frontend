@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
-import { CalendarDays, CalendarX2, Clock, Plus, Settings, SquarePen, Trash2 } from "lucide-react";
-import { Modal } from "@ui/primitives";
+import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "../_shared/buttons";
 import { ConfirmModal } from "../_shared/confirm-modal";
 import { Field, SelectInput, TextInput } from "../_shared/form";
 import { formatClock, formatDateTime, formatDaysSpan, weekdayName } from "../_shared/format";
+import { StaffIcon } from "../_shared/icon";
 import { useStaffLabels } from "../_shared/labels";
 import { MultiSelect } from "../_shared/multi-select";
+import { StaffModal } from "../_shared/staff-modal";
 import { CUSTOM_SHIFT, useStaffStore, type ShiftRoleRecord } from "../_shared/staff-store";
 import { StatusPill } from "../_shared/status-pill";
 import { Switch } from "../_shared/switch";
+import { FILL_BLUE, FILL_RED, INK, INK_SOFT, LINE, TEXT_RED } from "../_shared/theme";
 import { ToastBanner, useToast } from "../_shared/toast";
 import { rangeLabel } from "./schedule-utils";
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
 const WEEK = [0, 1, 2, 3, 4, 5, 6];
+
+// The frame's card actions: 32px tall on a 4px radius, a 24px glyph beside
+// 14px medium text.
+const CARD_ACTION =
+  "inline-flex h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[4px] text-[14px] font-medium leading-[14px] transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40";
 
 function nowStamp(): string {
   const d = new Date();
@@ -82,20 +88,15 @@ function ShiftRoleModal({
   };
 
   return (
-    <Modal
+    <StaffModal
       open={open}
       onClose={onClose}
       title={t(role ? "staff.shiftRoles.editTitle" : "staff.shiftRoles.addTitle")}
-      className="max-w-2xl p-6 [&>h2]:text-[22px] [&>h2]:font-bold"
+      submitLabel={t("staff.shiftRoles.save")}
+      onSubmit={save}
     >
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          save();
-        }}
-        className="mt-2 flex flex-col gap-5"
-      >
+      {/* This frame spaces its fields by 24px, the same step as its title and action. */}
+      <div className="flex flex-col gap-6">
         <Field label={t("staff.shiftRoles.name")} htmlFor="sr-name" required error={errors.name}>
           <TextInput
             id="sr-name"
@@ -138,15 +139,12 @@ function ShiftRoleModal({
             summary={(picked) => formatDaysSpan(picked.map((o) => Number(o.value)), locale, t("staff.shiftRoles.everyDay"))}
           />
         </Field>
-        <label className="flex cursor-pointer items-center gap-3">
+        <label className="flex cursor-pointer items-center gap-2 self-start">
           <Switch checked={active} onChange={setActive} label={t("staff.status.active")} />
-          <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("staff.status.active")}</span>
+          <span className={clsx("text-[14px] font-semibold leading-[14px]", INK)}>{t("staff.status.active")}</span>
         </label>
-        <button type="submit" className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
-          {t("staff.shiftRoles.save")}
-        </button>
-      </form>
-    </Modal>
+      </div>
+    </StaffModal>
   );
 }
 
@@ -163,41 +161,50 @@ export function ShiftRolesView({ addOpen, onAddOpenChange }: { addOpen: boolean;
   return (
     <div>
       {store.shiftRoles.length === 0 ? (
-        <div className="mx-auto flex max-w-[700px] flex-col items-center px-4 py-16 text-center">
-          <span aria-hidden className="relative grid h-40 w-40 place-items-center">
-            <span className="absolute inset-0 rounded-full bg-[var(--octo-hover)]" />
-            <CalendarX2 size={88} strokeWidth={1.2} className="relative text-[var(--octo-text-faint)]" />
-          </span>
-          <h2 className="mt-6 text-[17px] font-bold text-[var(--octo-text-primary)]">{t("staff.shiftRoles.emptyTitle")}</h2>
-          <p className="mt-2 text-[15px] text-[var(--octo-text-secondary)]">{t("staff.shiftRoles.emptyDescription")}</p>
-          <button type="button" onClick={() => onAddOpenChange(true)} className={buttonClass("primary", "lg", "mt-6 h-12 w-full text-[16px]")}>
-            <Plus size={22} aria-hidden />
+        <div className="mx-auto flex w-full max-w-[498px] flex-col gap-4 pb-16 pt-[136px]">
+          <div className="flex flex-col items-center gap-2 text-center">
+            {/* The art is exported as an alpha mask and tinted, as in the frame. */}
+            <StaffIcon name="staff-shift-empty.png" size={200} className="text-[#cbd5e1] [[data-theme=dark]_&]:text-[var(--octo-text-faint)]" />
+            <h2 className={clsx("text-[16px] font-bold leading-4", INK)}>{t("staff.shiftRoles.emptyTitle")}</h2>
+            <p className={clsx("text-[14px] font-medium leading-[1.4]", INK_SOFT)}>{t("staff.shiftRoles.emptyDescription")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onAddOpenChange(true)}
+            className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-[4px] border border-[#f5f9ff] bg-[#0D6EFD] p-2 text-[14px] font-semibold leading-[14px] text-white transition-colors hover:bg-[#0b5ed7] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 [[data-theme=dark]_&]:border-transparent"
+          >
+            <StaffIcon name="staff-shift-plus.svg" size={24} />
             {t("staff.shiftRoles.add")}
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {store.shiftRoles.map((role) => {
             const name = labels.data("staff.shiftRole", role.name);
             return (
-              <article key={role.id} className="flex flex-col rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="min-w-0 truncate text-[17px] font-semibold text-[var(--octo-text-primary)]">{name}</h3>
-                  <StatusPill tone={role.active ? "success" : "neutral"} label={t(role.active ? "staff.status.active" : "staff.status.inactive")} />
+              <article
+                key={role.id}
+                className={clsx("flex flex-col gap-2 rounded-[16px] border bg-[var(--octo-card)] p-3 shadow-[0_0_8px_rgba(0,0,0,0.08)]", LINE)}
+              >
+                <div className={clsx("flex flex-col gap-2 border-b pb-2", LINE)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="min-w-0 truncate text-[16px] font-semibold leading-4 text-black [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">{name}</h3>
+                    <StatusPill tone={role.active ? "success" : "neutral"} label={t(role.active ? "staff.status.active" : "staff.status.inactive")} />
+                  </div>
+                  <p className={clsx("flex flex-wrap items-center gap-1 text-[12px] leading-3", INK)}>
+                    <StaffIcon name="staff-shift-clock.svg" size={16} />
+                    <span>{t("staff.shiftRoles.shiftTime")}:</span>
+                    <span className="font-semibold">{rangeLabel(role.start, role.end, locale)}</span>
+                  </p>
+                  <p className={clsx("flex flex-wrap items-center gap-1 text-[12px] leading-3", INK)}>
+                    <StaffIcon name="staff-calendar-16.svg" size={16} />
+                    <span>{t("staff.shiftRoles.shiftDays")}:</span>
+                    <span className="font-semibold">{formatDaysSpan(role.days, locale, t("staff.shiftRoles.everyDay"))}</span>
+                  </p>
                 </div>
-                <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[14px] text-[var(--octo-text-primary)]">
-                  <Clock size={16} aria-hidden className="shrink-0" />
-                  <span>{t("staff.shiftRoles.shiftTime")}:</span>
-                  <span className="font-semibold">{rangeLabel(role.start, role.end, locale)}</span>
-                </p>
-                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[14px] text-[var(--octo-text-primary)]">
-                  <CalendarDays size={16} aria-hidden className="shrink-0" />
-                  <span>{t("staff.shiftRoles.shiftDays")}:</span>
-                  <span className="font-semibold">{formatDaysSpan(role.days, locale, t("staff.shiftRoles.everyDay"))}</span>
-                </p>
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--octo-divider)] pt-3">
-                  <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--octo-text-primary)]">
-                    <Settings size={15} aria-hidden className="shrink-0" />
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className={clsx("flex min-w-0 items-center gap-1 text-[10px] leading-[10px]", INK)}>
+                    <StaffIcon name="staff-system-update.svg" size={16} glyph={[14, 14.33]} />
                     <span className="truncate">
                       {t("staff.shiftRoles.updated")}: {formatDateTime(role.updatedAt, locale)}
                     </span>
@@ -207,12 +214,12 @@ export function ShiftRolesView({ addOpen, onAddOpenChange }: { addOpen: boolean;
                       type="button"
                       onClick={() => setDeleteTarget(role)}
                       aria-label={t("staff.shiftRoles.deleteAria").replace("{name}", name)}
-                      className={buttonClass("dangerSoft", "md", "w-10 px-0")}
+                      className={clsx(CARD_ACTION, "w-8", FILL_RED, TEXT_RED)}
                     >
-                      <Trash2 size={18} />
+                      <StaffIcon name="crm-trash.svg" size={24} />
                     </button>
-                    <button type="button" onClick={() => setEditing(role)} className={buttonClass("neutralSoft", "md", "font-medium")}>
-                      <SquarePen size={18} aria-hidden />
+                    <button type="button" onClick={() => setEditing(role)} className={clsx(CARD_ACTION, "px-2", FILL_BLUE, INK)}>
+                      <StaffIcon name="crm-detail-edit.svg" size={24} />
                       {t("staff.grid.menu.edit")}
                     </button>
                   </span>

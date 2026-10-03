@@ -1,10 +1,12 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/channel-icon.tsx
-import { Mail, MessageSquareText } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { WhatsAppGlyph } from "../whatsapp-glyph";
 import type { CommunicationChannel } from "../types";
 
-export function ChannelIcon({ channel, size = 20 }: { channel: CommunicationChannel; size?: number }) {
+export function ChannelIcon({ channel, size = 24 }: { channel: CommunicationChannel; size?: number }) {
   if (channel === "WhatsApp") return <WhatsAppGlyph size={size} />;
-  if (channel === "SMS") return <MessageSquareText size={size} strokeWidth={1.75} className="shrink-0 text-[#0D6EFD]" />;
-  return <Mail size={size} strokeWidth={1.75} className="shrink-0 text-[#EA580C]" />;
+  // The frames have no SMS channel, so it keeps a stock glyph in the same ink.
+  if (channel === "SMS") return <MessageSquareText size={size} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-primary)]" />;
+  return <ShellIcon name="crm-msg-sms.svg" size={size} className="text-[var(--octo-text-primary)]" />;
 }

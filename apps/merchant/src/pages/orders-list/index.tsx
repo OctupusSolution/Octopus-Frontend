@@ -1,11 +1,13 @@
 // apps/merchant/src/pages/orders-list/index.tsx
 import { useMemo, useState } from "react";
-import { CalendarDays, Download, Plus, Search, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Settings } from "lucide-react";
 import type { DuplicateOrderTemplateResponse } from "@octopus/api-client";
 import { mapRealOrderToRecord, mapRealOrdersToRecords, OrderErrorNote, useOrderText, useRealOrders } from "@/entities/order";
 import { NewOrderModal } from "@/features/order/take-order";
 import { OrderSettingsModal } from "@/features/order/order-settings";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { computeOrderStats, pillCount } from "./_shared/stats";
 import { OrdersStatCards } from "./_shared/stat-cards";
 import { OrderFilterPills } from "./_shared/filter-pills";
@@ -41,6 +43,13 @@ function downloadCsv(filename: string, csv: string) {
 
 const PAGE_SIZE = 10;
 
+// The frames' 40px controls: Export, and the header actions that share its shape.
+const CONTROL = "inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium leading-[14px]";
+const CONTROL_PRIMARY = "bg-[#007bff] text-white transition-opacity hover:opacity-90";
+const CONTROL_OUTLINE =
+  "border border-[#cbd5e1] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]";
+const EMPTY_ART_TONE = "text-[#cbd5e1] [[data-theme=dark]_&]:text-[var(--octo-border-input)]";
+
 export function OrdersListPage() {
   const { t } = useI18n();
   const { tx } = useOrderText();
@@ -60,6 +69,13 @@ export function OrdersListPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [detailsOrder, setDetailsOrder] = useState<OrderRecord | null>(null);
+  const navigate = useNavigate();
+  // A real order opens its own page; the modal remains for anything without
+  // a server id.
+  const showDetails = (order: OrderRecord) => {
+    if (order.real) navigate(`/orders/${order.real.orderId}`);
+    else setDetailsOrder(order);
+  };
   const [pendingAction, setPendingAction] = useState<{ action: OrderAction; order: OrderRecord } | null>(null);
 
   // Real orders only (US-018, AdminApi): today's plus every one still open.
@@ -110,25 +126,15 @@ export function OrdersListPage() {
 
   return (
     <>
-      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[22px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[25px]">
-              {t("orders.title")}
-            </h1>
-            <p className="mt-1 text-[12.5px] text-[var(--octo-text-muted)] sm:text-[13px]">{t("orders.subtitle")}</p>
+      <div className="px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-[24px] font-bold leading-[24px] text-[var(--octo-text-primary)]">{t("orders.title")}</h1>
+            <p className="text-[14px] font-medium leading-[14px] text-[var(--octo-text-secondary)]">{t("orders.subtitle")}</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-2 rounded-[9px] bg-[var(--octo-hover)] px-3 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-secondary)]">
-              <CalendarDays size={15} className="text-[var(--octo-text-muted)]" />
-              {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-            </span>
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-            >
-              <Settings size={15} className="text-[var(--octo-text-muted)]" />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button type="button" onClick={() => setSettingsOpen(true)} className={`${CONTROL} ${CONTROL_OUTLINE}`}>
+              <Settings size={20} strokeWidth={1.5} />
               {tx("page.settings")}
             </button>
             <button
@@ -138,11 +144,15 @@ export function OrdersListPage() {
                 setReorderTemplate(null);
                 setNewOrderOpen(true);
               }}
-              className="flex items-center gap-2 rounded-[9px] bg-[#0D6EFD] px-3.5 py-[8px] text-[12.5px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className={`${CONTROL} ${CONTROL_PRIMARY} disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              <Plus size={15} />
+              <Plus size={20} strokeWidth={1.5} />
               {tx("page.newOrder")}
             </button>
+            <span className="flex h-10 items-center gap-2 whitespace-nowrap rounded-[4px] bg-[#f1f5f9] px-2 text-[14px] font-medium leading-[14px] text-[var(--octo-text-primary)] [[data-theme=dark]_&]:bg-[var(--octo-soft-bg)]">
+              <ShellIcon name="ord-calendar.svg" size={24} />
+              {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </span>
           </div>
         </header>
 
@@ -152,23 +162,21 @@ export function OrdersListPage() {
           ordersError && <OrderErrorNote message={tx("page.loadFailed").replace("{message}", ordersError)} />
         )}
 
-        <div className="mt-4">
+        <div className="mt-7">
           <OrdersStatCards stats={stats} />
         </div>
 
         {ordersLoading && hasNoOrdersAtAll ? (
           <p className="py-16 text-center text-[13px] text-[var(--octo-text-muted)]">{tx("common.loading")}</p>
         ) : hasNoOrdersAtAll ? (
-          <div className="flex flex-col items-center px-4 py-16 text-center">
-            <EmptyOrdersArt className="h-[168px] w-[196px] text-[var(--octo-crumb)]" />
-            <h2 className="mt-6 text-[17px] font-bold text-[var(--octo-text-primary)]">{t("orders.empty.title")}</h2>
-            <p className="mt-2 max-w-[440px] text-[13px] text-[var(--octo-text-muted)]">
-              {t("orders.empty.description")}
-            </p>
+          <div className="mx-auto mt-16 flex w-full max-w-[667px] flex-col items-center gap-2 text-center lg:mt-[168px]">
+            <EmptyOrdersArt className={EMPTY_ART_TONE} />
+            <h2 className="text-[16px] font-bold leading-[16px] text-[var(--octo-text-primary)]">{t("orders.empty.title")}</h2>
+            <p className="text-[14px] font-medium leading-[1.4] text-[var(--octo-text-secondary)]">{t("orders.empty.description")}</p>
           </div>
         ) : (
           <>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
               <SourceFilterPopover
                 selected={selectedSources}
                 onChange={(sources) => {
@@ -187,9 +195,9 @@ export function OrdersListPage() {
               />
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[200px] flex-1">
-                <Search size={15} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--octo-text-faint)]" />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <label className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-[12px] border border-[#e2e8f0] bg-[var(--octo-card)] px-4 transition-colors focus-within:border-[#0d6efd] focus-within:ring-2 focus-within:ring-[#0d6efd]/30 [[data-theme=dark]_&]:border-[var(--octo-border-input)]">
+                <ShellIcon name="ord-search.svg" size={24} className="text-[var(--octo-text-secondary)]" />
                 <input
                   value={search}
                   onChange={(event) => {
@@ -197,61 +205,50 @@ export function OrdersListPage() {
                     setPage(1);
                   }}
                   placeholder={t("orders.search.placeholder")}
-                  className="w-full rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] py-[9px] ps-10 pe-3 text-[13px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30 focus:border-[#0D6EFD]"
+                  aria-label={t("orders.search.placeholder")}
+                  className="h-full min-w-0 flex-1 bg-transparent text-[14px] font-medium text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-secondary)] focus:outline-none"
                 />
-              </div>
-              <button
-                type="button"
-                onClick={handleExport}
-                className="flex items-center gap-2 rounded-[10px] bg-[#0D6EFD] px-4 py-[9px] text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                <Download size={15} />
+              </label>
+              <button type="button" onClick={handleExport} className={`${CONTROL} ${CONTROL_PRIMARY}`}>
+                <ShellIcon name="ord-export.svg" size={24} />
                 {t("orders.export")}
               </button>
             </div>
 
             {visibleRows.length === 0 ? (
-              <div className="flex flex-col items-center px-4 py-14 text-center">
-                <EmptyOrdersArt className="h-[132px] w-[154px] text-[var(--octo-crumb)]" />
-                <h2 className="mt-5 text-[15px] font-semibold text-[var(--octo-text-primary)]">
-                  {t("orders.filter.empty")}
-                </h2>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="mt-4 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3.5 py-[8px] text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-                >
+              <div className="flex flex-col items-center gap-2 px-4 py-14 text-center">
+                <EmptyOrdersArt size={140} className={EMPTY_ART_TONE} />
+                <h2 className="text-[16px] font-bold leading-[16px] text-[var(--octo-text-primary)]">{t("orders.filter.empty")}</h2>
+                <button type="button" onClick={resetFilters} className={`mt-2 ${CONTROL} ${CONTROL_OUTLINE}`}>
                   {t("orders.filter.reset")}
                 </button>
               </div>
             ) : (
               <>
                 {/* Mobile: the same card, collapsed to a tap-to-expand summary */}
-                <div className="mt-3 flex flex-col gap-2.5 lg:hidden">
+                <div className="mt-4 flex flex-col gap-4 lg:hidden">
                   {pageRows.map((order) => (
                     <OrderCard
                       key={order.id}
                       order={order}
                       expanded={expandedId === order.id}
                       onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
-                      onOpenDetails={setDetailsOrder}
+                      onOpenDetails={showDetails}
                       onAction={(action, target) => setPendingAction({ action, order: target })}
                     />
                   ))}
                 </div>
 
                 {/* Desktop: the full five-column row card */}
-                <div className="octo-scroll mt-3 hidden overflow-x-auto lg:block">
-                  <div className="flex min-w-[1120px] flex-col gap-2.5">
-                    {pageRows.map((order) => (
-                      <OrderRowCard
-                        key={order.id}
-                        order={order}
-                        onOpenDetails={setDetailsOrder}
-                        onAction={(action, target) => setPendingAction({ action, order: target })}
-                      />
-                    ))}
-                  </div>
+                <div className="mt-4 hidden flex-col gap-4 lg:flex">
+                  {pageRows.map((order) => (
+                    <OrderRowCard
+                      key={order.id}
+                      order={order}
+                      onOpenDetails={showDetails}
+                      onAction={(action, target) => setPendingAction({ action, order: target })}
+                    />
+                  ))}
                 </div>
 
                 <Pagination
@@ -291,7 +288,7 @@ export function OrdersListPage() {
           setNewOrderOpen(false);
           setReorderTemplate(null);
           refreshRealOrders();
-          setDetailsOrder(mapRealOrderToRecord(order));
+          navigate(`/orders/${order.id}`);
         }}
       />
       <OrderSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />

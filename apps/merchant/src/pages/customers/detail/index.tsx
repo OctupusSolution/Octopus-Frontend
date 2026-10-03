@@ -1,24 +1,60 @@
 // apps/merchant/src/pages/customers/detail/index.tsx
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, CalendarDays, CreditCard, Link2, Mail, MessageSquarePlus, Share, SquarePen, Tag, Trash2, Users, Utensils } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 import { EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { customerActions, useCustomers, useCustomerSync } from "../_shared/customer-store";
 import { customerName, formatDate, formatReservationDateTime, formatSar, formatSarWhole } from "../_shared/format";
 import { Avatar } from "../_shared/avatar";
-import { ActionButton } from "../_shared/action-button";
 import { TagChips } from "../_shared/tag-chips";
 import { Toast, useToast } from "../_shared/toast";
 import { WhatsAppGlyph } from "../_shared/whatsapp-glyph";
-import {
-  ACTION_TINT, DETAIL_STAT_TILE_THEME, PAYMENT_STATUS_STYLE, RESERVATION_STATUS_STYLE, type DetailStatTileTheme,
-} from "../_shared/theme";
+import { PAYMENT_STATUS_STYLE, RESERVATION_STATUS_STYLE } from "../_shared/theme";
 import { PaymentLinkModal } from "../_shared/payment-link-modal";
 import { AddNoteModal } from "../_shared/add-note-modal";
 import { AddTagModal } from "../_shared/add-tag-modal";
 import { EditInfoModal } from "../_shared/edit-info-modal";
 import { actionErrorKey } from "../_shared/crm-api";
+
+const PAGE_CLASS = "px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8";
+const LINE_COLOR = "border-[#cbd5e1] [[data-theme=dark]_&]:border-[var(--octo-border-card)]";
+const CARD_BORDER = `border ${LINE_COLOR}`;
+const LINK_COLOR = "text-[#0058da] [[data-theme=dark]_&]:text-[#60a5fa]";
+const ROW_CLASS = `flex items-center gap-2 rounded-[12px] bg-[var(--octo-card)] p-2 shadow-[0_0_4px_rgba(0,0,0,0.08)] ${CARD_BORDER}`;
+const PILL_CLASS = "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium leading-[12px]";
+// The frame sets line-height equal to font-size; a truncated line would clip
+// its descenders at that height, so the clip box is padded and pulled back.
+const CLIP_SAFE = "-my-[3px] truncate py-[3px]";
+
+interface StatTileStyle {
+  icon: string;
+  badge: string;
+  surface: string;
+}
+
+// Tile colours are this frame's own; in dark mode the pastel is rebuilt from
+// the badge colour over the card surface.
+const STAT_TILE = {
+  totalVisits: { icon: "crm-detail-location.svg", badge: "bg-[#0063f6]", surface: "bg-[#f0f6ff] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#0063f6_14%,var(--octo-card))]" },
+  totalSpend: { icon: "crm-detail-moneys.svg", badge: "bg-[#009a39]", surface: "bg-[#f3fff7] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#009a39_14%,var(--octo-card))]" },
+  lastVisit: { icon: "crm-detail-clock.svg", badge: "bg-[#c53395]", surface: "bg-[#fff3fb] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#c53395_14%,var(--octo-card))]" },
+  loyaltyPoints: { icon: "crm-detail-star.svg", badge: "bg-[#cc9934]", surface: "bg-[#fff8ea] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#cc9934_14%,var(--octo-card))]" },
+  avgSpend: { icon: "crm-detail-activity.svg", badge: "bg-[#8735e4]", surface: "bg-[#f9f3ff] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#8735e4_14%,var(--octo-card))]" },
+} satisfies Record<string, StatTileStyle>;
+
+// Per-button look of the action row. The light values are the frame's; the
+// dark ones rebuild each pastel as a tint over the card surface.
+const ACTION_STYLE = {
+  newReservations: "gap-1 border border-[#cccba8] bg-[#fffedc] px-2 text-[#696700] [[data-theme=dark]_&]:border-[#e0dc5a]/30 [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#e0dc5a_12%,var(--octo-card))] [[data-theme=dark]_&]:text-[#e0dc5a]",
+  paymentLink: "gap-1 border border-[#ebc0ff] bg-[#f8e9ff] px-2 text-[#7600b1] [[data-theme=dark]_&]:border-[#c77dff]/30 [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#c77dff_12%,var(--octo-card))] [[data-theme=dark]_&]:text-[#c77dff]",
+  whatsapp: "gap-1 bg-[#f2f9f3] px-3 text-[#009a39] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#22c55e_12%,var(--octo-card))] [[data-theme=dark]_&]:text-[#22c55e]",
+  email: "gap-1 bg-[#f5f9ff] px-3 text-[#0d6efd] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#0d6efd_14%,var(--octo-card))] [[data-theme=dark]_&]:text-[#60a5fa]",
+  addTag: "gap-2 border border-[#e2e8f0] bg-[var(--octo-card)] px-4 text-[var(--octo-text-secondary)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]",
+  block: `gap-2 border px-4 text-[var(--octo-text-secondary)] ${LINE_COLOR}`,
+  delete: "gap-2 bg-[#fef0f0] px-4 text-[#d30202] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#ef4444_12%,var(--octo-card))] [[data-theme=dark]_&]:text-[#f87171]",
+} satisfies Record<string, string>;
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,19 +76,19 @@ export function CustomerDetailPage() {
         onClick={() => navigate("/customers")}
         aria-label={t("customers.detail.back")}
         title={t("customers.detail.back")}
-        className="grid h-8 w-8 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+        className="-my-1 grid h-8 w-8 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
       >
         <ArrowLeft size={20} className="rtl:rotate-180" />
       </button>
-      <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)]">{t("customers.detail.title")}</h1>
+      <h1 className="text-[24px] font-bold leading-[24px] text-[var(--octo-text-primary)]">{t("customers.detail.title")}</h1>
     </div>
   );
 
   if (!customer) {
     return (
-      <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-6">
+      <div className={PAGE_CLASS}>
         {heading}
-        <EmptyState className="mt-4 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]" icon={<Users size={18} />} title={t("customers.detail.notFound")} />
+        <EmptyState className="mt-8 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]" icon={<Users size={18} />} title={t("customers.detail.notFound")} />
       </div>
     );
   }
@@ -68,44 +104,45 @@ export function CustomerDetailPage() {
 
   const name = customerName(customer);
   const localeTag = locale === "ar" ? "ar-SA" : "en-US";
+  const editIcon = <ShellIcon name="crm-detail-edit.svg" size={24} />;
 
   return (
-    <div className="px-4 pb-10 pt-4 sm:px-[26px] sm:pt-6">
+    <div className={PAGE_CLASS}>
       {heading}
 
-      <header className="mt-5 flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 xl:flex-nowrap">
-        <div className="flex min-w-[280px] items-center gap-4 xl:w-[380px] xl:shrink-0 xl:border-e xl:border-[var(--octo-divider)] xl:pe-4">
-          <Avatar name={name} photo={customer.avatarUrl} size={96} />
-          <div className="min-w-0">
-            <div className="truncate text-[18px] font-medium text-[var(--octo-text-primary)]">{name}</div>
-            <TagChips tags={customer.tags} blocked={customer.isBlocked} className="mt-1.5" />
-            <div className="mt-2 flex items-center gap-1.5 text-[14px] text-[var(--octo-text-secondary)]">
-              <WhatsAppGlyph size={13} /> <span dir="ltr">{customer.phone}</span>
+      <header className={`mt-8 flex flex-wrap items-center justify-between gap-y-4 rounded-[24px] p-3 xl:flex-nowrap ${CARD_BORDER}`}>
+        <div className={`flex w-full min-w-0 items-start gap-3 pe-2 xl:w-[367px] xl:shrink-0 xl:border-e ${LINE_COLOR}`}>
+          <Avatar name={name} photo={customer.avatarUrl} size={80} />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className={`text-[16px] font-medium leading-[16px] text-[var(--octo-text-primary)] ${CLIP_SAFE}`}>{name}</div>
+            <TagChips tags={customer.tags} blocked={customer.isBlocked} />
+            <div className="flex items-center gap-1 text-[12px] font-medium leading-[12px] text-[var(--octo-text-secondary)]">
+              <WhatsAppGlyph size={12} /> <span dir="ltr">{customer.phone}</span>
             </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[14px] text-[var(--octo-text-secondary)]">
-              <Mail size={13} className="shrink-0" /> <span className="truncate">{customer.email || "—"}</span>
+            <div className="flex min-w-0 items-center gap-1 text-[12px] font-medium leading-[12px] text-[var(--octo-text-secondary)]">
+              <ShellIcon name="crm-detail-sms.svg" size={12} /> <span className={CLIP_SAFE}>{customer.email || "—"}</span>
             </div>
           </div>
         </div>
-        <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} theme={DETAIL_STAT_TILE_THEME.totalVisits} />
-          <StatTile label={t("customers.detail.totalSpend")} value={formatSarWhole(customer.totalSpendSar)} theme={DETAIL_STAT_TILE_THEME.totalSpend} />
-          <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} theme={DETAIL_STAT_TILE_THEME.lastVisit} />
+        <div className="grid w-full grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:w-auto xl:flex-1 xl:px-[13px]">
+          <StatTile label={t("customers.detail.totalVisits")} value={String(customer.visits)} tile={STAT_TILE.totalVisits} />
+          <StatTile label={t("customers.detail.totalSpend")} value={formatSarWhole(customer.totalSpendSar)} tile={STAT_TILE.totalSpend} />
+          <StatTile label={t("customers.detail.lastVisit")} value={formatDate(customer.lastVisit, locale)} tile={STAT_TILE.lastVisit} />
           <StatTile
             label={t("customers.detail.loyaltyPoints")}
             value={t("customers.detail.pointsValue").replace("{points}", customer.loyaltyPoints.toLocaleString(localeTag))}
-            theme={DETAIL_STAT_TILE_THEME.loyaltyPoints}
+            tile={STAT_TILE.loyaltyPoints}
           />
-          <StatTile label={t("customers.detail.avgSpend")} value={formatSarWhole(customer.avgSpendSar)} theme={DETAIL_STAT_TILE_THEME.avgSpend} />
+          <StatTile label={t("customers.detail.avgSpend")} value={formatSarWhole(customer.avgSpendSar)} tile={STAT_TILE.avgSpend} />
         </div>
       </header>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Panel
           title={t("customers.detail.about.title")}
-          action={<PanelIconButton label={t("customers.detail.editAbout.title")} onClick={() => setAboutEditOpen(true)} icon={<SquarePen size={22} strokeWidth={1.75} />} />}
+          action={<PanelIconButton label={t("customers.detail.editAbout.title")} onClick={() => setAboutEditOpen(true)} icon={editIcon} className={LINK_COLOR} />}
         >
-          <dl className="flex flex-col gap-2">
+          <dl className="flex flex-col gap-3">
             <InfoRow label={t("customers.detail.about.customerSince")} value={formatDate(customer.customerSince, locale)} />
             <InfoRow label={t("customers.detail.about.firstVisit")} value={formatDate(customer.firstVisit, locale)} />
             <InfoRow label={t("customers.detail.about.preferredBranch")} value={customer.preferredBranch || "—"} />
@@ -118,9 +155,9 @@ export function CustomerDetailPage() {
 
         <Panel
           title={t("customers.detail.preferences.title")}
-          action={<PanelIconButton label={t("customers.detail.editPreferences.title")} onClick={() => setPreferencesEditOpen(true)} icon={<SquarePen size={22} strokeWidth={1.75} />} />}
+          action={<PanelIconButton label={t("customers.detail.editPreferences.title")} onClick={() => setPreferencesEditOpen(true)} icon={editIcon} className={LINK_COLOR} />}
         >
-          <dl className="flex flex-col gap-2">
+          <dl className="flex flex-col gap-3">
             <InfoRow label={t("customers.detail.preferences.cuisine")} value={customer.cuisinePreference.join(", ") || "—"} />
             <InfoRow label={t("customers.detail.preferences.dietary")} value={customer.dietaryPreference || "—"} />
             <InfoRow label={t("customers.detail.preferences.occasion")} value={customer.occasion || "—"} />
@@ -135,15 +172,23 @@ export function CustomerDetailPage() {
 
         <Panel
           title={t("customers.detail.notes.title")}
-          action={<PanelIconButton label={t("customers.addNote.title")} onClick={() => setNoteOpen(true)} icon={<MessageSquarePlus size={22} strokeWidth={1.75} />} />}
+          action={
+            <PanelIconButton
+              label={t("customers.addNote.title")}
+              onClick={() => setNoteOpen(true)}
+              // Exported at its own 21.5px bounds, inset in the frame's 24px slot.
+              icon={<ShellIcon name="crm-detail-chat-add.svg" size={21.5} />}
+              className="text-[#0d6efd] [[data-theme=dark]_&]:text-[#60a5fa]"
+            />
+          }
         >
           {customer.notes.length === 0 ? (
-            <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.detail.notes.empty")}</p>
+            <p className="text-[12px] font-medium text-[var(--octo-text-muted)]">{t("customers.detail.notes.empty")}</p>
           ) : (
-            <ul className="flex list-disc flex-col gap-2.5 ps-6 text-[14px] text-[var(--octo-text-primary)] marker:text-[var(--octo-text-primary)]">
+            <ul className="flex list-disc flex-col gap-3 ps-[18px] text-[12px] font-medium leading-[1.4] text-[var(--octo-text-primary)] marker:text-[var(--octo-text-primary)]">
               {customer.notes.map((note, index) => (
                 <li key={index}>
-                  <span className="font-semibold">{formatDate(note.date, locale)}</span> - {note.text}
+                  <span className="font-bold">{formatDate(note.date, locale)}</span> - {note.text}
                 </li>
               ))}
             </ul>
@@ -156,14 +201,14 @@ export function CustomerDetailPage() {
           {customer.recentReservations.map((res, index) => {
             const style = RESERVATION_STATUS_STYLE[res.status];
             return (
-              <li key={index} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
-                <CalendarDays size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[14px] leading-snug text-[var(--octo-text-primary)]">{formatReservationDateTime(res.date, locale)}</div>
-                  <div className="text-[13.5px] text-[var(--octo-text-secondary)]">{res.table} - {res.guests} {t("customers.detail.guests")}</div>
+              <li key={index} className={ROW_CLASS}>
+                <ShellIcon name="crm-detail-calendar.svg" size={24} className="text-[var(--octo-text-primary)]" />
+                <div className="flex min-w-0 flex-1 flex-col gap-2 font-medium">
+                  <div className={`text-[14px] leading-[14px] text-[var(--octo-text-primary)] ${CLIP_SAFE}`}>{formatReservationDateTime(res.date, locale)}</div>
+                  <div className={`text-[12px] leading-[12px] text-[var(--octo-text-secondary)] ${CLIP_SAFE}`}>{res.table} - {res.guests} {t("customers.detail.guests")}</div>
                 </div>
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[13px]" style={{ color: style.text, backgroundColor: style.bg }}>
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.text }} />
+                <span className={PILL_CLASS} style={{ color: style.text, backgroundColor: style.bg }}>
+                  <span className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: style.text }} />
                   {t(`customers.detail.reservationStatus.${res.status.toLowerCase()}`)}
                 </span>
               </li>
@@ -173,12 +218,12 @@ export function CustomerDetailPage() {
 
         <ListPanel title={t("customers.detail.orders.title")} viewAllTo="/orders" empty={customer.recentOrders.length === 0}>
           {customer.recentOrders.map((order) => (
-            <li key={order.id} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
-              <Utensils size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] text-[var(--octo-text-primary)]">{formatDate(order.date, locale)} - {order.id}</div>
-                <div className="truncate text-[13.5px] text-[var(--octo-text-secondary)]">{order.items}</div>
-                <div className="text-[16px] font-semibold text-[#0D6EFD]">{formatSar(order.totalSar)}</div>
+            <li key={order.id} className={ROW_CLASS}>
+              <ShellIcon name="crm-detail-food.svg" size={24} className="text-[var(--octo-text-primary)]" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className={`text-[12px] font-medium leading-[12px] text-[var(--octo-text-primary)] ${CLIP_SAFE}`}>{formatDate(order.date, locale)} - {order.id}</div>
+                <div className={`text-[12px] leading-[12px] text-[var(--octo-text-secondary)] ${CLIP_SAFE}`}>{order.items}</div>
+                <div className={`text-[14px] font-bold leading-[14px] ${LINK_COLOR}`}>{formatSar(order.totalSar)}</div>
               </div>
             </li>
           ))}
@@ -188,14 +233,16 @@ export function CustomerDetailPage() {
           {customer.recentPayments.map((payment, index) => {
             const style = PAYMENT_STATUS_STYLE[payment.status];
             return (
-              <li key={index} className="flex items-center gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2">
-                <CreditCard size={26} strokeWidth={1.5} className="shrink-0 text-[var(--octo-text-secondary)]" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[14px] text-[var(--octo-text-secondary)]">{formatDate(payment.date, locale)}</div>
-                  <div className="text-[14px] text-[var(--octo-text-primary)]" dir="ltr">{payment.cardLast4 ? `**** **** **** ${payment.cardLast4}` : payment.method ?? "—"}</div>
-                  <div className="text-[16px] font-semibold text-[#0D6EFD]">{formatSar(payment.amountSar)}</div>
+              <li key={index} className={ROW_CLASS}>
+                <ShellIcon name="crm-detail-card.svg" size={24} className="text-[var(--octo-text-primary)]" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="text-[12px] leading-[12px] text-[var(--octo-text-secondary)]">{formatDate(payment.date, locale)}</div>
+                  <div className="text-[12px] font-medium leading-[12px] text-[var(--octo-text-primary)]">
+                    <bdi dir="ltr">{payment.cardLast4 ? `**** **** **** ${payment.cardLast4}` : payment.method ?? "—"}</bdi>
+                  </div>
+                  <div className={`text-[14px] font-bold leading-[14px] ${LINK_COLOR}`}>{formatSar(payment.amountSar)}</div>
                 </div>
-                <span className="shrink-0 rounded-full px-2.5 py-0.5 text-[13px]" style={{ color: style.text, backgroundColor: style.bg }}>
+                <span className={PILL_CLASS} style={{ color: style.text, backgroundColor: style.bg }}>
                   {t(`customers.detail.${payment.status.toLowerCase()}`)}
                 </span>
               </li>
@@ -204,27 +251,50 @@ export function CustomerDetailPage() {
         </ListPanel>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:flex xl:justify-between">
-        <ActionButton size="md" className="xl:flex-1" icon={<CalendarDays size={18} />} label={t("customers.row.newReservations")} tint={ACTION_TINT.newReservations} onClick={() => navigate("/reservations/new")} />
-        <ActionButton size="md" className="xl:flex-1" icon={<Link2 size={18} />} label={t("customers.row.paymentLink")} tint={ACTION_TINT.paymentLink} onClick={() => setPaymentLinkOpen(true)} />
-        <ActionButton size="md" className="xl:flex-1" icon={<WhatsAppGlyph size={20} />} label={t("customers.rowAction.sendWhatsapp")} tint={ACTION_TINT.whatsapp} onClick={() => showToast(t("customers.rowAction.whatsappSent"))} />
-        <ActionButton size="md" className="xl:flex-1" icon={<Share size={19} />} label={t("customers.rowAction.sendEmail")} tint={ACTION_TINT.email} onClick={() => showToast(t("customers.rowAction.emailSent"))} />
-        <ActionButton size="md" className="xl:flex-1" icon={<Tag size={19} />} label={t("customers.rowAction.addTag")} onClick={() => setTagOpen(true)} />
-        <ActionButton
-          size="md"
-          className="xl:flex-1"
-          icon={<Ban size={19} />}
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:flex">
+        <DetailAction
+          className={ACTION_STYLE.newReservations}
+          // The frame draws these two 16px glyphs a shade lighter than their label.
+          icon={<ShellIcon name="crm-detail-calendar-16.svg" size={16} className="text-[#878533] [[data-theme=dark]_&]:text-current" />}
+          label={t("customers.row.newReservations")}
+          onClick={() => navigate("/reservations/new")}
+        />
+        <DetailAction
+          className={ACTION_STYLE.paymentLink}
+          icon={<ShellIcon name="crm-detail-link.svg" size={16} className="text-[#9133c1] [[data-theme=dark]_&]:text-current" />}
+          label={t("customers.row.paymentLink")}
+          onClick={() => setPaymentLinkOpen(true)}
+        />
+        <DetailAction
+          className={ACTION_STYLE.whatsapp}
+          icon={<WhatsAppGlyph size={24} />}
+          label={t("customers.rowAction.sendWhatsapp")}
+          onClick={() => showToast(t("customers.rowAction.whatsappSent"))}
+        />
+        <DetailAction
+          className={ACTION_STYLE.email}
+          icon={<ShellIcon name="crm-detail-export.svg" size={24} />}
+          label={t("customers.rowAction.sendEmail")}
+          onClick={() => showToast(t("customers.rowAction.emailSent"))}
+        />
+        <DetailAction
+          className={ACTION_STYLE.addTag}
+          icon={<IconSlot><ShellIcon name="crm-detail-tag.svg" size={21} /></IconSlot>}
+          label={t("customers.rowAction.addTag")}
+          onClick={() => setTagOpen(true)}
+        />
+        <DetailAction
+          className={ACTION_STYLE.block}
+          icon={<IconSlot><ShellIcon name="crm-detail-block.svg" size={21.5} /></IconSlot>}
           label={t(customer.isBlocked ? "customers.rowAction.unblock" : "customers.rowAction.block")}
           onClick={() => {
             run(customerActions.toggleBlocked(current.id), t(customer.isBlocked ? "customers.rowAction.unblocked" : "customers.rowAction.blocked"));
           }}
         />
-        <ActionButton
-          size="md"
-          className="xl:flex-1"
-          icon={<Trash2 size={19} />}
+        <DetailAction
+          className={ACTION_STYLE.delete}
+          icon={<ShellIcon name="crm-detail-trash.svg" size={24} />}
           label={t("customers.rowAction.delete")}
-          tint={ACTION_TINT.danger}
           onClick={() => {
             if (!window.confirm(t("customers.rowAction.deleteConfirm"))) return;
             customerActions.remove([current.id]).then(
@@ -301,22 +371,43 @@ export function CustomerDetailPage() {
   );
 }
 
-function StatTile({ label, value, theme }: { label: string; value: string; theme: DetailStatTileTheme }) {
-  const Icon = theme.icon;
+function StatTile({ label, value, tile }: { label: string; value: string; tile: StatTileStyle }) {
   return (
-    <div className={`flex min-w-0 flex-col items-center rounded-xl px-2 py-3 text-center ${theme.cardBg}`}>
-      <div className="grid h-10 w-10 place-items-center rounded-[8px]" style={{ backgroundColor: theme.tile }}>
-        <Icon size={22} className="text-white" />
+    <div className={`flex min-w-0 flex-col items-center gap-3 rounded-[12px] border-2 border-[#fefefe] px-1 py-2 text-center shadow-[0_4px_2.5px_rgba(0,0,0,0.05)] [[data-theme=dark]_&]:border-[var(--octo-card)] ${tile.surface}`}>
+      <div className={`grid h-8 w-8 place-items-center rounded-[4px] text-white ${tile.badge}`}>
+        <ShellIcon name={tile.icon} size={24} />
       </div>
-      <div className="mt-3 w-full truncate text-[20px] font-medium leading-tight text-[var(--octo-text-primary)]">{value}</div>
-      <div className="mt-1 w-full truncate text-[15px] text-[var(--octo-text-muted)]">{label}</div>
+      <div className="flex w-full min-w-0 flex-col gap-2">
+        <div className="whitespace-nowrap text-[20px] font-semibold leading-[20px] text-[var(--octo-text-primary)]">{value}</div>
+        <div className={`text-[14px] font-medium leading-[14px] text-[var(--octo-text-muted)] ${CLIP_SAFE}`}>{label}</div>
+      </div>
     </div>
   );
 }
 
-function PanelIconButton({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
+/** Centres a glyph exported at its own bounds inside the frame's 24px icon slot. */
+function IconSlot({ children }: { children: ReactNode }) {
+  return <span className="grid h-6 w-6 shrink-0 place-items-center">{children}</span>;
+}
+
+// Local rather than the shared ActionButton: this row mixes icon sizes, gaps
+// and paddings per button, which that component's fixed shape cannot express.
+function DetailAction({ icon, label, onClick, className }: { icon: ReactNode; label: string; onClick: () => void; className: string }) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} title={label} className="grid h-8 w-8 place-items-center rounded-md text-[#3B82F6] transition-colors hover:bg-[var(--octo-hover)]">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-[8px] text-[14px] font-medium leading-[14px] transition-[filter] hover:brightness-[0.97] xl:flex-auto ${className}`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function PanelIconButton({ label, icon, onClick, className }: { label: string; icon: ReactNode; onClick: () => void; className: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={label} title={label} className={`grid h-6 w-6 shrink-0 place-items-center rounded-[4px] transition-opacity hover:opacity-70 ${className}`}>
       {icon}
     </button>
   );
@@ -324,21 +415,21 @@ function PanelIconButton({ label, icon, onClick }: { label: string; icon: ReactN
 
 function Panel({ title, action, children }: { title: string; action: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3.5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[17px] font-semibold text-[var(--octo-text-primary)]">{title}</h2>
+    <section className={`flex flex-col gap-3 rounded-[16px] p-3 ${CARD_BORDER}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[14px] font-bold leading-[14px] text-[var(--octo-text-primary)]">{title}</h2>
         {action}
       </div>
-      <div className="mt-3">{children}</div>
+      {children}
     </section>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4">
-      <dt className="shrink-0 text-[12.5px] text-[var(--octo-text-secondary)]">{label}</dt>
-      <dd className="min-w-0 text-end text-[15px] text-[var(--octo-text-primary)]">{value}</dd>
+    <div className="flex items-center justify-between gap-4 font-medium">
+      <dt className="shrink-0 text-[10px] leading-[10px] text-[var(--octo-text-secondary)]">{label}</dt>
+      <dd className="min-w-0 text-end text-[12px] leading-[12px] text-[var(--octo-text-primary)]">{value}</dd>
     </div>
   );
 }
@@ -346,17 +437,17 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ListPanel({ title, viewAllTo, empty, children }: { title: string; viewAllTo: string; empty: boolean; children: ReactNode }) {
   const { t } = useI18n();
   return (
-    <section className="rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3.5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[17px] font-semibold text-[var(--octo-text-primary)]">{title}</h2>
-        <Link to={viewAllTo} className="text-[15px] text-[#3B82F6] underline underline-offset-2 hover:opacity-80">
+    <section className={`flex flex-col gap-3 rounded-[16px] p-3 ${CARD_BORDER}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[14px] font-bold leading-[14px] text-[var(--octo-text-primary)]">{title}</h2>
+        <Link to={viewAllTo} className={`shrink-0 text-[12px] font-medium leading-[12px] underline hover:opacity-80 ${LINK_COLOR}`}>
           {t("customers.detail.viewAll")}
         </Link>
       </div>
       {empty ? (
-        <p className="mt-3 text-[13px] text-[var(--octo-text-muted)]">{t("customers.detail.historyEmpty")}</p>
+        <p className="text-[12px] font-medium text-[var(--octo-text-muted)]">{t("customers.detail.historyEmpty")}</p>
       ) : (
-        <ul className="mt-3 flex flex-col gap-3">{children}</ul>
+        <ul className="flex flex-col gap-3">{children}</ul>
       )}
     </section>
   );

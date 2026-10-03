@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Search } from "lucide-react";
 import { assignRoleToStaffMembers } from "@octopus/api-client";
-import { Modal } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./_shared/avatar";
-import { buttonClass } from "./_shared/buttons";
 import { TextInput } from "./_shared/form";
+import { StaffIcon } from "./_shared/icon";
 import { useStaffLabels } from "./_shared/labels";
+import { StaffModal } from "./_shared/staff-modal";
 import { useStaffStore } from "./_shared/staff-store";
 import { serverMemberIdOrNull, serverRoleId } from "./_shared/staff-sync";
 import { staffErrorText, useTx } from "./_shared/text";
+import { FILL_RED, INK, INK_SOFT, TEXT_RED } from "./_shared/theme";
 
 export function AssignUsersModal({
   roleId,
@@ -72,74 +72,71 @@ export function AssignUsersModal({
   };
 
   return (
-    <Modal
+    <StaffModal
       open={Boolean(role)}
       onClose={onClose}
       title={role ? t("staff.assignUsers.title").replace("{name}", labels.roleName(role)) : ""}
-      className="max-w-lg"
-      footer={
-        <>
-          <span className="me-auto text-[13px] text-[var(--octo-text-secondary)]">
-            {t("staff.assignUsers.selected").replace("{count}", String(picked.size))}
-          </span>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={() => void save()} disabled={picked.size === 0 || saving} className={buttonClass("primary")}>
-            {saving && <Loader2 size={16} className="animate-spin" aria-hidden />}
-            {t("staff.assignUsers.save")}
-          </button>
-        </>
-      }
+      submitLabel={t("staff.assignUsers.save")}
+      onSubmit={() => void save()}
+      submitDisabled={picked.size === 0 || saving}
     >
-      <p className="-mt-1 mb-3 text-[13px] text-[var(--octo-text-secondary)]">{t("staff.assignUsers.body")}</p>
-      {error && <p role="alert" className="mb-3 rounded-[9px] bg-[var(--octo-tone-danger-bg)] px-3 py-2 text-[13px] text-[var(--octo-tone-danger-text)]">{error}</p>}
-      <TextInput
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("staff.assignUsers.search")}
-        aria-label={t("staff.assignUsers.search")}
-        leading={<Search size={18} />}
-      />
-      <ul className="octo-scroll mt-3 flex max-h-[340px] flex-col gap-1 overflow-y-auto pe-1">
-        {rows.map((p) => {
-          const already = p.assignedRole === role?.id;
-          const current = store.roles.find((r) => r.id === p.assignedRole);
-          return (
-            <li key={p.employee.id}>
-              <label
-                className={
-                  already
-                    ? "flex cursor-not-allowed items-center gap-3 rounded-[10px] px-2.5 py-2 opacity-70"
-                    : "flex cursor-pointer items-center gap-3 rounded-[10px] px-2.5 py-2 hover:bg-[var(--octo-hover)]"
-                }
-                title={already ? t("staff.assignUsers.alreadyMember") : undefined}
-              >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 shrink-0 accent-[#0D6EFD]"
-                  checked={already || picked.has(p.employee.id)}
-                  disabled={already}
-                  onChange={() =>
-                    setPicked((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(p.employee.id)) next.delete(p.employee.id);
-                      else next.add(p.employee.id);
-                      return next;
-                    })
+      <div className="flex flex-col gap-4">
+        <p className={`text-[14px] leading-[18px] ${INK_SOFT}`}>{t("staff.assignUsers.body")}</p>
+        {error && <p role="alert" className={`rounded-[8px] px-3 py-2.5 text-[14px] leading-[18px] ${FILL_RED} ${TEXT_RED}`}>{error}</p>}
+        <TextInput
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          // Enter in the search box filters; it must not submit the dialog.
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.preventDefault();
+          }}
+          placeholder={t("staff.assignUsers.search")}
+          aria-label={t("staff.assignUsers.search")}
+          leading={<StaffIcon name="crm-search.svg" size={24} />}
+        />
+        <ul className="octo-scroll flex max-h-[340px] flex-col gap-1 overflow-y-auto pe-1">
+          {rows.map((p) => {
+            const already = p.assignedRole === role?.id;
+            const current = store.roles.find((r) => r.id === p.assignedRole);
+            return (
+              <li key={p.employee.id}>
+                <label
+                  className={
+                    already
+                      ? "flex cursor-not-allowed items-center gap-3 rounded-[4px] p-2 opacity-70"
+                      : "flex cursor-pointer items-center gap-3 rounded-[4px] p-2 hover:bg-[var(--octo-hover)]"
                   }
-                />
-                <Avatar name={p.employee.name} size={32} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-medium text-[var(--octo-text-primary)]">{p.employee.name}</span>
-                  <span className="block truncate text-[12px] text-[var(--octo-text-secondary)]">
-                    {already ? t("staff.assignUsers.alreadyMember") : current ? labels.roleName(current) : "—"}
+                  title={already ? t("staff.assignUsers.alreadyMember") : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 accent-[#0D6EFD]"
+                    checked={already || picked.has(p.employee.id)}
+                    disabled={already}
+                    onChange={() =>
+                      setPicked((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(p.employee.id)) next.delete(p.employee.id);
+                        else next.add(p.employee.id);
+                        return next;
+                      })
+                    }
+                  />
+                  <Avatar name={p.employee.name} size={32} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className={`truncate text-[14px] font-medium leading-[18px] ${INK}`}>{p.employee.name}</span>
+                    <span className={`truncate text-[12px] leading-4 ${INK_SOFT}`}>
+                      {already ? t("staff.assignUsers.alreadyMember") : current ? labels.roleName(current) : "—"}
+                    </span>
                   </span>
-                </span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
-    </Modal>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        <p className={`text-[14px] font-medium leading-[14px] ${INK}`}>{t("staff.assignUsers.selected").replace("{count}", String(picked.size))}</p>
+      </div>
+    </StaffModal>
   );
 }

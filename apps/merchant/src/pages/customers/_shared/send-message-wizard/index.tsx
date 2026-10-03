@@ -1,17 +1,22 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/index.tsx
 import { useEffect, useMemo, useState } from "react";
-import clsx from "clsx";
 import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { CRM_MODAL_CLASS } from "../action-button";
 import { customerActions, type SavedSegment } from "../customer-store";
 import { AudienceStep } from "./audience-step";
 import { ChannelContentStep } from "./channel-content-step";
 import { ReviewSendStep, type SendTiming } from "./review-send-step";
+import { StepRail } from "./step-rail";
 import { EMPTY_AUDIENCE_FILTERS, audienceOf, type AudienceFilters } from "./audience";
 import type { CommunicationChannel, CustomerRecord } from "../types";
 
 type Step = 1 | 2 | 3;
+
+// The frame's 738px card: 24px padding, a 24px semibold title and 16px between
+// the title and the body. The child selectors outrank the primitive's own
+// title and body classes.
+const MODAL_CLASS =
+  "max-w-[738px] flex max-h-[calc(100dvh-2rem)] flex-col [&>div]:-mx-1 [&>div]:min-h-0 [&>div]:flex-1 [&>div]:overflow-y-auto [&>div]:px-1 [&>div]:[scrollbar-width:none] [&>div::-webkit-scrollbar]:hidden p-6 [&>h2]:text-[24px] [&>h2]:font-semibold [&>h2]:leading-6 [&>h2+div]:mt-4";
 
 export function SendMessageWizard({
   open,
@@ -90,51 +95,16 @@ export function SendMessageWizard({
     onClose();
   }
 
-  const STEPS: { id: Step; label: string }[] = [
-    { id: 1, label: t("customers.sendMessage.step.audience") },
-    { id: 2, label: t("customers.sendMessage.step.channelContent") },
-    { id: 3, label: t("customers.sendMessage.step.reviewSend") },
+  const labels = [
+    t("customers.sendMessage.step.audience"),
+    t("customers.sendMessage.step.channelContent"),
+    t("customers.sendMessage.step.reviewSend"),
   ];
-  // Blue progress runs from step 1 to the next step (send message.png shows
-  // 1→2 blue while on step 1; send message (1).png is fully blue on step 3).
-  const progress = step === 1 ? "50%" : "100%";
 
   return (
-    <Modal open={open} onClose={close} title={t("customers.sendMessage.title")} className={`max-w-[760px] max-h-[94vh] overflow-y-auto octo-scroll ${CRM_MODAL_CLASS}`}>
-      <nav aria-label={t("customers.sendMessage.stepsLabel")} className="relative mt-1">
-        <div className="absolute inset-x-[64px] top-[14px] h-[3px] rounded-full bg-[var(--octo-track)]" aria-hidden="true">
-          <div className="h-full rounded-full bg-[#0D6EFD] transition-[width]" style={{ width: progress }} />
-        </div>
-        <ol className="relative flex items-start justify-between">
-          {STEPS.map((s) => {
-            const done = step > s.id;
-            const current = step === s.id;
-            const reachable = s.id < step;
-            return (
-              <li key={s.id} className="flex w-[128px] flex-col items-center">
-                <button
-                  type="button"
-                  disabled={!reachable}
-                  onClick={() => setStep(s.id)}
-                  aria-current={current ? "step" : undefined}
-                  className={clsx(
-                    "grid h-[30px] w-[30px] place-items-center rounded-full text-[13px] font-medium",
-                    done && "bg-[#0D6EFD] text-white",
-                    current && "border-2 border-[#0D6EFD] bg-[var(--octo-card)] text-[#0D6EFD]",
-                    !done && !current && "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
-                    reachable && "cursor-pointer hover:opacity-90"
-                  )}
-                >
-                  {s.id}
-                </button>
-                <span className={clsx("mt-2 whitespace-nowrap text-[15px]", done || current ? "text-[#0D6EFD]" : "text-[var(--octo-text-secondary)]")}>{s.label}</span>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
-      <div className="mt-3">
+    <Modal open={open} onClose={close} title={t("customers.sendMessage.title")} className={MODAL_CLASS}>
+      <div className="flex flex-col gap-4">
+        <StepRail step={step} labels={labels} ariaLabel={t("customers.sendMessage.stepsLabel")} onStepClick={(n) => setStep(n as Step)} />
         {step === 1 && <AudienceStep value={filters} segments={segments} totalSelected={totalSelected} onChange={setFilters} onNext={() => setStep(2)} />}
         {step === 2 && (
           <ChannelContentStep

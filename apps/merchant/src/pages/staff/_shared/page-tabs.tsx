@@ -5,26 +5,37 @@ export interface PageTabItem<T extends string> {
   label: string;
 }
 
-// The underlined tab row from the Staff designs: the active tab turns blue,
-// and the rule only runs under the tabs rather than across the whole page.
+// The underlined tab row from the Staff frames: 16px medium labels 32px apart,
+// a hairline rail 8px below them that only runs under the tabs (not the whole
+// page), and the active tab's stretch of the rail turned blue.
 export function PageTabs<T extends string>({
   items,
   value,
   onChange,
-  size = "lg",
   className,
+  railClassName,
   ariaLabel,
 }: {
   items: PageTabItem<T>[];
   value: T;
   onChange: (id: T) => void;
+  /** Kept for existing call sites; both tab rows are drawn at one size. */
   size?: "lg" | "md";
   className?: string;
+  /** Extra classes for the rail, e.g. a min-width where the frame runs it past the last tab. */
+  railClassName?: string;
   ariaLabel: string;
 }) {
   return (
     <div className={clsx("octo-scroll max-w-full overflow-x-auto", className)}>
-      <div role="tablist" aria-label={ariaLabel} className="inline-flex min-w-max items-end gap-7 border-b border-[var(--octo-divider)]">
+      <div
+        role="tablist"
+        aria-label={ariaLabel}
+        className={clsx(
+          "inline-flex min-w-max items-start gap-8 border-b border-[#e2e8f0] [[data-theme=dark]_&]:border-[var(--octo-border-card)]",
+          railClassName
+        )}
+      >
         {items.map((item) => {
           const active = item.id === value;
           return (
@@ -35,11 +46,10 @@ export function PageTabs<T extends string>({
               aria-selected={active}
               onClick={() => onChange(item.id)}
               className={clsx(
-                "-mb-px whitespace-nowrap border-b-2 px-0.5 font-medium transition-colors focus:outline-none focus-visible:text-[#0D6EFD]",
-                size === "lg" ? "pb-3 text-[16px]" : "pb-2.5 text-[15px]",
+                "-mb-px whitespace-nowrap border-b pb-3 pt-1 text-[16px] font-medium leading-4 transition-colors focus:outline-none focus-visible:text-[#0D6EFD]",
                 active
                   ? "border-[#0D6EFD] text-[#0D6EFD]"
-                  : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+                  : "border-transparent text-[#58606c] hover:text-[var(--octo-text-primary)] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]"
               )}
             >
               {item.label}

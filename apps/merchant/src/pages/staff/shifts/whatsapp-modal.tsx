@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { MessageCircle } from "lucide-react";
-import { Modal } from "@ui/primitives";
+import clsx from "clsx";
 import type { Employee } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "../_shared/avatar";
-import { buttonClass } from "../_shared/buttons";
 import { Field, TextArea } from "../_shared/form";
 import { formatDayHeader } from "../_shared/format";
+import { StaffModal } from "../_shared/staff-modal";
+import { INK, INK_MUTED, INK_SOFT, LINE } from "../_shared/theme";
 
 export function WhatsAppModal({
   open,
@@ -74,76 +74,73 @@ export function WhatsAppModal({
   };
 
   return (
-    <Modal
+    <StaffModal
       open={open}
       onClose={onClose}
       title={t("staff.shiftsTab.sendWhatsAppTitle")}
-      className="max-w-2xl"
-      footer={
-        <>
-          <span className="me-auto text-[13px] text-[var(--octo-text-secondary)]">
-            {t("staff.assignUsers.selected").replace("{count}", String(recipients.length))}
-          </span>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={send} disabled={recipients.length === 0} className={buttonClass("primary")}>
-            <MessageCircle size={18} aria-hidden />
-            {t("staff.whatsapp.open")}
-          </button>
-        </>
-      }
+      submitLabel={t("staff.whatsapp.open")}
+      onSubmit={send}
+      submitDisabled={recipients.length === 0}
     >
-      <p className="-mt-1 mb-4 text-[13px] text-[var(--octo-text-secondary)]">{t("staff.whatsapp.body")}</p>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-        <div className="min-w-0">
-          <label className="flex cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-2 text-[13px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-[#0D6EFD]"
-              checked={allSelected}
-              onChange={() => setSelected(allSelected ? new Set() : new Set(staff.map((e) => e.id)))}
+      <div className="flex flex-col gap-4">
+        <p className={clsx("px-2 text-[14px] leading-5", INK_SOFT)}>{t("staff.whatsapp.body")}</p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div className="flex min-w-0 flex-col gap-3">
+            <div className="flex items-center justify-between gap-2 px-2">
+              <label className={clsx("flex cursor-pointer items-center gap-2 text-[16px] font-medium leading-4", INK)}>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-[#0D6EFD]"
+                  checked={allSelected}
+                  onChange={() => setSelected(allSelected ? new Set() : new Set(staff.map((e) => e.id)))}
+                />
+                {t("staff.member.modules.selectAll")}
+              </label>
+              <span className={clsx("text-[12px] font-medium leading-3", INK_MUTED)}>
+                {t("staff.assignUsers.selected").replace("{count}", String(recipients.length))}
+              </span>
+            </div>
+            <ul className={clsx("octo-scroll flex max-h-[300px] flex-col gap-1 overflow-y-auto rounded-[12px] border p-2", LINE)}>
+              {staff.map((e) => (
+                <li key={e.id}>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-[4px] p-2 hover:bg-[var(--octo-hover)]">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0 accent-[#0D6EFD]"
+                      checked={selected.has(e.id)}
+                      onChange={() =>
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(e.id)) next.delete(e.id);
+                          else next.add(e.id);
+                          return next;
+                        })
+                      }
+                    />
+                    <Avatar name={e.name} size={28} />
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <span className={clsx("truncate text-[14px] font-semibold leading-[14px]", INK)}>{e.name}</span>
+                      <span dir="ltr" className={clsx("truncate text-[12px] font-medium leading-3 rtl:text-end", INK_SOFT)}>{e.phone}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Field label={t("staff.whatsapp.message")} htmlFor="wa-message" hint={recipients.length > 1 ? t("staff.whatsapp.manyHint") : undefined}>
+            <TextArea
+              id="wa-message"
+              rows={12}
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                setEdited(true);
+              }}
+              className="font-mono text-[12px] leading-relaxed"
             />
-            {t("staff.member.modules.selectAll")}
-          </label>
-          <ul className="octo-scroll mt-1 flex max-h-[300px] flex-col gap-0.5 overflow-y-auto border-t border-[var(--octo-divider)] pe-1 pt-1">
-            {staff.map((e) => (
-              <li key={e.id}>
-                <label className="flex cursor-pointer items-center gap-2.5 rounded-[8px] px-2 py-1.5 hover:bg-[var(--octo-hover)]">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 accent-[#0D6EFD]"
-                    checked={selected.has(e.id)}
-                    onChange={() =>
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(e.id)) next.delete(e.id);
-                        else next.add(e.id);
-                        return next;
-                      })
-                    }
-                  />
-                  <Avatar name={e.name} size={28} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-medium text-[var(--octo-text-primary)]">{e.name}</span>
-                    <span dir="ltr" className="block truncate text-[12px] text-[var(--octo-text-secondary)] rtl:text-end">{e.phone}</span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
+          </Field>
         </div>
-        <Field label={t("staff.whatsapp.message")} htmlFor="wa-message" hint={recipients.length > 1 ? t("staff.whatsapp.manyHint") : undefined}>
-          <TextArea
-            id="wa-message"
-            rows={12}
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              setEdited(true);
-            }}
-            className="font-mono text-[12px] leading-relaxed"
-          />
-        </Field>
       </div>
-    </Modal>
+    </StaffModal>
   );
 }

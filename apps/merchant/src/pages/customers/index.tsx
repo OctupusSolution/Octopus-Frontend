@@ -1,9 +1,10 @@
 // apps/merchant/src/pages/customers/index.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, MessageSquareMore, Plus, RotateCcw, Search, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { Button, EmptyState } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { customerActions, useCustomers, useCustomerSync, useSavedSegments } from "./_shared/customer-store";
 import { CustomerStatCards } from "./_shared/stat-cards";
 import { CustomerRow } from "./_shared/customer-row";
@@ -25,6 +26,29 @@ import { Pagination } from "@/pages/inventory/_shared/pagination";
 import type { CustomerRecord } from "./_shared/types";
 
 const PAGE_SIZE = 10;
+
+// The frames' 48px header / empty-state buttons.
+const BIG_BUTTON = "inline-flex h-12 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-3 text-[18px] font-bold leading-[18px]";
+const BIG_PRIMARY = `${BIG_BUTTON} bg-[#0d6efd] text-white transition-opacity hover:opacity-90`;
+const BIG_OUTLINE = `${BIG_BUTTON} border border-[#0d6efd] text-[#0d6efd] transition-colors hover:bg-[#0d6efd]/5`;
+// The toolbar's 40px Reset / Save Segment buttons.
+const TOOL_BUTTON = "inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-[8px] text-[14px] font-medium leading-[14px] text-[#0d6efd] transition-colors";
+
+const IMPORT_CSV_KEY = "customers.importCsv";
+
+/** "Import CSV" is drawn in the frames but has no import endpoint yet, so the
+ *  button is inert. The label falls back to English until the key is added
+ *  to the locale files. */
+function ImportCsvButton({ className }: { className?: string }) {
+  const { t } = useI18n();
+  const translated = t(IMPORT_CSV_KEY);
+  return (
+    <button type="button" disabled className={`${BIG_OUTLINE} cursor-not-allowed ${className ?? ""}`}>
+      <ShellIcon name="crm-import.svg" size={24} />
+      {translated === IMPORT_CSV_KEY ? "Import CSV" : translated}
+    </button>
+  );
+}
 
 function downloadFile(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
@@ -165,65 +189,63 @@ export function CustomersPage() {
 
   return (
     <>
-      <div className="px-4 pb-8 pt-4 sm:px-[26px] sm:pt-6">
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)]">{t("customers.title")}</h1>
-            <p className="mt-1.5 text-[14px] text-[var(--octo-text-muted)]">{t("customers.subtitle")}</p>
+      <div className="px-4 pb-10 pt-6 sm:px-6 lg:ps-12 lg:pt-8">
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-[24px] font-bold leading-[24px] text-[var(--octo-text-primary)]">{t("customers.title")}</h1>
+            <p className="text-[14px] font-medium leading-[14px] text-[var(--octo-text-secondary)]">{t("customers.subtitle")}</p>
           </div>
           {!isEmpty && (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-4">
               <button
                 type="button"
                 onClick={() => setSendMessageOpen(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-[#3B82F6] bg-[var(--octo-card)] px-3.5 text-[16px] font-semibold text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/5"
+                className={`${BIG_BUTTON} border border-[#cbd5e1] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]`}
               >
-                <MessageSquareMore size={20} strokeWidth={1.75} className="rtl:-scale-x-100" />
+                <ShellIcon name="crm-message-add.svg" size={24} className="rtl:-scale-x-100" />
                 {t("customers.sendMessageCta")}
               </button>
-              <button
-                type="button"
-                onClick={() => setAddCustomerOpen(true)}
-                className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-[#3B82F6] px-4 text-[16px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                <Plus size={18} strokeWidth={2.25} />
+              <ImportCsvButton />
+              <button type="button" onClick={() => setAddCustomerOpen(true)} className={BIG_PRIMARY}>
+                <ShellIcon name="crm-plus.svg" size={24} />
                 {t("customers.addCustomer.cta")}
               </button>
             </div>
           )}
         </header>
 
-        <div className="mt-6">
+        <div className="mt-8">
           <CustomerStatCards isEmpty={isEmpty} />
         </div>
 
         {isEmpty ? (
-          <div className="mt-24 flex flex-col items-center text-center">
-            <EmptyCustomersIllustration className="text-[#CBD5E1]" />
-            <h2 className="mt-8 text-[16px] font-semibold text-[var(--octo-text-primary)]">{t("customers.empty.title")}</h2>
-            <p className="mt-1 text-[14px] text-[var(--octo-text-muted)]">{t("customers.empty.description")}</p>
-            <button
-              type="button"
-              onClick={() => setAddCustomerOpen(true)}
-              className="mt-5 inline-flex h-11 w-full max-w-[660px] items-center justify-center gap-2 rounded-[8px] bg-[#3B82F6] text-[16px] font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              <Plus size={18} strokeWidth={2.25} />
-              {t("customers.empty.cta")}
-            </button>
+          <div className="mx-auto mt-[75px] flex w-full max-w-[686px] flex-col items-center gap-6 text-center">
+            <EmptyCustomersIllustration className="text-[#cbd5e1] [[data-theme=dark]_&]:text-[var(--octo-border-input)]" />
+            <div className="flex flex-col gap-2">
+              <h2 className="text-[16px] font-bold leading-[16px] text-[var(--octo-text-primary)]">{t("customers.empty.title")}</h2>
+              <p className="text-[14px] font-medium leading-[1.3] text-[var(--octo-text-secondary)] sm:leading-[14px]">{t("customers.empty.description")}</p>
+            </div>
+            <div className="flex w-full flex-col gap-3">
+              <button type="button" onClick={() => setAddCustomerOpen(true)} className={`${BIG_PRIMARY} w-full`}>
+                <ShellIcon name="crm-plus.svg" size={24} />
+                {t("customers.empty.cta")}
+              </button>
+              <ImportCsvButton className="w-full" />
+            </div>
           </div>
         ) : (
           <>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[200px] flex-1">
-                <Search size={20} strokeWidth={1.5} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-muted)]" />
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              <label className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-[12px] border border-[#e2e8f0] bg-[var(--octo-card)] px-4 transition-colors focus-within:border-[#0d6efd] focus-within:ring-2 focus-within:ring-[#0d6efd]/30 [[data-theme=dark]_&]:border-[var(--octo-border-input)]">
+                <ShellIcon name="crm-search.svg" size={24} className="text-[var(--octo-text-secondary)]" />
                 <input
                   value={filters.search}
                   onChange={(event) => setFilters({ search: event.target.value })}
                   placeholder={t("customers.searchPlaceholder")}
                   aria-label={t("customers.searchPlaceholder")}
-                  className="h-10 w-full rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-3 ps-10 text-[14px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-muted)] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/30"
+                  className="h-full min-w-0 flex-1 bg-transparent text-[14px] font-medium text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-secondary)] focus:outline-none"
                 />
-              </div>
+              </label>
               <TagsFilterPopover selected={filters.tags} onApply={(tags) => setFilters({ tags })} />
               <RangeFilterPopover label={t("customers.filter.visits")} kind="number" value={filters.visits} onApply={(visits) => setFilters({ visits })} />
               <RangeFilterPopover label={t("customers.filter.totalSpend")} kind="currency" value={filters.spend} onApply={(spend) => setFilters({ spend })} />
@@ -232,9 +254,11 @@ export function CustomersPage() {
                 type="button"
                 onClick={resetFilters}
                 disabled={!isFiltered}
-                className="inline-flex h-10 items-center gap-1.5 rounded-[8px] bg-[#3B82F6]/[0.06] px-3 text-[14px] font-medium text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/10 disabled:cursor-default disabled:opacity-60"
+                className={`${TOOL_BUTTON} bg-[#f5f9ff] px-2 hover:bg-[#e9f1ff] disabled:cursor-default disabled:hover:bg-[#f5f9ff] [[data-theme=dark]_&]:bg-[#0d6efd]/10 [[data-theme=dark]_&]:hover:bg-[#0d6efd]/20 [[data-theme=dark]_&]:disabled:hover:bg-[#0d6efd]/10`}
               >
-                <RotateCcw size={18} strokeWidth={1.75} />
+                <span className="grid h-6 w-6 place-items-center">
+                  <ShellIcon name="crm-reset.svg" size={20} />
+                </span>
                 {t("customers.filter.reset")}
               </button>
               <button
@@ -243,9 +267,9 @@ export function CustomersPage() {
                   if (!isFiltered) showToast(t("customers.segment.needsFilter"));
                   else setSaveSegmentOpen(true);
                 }}
-                className="inline-flex h-10 items-center gap-1.5 rounded-[8px] border border-[#3B82F6] bg-[var(--octo-card)] px-3 text-[14px] font-medium text-[#3B82F6] transition-colors hover:bg-[#3B82F6]/5"
+                className={`${TOOL_BUTTON} border border-[#0d6efd] px-[7px] hover:bg-[#0d6efd]/5`}
               >
-                <Bookmark size={18} strokeWidth={1.75} />
+                <ShellIcon name="crm-archive-minus.svg" size={24} />
                 {t("customers.saveSegment")}
               </button>
             </div>
@@ -273,7 +297,7 @@ export function CustomersPage() {
                   />
                 )}
 
-                <div className="mt-5 flex flex-col gap-4">
+                <div className="mt-6 flex flex-col gap-3">
                   {pageRows.map((customer) => (
                     <CustomerRow
                       key={customer.id}

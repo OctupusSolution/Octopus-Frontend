@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { getStaffAvailability, type AvailabilityRowResponse } from "@octopus/api-client";
 import { Modal } from "@ui/primitives";
@@ -9,14 +8,23 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "../_shared/avatar";
 import { buttonClass } from "../_shared/buttons";
 import { addDays, formatWeekRange, formatWeekdayDate, fromISO, startOfWeek, toISO } from "../_shared/format";
+import { StaffIcon } from "../_shared/icon";
 import { useStaffLabels } from "../_shared/labels";
 import { useCatalogNames } from "../_shared/catalog-names";
 import { useStaffStore } from "../_shared/staff-store";
 import { StatusPill, type PillTone } from "../_shared/status-pill";
+import { FILL_BLUE, INK, INK_LINK, LINE } from "../_shared/theme";
 import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
 
 type AvailabilityStatus = "available" | "unavailable" | "onLeave";
 const STATUS_TONE: Record<AvailabilityStatus, PillTone> = { available: "success", unavailable: "neutral", onLeave: "warning" };
+
+// The frame's row actions: 32px tall on a 4px radius, a 24px glyph beside
+// 14px medium text.
+const ROW_ACTION =
+  "inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-[4px] px-2 text-[14px] font-medium leading-[14px] transition-[background-color,filter] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40";
+
+const CELL = "whitespace-nowrap px-3 text-center text-[14px] font-medium leading-[14px]";
 
 export function AvailabilityView({
   onViewProfile,
@@ -92,17 +100,18 @@ export function AvailabilityView({
 
   return (
     <div>
-      <div className="octo-scroll overflow-x-auto rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-        <table className="w-full min-w-[980px] border-collapse text-[15px]">
+      <div className={clsx("octo-scroll overflow-x-auto rounded-[12px] border bg-[var(--octo-card)] p-3", LINE)}>
+        <table className="w-full min-w-[980px] border-collapse">
           <thead>
-            <tr className="bg-[var(--octo-hover)]">
+            <tr className="bg-[#f1f5f9] [[data-theme=dark]_&]:bg-[var(--octo-hover)]">
               {(["employee", "shift", "status", "location", "actions"] as const).map((col) => (
                 <th
                   key={col}
                   scope="col"
                   className={clsx(
-                    "whitespace-nowrap px-3 py-2 text-[13px] font-medium text-[var(--octo-text-primary)] first:rounded-s-[6px] last:rounded-e-[6px]",
-                    col === "employee" ? "text-start ps-16" : col === "actions" ? "text-end pe-8" : "text-center"
+                    "h-6 whitespace-nowrap px-3 py-0 text-[12px] font-medium leading-3",
+                    INK,
+                    col === "employee" ? "ps-12 text-start" : "text-center"
                   )}
                 >
                   {t(`staff.availability.column.${col}`)}
@@ -110,35 +119,44 @@ export function AvailabilityView({
               ))}
             </tr>
           </thead>
-          <tbody>
+          {/* 16px under the header band, then 24px above and 8px below each 32px row. */}
+          <tbody className="[&>tr:first-child>td]:pt-4 [&>tr:last-child>td]:pb-0 [&>tr>td]:pb-2 [&>tr>td]:pt-6">
             {staff.map((e) => {
               const status = statusOf(e.id);
               return (
-                <tr key={e.id} className="border-b border-[var(--octo-divider)] last:border-b-0">
-                  <td className="px-3 py-3">
-                    <span className="flex items-center gap-3">
-                      <Avatar name={e.name} size={44} />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-[var(--octo-text-primary)]">{e.name}</span>
-                        <span className="block truncate text-[13px] text-[#0D6EFD]">
+                <tr key={e.id} className={clsx("border-b last:border-b-0", LINE)}>
+                  <td className="pe-3">
+                    <span className="flex items-start gap-2">
+                      <Avatar name={e.name} size={32} />
+                      <span className="flex min-w-0 flex-col gap-1">
+                        <span className={clsx("truncate text-[14px] font-semibold leading-[14px]", INK)}>{e.name}</span>
+                        <span className={clsx("truncate text-[12px] font-medium leading-3", INK_LINK)}>
                           {names.jobTitle(store.profileOf(e.id)?.jobTitle ?? "")}
                         </span>
                       </span>
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{dayLabel(e.id, today)}</td>
-                  <td className="px-3 py-3 text-center">
+                  <td className={clsx(CELL, INK)}>{dayLabel(e.id, today)}</td>
+                  <td className="px-3 text-center">
                     <StatusPill tone={STATUS_TONE[status]} label={t(`staff.availability.status.${status}`)} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{e.branch}</td>
-                  <td className="px-3 py-3">
-                    <span className="flex items-center justify-end gap-3">
-                      <button type="button" onClick={() => onViewProfile(e.id)} className={buttonClass("infoSoft", "md", "font-medium")}>
-                        <UserRound size={20} aria-hidden />
+                  <td className={clsx(CELL, INK)}>{e.branch}</td>
+                  <td className="w-px ps-3">
+                    <span className="flex items-center justify-end gap-4">
+                      <button
+                        type="button"
+                        onClick={() => onViewProfile(e.id)}
+                        className={clsx(ROW_ACTION, "text-[#0D6EFD] hover:brightness-95", FILL_BLUE)}
+                      >
+                        <StaffIcon name="staff-user.svg" size={24} />
                         {t("staff.availability.viewProfile")}
                       </button>
-                      <button type="button" onClick={() => setShiftFor(e.id)} className={buttonClass("secondary", "md", "font-medium")}>
-                        <CalendarDays size={20} aria-hidden />
+                      <button
+                        type="button"
+                        onClick={() => setShiftFor(e.id)}
+                        className={clsx(ROW_ACTION, "border hover:bg-[var(--octo-hover)]", LINE, INK)}
+                      >
+                        <StaffIcon name="staff-calendar.svg" size={24} />
                         {t("staff.availability.viewShift")}
                       </button>
                     </span>

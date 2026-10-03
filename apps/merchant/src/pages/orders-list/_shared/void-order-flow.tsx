@@ -4,11 +4,15 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { toVoidReasonCode, voidRealOrder } from "@/entities/order";
 import { ScopeReasonForm, type ScopeReasonPayload } from "./scope-reason-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
-import { ResultModal } from "./result-modal";
+import { ResultModal, StampArt } from "./result-modal";
 import { useActionFlow } from "./action-flow";
 import { useOrderActionConfirm } from "./use-order-action-confirm";
-import { ACTION_THEME } from "./theme";
+import { FLOW_BACKDROP_CLASS, FLOW_MODAL_CLASS } from "./form-bits";
 import type { OrderRecord } from "./types";
+
+// The fill of this flow's "Manager Authentication & Security" confirm button,
+// as its frame draws it.
+const CONFIRM_ACCENT = "#f59e0b";
 
 export function VoidOrderFlow({
   order,
@@ -21,7 +25,6 @@ export function VoidOrderFlow({
 }) {
   const { t } = useI18n();
   const flow = useActionFlow<ScopeReasonPayload>(["form", "pin", "result"], order !== null);
-  const accent = ACTION_THEME.void.accent;
   const { confirm, submitting, errorText } = useOrderActionConfirm(
     order,
     (businessId, orderId, version, approval) =>
@@ -34,9 +37,8 @@ export function VoidOrderFlow({
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
+      <Modal open onClose={onClose} title={t("orders.void.title")} className={FLOW_MODAL_CLASS} backdropClassName={FLOW_BACKDROP_CLASS}>
         <ScopeReasonForm
-          title={t("orders.void.title")}
           // No orders.void.scopeLabel key exists in i18n — this form
           // intentionally reuses cancel's scope-label wording since both
           // flows share the same "entire vs specific" radio choice.
@@ -68,7 +70,7 @@ export function VoidOrderFlow({
         open
         onClose={onClose}
         onConfirm={confirm}
-        accent={accent}
+        accent={CONFIRM_ACCENT}
         promptKey="orders.managerAuth.prompt.void"
         confirmLabelKey="orders.managerAuth.confirm.void"
         errorText={errorText}
@@ -91,8 +93,10 @@ export function VoidOrderFlow({
       onClose={onClose}
       title={t("orders.result.voidTitle")}
       subtitle={t("orders.result.voidSubtitle").replace("{id}", order.id).replace("{date}", now)}
-      noteLines={[t("orders.result.voidLine1"), t("orders.result.voidLine2")]}
-      noteClassName="bg-[#FFFBEB] text-[#92400E]"
+      artwork={<StampArt />}
+      // The frame keeps its explanatory note box hidden, so no lines are passed.
+      noteLines={[]}
+      noteClassName=""
       primaryLabel={t("orders.result.done")}
       onPrimary={onClose}
     />

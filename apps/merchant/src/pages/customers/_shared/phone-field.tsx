@@ -1,12 +1,11 @@
 // apps/merchant/src/pages/customers/_shared/phone-field.tsx
+import { FIELD_BORDER } from "./form-controls";
+
+// Multi-colour artwork from the frame, so it is an <img> rather than a mask.
+const FLAG_URL = new URL("../../../../../assets/Dashboard/icons/form-flag-sa.png", import.meta.url).href;
+
 export function SaudiFlag({ size = 20 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
-      <circle cx="12" cy="12" r="12" fill="#006C35" />
-      <path d="M6 9.2h12M6.8 11h10.4" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" strokeDasharray="1.6 1" />
-      <path d="M7 14.6h9.6l1.2-.8" stroke="#fff" strokeWidth="1" strokeLinecap="round" fill="none" />
-    </svg>
-  );
+  return <img src={FLAG_URL} alt="" aria-hidden="true" width={size} height={size} className="shrink-0 object-cover" style={{ width: size, height: size }} />;
 }
 
 export function phoneDigitsFrom(phone: string): string {
@@ -19,9 +18,11 @@ export function combinePhone(digits: string): string {
 
 export function PhoneField({ digits, onChange }: { digits: string; onChange: (digits: string) => void }) {
   return (
-    <div className="flex h-10 items-stretch rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
-      <span dir="ltr" className="flex items-center gap-1.5 border-e border-[var(--octo-border-input)] px-3 text-[14px] text-[var(--octo-text-primary)]">
-        <SaudiFlag />
+    <div
+      className={`flex h-10 items-center rounded-[12px] ${FIELD_BORDER} bg-[var(--octo-card)] px-3 transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/25 [[data-theme=dark]_&]:focus-within:border-[#0D6EFD]`}
+    >
+      <span dir="ltr" className="flex shrink-0 items-center gap-2 text-[14px] leading-none text-[var(--octo-text-primary)]">
+        <SaudiFlag size={24} />
         +966
       </span>
       <input
@@ -30,7 +31,7 @@ export function PhoneField({ digits, onChange }: { digits: string; onChange: (di
         value={digits}
         onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
         placeholder="000 000 000"
-        className="w-full flex-1 rounded-e-[8px] bg-transparent px-3 text-[14px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-muted)] rtl:text-end"
+        className="ms-1 h-[30px] w-full min-w-0 flex-1 border-s border-[#cbd5e1] bg-transparent px-2 text-[14px] leading-none text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-secondary)] rtl:text-end [[data-theme=dark]_&]:border-[var(--octo-border-input)]"
       />
     </div>
   );

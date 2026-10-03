@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { BriefcaseBusiness, ChevronDown, Eye, EyeOff, KeyRound, Lock, LockOpen, ShieldCheck, UserRound } from "lucide-react";
+import { LockOpen } from "lucide-react";
 import clsx from "clsx";
 import {
   ACCESS_LEVELS,
@@ -14,10 +14,12 @@ import {
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { ConfirmModal } from "./_shared/confirm-modal";
-import { Field, SelectInput, TextInput } from "./_shared/form";
+import { DateInput, Field, FormLookProvider, SelectInput, TextInput } from "./_shared/form";
+import { StaffIcon } from "./_shared/icon";
 import { EMAIL_RE, PHONE_RE, useStaffLabels } from "./_shared/labels";
 import { useStaffStore } from "./_shared/staff-store";
 import { Switch } from "./_shared/switch";
+import { INK, INK_MUTED, INK_SOFT, LINE } from "./_shared/theme";
 import { useLocalName, useTx } from "./_shared/text";
 import { useAssignableRoles } from "./_shared/use-assignable-roles";
 import { InvitationPanel } from "./invitation-panel";
@@ -111,39 +113,42 @@ function Section({
 }) {
   const bodyId = `member-section-${id}`;
   return (
-    <section className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
+    <section className={clsx("flex flex-col gap-4 rounded-[16px] border bg-[var(--octo-card)] p-3", LINE)}>
       <h2>
         <button
           type="button"
           aria-expanded={open}
           aria-controls={bodyId}
           onClick={onToggle}
-          className="flex w-full items-center justify-between gap-3 rounded-[16px] px-4 py-4 text-start focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D6EFD]/40"
+          className={clsx(
+            "flex w-full items-center justify-between gap-3 rounded-[4px] text-start focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+            INK
+          )}
         >
-          <span className="flex items-center gap-2.5 text-[16px] font-semibold text-[var(--octo-text-primary)]">
+          <span className="flex items-center gap-1 text-[14px] font-bold leading-[14px]">
             {icon}
             {title}
           </span>
-          <ChevronDown size={20} aria-hidden className={clsx("shrink-0 text-[var(--octo-text-primary)] transition-transform", open && "rotate-180")} />
+          <StaffIcon name="form-arrow-down.svg" size={24} className={clsx("transition-transform", open && "-scale-y-100")} />
         </button>
       </h2>
-      {open && (
-        <div id={bodyId} className="px-4 pb-5">
-          {children}
-        </div>
-      )}
+      {open && <div id={bodyId}>{children}</div>}
     </section>
   );
 }
 
 function SwitchRow({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="flex cursor-pointer items-center gap-3">
+    <label className="flex cursor-pointer items-start gap-2">
       <Switch checked={checked} onChange={onChange} label={label} />
-      <span className="text-[14px] text-[var(--octo-text-primary)]">{label}</span>
+      <span className={clsx("text-[14px] font-medium leading-[14px]", INK)}>{label}</span>
     </label>
   );
 }
+
+// The profile's two-column field grid: 14px between columns, 16px between rows.
+const FIELD_GRID = "grid grid-cols-1 gap-x-3.5 gap-y-4 sm:grid-cols-2";
+const LINK = "text-[14px] font-semibold leading-[14px] text-[#0D6EFD] underline decoration-from-font [text-underline-position:from-font] hover:no-underline";
 
 export function MemberDetails({
   profile,
@@ -207,11 +212,6 @@ export function MemberDetails({
     setBaseline(draft);
   };
 
-  const discard = () => {
-    setDraft(baseline);
-    setErrors({});
-  };
-
   const resetPin = () => {
     set("pinCode", String(Math.floor(1000 + Math.random() * 9000)));
     setPinVisible(true);
@@ -230,273 +230,285 @@ export function MemberDetails({
   const departments = store.departments.filter((d) => d.isActive || d.id === draft.department);
 
   return (
-    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[268px_minmax(0,1fr)_268px]">
-      <MemberSummaryCard profile={profile} status={status} showSessions className="lg:sticky lg:top-4" />
+    <FormLookProvider look="page">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[269px_minmax(0,1fr)] xl:grid-cols-[269px_minmax(0,1fr)_269px]">
+        <MemberSummaryCard profile={profile} status={status} showSessions className="lg:sticky lg:top-4" />
 
-      <div className="flex min-w-0 flex-col gap-4">
-        {profile.locked && (
-          <div role="status" className="flex items-center gap-2.5 rounded-[12px] bg-[var(--octo-tone-danger-bg)] px-4 py-3 text-[13px] font-medium text-[var(--octo-tone-danger-text)]">
-            <Lock size={16} aria-hidden className="shrink-0" />
-            {t("staff.member.lockedBanner").replace("{name}", profile.employee.name)}
-          </div>
-        )}
+        <div className="flex min-w-0 flex-col gap-4">
+          {profile.locked && (
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-[12px] bg-[#fef0f0] p-3 text-[14px] font-medium leading-[1.4] text-[#d30202] [[data-theme=dark]_&]:bg-[#d30202]/20 [[data-theme=dark]_&]:text-[#f87171]"
+            >
+              <StaffIcon name="staff-lock.svg" size={24} />
+              {t("staff.member.lockedBanner").replace("{name}", profile.employee.name)}
+            </div>
+          )}
 
-        <Section id="personal" icon={<UserRound size={22} strokeWidth={1.7} />} title={t("staff.member.personalInfo")} open={openSections.has("personal")} onToggle={() => toggleSection("personal")}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t("staff.member.field.firstName")} htmlFor="m-first" error={errors.firstName}>
-              <TextInput id="m-first" value={draft.firstName} invalid={!!errors.firstName} onChange={(e) => set("firstName", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.lastName")} htmlFor="m-last" error={errors.lastName}>
-              <TextInput id="m-last" value={draft.lastName} invalid={!!errors.lastName} onChange={(e) => set("lastName", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.phoneNumber")} htmlFor="m-phone" error={errors.phone}>
-              <TextInput id="m-phone" type="tel" dir="ltr" value={draft.phone} invalid={!!errors.phone} onChange={(e) => set("phone", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.email")} htmlFor="m-email" error={errors.email}>
-              <TextInput id="m-email" type="email" dir="ltr" value={draft.email} invalid={!!errors.email} onChange={(e) => set("email", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.dateOfBirth")} htmlFor="m-dob">
-              <TextInput id="m-dob" type="date" value={draft.dateOfBirth} max={draft.hireDate || undefined} onChange={(e) => set("dateOfBirth", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.gender")} htmlFor="m-gender">
-              <SelectInput id="m-gender" value={draft.gender} onChange={(e) => set("gender", e.target.value as MemberDraft["gender"])}>
-                <option value="Male">{t("staff.member.gender.male")}</option>
-                <option value="Female">{t("staff.member.gender.female")}</option>
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.nationality")} htmlFor="m-nationality">
-              <TextInput id="m-nationality" value={labels.data("staff.nationality", draft.nationality)} onChange={(e) => set("nationality", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.language")} htmlFor="m-language">
-              <SelectInput id="m-language" value={draft.languages} onChange={(e) => set("languages", e.target.value)}>
-                {LANGUAGE_OPTIONS.map((l) => (
-                  <option key={l} value={l}>{labels.data("staff.language", l)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-          </div>
-        </Section>
+          <Section id="personal" icon={<StaffIcon name="staff-user.svg" size={24} />} title={t("staff.member.personalInfo")} open={openSections.has("personal")} onToggle={() => toggleSection("personal")}>
+            <div className={FIELD_GRID}>
+              <Field label={t("staff.member.field.firstName")} htmlFor="m-first" error={errors.firstName}>
+                <TextInput id="m-first" value={draft.firstName} invalid={!!errors.firstName} onChange={(e) => set("firstName", e.target.value)} />
+              </Field>
+              <Field label={t("staff.member.field.lastName")} htmlFor="m-last" error={errors.lastName}>
+                <TextInput id="m-last" value={draft.lastName} invalid={!!errors.lastName} onChange={(e) => set("lastName", e.target.value)} />
+              </Field>
+              <Field label={t("staff.member.field.phoneNumber")} htmlFor="m-phone" error={errors.phone}>
+                <TextInput id="m-phone" type="tel" dir="ltr" value={draft.phone} invalid={!!errors.phone} onChange={(e) => set("phone", e.target.value)} />
+              </Field>
+              <Field label={t("staff.member.field.email")} htmlFor="m-email" error={errors.email}>
+                <TextInput id="m-email" type="email" dir="ltr" value={draft.email} invalid={!!errors.email} onChange={(e) => set("email", e.target.value)} />
+              </Field>
+              <Field label={t("staff.member.field.dateOfBirth")} htmlFor="m-dob">
+                <DateInput id="m-dob" value={draft.dateOfBirth} max={draft.hireDate || undefined} onChange={(iso) => set("dateOfBirth", iso)} />
+              </Field>
+              <Field label={t("staff.member.field.gender")} htmlFor="m-gender">
+                <SelectInput id="m-gender" value={draft.gender} onChange={(e) => set("gender", e.target.value as MemberDraft["gender"])}>
+                  <option value="Male">{t("staff.member.gender.male")}</option>
+                  <option value="Female">{t("staff.member.gender.female")}</option>
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.nationality")} htmlFor="m-nationality">
+                <TextInput id="m-nationality" value={labels.data("staff.nationality", draft.nationality)} onChange={(e) => set("nationality", e.target.value)} />
+              </Field>
+              <Field label={t("staff.member.field.language")} htmlFor="m-language">
+                <SelectInput id="m-language" value={draft.languages} onChange={(e) => set("languages", e.target.value)}>
+                  {LANGUAGE_OPTIONS.map((l) => (
+                    <option key={l} value={l}>{labels.data("staff.language", l)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+            </div>
+          </Section>
 
-        <Section id="work" icon={<BriefcaseBusiness size={22} strokeWidth={1.7} />} title={t("staff.member.workInfo")} open={openSections.has("work")} onToggle={() => toggleSection("work")}>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t("staff.member.field.jobTitle")} htmlFor="m-title">
-              <SelectInput id="m-title" value={draft.jobTitle} onChange={(e) => set("jobTitle", e.target.value)}>
-                <option value="">{tx("No job title", "بدون مسمى وظيفي")}</option>
-                {jobTitles.map((j) => (
-                  <option key={j.id} value={j.id}>{localName(j)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.branch")} htmlFor="m-branch">
-              <SelectInput id="m-branch" value={draft.branch} onChange={(e) => set("branch", e.target.value as Branch)}>
-                {branches.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.department")} htmlFor="m-dept">
-              <SelectInput id="m-dept" value={draft.department} onChange={(e) => set("department", e.target.value)}>
-                <option value="">{tx("No department", "بدون قسم")}</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{localName(d)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.reportsTo")} htmlFor="m-reports">
-              <SelectInput id="m-reports" value={draft.reportsTo} onChange={(e) => set("reportsTo", e.target.value)}>
-                <option value="">{t("staff.member.field.noManager")}</option>
-                {managerNames.map((name) => (
-                  <option key={name} value={name}>{name}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.hireDate")} htmlFor="m-hire">
-              <TextInput id="m-hire" type="date" value={draft.hireDate} onChange={(e) => set("hireDate", e.target.value)} />
-            </Field>
-            <Field label={t("staff.member.field.employmentType")} htmlFor="m-type">
-              <SelectInput id="m-type" value={draft.employmentType} onChange={(e) => set("employmentType", e.target.value as MemberDraft["employmentType"])}>
-                <option value="Full time">{t("staff.member.employment.fullTime")}</option>
-                <option value="Part time">{t("staff.member.employment.partTime")}</option>
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.status")} htmlFor="m-status" className="sm:col-span-2">
-              <SelectInput
-                id="m-status"
-                value={draft.status}
-                onChange={(e) => set("status", e.target.value as MemberDraft["status"])}
-                className={draft.status === "Active" ? "text-[var(--octo-tone-success-text)]" : undefined}
-              >
-                <option value="Active">{t("staff.status.active")}</option>
-                <option value="Inactive">{t("staff.status.inactive")}</option>
-              </SelectInput>
-            </Field>
-          </div>
-        </Section>
+          <Section
+            id="work"
+            icon={<StaffIcon name="staff-briefcase.svg" size={24} glyph={[21.5, 19.5]} />}
+            title={t("staff.member.workInfo")}
+            open={openSections.has("work")}
+            onToggle={() => toggleSection("work")}
+          >
+            <div className={FIELD_GRID}>
+              <Field label={t("staff.member.field.jobTitle")} htmlFor="m-title">
+                <SelectInput id="m-title" value={draft.jobTitle} onChange={(e) => set("jobTitle", e.target.value)}>
+                  <option value="">{tx("No job title", "بدون مسمى وظيفي")}</option>
+                  {jobTitles.map((j) => (
+                    <option key={j.id} value={j.id}>{localName(j)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.branch")} htmlFor="m-branch">
+                <SelectInput id="m-branch" value={draft.branch} onChange={(e) => set("branch", e.target.value as Branch)}>
+                  {branches.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.department")} htmlFor="m-dept">
+                <SelectInput id="m-dept" value={draft.department} onChange={(e) => set("department", e.target.value)}>
+                  <option value="">{tx("No department", "بدون قسم")}</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{localName(d)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.reportsTo")} htmlFor="m-reports">
+                <SelectInput id="m-reports" value={draft.reportsTo} onChange={(e) => set("reportsTo", e.target.value)}>
+                  <option value="">{t("staff.member.field.noManager")}</option>
+                  {managerNames.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.hireDate")} htmlFor="m-hire">
+                <DateInput id="m-hire" value={draft.hireDate} onChange={(iso) => set("hireDate", iso)} />
+              </Field>
+              <Field label={t("staff.member.field.employmentType")} htmlFor="m-type">
+                <SelectInput id="m-type" value={draft.employmentType} onChange={(e) => set("employmentType", e.target.value as MemberDraft["employmentType"])}>
+                  <option value="Full time">{t("staff.member.employment.fullTime")}</option>
+                  <option value="Part time">{t("staff.member.employment.partTime")}</option>
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.status")} htmlFor="m-status" className="sm:col-span-2">
+                <SelectInput
+                  id="m-status"
+                  value={draft.status}
+                  onChange={(e) => set("status", e.target.value as MemberDraft["status"])}
+                  className={draft.status === "Active" ? "!text-[#009a39]" : undefined}
+                >
+                  <option value="Active">{t("staff.status.active")}</option>
+                  <option value="Inactive">{t("staff.status.inactive")}</option>
+                </SelectInput>
+              </Field>
+            </div>
+          </Section>
 
-        <Section id="access" icon={<ShieldCheck size={22} strokeWidth={1.7} />} title={t("staff.member.roleAccess")} open={openSections.has("access")} onToggle={() => toggleSection("access")}>
-          <div className="flex flex-col gap-4">
-            <Field label={t("staff.member.field.assignedRole")} htmlFor="m-role">
-              <SelectInput id="m-role" value={draft.assignedRole} onChange={(e) => set("assignedRole", e.target.value)}>
-                {!draft.assignedRole && <option value="">{tx("No role", "بدون دور")}</option>}
-                {roleOptions.map((r) => (
-                  <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.accessLevel")} htmlFor="m-level">
-              <SelectInput id="m-level" value={draft.accessLevel} onChange={(e) => set("accessLevel", e.target.value)}>
-                {ACCESS_LEVELS.map((a) => (
-                  <option key={a} value={a}>{labels.data("staff.accessLevel", a)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-            <Field label={t("staff.member.field.modulesAccess")} htmlFor="m-modules">
-              <ModulesSelect id="m-modules" value={draft.modulesAccess} onChange={(next) => set("modulesAccess", next)} />
-            </Field>
-          </div>
-        </Section>
+          <Section id="access" icon={<StaffIcon name="staff-shield.svg" size={24} />} title={t("staff.member.roleAccess")} open={openSections.has("access")} onToggle={() => toggleSection("access")}>
+            <div className="flex flex-col gap-4">
+              <Field label={t("staff.member.field.assignedRole")} htmlFor="m-role">
+                <SelectInput id="m-role" value={draft.assignedRole} onChange={(e) => set("assignedRole", e.target.value)}>
+                  {!draft.assignedRole && <option value="">{tx("No role", "بدون دور")}</option>}
+                  {roleOptions.map((r) => (
+                    <option key={r.id} value={r.id}>{labels.roleName(r)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.accessLevel")} htmlFor="m-level">
+                <SelectInput id="m-level" value={draft.accessLevel} onChange={(e) => set("accessLevel", e.target.value)}>
+                  {ACCESS_LEVELS.map((a) => (
+                    <option key={a} value={a}>{labels.data("staff.accessLevel", a)}</option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label={t("staff.member.field.modulesAccess")} htmlFor="m-modules">
+                <ModulesSelect id="m-modules" value={draft.modulesAccess} onChange={(next) => set("modulesAccess", next)} />
+              </Field>
+            </div>
+          </Section>
 
-        <Section id="login" icon={<KeyRound size={22} strokeWidth={1.7} />} title={t("staff.member.loginSecurity")} open={openSections.has("login")} onToggle={() => toggleSection("login")}>
-          <div className="flex flex-col gap-4">
-            <Field label={t("staff.member.field.loginMethod")}>
-              <div role="radiogroup" aria-label={t("staff.member.field.loginMethod")} className="flex flex-wrap gap-2 rounded-[10px] bg-[var(--octo-hover)] p-2">
-                {LOGIN_METHODS.map((method) => {
-                  const active = draft.loginMethod === method;
-                  return (
-                    <button
-                      key={method}
-                      type="button"
-                      role="radio"
-                      aria-checked={active}
-                      onClick={() => set("loginMethod", method)}
-                      className={clsx(
-                        "h-9 rounded-[8px] border bg-[var(--octo-card)] px-3.5 text-[14px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                        active ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
-                      )}
-                    >
-                      {t(`staff.member.loginMethod.${method.toLowerCase()}`)}
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-
-            {draft.loginMethod !== "Password" && (
-              <div>
-                <Field label={t("staff.member.field.pinCode")} htmlFor="m-pin" error={errors.pinCode} hint={t("staff.member.pinHint")}>
-                  <TextInput
-                    id="m-pin"
-                    type={pinVisible ? "text" : "password"}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    dir="ltr"
-                    maxLength={6}
-                    value={draft.pinCode}
-                    invalid={!!errors.pinCode}
-                    onChange={(e) => set("pinCode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    trailing={
+          <Section id="login" icon={<StaffIcon name="staff-key.svg" size={24} />} title={t("staff.member.loginSecurity")} open={openSections.has("login")} onToggle={() => toggleSection("login")}>
+            <div className="flex flex-col gap-4">
+              <Field label={t("staff.member.field.loginMethod")}>
+                <div
+                  role="radiogroup"
+                  aria-label={t("staff.member.field.loginMethod")}
+                  className="flex flex-wrap gap-3 rounded-[12px] border border-[#e2e8f0] bg-[#fbfafc] p-2 [[data-theme=dark]_&]:border-[var(--octo-border-card)] [[data-theme=dark]_&]:bg-[var(--octo-hover)]"
+                >
+                  {LOGIN_METHODS.map((method) => {
+                    const active = draft.loginMethod === method;
+                    return (
                       <button
+                        key={method}
                         type="button"
-                        onClick={() => setPinVisible((v) => !v)}
-                        aria-label={t(pinVisible ? "staff.member.hidePin" : "staff.member.showPin")}
-                        aria-pressed={pinVisible}
-                        className="grid h-8 w-8 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => set("loginMethod", method)}
+                        className={clsx(
+                          "rounded-[4px] border p-2 text-[14px] leading-[14px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                          active
+                            ? "border-[#0D6EFD] bg-[#f5f9ff] text-[#0D6EFD] [[data-theme=dark]_&]:bg-[#0d6efd]/15"
+                            : clsx("border-[#e2e8f0] bg-[var(--octo-card)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]", INK_MUTED)
+                        )}
                       >
-                        {pinVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                        {t(`staff.member.loginMethod.${method.toLowerCase()}`)}
                       </button>
-                    }
-                  />
-                </Field>
-                <div className="mt-1 flex justify-end">
-                  <button type="button" onClick={resetPin} className="text-[13px] font-medium text-[#0D6EFD] underline underline-offset-2 hover:no-underline">
+                    );
+                  })}
+                </div>
+              </Field>
+
+              {draft.loginMethod !== "Password" && (
+                <div className="flex flex-col items-end gap-2">
+                  <Field className="w-full" label={t("staff.member.field.pinCode")} htmlFor="m-pin" error={errors.pinCode} hint={t("staff.member.pinHint")}>
+                    <TextInput
+                      id="m-pin"
+                      type={pinVisible ? "text" : "password"}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      dir="ltr"
+                      maxLength={6}
+                      value={draft.pinCode}
+                      invalid={!!errors.pinCode}
+                      onChange={(e) => set("pinCode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      trailing={
+                        <button
+                          type="button"
+                          onClick={() => setPinVisible((v) => !v)}
+                          aria-label={t(pinVisible ? "staff.member.hidePin" : "staff.member.showPin")}
+                          aria-pressed={pinVisible}
+                          className={clsx("grid rounded-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40", pinVisible ? "text-[#0D6EFD]" : INK_SOFT)}
+                        >
+                          <StaffIcon name="staff-eye.svg" size={24} />
+                        </button>
+                      }
+                    />
+                  </Field>
+                  <button type="button" onClick={resetPin} className={LINK}>
                     {t("staff.member.field.resetPinCode")}
                   </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {draft.loginMethod !== "PIN" && (
-              <div>
-                <Field label={t("staff.member.field.password")} htmlFor="m-password" hint={t("staff.member.passwordHint")}>
-                  <TextInput id="m-password" type="password" dir="ltr" value="password" readOnly />
-                </Field>
-                <div className="mt-1 flex justify-end">
+              {draft.loginMethod !== "PIN" && (
+                <div className="flex flex-col items-end gap-2">
+                  <Field className="w-full" label={t("staff.member.field.password")} htmlFor="m-password" hint={t("staff.member.passwordHint")}>
+                    <TextInput id="m-password" type="password" dir="ltr" value="password" readOnly />
+                  </Field>
                   <button
                     type="button"
                     onClick={() => notify(t("staff.toast.passwordResetSent").replace("{email}", draft.email || profile.email))}
-                    className="text-[13px] font-medium text-[#0D6EFD] underline underline-offset-2 hover:no-underline"
+                    className={LINK}
                   >
                     {t("staff.member.field.sendPasswordReset")}
                   </button>
                 </div>
-              </div>
-            )}
-
-            <SwitchRow checked={draft.twoFactorEnabled} onChange={(v) => set("twoFactorEnabled", v)} label={t("staff.member.field.twoFactor")} />
-            <Field label={t("staff.member.field.preferred2fa")} htmlFor="m-2fa">
-              <SelectInput id="m-2fa" value={draft.twoFactorMethod} disabled={!draft.twoFactorEnabled} onChange={(e) => set("twoFactorMethod", e.target.value)}>
-                {TWO_FACTOR_METHODS.map((m) => (
-                  <option key={m} value={m}>{labels.data("staff.twoFactor", m)}</option>
-                ))}
-              </SelectInput>
-            </Field>
-          </div>
-        </Section>
-
-        <Section id="controls" icon={<Lock size={22} strokeWidth={1.7} />} title={t("staff.member.accessControls")} open={openSections.has("controls")} onToggle={() => toggleSection("controls")}>
-          <div className="flex flex-col gap-4">
-            <SwitchRow checked={draft.allowSystemLogin} onChange={(v) => set("allowSystemLogin", v)} label={t("staff.member.field.allowSystemLogin")} />
-            <div className="flex flex-col gap-1">
-              <SwitchRow checked={draft.allowAccessOutsideBranch} onChange={(v) => set("allowAccessOutsideBranch", v)} label={t("staff.member.field.allowAccessOutsideBranch")} />
-              <span className="ps-[52px] text-[12px] text-[var(--octo-text-muted)]">
-                {tx(
-                  "Off: the member acts in their assigned branch only. On: across the whole business. You cannot grant wider reach than your own.",
-                  "إيقاف: يعمل الموظف في فرعه فقط. تشغيل: في كل فروع النشاط. لا يمكنك منح نطاق أوسع من نطاقك."
-                )}
-              </span>
-            </div>
-            <InvitationPanel employeeId={profile.employee.id} notify={notify} />
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-[14px] text-[var(--octo-text-primary)]">
-                {t(profile.locked ? "staff.member.field.unlockAccountPrompt" : "staff.member.field.lockAccountPrompt")}
-              </span>
-              {profile.locked ? (
-                <button type="button" onClick={() => onLockChange(false)} className={buttonClass("secondary", "sm")}>
-                  <LockOpen size={16} />
-                  {t("staff.member.field.unlockAccount")}
-                </button>
-              ) : (
-                <button type="button" onClick={() => setLockConfirmOpen(true)} className={buttonClass("danger", "sm")}>
-                  <Lock size={16} />
-                  {t("staff.member.field.lockAccount")}
-                </button>
               )}
-            </div>
-          </div>
-        </Section>
 
+              <div className="flex flex-col gap-2">
+                <SwitchRow checked={draft.twoFactorEnabled} onChange={(v) => set("twoFactorEnabled", v)} label={t("staff.member.field.twoFactor")} />
+                <Field label={t("staff.member.field.preferred2fa")} htmlFor="m-2fa">
+                  <SelectInput id="m-2fa" value={draft.twoFactorMethod} disabled={!draft.twoFactorEnabled} onChange={(e) => set("twoFactorMethod", e.target.value)}>
+                    {TWO_FACTOR_METHODS.map((m) => (
+                      <option key={m} value={m}>{labels.data("staff.twoFactor", m)}</option>
+                    ))}
+                  </SelectInput>
+                </Field>
+              </div>
+            </div>
+          </Section>
+
+          <Section id="controls" icon={<StaffIcon name="staff-lock.svg" size={24} />} title={t("staff.member.accessControls")} open={openSections.has("controls")} onToggle={() => toggleSection("controls")}>
+            <div className="flex flex-col gap-4">
+              <SwitchRow checked={draft.allowSystemLogin} onChange={(v) => set("allowSystemLogin", v)} label={t("staff.member.field.allowSystemLogin")} />
+              <div className="flex flex-col gap-2">
+                <SwitchRow checked={draft.allowAccessOutsideBranch} onChange={(v) => set("allowAccessOutsideBranch", v)} label={t("staff.member.field.allowAccessOutsideBranch")} />
+                <span className={clsx("ps-10 text-[12px] leading-[1.4]", INK_MUTED)}>
+                  {tx(
+                    "Off: the member acts in their assigned branch only. On: across the whole business. You cannot grant wider reach than your own.",
+                    "إيقاف: يعمل الموظف في فرعه فقط. تشغيل: في كل فروع النشاط. لا يمكنك منح نطاق أوسع من نطاقك."
+                  )}
+                </span>
+              </div>
+              <InvitationPanel employeeId={profile.employee.id} notify={notify} />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={clsx("text-[14px] font-medium leading-[14px]", INK)}>
+                  {t(profile.locked ? "staff.member.field.unlockAccountPrompt" : "staff.member.field.lockAccountPrompt")}
+                </span>
+                {profile.locked ? (
+                  <button type="button" onClick={() => onLockChange(false)} className={buttonClass("secondary", "sm")}>
+                    <LockOpen size={16} />
+                    {t("staff.member.field.unlockAccount")}
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setLockConfirmOpen(true)} className={buttonClass("danger", "sm")}>
+                    <StaffIcon name="staff-lock-16.svg" size={16} />
+                    {t("staff.member.field.lockAccount")}
+                  </button>
+                )}
+              </div>
+            </div>
+          </Section>
+        </div>
+
+        <ActivityAuditCard employeeId={profile.employee.id} name={profile.employee.name} className="lg:col-span-2 xl:sticky xl:top-4 xl:col-span-1" />
+
+        {/* The frame's single action: a full-width Save Changes under all three columns. */}
         {dirty && (
-          <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3 shadow-[0_12px_32px_rgba(16,24,40,0.14)]">
-            <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">{t("staff.member.unsaved")}</span>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={discard} className={buttonClass("secondary")}>{t("staff.member.discard")}</button>
-              <button type="button" onClick={save} className={buttonClass("primary")}>{t("staff.member.saveChanges")}</button>
-            </div>
-          </div>
+          <button type="button" onClick={save} className={buttonClass("primary", "lg", "w-full lg:col-span-2 xl:col-span-3")}>
+            {t("staff.member.saveChanges")}
+          </button>
         )}
+
+        <ConfirmModal
+          open={lockConfirmOpen}
+          title={t("staff.member.lockConfirmTitle")}
+          body={t("staff.member.lockConfirmBody").replace("{name}", profile.employee.name)}
+          confirmLabel={t("staff.member.field.lockAccount")}
+          cancelLabel={t("common.cancel")}
+          onClose={() => setLockConfirmOpen(false)}
+          onConfirm={() => onLockChange(true)}
+        />
       </div>
-
-      <ActivityAuditCard employeeId={profile.employee.id} name={profile.employee.name} className="lg:col-span-2 xl:sticky xl:top-4 xl:col-span-1" />
-
-      <ConfirmModal
-        open={lockConfirmOpen}
-        title={t("staff.member.lockConfirmTitle")}
-        body={t("staff.member.lockConfirmBody").replace("{name}", profile.employee.name)}
-        confirmLabel={t("staff.member.field.lockAccount")}
-        cancelLabel={t("common.cancel")}
-        onClose={() => setLockConfirmOpen(false)}
-        onConfirm={() => onLockChange(true)}
-      />
-    </div>
+    </FormLookProvider>
   );
 }

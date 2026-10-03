@@ -5,22 +5,7 @@
 // with the version it was read at, so a concurrent edit fails loudly instead of
 // being half-applied.
 import { Fragment, useEffect, useMemo, useState } from "react";
-import {
-  BookOpen,
-  CalendarDays,
-  ChevronDown,
-  ClipboardList,
-  LayoutGrid,
-  Link2,
-  Loader2,
-  ReceiptText,
-  Settings,
-  ShieldCheck,
-  Users,
-  UsersRound,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import clsx from "clsx";
 import {
   ApiError,
@@ -34,24 +19,57 @@ import {
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
+import { StaffIcon } from "./_shared/icon";
 import { useStaffLabels } from "./_shared/labels";
 import { noteRoleVersion, serverRoleId } from "./_shared/staff-sync";
 import type { RoleRecord } from "./_shared/staff-store";
 import { Switch } from "./_shared/switch";
 import { staffErrorText, useTx, UUID_RE } from "./_shared/text";
+import { FILL_RED, INK, INK_MUTED, INK_SOFT, LINE, LINE_SOFT, TEXT_RED } from "./_shared/theme";
 
-const MODULE_ICONS: [RegExp, LucideIcon][] = [
-  [/staff/, UsersRound],
-  [/menu/, BookOpen],
-  [/order|pos|kds/, ReceiptText],
-  [/reservation|booking/, CalendarDays],
-  [/wait/, ClipboardList],
-  [/floor/, LayoutGrid],
-  [/crm|customer/, Users],
-  [/bill|pay|finance/, Wallet],
-  [/link|site|store/, Link2],
+// The frame's module glyphs, matched on the catalog's module code. The floor
+// plan is the one the frame draws at 20px rather than 24.
+const MODULE_ICONS: [RegExp, string, number?][] = [
+  [/staff/, "staff-perm-people.svg"],
+  [/dashboard|home/, "staff-perm-home.svg"],
+  [/menu/, "staff-perm-menu-board.svg"],
+  [/order|pos|kds/, "staff-perm-clipboard-text.svg"],
+  [/reservation|booking/, "staff-perm-calendar-add.svg"],
+  [/wait/, "staff-perm-clipboard-text.svg"],
+  [/floor/, "staff-perm-floor-plan.svg", 20],
+  [/crm|customer/, "staff-perm-profile-2user.svg"],
+  [/bill|pay|finance/, "staff-perm-money.svg"],
+  [/inventory|stock/, "staff-perm-box.svg"],
+  [/report|analytic/, "staff-perm-document-text.svg"],
 ];
-const moduleIcon = (code: string): LucideIcon => MODULE_ICONS.find(([re]) => re.test(code))?.[1] ?? Settings;
+function moduleIcon(code: string): { name: string; size: number } {
+  const hit = MODULE_ICONS.find(([re]) => re.test(code));
+  return { name: hit?.[1] ?? "staff-perm-setting.svg", size: hit?.[2] ?? 24 };
+}
+
+// The catalog sends module codes ("crm", "floor-plan") and resource keys the
+// console has no translation for, so the modules the console knows are named
+// here; anything else is still read off its code.
+const MODULE_NAMES: [RegExp, string, string][] = [
+  [/crm|customer/, "Customer CRM", "إدارة علاقات العملاء"],
+  [/floor/, "Floor Plan", "مخطط القاعة"],
+  [/menu/, "Menu", "القائمة"],
+  [/order/, "Orders", "الطلبات"],
+  [/public/, "Public Link", "الرابط العام"],
+  [/reservation|booking/, "Reservations", "الحجوزات"],
+  [/wait/, "Wait List", "قائمة الانتظار"],
+  [/staff/, "Staff", "الموظفون"],
+];
+
+// The card the matrix sits in, the same one as the Roles list beside it.
+const CARD = `min-w-0 rounded-[16px] border bg-[var(--octo-card)] p-3 ${LINE}`;
+
+// Table chrome from the frame: a 36px tinted header over 52px rows, split by
+// 0.8px hairlines.
+const PANEL = `rounded-[14.5px] border-[0.8px] bg-[var(--octo-card)] ${LINE_SOFT}`;
+const HEAD_CELL = `h-9 border-b-[0.8px] px-3 text-[12px] font-medium capitalize leading-3 ${LINE_SOFT} ${INK}`;
+const ROW_LINE = "border-b-[0.8px] border-[#f1f5f9] [[data-theme=dark]_&]:border-[var(--octo-divider)]";
+const HEAD_FILL = "bg-[#f8fafc] [[data-theme=dark]_&]:bg-[var(--octo-hover)]";
 
 // The catalog carries resource keys, never text. Keys the console has a
 // translation for are shown translated; the rest are read off the identifier.
@@ -184,10 +202,10 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
 
   const heading = (
     <>
-      <h2 id="matrix-heading" className="text-[16px] font-semibold text-[var(--octo-text-primary)]">
+      <h2 id="matrix-heading" className={clsx("text-[14px] font-bold leading-[14px]", INK)}>
         {t("staff.permissions.matrixHeading")}
       </h2>
-      <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">
+      <p className={clsx("-mb-[2px] mt-[6px] text-[14px] leading-[18px]", INK_SOFT)}>
         {readOnly ? t("staff.permissions.systemRoleNote").replace("{name}", roleName) : t("staff.permissions.matrixSubheading")}
       </p>
     </>
@@ -196,12 +214,12 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
   const failure = catalogError ?? roleError;
   if (failure || !onServer || !catalog || !granted) {
     return (
-      <section aria-labelledby="matrix-heading" className="min-w-0">
+      <section aria-labelledby="matrix-heading" className={CARD}>
         {heading}
-        <div className="mt-4 flex min-h-[160px] flex-col items-center justify-center gap-3 rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-8 text-center text-[13px] text-[var(--octo-text-secondary)]">
+        <div className={clsx("mt-4 flex min-h-[160px] flex-col items-center justify-center gap-3 px-4 py-8 text-center text-[14px]", PANEL, INK_SOFT)}>
           {failure ? (
             <>
-              <p role="alert" className="text-[var(--octo-tone-danger-text)]">{failure}</p>
+              <p role="alert" className={TEXT_RED}>{failure}</p>
               <button type="button" onClick={() => setReloadTick((n) => n + 1)} className={buttonClass("secondary", "sm")}>
                 {tx("Try again", "إعادة المحاولة")}
               </button>
@@ -220,38 +238,39 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
   const allOn = allIds.length > 0 && allIds.every((id) => draft.has(id));
 
   return (
-    <section aria-labelledby="matrix-heading" className="min-w-0">
+    <section aria-labelledby="matrix-heading" className={CARD}>
       {heading}
 
       {catalog.modules.length === 0 ? (
-        <div className="mt-4 rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-8 text-center text-[13px] text-[var(--octo-text-secondary)]">
+        <div className={clsx("mt-4 px-4 py-8 text-center text-[14px]", PANEL, INK_SOFT)}>
           {tx("No modules are active for this business yet, so there is nothing to grant.", "لا توجد وحدات مفعّلة لهذا النشاط بعد، فلا توجد صلاحيات لمنحها.")}
         </div>
       ) : (
-        <div className="octo-scroll mt-4 overflow-x-auto rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-          <table className="w-full min-w-[560px] border-collapse text-[14px]">
+        <div className={clsx("octo-scroll mt-4 overflow-x-auto p-[0.8px]", PANEL)}>
+          <table className="w-full min-w-[560px] border-separate border-spacing-0">
             <caption className="sr-only">{t("staff.permissions.caption").replace("{name}", roleName)}</caption>
             <thead>
-              <tr className="bg-[var(--octo-hover)]">
-                <th scope="col" className="py-3 pe-2 ps-4 text-start text-[13px] font-medium text-[var(--octo-text-primary)]">
+              <tr className={HEAD_FILL}>
+                <th scope="col" className={clsx(HEAD_CELL, "text-start")}>
                   {t("staff.permissions.column.module")}
                 </th>
-                <th scope="col" className="w-[110px] px-2 py-3 text-center text-[13px] font-medium text-[var(--octo-text-primary)]">
+                <th scope="col" className={clsx(HEAD_CELL, "w-[76px] text-center")}>
                   {tx("Granted", "الممنوحة")}
                 </th>
-                <th scope="col" className="w-[150px] py-3 pe-4 ps-2 text-end">
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-medium text-[var(--octo-text-primary)]">
-                    {t("staff.permissions.selectAll")}
+                <th scope="col" className={clsx(HEAD_CELL, "w-[1%] whitespace-nowrap text-end")}>
+                  <label className="inline-flex cursor-pointer items-center gap-2 align-middle">
                     <Switch checked={allOn} disabled={readOnly} onChange={(v) => setMany(allIds, v)} label={t("staff.permissions.selectAll")} />
+                    {t("staff.permissions.selectAll")}
                   </label>
                 </th>
               </tr>
             </thead>
             <tbody>
               {catalog.modules.map((m) => {
-                const Icon = moduleIcon(m.code);
+                const icon = moduleIcon(m.code);
                 const open = expanded.has(m.code);
-                const moduleLabel = label(m.displayNameKey, words(m.code));
+                const known = MODULE_NAMES.find(([re]) => re.test(m.code));
+                const moduleLabel = label(m.displayNameKey, known ? tx(known[1], known[2]) : words(m.code));
                 const ids = modulePermissions(m).map((p) => p.id);
                 const on = ids.filter((id) => draft.has(id)).length;
                 const partial = on > 0 && on < ids.length;
@@ -263,58 +282,72 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
                 ];
                 return (
                   <Fragment key={m.code}>
-                    <tr className="border-t border-[var(--octo-divider)]">
-                      <th scope="row" className="py-2.5 pe-2 ps-4 text-start font-normal">
+                    <tr>
+                      <th scope="row" className={clsx("h-[52px] px-3 text-start font-normal", ROW_LINE)}>
                         <div className="flex items-center gap-2">
-                          <Icon size={22} strokeWidth={1.5} aria-hidden className="shrink-0 text-[var(--octo-text-primary)]" />
-                          <span className="min-w-0 flex-1 truncate text-[15px] text-[var(--octo-text-primary)]">{moduleLabel}</span>
+                          {/* One 24px slot for every glyph, so the names line up whatever size the frame draws the icon at. */}
+                          <span className="grid h-6 w-6 shrink-0 place-items-center">
+                            <StaffIcon name={icon.name} size={icon.size} className={INK} />
+                          </span>
+                          <span className={clsx("-my-[2px] min-w-0 flex-1 truncate py-[2px] text-[14px] font-medium leading-[14px]", INK)}>{moduleLabel}</span>
                           <button
                             type="button"
                             aria-expanded={open}
                             aria-label={t(open ? "staff.permissions.collapse" : "staff.permissions.expand").replace("{module}", moduleLabel)}
                             onClick={() => toggleExpanded(m.code)}
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                            className={clsx(
+                              "grid h-6 w-6 shrink-0 place-items-center rounded-[4px] hover:bg-[var(--octo-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                              INK_SOFT
+                            )}
                           >
-                            <ChevronDown size={20} className={clsx("transition-transform", open && "rotate-180")} />
+                            <StaffIcon name="staff-perm-arrow-down.svg" size={24} className={clsx("transition-transform", open && "rotate-180")} />
                           </button>
                         </div>
                       </th>
-                      <td className="px-2 py-2.5 text-center text-[13px] tabular-nums text-[var(--octo-text-secondary)]">
+                      <td className={clsx("h-[52px] px-3 text-center text-[12px] font-medium tabular-nums leading-3", ROW_LINE, INK_SOFT)}>
                         {on} / {ids.length}
                       </td>
-                      <td className="py-2.5 pe-4 ps-2">
-                        <div className="relative flex justify-end">
-                          <Switch
-                            checked={ids.length > 0 && on === ids.length}
-                            disabled={readOnly || ids.length === 0}
-                            onChange={(v) => setMany(ids, v)}
-                            label={`${moduleLabel}${partial ? ` (${t("staff.permissions.partial")})` : ""}`}
-                          />
-                          {partial && <span title={t("staff.permissions.partial")} className="absolute -bottom-2 end-4 h-1.5 w-1.5 rounded-full bg-[#0D6EFD]" />}
+                      <td className={clsx("h-[52px] px-3", ROW_LINE)}>
+                        <div className="flex justify-end">
+                          <span className="relative inline-flex">
+                            <Switch
+                              size="lg"
+                              checked={ids.length > 0 && on === ids.length}
+                              disabled={readOnly || ids.length === 0}
+                              onChange={(v) => setMany(ids, v)}
+                              label={`${moduleLabel}${partial ? ` (${t("staff.permissions.partial")})` : ""}`}
+                            />
+                            {partial && <span title={t("staff.permissions.partial")} className="absolute -bottom-2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-[#0D6EFD]" />}
+                          </span>
                         </div>
                       </td>
                     </tr>
                     {open &&
                       groups.map((g) => (
                         <Fragment key={g.key}>
-                          <tr className="bg-[var(--octo-hover)]">
-                            <th scope="rowgroup" colSpan={3} className="py-2 pe-4 ps-[46px] text-start text-[12px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-secondary)]">
+                          <tr className={HEAD_FILL}>
+                            <th scope="rowgroup" colSpan={3} className={clsx("h-9 pe-3 ps-11 text-start text-[12px] font-medium leading-3", ROW_LINE, INK)}>
                               {g.title}
-                              {g.description && <span className="ms-2 font-normal normal-case tracking-normal text-[var(--octo-text-muted)]">{g.description}</span>}
+                              {g.description && <span className={clsx("ms-2 font-normal", INK_MUTED)}>{g.description}</span>}
                             </th>
                           </tr>
                           {g.permissions.map((p) => {
-                            const name = label(p.displayNameKey, words(p.id.startsWith(`${m.code}.`) ? p.id.slice(m.code.length + 1).replace(/\./g, " · ") : p.id));
+                            // "crm.customers.export" reads as "Customers · Export".
+                            const name = label(
+                              p.displayNameKey,
+                              (p.id.startsWith(`${m.code}.`) ? p.id.slice(m.code.length + 1) : p.id).split(".").map(words).join(" · ")
+                            );
                             const description = label(p.descriptionKey, "");
                             return (
-                              <tr key={p.id} className="border-t border-[var(--octo-divider)] bg-[var(--octo-card)]">
-                                <th scope="row" colSpan={2} className="py-2 pe-2 ps-[58px] text-start font-normal">
-                                  <span className="block text-[13px] text-[var(--octo-text-primary)]">{name}</span>
-                                  <span dir="ltr" className="block text-[11.5px] text-[var(--octo-text-muted)]">{description || p.id}</span>
+                              <tr key={p.id}>
+                                {/* The raw permission id is for developers; it stays as a tooltip. */}
+                                <th scope="row" colSpan={2} title={p.id} className={clsx("h-[44px] py-2 pe-3 ps-11 text-start font-normal", ROW_LINE)}>
+                                  <span className={clsx("block text-[14px] leading-[18px]", INK)}>{name}</span>
+                                  {description && <span className={clsx("block text-[12px] leading-4", INK_MUTED)}>{description}</span>}
                                 </th>
-                                <td className="py-2 pe-4 ps-2">
+                                <td className={clsx("h-[44px] px-3", ROW_LINE)}>
                                   <div className="flex justify-end">
-                                    <Switch size="sm" checked={draft.has(p.id)} disabled={readOnly} onChange={(v) => setMany([p.id], v)} label={name} />
+                                    <Switch checked={draft.has(p.id)} disabled={readOnly} onChange={(v) => setMany([p.id], v)} label={name} />
                                   </div>
                                 </td>
                               </tr>
@@ -331,7 +364,7 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
       )}
 
       {saveError && (
-        <p role="alert" className="mt-3 rounded-[10px] bg-[var(--octo-tone-danger-bg)] px-4 py-2.5 text-[13px] text-[var(--octo-tone-danger-text)]">
+        <p role="alert" className={clsx("mt-3 rounded-[8px] px-3 py-2.5 text-[14px] leading-[18px]", FILL_RED, TEXT_RED)}>
           {saveError}{" "}
           <button type="button" className="underline" onClick={() => setReloadTick((n) => n + 1)}>
             {tx("Reload", "إعادة التحميل")}
@@ -340,9 +373,9 @@ export function PermissionMatrix({ role }: { role: RoleRecord }) {
       )}
 
       {dirty && !readOnly && (
-        <div className="sticky bottom-4 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3 shadow-[0_12px_32px_rgba(16,24,40,0.14)]">
-          <span className="flex items-center gap-2 text-[14px] font-medium text-[var(--octo-text-primary)]">
-            <ShieldCheck size={18} aria-hidden className="text-[#0D6EFD]" />
+        <div className={clsx("sticky bottom-4 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border bg-[var(--octo-card)] p-3 shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)]", LINE_SOFT)}>
+          <span className={clsx("flex items-center gap-2 text-[14px] font-medium leading-[14px]", INK)}>
+            <StaffIcon name="staff-shield.svg" size={24} className="text-[#0D6EFD]" />
             {tx("Unsaved permission changes", "تغييرات صلاحيات غير محفوظة")}
           </span>
           <div className="flex items-center gap-2">

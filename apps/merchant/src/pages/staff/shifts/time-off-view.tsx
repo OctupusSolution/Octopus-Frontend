@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { CalendarOff, ListChecks, SquarePen } from "lucide-react";
 import clsx from "clsx";
 import { createTimeOffType, deleteTimeOffType, updateTimeOffType } from "@octopus/api-client";
 import { EmptyState, Modal } from "@ui/primitives";
@@ -7,11 +6,14 @@ import { TODAY } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "../_shared/avatar";
 import { buttonClass } from "../_shared/buttons";
-import { Field, SelectInput, TextInput } from "../_shared/form";
+import { DateInput, Field, SelectInput, TextInput } from "../_shared/form";
 import { formatShortDate } from "../_shared/format";
+import { StaffIcon } from "../_shared/icon";
 import { useStaffLabels } from "../_shared/labels";
 import { useCatalogNames } from "../_shared/catalog-names";
+import { StaffModal } from "../_shared/staff-modal";
 import { useStaffStore, type LeaveRequest, type LeaveStatus } from "../_shared/staff-store";
+import { FILL_BLUE, FILL_GREEN, FILL_RED, INK, INK_LINK, INK_SOFT, LINE, TEXT_GREEN, TEXT_RED } from "../_shared/theme";
 import { ToastBanner, useToast } from "../_shared/toast";
 import { CatalogEditor, type CatalogApi } from "../_shared/catalog-editor";
 import { StatusPill } from "../_shared/status-pill";
@@ -44,10 +46,17 @@ function TimeOffTypesModal({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 const STATUS_TEXT: Record<LeaveStatus, string> = {
-  pending: "text-[var(--octo-text-primary)]",
-  approved: "text-[var(--octo-tone-success-text)]",
-  rejected: "text-[var(--octo-tone-danger-text)]",
+  pending: INK,
+  approved: TEXT_GREEN,
+  rejected: TEXT_RED,
 };
+
+// The frame's row actions: 32px tall on a 4px radius, a 24px glyph beside
+// 14px medium text; a decided row keeps them at half strength.
+const ROW_ACTION =
+  "inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-[4px] px-2 text-[14px] font-medium leading-[14px] transition-[filter,opacity] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100";
+
+const CELL = "whitespace-nowrap px-3 text-center text-[14px] font-medium leading-[14px]";
 
 type Errors = { employee?: string; type?: string; start?: string; end?: string };
 
@@ -111,17 +120,24 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={t("staff.timeOff.addTitle")} className="max-w-2xl p-6 [&>h2]:text-[22px] [&>h2]:font-bold">
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-        className="mt-2 flex flex-col gap-5"
-      >
+    <StaffModal
+      open={open}
+      onClose={onClose}
+      title={t("staff.timeOff.addTitle")}
+      submitLabel={grant ? tx("Grant time off", "منح الإجازة") : t("staff.timeOff.add")}
+      onSubmit={submit}
+    >
+      {/* This frame spaces its fields by 24px, the same step as its title and action. */}
+      <div className="flex flex-col gap-6">
         <Field label={t("staff.timeOff.employee")} htmlFor="to-employee" required error={errors.employee}>
-          <SelectInput id="to-employee" value={employeeId} invalid={!!errors.employee} onChange={(e) => { setEmployeeId(e.target.value); setErrors((p) => ({ ...p, employee: undefined })); }}>
+          <SelectInput
+            id="to-employee"
+            value={employeeId}
+            invalid={!!errors.employee}
+            // The unpicked prompt reads as a placeholder (#58606c) in the frame.
+            className={clsx(!employeeId && "!text-[#58606c] [[data-theme=dark]_&]:!text-[var(--octo-text-secondary)]")}
+            onChange={(e) => { setEmployeeId(e.target.value); setErrors((p) => ({ ...p, employee: undefined })); }}
+          >
             <option value="">{t("staff.assignShift.selectEmployee")}</option>
             {store.employees.map((e) => (
               <option key={e.id} value={e.id}>{e.name}</option>
@@ -137,17 +153,32 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
           </SelectInput>
         </Field>
         <Field label={t("staff.timeOff.startDate")} htmlFor="to-start" required error={errors.start}>
-          <TextInput id="to-start" type="date" value={start} min={TODAY} invalid={!!errors.start} onChange={(e) => { setStart(e.target.value); setErrors((p) => ({ ...p, start: undefined, end: undefined })); }} />
+          <DateInput
+            id="to-start"
+            value={start}
+            min={TODAY}
+            invalid={!!errors.start}
+            placeholder={tx("Select start day", "اختر يوم البداية")}
+            onChange={(iso) => { setStart(iso); setErrors((p) => ({ ...p, start: undefined, end: undefined })); }}
+          />
         </Field>
         <Field label={t("staff.timeOff.endDate")} htmlFor="to-end" required error={errors.end}>
-          <TextInput id="to-end" type="date" value={end} min={start || TODAY} invalid={!!errors.end} onChange={(e) => { setEnd(e.target.value); setErrors((p) => ({ ...p, end: undefined })); }} />
+          <DateInput
+            id="to-end"
+            value={end}
+            min={start || TODAY}
+            invalid={!!errors.end}
+            placeholder={tx("Select end day", "اختر يوم النهاية")}
+            onChange={(iso) => { setEnd(iso); setErrors((p) => ({ ...p, end: undefined })); }}
+          />
         </Field>
-        <div className="flex flex-col gap-2 rounded-[10px] bg-[var(--octo-hover)] px-3 py-3">
-          <label className="flex cursor-pointer items-center gap-3">
+        {/* Not in the frame: the direct-grant option, kept in the frame's own field colours. */}
+        <div className={clsx("flex flex-col gap-3 rounded-[12px] p-3", FILL_BLUE)}>
+          <label className="flex cursor-pointer items-center gap-2">
             <Switch checked={grant} onChange={setGrant} label={tx("Grant directly", "منح مباشر")} />
-            <span className="min-w-0">
-              <span className="block text-[14px] font-medium text-[var(--octo-text-primary)]">{tx("Grant directly (approved now)", "منح مباشر (معتمد فورًا)")}</span>
-              <span className="block text-[12px] text-[var(--octo-text-secondary)]">
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className={clsx("text-[14px] font-semibold leading-[14px]", INK)}>{tx("Grant directly (approved now)", "منح مباشر (معتمد فورًا)")}</span>
+              <span className={clsx("text-[12px] leading-[1.4]", INK_SOFT)}>
                 {tx("Recorded as given by you rather than requested. Shifts it covers are not cancelled.", "يُسجَّل كمنحة منك وليس كطلب. لا تُلغى الورديات التي يغطيها.")}
               </span>
             </span>
@@ -156,11 +187,8 @@ function AddTimeOffModal({ open, onClose, onAdded }: { open: boolean; onClose: (
             <TextInput value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder={tx("Note (optional)", "ملاحظة (اختياري)")} aria-label={tx("Note", "ملاحظة")} />
           )}
         </div>
-        <button type="submit" className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
-          {grant ? tx("Grant time off", "منح الإجازة") : t("staff.timeOff.add")}
-        </button>
-      </form>
-    </Modal>
+      </div>
+    </StaffModal>
   );
 }
 
@@ -191,27 +219,27 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
   return (
     <div>
       <div className="mb-3 flex justify-end">
-        <button type="button" onClick={() => setTypesOpen(true)} className={buttonClass("outline", "md")}>
-          <ListChecks size={18} aria-hidden />
+        <button type="button" onClick={() => setTypesOpen(true)} className={buttonClass("outline", "sm")}>
           {tx("Leave types", "أنواع الإجازات")} ({store.timeOffTypes.length})
         </button>
       </div>
       {store.leaveRequests.length === 0 ? (
-        <div className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-          <EmptyState icon={<CalendarOff size={18} />} title={t("staff.timeOff.emptyTitle")} description={t("staff.timeOff.emptyDescription")} />
+        <div className={clsx("rounded-[12px] border bg-[var(--octo-card)]", LINE)}>
+          <EmptyState icon={<StaffIcon name="staff-calendar.svg" size={18} />} title={t("staff.timeOff.emptyTitle")} description={t("staff.timeOff.emptyDescription")} />
         </div>
       ) : (
-        <div className="octo-scroll overflow-x-auto rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-          <table className="w-full min-w-[980px] border-collapse text-[15px]">
+        <div className={clsx("octo-scroll overflow-x-auto rounded-[12px] border bg-[var(--octo-card)] p-3", LINE)}>
+          <table className="w-full min-w-[980px] border-collapse">
             <thead>
-              <tr className="bg-[var(--octo-hover)]">
+              <tr className="bg-[#f1f5f9] [[data-theme=dark]_&]:bg-[var(--octo-hover)]">
                 {columns.map((col) => (
                   <th
                     key={col}
                     scope="col"
                     className={clsx(
-                      "whitespace-nowrap px-3 py-2 text-[13px] font-medium text-[var(--octo-text-primary)] first:rounded-s-[6px] last:rounded-e-[6px]",
-                      col === "employee" ? "text-start ps-16" : "text-center"
+                      "h-6 whitespace-nowrap px-3 py-0 text-[12px] font-medium leading-3",
+                      INK,
+                      col === "employee" ? "ps-12 text-start" : "text-center"
                     )}
                   >
                     {t(`staff.timeOff.column.${col}`)}
@@ -219,40 +247,41 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
                 ))}
               </tr>
             </thead>
-            <tbody>
+            {/* 16px under the header band, then 24px above and 8px below each 32px row. */}
+            <tbody className="[&>tr:first-child>td]:pt-4 [&>tr:last-child>td]:pb-0 [&>tr>td]:pb-2 [&>tr>td]:pt-6">
               {store.leaveRequests.map((r) => {
                 const profile = r.employeeId ? store.profileOf(r.employeeId) : null;
                 const decided = r.status !== "pending";
                 return (
-                  <tr key={r.id} className="border-b border-[var(--octo-divider)] last:border-b-0">
-                    <td className="px-3 py-3">
-                      <span className="flex items-center gap-3">
-                        <Avatar name={r.employeeName} size={44} />
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-[var(--octo-text-primary)]">{r.employeeName}</span>
-                          {profile && <span className="block truncate text-[13px] text-[#0D6EFD]">{names.jobTitle(profile.jobTitle)}</span>}
+                  <tr key={r.id} className={clsx("border-b last:border-b-0", LINE)}>
+                    <td className="pe-3">
+                      <span className="flex items-start gap-2">
+                        <Avatar name={r.employeeName} size={32} />
+                        <span className="flex min-w-0 flex-col gap-1">
+                          <span className={clsx("truncate text-[14px] font-semibold leading-[14px]", INK)}>{r.employeeName}</span>
+                          {profile && <span className={clsx("truncate text-[12px] font-medium leading-3", INK_LINK)}>{names.jobTitle(profile.jobTitle)}</span>}
                         </span>
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">
+                    <td className={clsx(CELL, INK)}>
                       {typeLabel(r)}
                       {r.origin === "DirectGrant" && <StatusPill className="ms-2" tone="info" label={tx("Granted", "ممنوحة")} />}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{formatShortDate(r.start, locale)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-center text-[var(--octo-text-primary)]">{formatShortDate(r.end, locale)}</td>
-                    <td className={clsx("whitespace-nowrap px-3 py-3 text-center font-medium", STATUS_TEXT[r.status])}>
+                    <td className={clsx(CELL, INK)}>{formatShortDate(r.start, locale)}</td>
+                    <td className={clsx(CELL, INK)}>{formatShortDate(r.end, locale)}</td>
+                    <td className={clsx(CELL, STATUS_TEXT[r.status])}>
                       {t(`staff.timeOff.status.${r.status}`)}
                     </td>
-                    <td className="px-3 py-3">
-                      <span className="flex items-center justify-end gap-3">
+                    <td className="w-px ps-3">
+                      <span className="flex items-center justify-end gap-4">
                         <button
                           type="button"
                           disabled={decided}
                           onClick={() => decide(r.id, "approved")}
                           title={decided ? t("staff.timeOff.alreadyDecided") : undefined}
-                          className={buttonClass("successSoft", "md", "font-medium disabled:opacity-50")}
+                          className={clsx(ROW_ACTION, FILL_GREEN, TEXT_GREEN)}
                         >
-                          <SquarePen size={18} aria-hidden />
+                          <StaffIcon name="crm-detail-edit.svg" size={24} />
                           {t("staff.timeOff.approve")}
                         </button>
                         <button
@@ -260,9 +289,9 @@ export function TimeOffView({ addOpen, onAddOpenChange }: { addOpen: boolean; on
                           disabled={decided}
                           onClick={() => decide(r.id, "rejected")}
                           title={decided ? t("staff.timeOff.alreadyDecided") : undefined}
-                          className={buttonClass("dangerSoft", "md", "font-medium disabled:opacity-50")}
+                          className={clsx(ROW_ACTION, FILL_RED, TEXT_RED)}
                         >
-                          <SquarePen size={18} aria-hidden />
+                          <StaffIcon name="crm-detail-edit.svg" size={24} />
                           {t("staff.timeOff.reject")}
                         </button>
                       </span>

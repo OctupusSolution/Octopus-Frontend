@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { createStaffRole, duplicateStaffRole } from "@octopus/api-client";
-import { Modal } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "./_shared/buttons";
 import { Field, SelectInput, TextArea, TextInput } from "./_shared/form";
 import { useStaffLabels } from "./_shared/labels";
+import { StaffModal } from "./_shared/staff-modal";
 import { useStaffStore } from "./_shared/staff-store";
 import { rememberRole, serverRoleId } from "./_shared/staff-sync";
 import { newKey, staffErrorText, useTx, UUID_RE } from "./_shared/text";
@@ -90,29 +88,15 @@ export function RoleFormModal({
   };
 
   return (
-    <Modal
+    <StaffModal
       open={Boolean(state)}
       onClose={onClose}
       title={t(editing ? "staff.roles.editRoleTitle" : "staff.roles.addRoleTitle")}
-      className="max-w-lg"
-      footer={
-        <>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={() => void save()} disabled={saving} className={buttonClass("primary")}>
-            {saving && <Loader2 size={16} className="animate-spin" aria-hidden />}
-            {t(editing ? "staff.roles.saveRole" : "staff.roles.addRoleSave")}
-          </button>
-        </>
-      }
+      submitLabel={t(editing ? "staff.roles.saveRole" : "staff.roles.addRoleSave")}
+      onSubmit={() => void save()}
+      submitDisabled={saving}
     >
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-        className="flex flex-col gap-4"
-      >
+      <div className="flex flex-col gap-4">
         <Field label={t("staff.roles.addRoleName")} htmlFor="role-name" error={error}>
           <TextInput
             id="role-name"
@@ -147,8 +131,7 @@ export function RoleFormModal({
             </SelectInput>
           </Field>
         )}
-        <button type="submit" hidden />
-      </form>
-    </Modal>
+      </div>
+    </StaffModal>
   );
 }

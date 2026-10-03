@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { TriangleAlert } from "lucide-react";
 import clsx from "clsx";
-import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "../_shared/buttons";
 import { Field, TextInput } from "../_shared/form";
 import { formatWeekdayDate, fromISO, shiftDurationHours } from "../_shared/format";
+import { StaffIcon } from "../_shared/icon";
 import { useStaffLabels } from "../_shared/labels";
+import { StaffModal } from "../_shared/staff-modal";
 import { CUSTOM_SHIFT, useStaffStore } from "../_shared/staff-store";
+import { FILL_AMBER, FILL_BLUE, INK, INK_LINK, INK_SOFT, LINE, TEXT_AMBER } from "../_shared/theme";
 import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
 
 export interface ShiftTarget {
@@ -95,13 +96,15 @@ export function EditShiftModal({
   ];
 
   return (
-    <Modal
+    <StaffModal
       open
       onClose={onClose}
       title={t("staff.shiftsTab.editShift")}
-      className="max-w-lg"
+      onSubmit={save}
       footer={
-        <>
+        // No frame for this dialog: it keeps the shell's 48px action and sets
+        // the destructive one beside it in the frames' red tint.
+        <div className="flex flex-wrap gap-3">
           <button
             type="button"
             onClick={() => {
@@ -109,83 +112,86 @@ export function EditShiftModal({
               notify(t("staff.shiftsTab.toastShiftCleared").replace("{name}", employee.name));
               onClose();
             }}
-            className={buttonClass("ghost", "md", "me-auto text-[var(--octo-tone-danger-text)]")}
+            className={buttonClass("dangerSoft", "lg")}
           >
             {t("staff.shiftsTab.removeShift")}
           </button>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={save} className={buttonClass("primary")}>{t("common.save")}</button>
-        </>
+          <button type="submit" className={buttonClass("primary", "lg", "min-w-[160px] flex-1")}>
+            {t("common.save")}
+          </button>
+        </div>
       }
     >
-      <p className="-mt-1 text-[13px] text-[var(--octo-text-secondary)]">
-        {employee.name} · {formatWeekdayDate(day, locale)}
-      </p>
-
-      {(unavailable || onLeave) && (
-        <p className="mt-3 flex items-start gap-2 rounded-[10px] bg-[var(--octo-tone-warning-bg)] px-3 py-2 text-[13px] text-[var(--octo-tone-warning-text)]">
-          <TriangleAlert size={16} aria-hidden className="mt-0.5 shrink-0" />
-          {onLeave ? t("staff.shiftsTab.warnOnLeave") : t("staff.shiftsTab.warnUnavailable")}
+      <div className="flex flex-col gap-4">
+        <p className={clsx("px-2 text-[14px] font-medium leading-[14px]", INK_SOFT)}>
+          {employee.name} · {formatWeekdayDate(day, locale)}
         </p>
-      )}
 
-      <div role="radiogroup" aria-label={t("staff.shiftsTab.editShift")} className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {options.map((o) => {
-          const active = choice === o.id;
-          return (
-            <button
-              key={o.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => pick(o.id)}
-              className={clsx(
-                "rounded-[10px] border px-3 py-2.5 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                active ? "border-[#0D6EFD] bg-[var(--octo-selected)]" : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
-              )}
-            >
-              <span className={clsx("block text-[14px] font-medium", active ? "text-[#0D6EFD]" : "text-[var(--octo-text-primary)]")}>{o.title}</span>
-              <span className="block text-[12px] text-[var(--octo-text-secondary)]">{o.detail}</span>
-            </button>
-          );
-        })}
-      </div>
+        {(unavailable || onLeave) && (
+          <p className={clsx("flex items-start gap-2 rounded-[8px] px-3 py-2 text-[14px] font-medium leading-5", FILL_AMBER, TEXT_AMBER)}>
+            <StaffIcon name="staff-error-circle.svg" size={16} className="mt-0.5" />
+            {onLeave ? t("staff.shiftsTab.warnOnLeave") : t("staff.shiftsTab.warnUnavailable")}
+          </p>
+        )}
 
-      {choice !== OFF && (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <Field label={t("staff.shiftRoles.startTime")} htmlFor="shift-start" error={error}>
-            <TextInput
-              id="shift-start"
-              type="time"
-              value={start}
-              invalid={!!error}
-              onChange={(e) => {
-                setStart(e.target.value);
-                setChoice(CUSTOM_SHIFT);
-                setError("");
-              }}
-            />
-          </Field>
-          <Field label={t("staff.shiftRoles.endTime")} htmlFor="shift-end">
-            <TextInput
-              id="shift-end"
-              type="time"
-              value={end}
-              onChange={(e) => {
-                setEnd(e.target.value);
-                setChoice(CUSTOM_SHIFT);
-                setError("");
-              }}
-            />
-          </Field>
-          {start && end && start !== end && (
-            <p className="col-span-2 text-[13px] text-[var(--octo-text-secondary)]">
-              {t("staff.shiftsTab.duration").replace("{hours}", String(shiftDurationHours(start, end)))}
-              {end < start ? ` · ${t("staff.shiftsTab.overnight")}` : ""}
-            </p>
-          )}
+        <div role="radiogroup" aria-label={t("staff.shiftsTab.editShift")} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {options.map((o) => {
+            const active = choice === o.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => pick(o.id)}
+                className={clsx(
+                  "flex flex-col gap-1.5 rounded-[12px] border p-3 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                  active ? clsx("border-[#0d6efd]", FILL_BLUE) : clsx("hover:bg-[var(--octo-hover)]", LINE)
+                )}
+              >
+                <span className={clsx("text-[14px] font-medium leading-[14px]", active ? INK_LINK : INK)}>{o.title}</span>
+                <span className={clsx("text-[12px] font-medium leading-3", INK_SOFT)}>{o.detail}</span>
+              </button>
+            );
+          })}
         </div>
-      )}
-    </Modal>
+
+        {choice !== OFF && (
+          <div className="grid grid-cols-2 gap-4">
+            <Field label={t("staff.shiftRoles.startTime")} htmlFor="shift-start" error={error}>
+              <TextInput
+                id="shift-start"
+                type="time"
+                value={start}
+                invalid={!!error}
+                onChange={(e) => {
+                  setStart(e.target.value);
+                  setChoice(CUSTOM_SHIFT);
+                  setError("");
+                }}
+              />
+            </Field>
+            <Field label={t("staff.shiftRoles.endTime")} htmlFor="shift-end">
+              <TextInput
+                id="shift-end"
+                type="time"
+                value={end}
+                onChange={(e) => {
+                  setEnd(e.target.value);
+                  setChoice(CUSTOM_SHIFT);
+                  setError("");
+                }}
+              />
+            </Field>
+            {start && end && start !== end && (
+              <p className={clsx("col-span-2 px-2 text-[12px] font-medium leading-3", INK_SOFT)}>
+                {t("staff.shiftsTab.duration").replace("{hours}", String(shiftDurationHours(start, end)))}
+                {end < start ? ` · ${t("staff.shiftsTab.overnight")}` : ""}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </StaffModal>
   );
 }

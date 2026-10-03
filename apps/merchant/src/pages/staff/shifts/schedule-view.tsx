@@ -1,26 +1,9 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  CalendarClock,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  CopyPlus,
-  Eraser,
-  FileDown,
-  MessageCircle,
-  Printer,
-  Timer,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import clsx from "clsx";
 import { clearScheduleWeek, copyScheduleWeek, type BulkAssignmentSkipResponse } from "@octopus/api-client";
 import { EmptyState } from "@ui/primitives";
-import { branches, TODAY, SHIFT_PILL_COLORS, type Branch } from "@/shared/api/mock-staff";
+import { branches, TODAY, type Branch } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "../_shared/buttons";
-import { SelectInput } from "../_shared/form";
 import {
   addDays,
   addMonths,
@@ -32,10 +15,12 @@ import {
   startOfWeek,
   toISO,
 } from "../_shared/format";
+import { StaffIcon } from "../_shared/icon";
 import { useStaffLabels } from "../_shared/labels";
 import { useCatalogNames } from "../_shared/catalog-names";
 import { RowMenu } from "../_shared/row-menu";
 import { useStaffStore } from "../_shared/staff-store";
+import { FILL_BLUE, INK, INK_LINK, INK_MUTED, INK_SOFT, LINE, LINE_SOFT, TEXT_RED } from "../_shared/theme";
 import { ToastBanner, useToast } from "../_shared/toast";
 import { ConfirmModal } from "../_shared/confirm-modal";
 import { serverMemberIdOrNull } from "../_shared/staff-sync";
@@ -50,18 +35,56 @@ import { WhatsAppModal } from "./whatsapp-modal";
 type ViewMode = "week" | "month";
 export type ScheduleDialog = "assign" | "bulkAssign" | null;
 
-function SummaryTile({ icon, value, unit, label, tint, iconBg }: { icon: ReactNode; value: string; unit?: string; label: string; tint: string; iconBg: string }) {
+// Multi-colour artwork from the frame, so it is an <img> rather than a mask.
+const WHATSAPP_URL = new URL("../../../../../assets/Dashboard/icons/staff-sched-whatsapp.svg", import.meta.url).href;
+
+interface Tint {
+  fg: string;
+  bg: string;
+}
+
+function tintVars(tint: Tint): CSSProperties {
+  return { "--tint-fg": tint.fg, "--tint-bg": tint.bg } as CSSProperties;
+}
+
+// The frame's shift chips, one colour per employee row, cycled. The frames
+// only draw the light pastels, so dark mixes the same hue into the card.
+const CHIP_TINTS: readonly Tint[] = [
+  { fg: "#8b6fd4", bg: "#f6f3fd" },
+  { fg: "#0058da", bg: "#f3f7fe" },
+  { fg: "#009a39", bg: "#f2f9f3" },
+  { fg: "#c77a1d", bg: "#fef9f0" },
+  { fg: "#6aa4b5", bg: "#f2fbfb" },
+  { fg: "#f03989", bg: "#fff5f9" },
+  { fg: "#9e8ae2", bg: "#f6f4fe" },
+];
+
+const CHIP =
+  "flex w-full items-center justify-center overflow-hidden whitespace-nowrap rounded-[4px] px-1 text-[12px] font-medium leading-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40";
+const CHIP_TINTED =
+  "border border-[color:var(--tint-fg)] bg-[var(--tint-bg)] text-[color:var(--tint-fg)] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,var(--tint-fg)_18%,var(--octo-card))] [[data-theme=dark]_&]:text-[color:color-mix(in_srgb,var(--tint-fg)_55%,white)]";
+
+// The toolbar's own button metrics: 40px high, 14px medium, 24px icons.
+const TOOL_BUTTON =
+  "inline-flex h-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-3 text-[14px] font-medium leading-[14px] transition-[background-color,filter,opacity] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 disabled:cursor-not-allowed disabled:opacity-50";
+const NAV_BUTTON = clsx(
+  "grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[4px] border transition-colors hover:bg-[var(--octo-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+  LINE,
+  INK_MUTED
+);
+
+function SummaryTile({ icon, value, label, tint }: { icon: ReactNode; value: string; label: string; tint: Tint }) {
   return (
-    <div className={clsx("flex min-w-0 items-center gap-2.5 rounded-[12px] px-3 py-3", tint)}>
-      <span aria-hidden className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-[10px] text-white", iconBg)}>
+    <div
+      style={tintVars(tint)}
+      className="flex min-w-[150px] flex-1 items-center gap-3 rounded-[12px] border-2 border-[#fefefe] bg-[var(--tint-bg)] p-[6px] drop-shadow-[0px_4px_2.5px_rgba(0,0,0,0.05)] [[data-theme=dark]_&]:border-[var(--octo-card)] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,var(--tint-fg)_18%,var(--octo-card))]"
+    >
+      <span aria-hidden className="relative grid h-8 w-8 shrink-0 place-items-center rounded-[4px] bg-[var(--tint-fg)] text-white">
         {icon}
       </span>
-      <span className="min-w-0">
-        <span className="block whitespace-nowrap text-[20px] font-bold leading-tight text-[var(--octo-text-primary)]">
-          {value}
-          {unit && <span className="ms-1 text-[12px] font-semibold text-[var(--octo-text-secondary)]">{unit}</span>}
-        </span>
-        <span className="line-clamp-2 block text-[13px] leading-snug text-[var(--octo-text-secondary)]">{label}</span>
+      <span className="flex min-w-0 flex-col gap-2 whitespace-nowrap">
+        <span className={clsx("text-[24px] font-semibold leading-6", INK)}>{value}</span>
+        <span className="text-[14px] font-medium leading-[14px] text-[#6f6f6f] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]">{label}</span>
       </span>
     </div>
   );
@@ -195,103 +218,161 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
     <>
       <section
         aria-label={t("staff.shiftsTab.weeklySummary")}
-        className="flex flex-col gap-4 rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4 xl:flex-row xl:items-center"
+        className={clsx("flex flex-col gap-3 rounded-[24px] border bg-[var(--octo-card)] p-3 xl:flex-row xl:items-center xl:gap-[18px]", LINE)}
       >
-        <div className="shrink-0 xl:w-[160px]">
-          <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{t("staff.shiftsTab.weeklySummary")}</h2>
-          <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{weekRange}</p>
+        <div className="flex shrink-0 flex-col gap-3">
+          <h2 className="text-[18px] font-bold leading-[18px] text-[#16161d] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">{t("staff.shiftsTab.weeklySummary")}</h2>
+          <p className={clsx("text-[14px] font-medium leading-[14px]", INK_MUTED)}>{weekRange}</p>
         </div>
-        <div className="grid min-w-0 flex-1 grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 min-[1400px]:grid-cols-5">
-          <SummaryTile icon={<Clock size={24} />} value={`${summary.totalHours}${t("staff.shiftsTab.hoursUnit")}`} label={t("staff.shiftsTab.totalHours")} tint="bg-[var(--octo-tone-info-bg)]" iconBg="bg-[#0D6EFD]" />
-          <SummaryTile icon={<Users size={24} />} value={String(summary.employeesScheduled)} label={t("staff.shiftsTab.totalEmployees")} tint="bg-[var(--octo-tone-violet-bg)]" iconBg="bg-[#7C3AED]" />
-          <SummaryTile icon={<Timer size={24} />} value={`${summary.overtimeHours}${t("staff.shiftsTab.hoursUnit")}`} label={t("staff.shiftsTab.overtime")} tint="bg-[var(--octo-tone-danger-bg)]" iconBg="bg-[#DB2777]" />
-          <SummaryTile icon={<CalendarClock size={24} />} value={String(summary.openShifts)} label={t("staff.shiftsTab.openShift")} tint="bg-[var(--octo-tone-warning-bg)]" iconBg="bg-[#D97706]" />
-          <SummaryTile icon={<Wallet size={24} />} value={formatCurrency(summary.laborCost, locale, false)} unit={locale === "ar" ? "ر.س" : "SAR"} label={t("staff.shiftsTab.estLaborCost")} tint="bg-[var(--octo-tone-success-bg)]" iconBg="bg-[#16A34A]" />
+        <div className="flex min-w-0 flex-1 flex-wrap gap-x-[18px] gap-y-3">
+          <SummaryTile
+            icon={<StaffIcon name="crm-detail-clock.svg" size={24} />}
+            value={`${summary.totalHours}${t("staff.shiftsTab.hoursUnit")}`}
+            label={t("staff.shiftsTab.totalHours")}
+            tint={{ fg: "#0063f6", bg: "#f0f6ff" }}
+          />
+          <SummaryTile
+            icon={<StaffIcon name="staff-sched-users.svg" size={24} />}
+            value={String(summary.employeesScheduled)}
+            label={t("staff.shiftsTab.totalEmployees")}
+            tint={{ fg: "#6903dd", bg: "#f7f0ff" }}
+          />
+          <SummaryTile
+            icon={
+              // The frame draws the overtime glyph as a timer with a separate 10px plus set into its lower right.
+              <span className="relative block h-6 w-6">
+                <StaffIcon name="staff-sched-timer-start.svg" size={24} className="absolute inset-0" />
+                <StaffIcon name="staff-sched-timer-plus.svg" size={10} className="absolute left-[11.6px] top-[13px]" />
+              </span>
+            }
+            value={`${summary.overtimeHours}${t("staff.shiftsTab.hoursUnit")}`}
+            label={t("staff.shiftsTab.overtime")}
+            tint={{ fg: "#b7007a", bg: "#fff0fa" }}
+          />
+          <SummaryTile
+            icon={<StaffIcon name="staff-sched-shift.svg" size={24} glyph={[21.5, 20.5]} className="translate-y-[0.5px]" />}
+            value={String(summary.openShifts)}
+            label={t("staff.shiftsTab.openShift")}
+            tint={{ fg: "#bf8001", bg: "#fffaf0" }}
+          />
+          <SummaryTile
+            icon={<StaffIcon name="staff-sched-money.svg" size={24} />}
+            value={locale === "ar" ? formatCurrency(summary.laborCost, locale) : `SAR${formatCurrency(summary.laborCost, locale, false)}`}
+            label={t("staff.shiftsTab.estLaborCost")}
+            tint={{ fg: "#009331", bg: "#f0fff5" }}
+          />
         </div>
       </section>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        <div role="radiogroup" aria-label={t("staff.shiftsTab.viewMode")} className="inline-flex h-10 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)]">
-          {(["week", "month"] as ViewMode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={mode === m}
-              onClick={() => setMode(m)}
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div role="radiogroup" aria-label={t("staff.shiftsTab.viewMode")} className="inline-flex h-[42px]">
+            {(["week", "month"] as ViewMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className={clsx(
+                  "w-[66px] border px-1 text-[12px] font-medium leading-3 transition-colors first:rounded-s-[4px] last:rounded-e-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                  mode === m
+                    ? clsx("border-[#0d6efd] text-[#0d6efd]", FILL_BLUE)
+                    : clsx("bg-[var(--octo-card)] hover:text-[var(--octo-text-primary)]", LINE_SOFT, INK_MUTED)
+                )}
+              >
+                {t(`staff.shiftsTab.${m}`)}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => move(-1)} aria-label={t(mode === "week" ? "staff.shiftsTab.previousWeek" : "staff.shiftsTab.previousMonth")} className={NAV_BUTTON}>
+              <StaffIcon name="form-arrow-down.svg" size={24} className="rotate-90 rtl:-rotate-90" />
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = dateInputRef.current;
+                  if (el && typeof el.showPicker === "function") el.showPicker();
+                }}
+                className="flex h-10 items-center gap-2 whitespace-nowrap rounded-[4px] bg-[#f1f5f9] px-2 text-[14px] font-medium leading-[14px] text-[#16161d] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 [[data-theme=dark]_&]:bg-[var(--octo-hover)] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]"
+              >
+                <StaffIcon name="form-calendar.svg" size={24} className={INK} />
+                {mode === "week" ? formatWeekdayDate(anchor, locale) : formatMonthYear(anchor, locale)}
+              </button>
+              <input
+                ref={dateInputRef}
+                type="date"
+                tabIndex={-1}
+                aria-label={t("staff.shiftsTab.pickDate")}
+                value={toISO(anchor)}
+                onChange={(e) => e.target.value && setAnchor(fromISO(e.target.value))}
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
+              />
+            </div>
+            <button type="button" onClick={() => move(1)} aria-label={t(mode === "week" ? "staff.shiftsTab.nextWeek" : "staff.shiftsTab.nextMonth")} className={NAV_BUTTON}>
+              <StaffIcon name="form-arrow-down.svg" size={24} className="-rotate-90 rtl:rotate-90" />
+            </button>
+            {toISO(anchor) !== TODAY && (
+              <button type="button" onClick={() => setAnchor(fromISO(TODAY))} className={clsx(TOOL_BUTTON, "px-2 hover:bg-[var(--octo-hover)]", INK_LINK)}>
+                {t("staff.shiftsTab.today")}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="relative flex items-center">
+            <select
+              aria-label={t("staff.filter.allBranches")}
+              value={branchFilter}
+              onChange={(e) => setBranchFilter(e.target.value as "all" | Branch)}
               className={clsx(
-                "min-w-[68px] rounded-[10px] px-3 text-[14px] font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                mode === m ? "bg-[var(--octo-selected)] text-[#0D6EFD] ring-1 ring-inset ring-[#0D6EFD]" : "text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+                "h-10 appearance-none rounded-[8px] border bg-[var(--octo-card)] pe-12 ps-4 text-[14px] font-medium leading-[14px] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25 [[data-theme=dark]_&]:focus:border-[#0D6EFD]",
+                LINE_SOFT,
+                INK_MUTED
               )}
             >
-              {t(`staff.shiftsTab.${m}`)}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => move(-1)} aria-label={t(mode === "week" ? "staff.shiftsTab.previousWeek" : "staff.shiftsTab.previousMonth")} className={buttonClass("secondary", "lg", "w-11 px-0")}>
-            <ChevronLeft size={20} className="rtl:rotate-180" />
-          </button>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => {
-                const el = dateInputRef.current;
-                if (el && typeof el.showPicker === "function") el.showPicker();
-              }}
-              className="flex h-11 items-center gap-2 rounded-[10px] bg-[var(--octo-hover)] px-3.5 text-[15px] font-medium text-[var(--octo-text-primary)] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40"
-            >
-              <CalendarDays size={20} aria-hidden />
-              {mode === "week" ? formatWeekdayDate(anchor, locale) : formatMonthYear(anchor, locale)}
-            </button>
-            <input
-              ref={dateInputRef}
-              type="date"
-              tabIndex={-1}
-              aria-label={t("staff.shiftsTab.pickDate")}
-              value={toISO(anchor)}
-              onChange={(e) => e.target.value && setAnchor(fromISO(e.target.value))}
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
-            />
-          </div>
-          <button type="button" onClick={() => move(1)} aria-label={t(mode === "week" ? "staff.shiftsTab.nextWeek" : "staff.shiftsTab.nextMonth")} className={buttonClass("secondary", "lg", "w-11 px-0")}>
-            <ChevronRight size={20} className="rtl:rotate-180" />
-          </button>
-          {toISO(anchor) !== TODAY && (
-            <button type="button" onClick={() => setAnchor(fromISO(TODAY))} className={buttonClass("ghost", "md")}>
-              {t("staff.shiftsTab.today")}
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 xl:ms-auto">
-          <div className="w-[170px]">
-            <SelectInput aria-label={t("staff.filter.allBranches")} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value as "all" | Branch)}>
               <option value="all">{t("staff.filter.allBranches")}</option>
               {branches.map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
-            </SelectInput>
-          </div>
-          <button type="button" disabled={weekBusy} onClick={() => void copyWeekForward(null)} className={buttonClass("outline", "md")}>
-            <CopyPlus size={20} aria-hidden />
+            </select>
+            <StaffIcon name="form-arrow-down.svg" size={24} className={clsx("pointer-events-none absolute end-4", INK_MUTED)} />
+          </span>
+          {/* Week-wide copy and clear are not in the frame; they take the toolbar's metrics without an icon. */}
+          <button
+            type="button"
+            disabled={weekBusy}
+            onClick={() => void copyWeekForward(null)}
+            className={clsx(TOOL_BUTTON, "border border-[#007bff] bg-[var(--octo-card)] text-[#0d6efd] hover:bg-[var(--octo-selected)]")}
+          >
             {tx("Copy to next week", "نسخ للأسبوع القادم")}
           </button>
-          <button type="button" disabled={weekBusy} onClick={() => setConfirmClear(true)} className={buttonClass("dangerSoft", "md")}>
-            <Eraser size={20} aria-hidden />
+          <button
+            type="button"
+            disabled={weekBusy}
+            onClick={() => setConfirmClear(true)}
+            className={clsx(TOOL_BUTTON, "border border-[#d30202] bg-[#fef0f0] text-[#d30202] hover:brightness-95 [[data-theme=dark]_&]:bg-[#d30202]/20 [[data-theme=dark]_&]:text-[#f87171]")}
+          >
             {tx("Clear week", "مسح الأسبوع")}
           </button>
-          <button type="button" onClick={() => setWhatsAppOpen(true)} className={buttonClass("successOutline", "md")}>
-            <MessageCircle size={20} aria-hidden />
+          <button
+            type="button"
+            onClick={() => setWhatsAppOpen(true)}
+            className={clsx(TOOL_BUTTON, "border border-[#009a39] bg-[#f2f9f3] text-[#009a39] hover:brightness-95 [[data-theme=dark]_&]:bg-[#009a39]/20 [[data-theme=dark]_&]:text-[#4ade80]")}
+          >
+            <img src={WHATSAPP_URL} alt="" aria-hidden="true" width={24} height={24} className="h-6 w-6 shrink-0" />
             {t("staff.shiftsTab.sendViaWhatsApp")}
           </button>
-          <button type="button" onClick={() => print(false)} className={buttonClass("outline", "md")}>
-            <Printer size={20} aria-hidden />
+          <button type="button" onClick={() => print(false)} className={clsx(TOOL_BUTTON, "border border-[#007bff] bg-[var(--octo-card)] text-[#0d6efd] hover:bg-[var(--octo-selected)]")}>
+            <StaffIcon name="crm-detail-export.svg" size={24} />
             {t("staff.shiftsTab.print")}
           </button>
-          <button type="button" onClick={() => print(true)} className={buttonClass("primary", "md")}>
-            <FileDown size={20} aria-hidden />
+          <button type="button" onClick={() => print(true)} className={clsx(TOOL_BUTTON, "bg-[#007bff] text-white hover:bg-[#0b5ed7]")}>
+            <StaffIcon name="crm-detail-export.svg" size={24} />
             {t("staff.shiftsTab.exportPdf")}
           </button>
         </div>
@@ -307,22 +388,24 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
           }}
         />
       ) : staff.length === 0 ? (
-        <div className="mt-4 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-          <EmptyState icon={<Users size={18} />} title={t("staff.shiftsTab.noStaffTitle")} description={t("staff.shiftsTab.noStaffDescription")} />
+        <div className={clsx("mt-6 rounded-[8px] border bg-[var(--octo-card)]", LINE)}>
+          <EmptyState icon={<StaffIcon name="staff-sched-users.svg" size={18} />} title={t("staff.shiftsTab.noStaffTitle")} description={t("staff.shiftsTab.noStaffDescription")} />
         </div>
       ) : (
-        <div className="octo-scroll mt-4 overflow-x-auto rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-          <table className="w-full min-w-[1100px] table-fixed border-collapse">
+        <div className={clsx("octo-scroll mt-6 overflow-x-auto rounded-[8px] border bg-[var(--octo-card)]", LINE)}>
+          {/* Cells carry their own rules: the frame's column dividers are 46px
+              segments inside each 63px row, not full-height table borders. */}
+          <table className="w-full min-w-[1146px] table-fixed border-separate border-spacing-0">
             <caption className="sr-only">{`${t("staff.shiftsTab.printTitle")} ${weekRange}`}</caption>
             <colgroup>
-              <col className="w-[210px]" />
+              <col className="w-[150px]" />
               {days.map((d) => (
                 <col key={toISO(d)} />
               ))}
             </colgroup>
             <thead>
               <tr>
-                <th scope="col" className="border-b border-e border-[var(--octo-divider)] px-3 py-3 text-center text-[14px] font-semibold text-[var(--octo-text-primary)]">
+                <th scope="col" className={clsx("h-7 truncate border-b px-4 text-center text-[12px] font-bold leading-3", LINE, INK)}>
                   {t("staff.shiftsTab.allEmployees")}
                 </th>
                 {days.map((d) => {
@@ -333,8 +416,9 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
                       scope="col"
                       aria-current={isToday ? "date" : undefined}
                       className={clsx(
-                        "border-b border-e border-[var(--octo-divider)] px-2 py-3 text-center text-[14px] font-semibold last:border-e-0",
-                        isToday ? "bg-[var(--octo-selected)] text-[#0D6EFD]" : "text-[var(--octo-text-primary)]"
+                        "h-7 truncate border-b px-3 text-center text-[12px] font-bold leading-3",
+                        LINE,
+                        isToday ? clsx(FILL_BLUE, INK_LINK) : INK
                       )}
                     >
                       {formatDayHeader(d, locale)}
@@ -345,27 +429,25 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
             </thead>
             <tbody>
               {staff.map((e, index) => {
-                const color = SHIFT_PILL_COLORS[index % SHIFT_PILL_COLORS.length];
+                const tint = CHIP_TINTS[index % CHIP_TINTS.length];
                 const hours = employeeHours(e.id, days, store.shifts);
                 const profile = store.profileOf(e.id);
                 return (
-                  <tr key={e.id} className="border-b border-[var(--octo-divider)] last:border-b-0">
-                    <th scope="row" className="border-e border-[var(--octo-divider)] px-3 py-2 text-start align-middle font-normal">
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="min-w-0">
-                          <p className="truncate text-[15px] font-semibold text-[var(--octo-text-primary)]">{e.name}</p>
-                          <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{names.jobTitle(profile?.jobTitle ?? "")}</p>
+                  <tr key={e.id}>
+                    <th scope="row" className={clsx("border-b py-2 pe-0 ps-1 text-start align-middle font-normal [tr:last-child>&]:border-b-0", LINE)}>
+                      <div className={clsx("flex h-[46px] items-start justify-between gap-2 border-e pe-1", LINE)}>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <p className={clsx("truncate text-[14px] font-semibold leading-[14px]", INK)}>{e.name}</p>
+                          <p className={clsx("truncate text-[12px] font-medium leading-3", INK_SOFT)}>{names.jobTitle(profile?.jobTitle ?? "")}</p>
                           <p
-                            className={clsx(
-                              "text-[13px]",
-                              hours > MAX_WEEK_HOURS ? "font-semibold text-[var(--octo-tone-danger-text)]" : "text-[var(--octo-text-secondary)]"
-                            )}
+                            className={clsx("text-[12px] leading-3", hours > MAX_WEEK_HOURS ? clsx("font-semibold", TEXT_RED) : clsx("font-medium", INK_SOFT))}
                             title={hours > MAX_WEEK_HOURS ? t("staff.shiftsTab.overLimit").replace("{max}", String(MAX_WEEK_HOURS)) : undefined}
                           >
                             {hours}{t("staff.shiftsTab.hoursUnit")}/ {STANDARD_WEEK_HOURS}{t("staff.shiftsTab.hoursUnit")}
                           </p>
                         </div>
                         <RowMenu
+                          align="start"
                           open={menuId === e.id}
                           onOpenChange={(open) => setMenuId(open ? e.id : null)}
                           ariaLabel={t("staff.grid.moreActions").replace("{name}", e.name)}
@@ -397,32 +479,35 @@ export function ScheduleView({ dialog, onDialogChange }: { dialog: ScheduleDialo
                       const off = store.offDays[key];
                       const dateLabel = formatWeekdayDate(d, locale);
                       return (
-                        <td key={iso} className="border-e border-[var(--octo-divider)] px-2 py-2 align-middle last:border-e-0">
-                          {cell || off ? (
-                            <button
-                              type="button"
-                              onClick={() => setEditing({ employeeId: e.id, date: iso })}
-                              aria-label={t("staff.shiftsTab.editShiftFor").replace("{name}", e.name).replace("{date}", dateLabel).replace("{shift}", shiftLabel(e.id, d))}
-                              style={cell ? { borderColor: color, color, backgroundColor: `${color}12` } : undefined}
-                              className={clsx(
-                                "flex h-10 w-full items-center justify-center truncate rounded-[8px] border px-1 text-[13px] font-medium transition-[filter,border-color,color] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                                cell
-                                  ? "hover:brightness-95"
-                                  : "border-dashed border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:border-[#0D6EFD] hover:text-[#0D6EFD]"
-                              )}
-                            >
-                              {shiftLabel(e.id, d)}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => openAssign("assign", { employeeIds: [e.id], dates: [iso] })}
-                              aria-label={t("staff.shiftsTab.assignShiftFor").replace("{name}", e.name).replace("{date}", dateLabel)}
-                              className="flex h-10 w-full items-center justify-center truncate rounded-[8px] bg-[#0D6EFD] px-1 text-[13px] font-medium text-white transition-colors hover:bg-[#0b5ed7] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40 focus-visible:ring-offset-1"
-                            >
-                              {t("staff.assignShift.submit")}
-                            </button>
-                          )}
+                        <td key={iso} className={clsx("border-b px-0 py-2 align-middle [tr:last-child>&]:border-b-0", LINE)}>
+                          <div className={clsx("flex h-[46px] items-center border-e px-3 [td:last-child>&]:border-e-0", LINE)}>
+                            {cell || off ? (
+                              <button
+                                type="button"
+                                onClick={() => setEditing({ employeeId: e.id, date: iso })}
+                                aria-label={t("staff.shiftsTab.editShiftFor").replace("{name}", e.name).replace("{date}", dateLabel).replace("{shift}", shiftLabel(e.id, d))}
+                                style={cell ? tintVars(tint) : undefined}
+                                className={clsx(
+                                  CHIP,
+                                  "h-[30px] transition-[filter,border-color,color]",
+                                  cell
+                                    ? clsx(CHIP_TINTED, "hover:brightness-95")
+                                    : clsx("border border-dashed bg-[var(--octo-card)] hover:border-[#0D6EFD] hover:text-[#0D6EFD]", LINE, INK)
+                                )}
+                              >
+                                {shiftLabel(e.id, d)}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openAssign("assign", { employeeIds: [e.id], dates: [iso] })}
+                                aria-label={t("staff.shiftsTab.assignShiftFor").replace("{name}", e.name).replace("{date}", dateLabel)}
+                                className={clsx(CHIP, "h-7 bg-[#0d6efd] text-white transition-colors hover:bg-[#0b5ed7] focus-visible:ring-offset-1")}
+                              >
+                                {t("staff.assignShift.submit")}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       );
                     })}

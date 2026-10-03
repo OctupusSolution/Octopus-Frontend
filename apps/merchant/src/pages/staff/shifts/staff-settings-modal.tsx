@@ -4,11 +4,12 @@
 // than a whole new settings page.
 import { useEffect, useState } from "react";
 import { getStaffSettings, updateStaffSettings, type StaffWeekDay } from "@octopus/api-client";
-import { Modal } from "@ui/primitives";
+import clsx from "clsx";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "../_shared/buttons";
-import { Field, SelectInput } from "../_shared/form";
+import { Field, SelectInput, TextInput } from "../_shared/form";
+import { StaffModal } from "../_shared/staff-modal";
+import { FILL_RED, INK_MUTED, TEXT_RED } from "../_shared/theme";
 
 const WEEK_DAYS: readonly StaffWeekDay[] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -61,12 +62,23 @@ export function StaffSettingsModal({ open, onClose }: { open: boolean; onClose: 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={t("staff.settings.title")} className="max-w-md">
+    <StaffModal
+      open={open}
+      onClose={onClose}
+      title={t("staff.settings.title")}
+      submitLabel={saving ? t("staff.settings.saving") : t("staff.settings.save")}
+      onSubmit={() => void save()}
+      submitDisabled={loading || saving}
+    >
       {loading ? (
-        <p className="py-6 text-center text-[13px] text-[var(--octo-text-secondary)]">{t("staff.settings.loading")}</p>
+        <p className={clsx("py-6 text-center text-[14px] font-medium leading-[14px]", INK_MUTED)}>{t("staff.settings.loading")}</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {error && <p role="alert" className="rounded-[9px] bg-error/10 px-3 py-2 text-[13px] text-error">{error}</p>}
+          {error && (
+            <p role="alert" className={clsx("rounded-[8px] px-3 py-2 text-[14px] font-medium leading-5", FILL_RED, TEXT_RED)}>
+              {error}
+            </p>
+          )}
           <Field label={t("staff.settings.weekStartDay")} htmlFor="staff-week-start">
             <SelectInput id="staff-week-start" value={weekStartDay} onChange={(e) => setWeekStartDay(e.target.value as StaffWeekDay)}>
               {WEEK_DAYS.map((day) => (
@@ -77,26 +89,17 @@ export function StaffSettingsModal({ open, onClose }: { open: boolean; onClose: 
             </SelectInput>
           </Field>
           <Field label={t("staff.settings.invitationTtl")} htmlFor="staff-invite-ttl" hint={t("staff.settings.invitationTtlHint")}>
-            <input
+            <TextInput
               id="staff-invite-ttl"
               type="number"
               min={1}
               max={90}
               value={invitationTtlDays}
               onChange={(e) => setInvitationTtlDays(Math.max(1, Math.min(90, Number(e.target.value) || 1)))}
-              className="h-11 w-full rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3.5 text-[14px] text-[var(--octo-text-primary)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25"
             />
           </Field>
         </div>
       )}
-      <div className="mt-6 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className={buttonClass("secondary")}>
-          {t("staff.availability.close")}
-        </button>
-        <button type="button" onClick={() => void save()} disabled={loading || saving} className={buttonClass("primary")}>
-          {saving ? t("staff.settings.saving") : t("staff.settings.save")}
-        </button>
-      </div>
-    </Modal>
+    </StaffModal>
   );
 }

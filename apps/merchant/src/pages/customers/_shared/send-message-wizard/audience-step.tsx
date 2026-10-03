@@ -1,13 +1,14 @@
 // apps/merchant/src/pages/customers/_shared/send-message-wizard/audience-step.tsx
 import { useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { Bookmark, Check, X } from "lucide-react";
+import { Bookmark, X } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { SavedSegment } from "../customer-store";
-import { DateField, PRIMARY_SUBMIT_CLASS, RadioBox, SelectBox } from "../form-controls";
+import { DateField, RadioBox, SelectBox } from "../form-controls";
 import { useTagLabel } from "../tag-chips";
 import { ALL_TAGS } from "../types";
 import { AGE_RANGES, EMPTY_AUDIENCE_FILTERS, VISIT_FREQUENCIES, type AudienceFilters } from "./audience";
+import { BRAND_TEXT_CLASS, OUTLINE_CLASS, SECTION_LABEL_CLASS, SELECTED_SURFACE_CLASS, SOFT_BLUE_BG_CLASS, STEP_SUBMIT_CLASS } from "./styles";
 
 type Tab = "filters" | "segments" | "savedAudiences";
 
@@ -39,8 +40,8 @@ export function AudienceStep({
   ];
 
   return (
-    <div>
-      <div role="tablist" className="inline-flex gap-[46px] border-b border-[var(--octo-divider)]">
+    <div className="flex flex-col gap-4">
+      <div role="tablist" className="flex w-fit gap-8 border-b border-[#e2e8f0] [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -49,8 +50,8 @@ export function AudienceStep({
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
             className={clsx(
-              "-mb-px border-b-2 pb-2 text-[17px] transition-colors",
-              tab === item.id ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+              "-mb-px border-b pb-3 pt-1 text-[16px] font-medium leading-4 transition-colors",
+              tab === item.id ? clsx("border-[#0d6efd]", BRAND_TEXT_CLASS) : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
             )}
           >
             {item.label}
@@ -59,7 +60,7 @@ export function AudienceStep({
       </div>
 
       {value.segment && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-[8px] bg-[#0D6EFD]/[0.06] px-3 py-2 text-[13px] text-[#0D6EFD]">
+        <div className={clsx("flex items-center justify-between gap-2 rounded-[8px] px-3 py-2 text-[12px] font-medium", SOFT_BLUE_BG_CLASS, BRAND_TEXT_CLASS)}>
           <span className="inline-flex items-center gap-1.5">
             <Bookmark size={15} /> {t("customers.sendMessage.usingAudience").replace("{name}", value.segment.name)}
           </span>
@@ -70,7 +71,7 @@ export function AudienceStep({
       )}
 
       {tab === "filters" && (
-        <div className="mt-4 flex flex-col gap-3.5">
+        <div className="flex flex-col gap-4">
           <Group label={t("customers.sendMessage.filter.tags")}>
             <SelectBox value={value.tag} onChange={(v) => set("tag", v)} placeholderShown={value.tag === ""} ariaLabel={t("customers.sendMessage.filter.tags")}>
               <option value="">{t("customers.sendMessage.filter.tagsPlaceholder")}</option>
@@ -91,15 +92,15 @@ export function AudienceStep({
           <RangeRow label={t("customers.sendMessage.filter.totalSpend")}>
             {(["totalSpendFrom", "totalSpendTo"] as const).map((key, i) => (
               <SubField key={key} label={t(i === 0 ? "customers.filter.from" : "customers.filter.to")}>
-                <div className="flex h-10 items-center gap-3 rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/25">
-                  <span className="text-[14px] text-[var(--octo-text-primary)]">SAR</span>
+                <div className={clsx("flex h-10 items-center gap-4 rounded-[12px] border bg-[var(--octo-card)] p-2 focus-within:border-[#0d6efd] focus-within:ring-2 focus-within:ring-[#0d6efd]/25", OUTLINE_CLASS)}>
+                  <span className="text-[14px] leading-[14px] text-[var(--octo-text-primary)]">SAR</span>
                   <input
                     value={value[key]}
                     inputMode="decimal"
                     aria-label={`${t("customers.sendMessage.filter.totalSpend")} ${t(i === 0 ? "customers.filter.from" : "customers.filter.to")}`}
                     onChange={(e) => set(key, e.target.value.replace(/[^\d.]/g, ""))}
                     placeholder={t("customers.sendMessage.filter.enterAmount")}
-                    className="h-full w-full flex-1 bg-transparent text-[14px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-muted)]"
+                    className="h-full w-full flex-1 bg-transparent text-[14px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-secondary)]"
                   />
                 </div>
               </SubField>
@@ -131,10 +132,9 @@ export function AudienceStep({
       )}
 
       {tab === "segments" && (
-        <div className="mt-4 flex flex-col gap-2">
-          <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.segmentsHint")}</p>
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
           {ALL_TAGS.map((tag) => (
-            <ChoiceRow
+            <SegmentCard
               key={tag}
               label={tagLabel(tag)}
               selected={value.tag === tag && !value.segment}
@@ -144,28 +144,27 @@ export function AudienceStep({
         </div>
       )}
 
-      {tab === "savedAudiences" && (
-        <div className="mt-4 flex flex-col gap-2">
-          {segments.length === 0 ? (
-            <p className="text-[13px] text-[var(--octo-text-muted)]">{t("customers.sendMessage.savedAudiencesEmpty")}</p>
-          ) : (
-            segments.map((segment) => (
-              <ChoiceRow
+      {tab === "savedAudiences" &&
+        (segments.length === 0 ? (
+          <p className="text-[12px] font-medium text-[var(--octo-text-secondary)]">{t("customers.sendMessage.savedAudiencesEmpty")}</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            {segments.map((segment) => (
+              <SegmentCard
                 key={segment.id}
                 label={segment.name}
                 selected={value.segment?.id === segment.id}
                 onClick={() => onChange({ ...EMPTY_AUDIENCE_FILTERS, segment: { id: segment.id, name: segment.name, filters: segment.filters } })}
               />
-            ))
-          )}
-        </div>
-      )}
+            ))}
+          </div>
+        ))}
 
       <button
         type="button"
         onClick={onNext}
         title={t("customers.sendMessage.matchCount").replace("{count}", totalSelected.toLocaleString("en-US"))}
-        className={clsx(PRIMARY_SUBMIT_CLASS, "!mt-5")}
+        className={STEP_SUBMIT_CLASS}
       >
         {t("customers.sendMessage.next")}
       </button>
@@ -175,8 +174,8 @@ export function AudienceStep({
 
 function Group({ label, indent, children }: { label: string; indent?: boolean; children: ReactNode }) {
   return (
-    <div>
-      <p className={clsx("mb-2 text-[16px] text-[var(--octo-text-primary)]", indent && "px-2.5")}>{label}</p>
+    <div className="flex flex-col gap-3">
+      <p className={clsx(SECTION_LABEL_CLASS, indent && "px-2")}>{label}</p>
       {children}
     </div>
   );
@@ -184,17 +183,16 @@ function Group({ label, indent, children }: { label: string; indent?: boolean; c
 
 function RangeRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div>
-      <p className="text-[16px] text-[var(--octo-text-primary)]">{label}</p>
-      <div className="mt-1 grid grid-cols-2 gap-6">{children}</div>
-    </div>
+    <Group label={label}>
+      <div className="grid grid-cols-2 gap-6">{children}</div>
+    </Group>
   );
 }
 
 function SubField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[12.5px] text-[var(--octo-text-primary)]">{label}</span>
+    <div className="flex flex-col gap-2">
+      <span className="text-[12px] font-medium leading-3 text-[var(--octo-text-primary)]">{label}</span>
       {children}
     </div>
   );
@@ -214,19 +212,18 @@ function DateRange({ label, from, to, onFrom, onTo }: { label: string; from: str
   );
 }
 
-function ChoiceRow({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+function SegmentCard({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       className={clsx(
-        "flex h-11 items-center justify-between rounded-[8px] border px-3 text-start text-[14px] transition-colors",
-        selected ? "border-[#0D6EFD] bg-[#0D6EFD]/[0.04] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+        "rounded-[12px] border p-3 text-start text-[16px] font-bold leading-none transition-colors",
+        selected ? clsx(SELECTED_SURFACE_CLASS, BRAND_TEXT_CLASS) : clsx(OUTLINE_CLASS, "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]")
       )}
     >
       {label}
-      {selected && <Check size={16} />}
     </button>
   );
 }

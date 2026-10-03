@@ -1,9 +1,16 @@
 // apps/merchant/src/pages/orders-list/_shared/refund-form.tsx
 import { useState } from "react";
-import { Checkbox, Input, Select, Textarea } from "@ui/primitives";
 import { formatSar } from "@octopus/api-client";
-import { RadioCardGroup } from "./radio-card";
-import { FieldLabel, PrimaryButton, SummaryRow } from "./form-bits";
+import {
+  REFUND_INPUT_CLASS,
+  REFUND_SUBMIT_CLASS,
+  REFUND_TEXTAREA_CLASS,
+  RefundCheckRow,
+  RefundFieldLabel,
+  RefundRadioCards,
+  RefundSelect,
+  RefundSummaryBar,
+} from "./refund-controls";
 import { clampAmountSar, maxRefundableSar, selectedItemsTotalSar } from "./refund-amount";
 import type { OrderRecord } from "./types";
 
@@ -84,7 +91,7 @@ export function RefundForm({
   const canSubmit =
     type === "full" || (!isCash && method === "items" ? selectedIndices.size > 0 : amountSar > 0);
   // Cash refunds are always an amount in hand — the frames drop the
-  // Items/Amount choice for them entirely.
+  // Items/Amount choice for them entirely (and, with it, the required marks).
   const showItemPicker = !isCash && method === "items";
 
   function submit() {
@@ -99,28 +106,28 @@ export function RefundForm({
   }
 
   return (
-    <div>
-      <div className="mt-5">
-        <FieldLabel>{typeLabel}</FieldLabel>
-        <RadioCardGroup
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <RefundFieldLabel required={!isCash}>{typeLabel}</RefundFieldLabel>
+        <RefundRadioCards
           name="refund-type"
+          ariaLabel={typeLabel}
           options={[
             { value: "full", label: typeFullLabel },
             { value: "partial", label: typePartialLabel },
           ]}
           value={type}
-          onChange={(value) => setType(value as "full" | "partial")}
+          onChange={setType}
         />
       </div>
 
       {isCash ? (
-        <>
-          <div className="mt-4">
-            <SummaryRow label={maxAmountLabel} value={formatSar(max)} />
-          </div>
-          <div className="mt-4">
-            <FieldLabel>{amountFieldLabel}</FieldLabel>
-            <Input
+        <div className="flex flex-col gap-3">
+          <RefundSummaryBar label={maxAmountLabel} value={formatSar(max)} strongLabel />
+          <div className="flex flex-col gap-2">
+            <RefundFieldLabel>{amountFieldLabel}</RefundFieldLabel>
+            <input
+              className={REFUND_INPUT_CLASS}
               value={amountInput}
               onChange={(event) => setAmountInput(event.target.value)}
               placeholder={cashAmountPlaceholder}
@@ -128,55 +135,51 @@ export function RefundForm({
               aria-label={amountFieldLabel}
             />
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          <div className="mt-4">
-            <FieldLabel>{methodLabel}</FieldLabel>
-            <RadioCardGroup
+        <div className="flex flex-col gap-3">
+          <RefundFieldLabel required>{methodLabel}</RefundFieldLabel>
+          <div className="flex flex-col gap-2">
+            <RefundRadioCards
               name="refund-method"
+              ariaLabel={methodLabel}
               options={[
                 { value: "items", label: methodItemsLabel },
                 { value: "amount", label: methodAmountLabel },
               ]}
               value={method}
-              onChange={(value) => setMethod(value as "items" | "amount")}
+              onChange={setMethod}
             />
-          </div>
 
-          {showItemPicker ? (
-            <div className="mt-2 rounded-[10px] border-[1.5px] border-[#0D6EFD] p-2">
-              {order.items.map((item, index) => (
-                <div key={index} className="flex items-center justify-between gap-3 px-2 py-1.5">
-                  <Checkbox
+            {showItemPicker ? (
+              <div className="flex flex-col gap-3 rounded-[12px] border border-[#0D6EFD] p-2">
+                {order.items.map((item, index) => (
+                  <RefundCheckRow
+                    key={index}
                     label={item.name}
-                    className="text-[13px]"
+                    value={formatSar(item.priceSar * item.qty)}
                     checked={selectedIndices.has(index)}
                     onChange={() => toggleItem(index)}
                   />
-                  <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
-                    {formatSar(item.priceSar * item.qty)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-2">
-              <Input
+                ))}
+              </div>
+            ) : (
+              <input
+                className={REFUND_INPUT_CLASS}
                 value={amountInput}
                 onChange={(event) => setAmountInput(event.target.value)}
                 placeholder={amountPlaceholder}
                 inputMode="decimal"
                 aria-label={amountFieldLabel}
               />
-            </div>
-          )}
-        </>
+            )}
+          </div>
+        </div>
       )}
 
-      <div className="mt-4">
-        <FieldLabel>{reasonLabel}</FieldLabel>
-        <Select value={reason} onChange={(event) => setReason(event.target.value)} aria-label={reasonLabel}>
+      <div className="flex flex-col gap-2">
+        <RefundFieldLabel required={!isCash}>{reasonLabel}</RefundFieldLabel>
+        <RefundSelect value={reason} onChange={setReason} ariaLabel={reasonLabel}>
           <option value="" disabled>
             {reasonPlaceholder}
           </option>
@@ -185,12 +188,13 @@ export function RefundForm({
               {option.label}
             </option>
           ))}
-        </Select>
+        </RefundSelect>
       </div>
 
-      <div className="mt-4">
-        <FieldLabel>{noteLabel}</FieldLabel>
-        <Textarea
+      <div className="flex flex-col gap-2">
+        <RefundFieldLabel>{noteLabel}</RefundFieldLabel>
+        <textarea
+          className={REFUND_TEXTAREA_CLASS}
           placeholder={notePlaceholder}
           rows={4}
           value={note}
@@ -200,17 +204,21 @@ export function RefundForm({
       </div>
 
       {!isCash && (
-        <div className="mt-4">
-          <SummaryRow
-            label={
-              showItemPicker ? selectedSummaryLabel.replace("{n}", String(selectedIndices.size)) : amountSummaryLabel
-            }
-            value={formatSar(amountSar)}
-          />
-        </div>
+        <RefundSummaryBar
+          label={showItemPicker ? selectedSummaryLabel.replace("{n}", String(selectedIndices.size)) : amountSummaryLabel}
+          value={formatSar(amountSar)}
+        />
       )}
-
-      <PrimaryButton className="mt-5" label={submitLabel} disabled={!canSubmit || !reason} onClick={submit} />
+      {/* The frame sets the button 12px under the summary strip, inside this
+          24px-gap column — hence the negative margin on the online form. */}
+      <button
+        type="button"
+        disabled={!canSubmit || !reason}
+        onClick={submit}
+        className={`${REFUND_SUBMIT_CLASS}${isCash ? "" : " -mt-3"}`}
+      >
+        {submitLabel}
+      </button>
     </div>
   );
 }

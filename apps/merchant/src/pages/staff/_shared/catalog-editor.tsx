@@ -136,7 +136,7 @@ export function CatalogEditor({
           placeholder={tx("Name in Arabic", "الاسم بالعربية")}
           aria-label={tx("Name in Arabic", "الاسم بالعربية")}
         />
-        <button type="submit" disabled={busy !== null} className={buttonClass("primary", "md", "h-11")}>
+        <button type="submit" disabled={busy !== null} className={buttonClass("primary", "md")}>
           {busy === "add" ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Plus size={16} aria-hidden />}
           {addLabel}
         </button>

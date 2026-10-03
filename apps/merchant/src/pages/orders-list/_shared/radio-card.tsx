@@ -1,5 +1,7 @@
 // apps/merchant/src/pages/orders-list/_shared/radio-card.tsx
 import clsx from "clsx";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { FLOW_FIELD_BORDER } from "./form-bits";
 
 export interface RadioCardOption<T extends string> {
   value: T;
@@ -20,17 +22,17 @@ export function RadioCardGroup<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="radiogroup" className={clsx("grid grid-cols-2 gap-3", className)}>
+    <div role="radiogroup" className={clsx("grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2", className)}>
       {options.map((option) => {
         const active = option.value === value;
         return (
           <label
             key={option.value}
             className={clsx(
-              "flex cursor-pointer items-center justify-between gap-2 rounded-[10px] border px-4 py-3.5 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors",
+              "flex h-10 cursor-pointer items-center justify-between gap-2 rounded-[12px] px-2 text-[14px] font-medium leading-[14px] text-[var(--octo-text-primary)] transition-colors focus-within:ring-2 focus-within:ring-[#0D6EFD]/25",
               active
-                ? "border-[#0D6EFD] bg-[#0D6EFD]/[0.04]"
-                : "border-[var(--octo-border-input)] hover:bg-[var(--octo-hover)]"
+                ? "border border-[#0D6EFD] bg-[#f5f9ff] [[data-theme=dark]_&]:bg-[#0d6efd]/15"
+                : `${FLOW_FIELD_BORDER} hover:bg-[var(--octo-hover)]`
             )}
           >
             <input
@@ -41,15 +43,12 @@ export function RadioCardGroup<T extends string>({
               onChange={() => onChange(option.value)}
               className="sr-only"
             />
-            {option.label}
-            <span
-              className={clsx(
-                "grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px]",
-                active ? "border-[#0D6EFD]" : "border-[var(--octo-crumb)]"
-              )}
-            >
-              {active && <span className="h-[8px] w-[8px] rounded-full bg-[#0D6EFD]" />}
-            </span>
+            <span className="truncate">{option.label}</span>
+            <ShellIcon
+              name={active ? "form-radio-on.svg" : "form-radio-off.svg"}
+              size={24}
+              className={active ? "text-[#0D6EFD]" : "text-[#64748b] [[data-theme=dark]_&]:text-[var(--octo-text-muted)]"}
+            />
           </label>
         );
       })}

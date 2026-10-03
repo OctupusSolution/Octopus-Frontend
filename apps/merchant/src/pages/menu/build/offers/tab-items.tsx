@@ -4,11 +4,17 @@
 // at an item by id: letting a name be typed here would create a line that
 // resolves to nothing and quotes a price for a dish that does not exist.
 import { useState } from "react";
-import { GripVertical, Info, Minus, Plus, SquarePen, Trash2 } from "lucide-react";
-import { Button, Modal, Select } from "@ui/primitives";
+import clsx from "clsx";
+import { Modal } from "@ui/primitives";
 import { MediaTile } from "@/shared/ui/media-tile";
 import { type Item, type Menu, type Offer } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { Field, SelectBox } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_INVALID, INFO_STRIP, LINE, MODAL_SUBMIT, SURFACE_SUBTLE, TEXT, TEXT_INPUT_CLASS } from "../../_shared/theme";
+import type { OfferTabValidation } from "./index";
+
+const PRICE_TEXT = "text-[#004bb9] [[data-theme=dark]_&]:text-[#8ab8ff]";
 
 export function TabItems({
   menu,
@@ -17,6 +23,7 @@ export function TabItems({
   onRemoveEntry,
   onReplaceEntry,
   onPatch,
+  validation,
 }: {
   menu: Menu;
   offer: Offer;
@@ -26,12 +33,16 @@ export function TabItems({
    *  remove followed by an add would each close over the same stale draft. */
   onReplaceEntry: (fromItemId: string, toItemId: string, qty: number, price: number) => void;
   onPatch: (patch: Partial<Offer>) => void;
+  validation: OfferTabValidation;
 }) {
   const { t } = useI18n();
+  const { errors, onTouch } = validation;
   // null = closed; "" = adding a new line; otherwise the line being edited.
   const [editing, setEditing] = useState<string | null>(null);
   const [pickId, setPickId] = useState("");
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState("1");
+  const [attempted, setAttempted] = useState(false);
+  const [qtyTouched, setQtyTouched] = useState(false);
 
   const allItems = menu.sections
     .filter((s) => s.kind === "items")
@@ -48,144 +59,195 @@ export function TabItems({
     setEditing(itemId);
     const firstFree = allItems.find((i) => !offer.entries.some((e) => e.itemId === i.id));
     setPickId(itemId || (firstFree?.id ?? ""));
-    setQty(entry?.qty ?? 1);
+    setQty(String(entry?.qty ?? 1));
+    setAttempted(false);
+    setQtyTouched(false);
   }
 
+  const qtyNumber = Number(qty);
+  const qtyValid = qty.trim() !== "" && Number.isInteger(qtyNumber) && qtyNumber >= 1;
+  const itemError = attempted && !byId.has(pickId) ? t("menuOffer.validation.itemRequired") : null;
+  const qtyError = (attempted || qtyTouched) && !qtyValid ? t("menuOffer.validation.qtyMin") : null;
+
   function save() {
+    setAttempted(true);
     const item = byId.get(pickId);
-    if (item && editing === "") onSetEntry(item.id, qty, item.pricing.price);
-    else if (item && editing) {
+    if (!item || !qtyValid) return;
+    if (editing === "") onSetEntry(item.id, qtyNumber, item.pricing.price);
+    else if (editing) {
       const price = item.id === editing
         ? (offer.entries.find((e) => e.itemId === editing)?.price ?? item.pricing.price)
         : item.pricing.price;
-      onReplaceEntry(editing, item.id, qty, price);
+      onReplaceEntry(editing, item.id, qtyNumber, price);
     }
+    onTouch("entries");
     setEditing(null);
   }
 
+  const lines = offer.entries.filter((entry) => byId.has(entry.itemId));
+
   return (
-    <div className="space-y-3">
-      {offer.entries.map((entry) => {
-        const item = byId.get(entry.itemId);
-        // An entry whose item was deleted quotes nothing — pricing.ts drops it
-        // too, so the row would only be a line with no dish behind it.
-        if (!item) return null;
-        return (
-          <div
-            key={entry.itemId}
-            className="flex items-center gap-3 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-2.5"
-          >
-            <GripVertical size={16} className="shrink-0 text-[var(--octo-text-secondary)]" aria-hidden />
-            <span className="h-12 w-12 shrink-0 overflow-hidden rounded-[8px]">
-              <MediaTile src={item.image} rounded="rounded-[8px]" />
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[16px] text-[var(--octo-text-primary)]">
-              {item.name}
-            </span>
+    <div className="flex flex-col gap-4">
+      {lines.length > 0 && (
+        <ul className="flex flex-col gap-4">
+          {lines.map((entry) => {
+            // An entry whose item was deleted quotes nothing — pricing.ts drops
+            // it too, so the row would only be a line with no dish behind it.
+            const item = byId.get(entry.itemId)!;
+            return (
+              <li key={entry.itemId} className={clsx("flex items-center gap-2 rounded-[4px] border px-2 py-1", LINE)}>
+                <span className={clsx("grid size-6 shrink-0 place-items-center", "text-black [[data-theme=dark]_&]:text-[var(--octo-text-primary)]")}>
+                  <MenuIcon name="menu-drag.svg" size={12} />
+                </span>
+                <span className="size-12 shrink-0 overflow-hidden rounded-[4px]">
+                  <MediaTile src={item.image} rounded="rounded-[4px]" />
+                </span>
 
-            <div className="flex shrink-0 items-center gap-4 rounded-[6px] border border-[var(--octo-border-input)] px-2.5 py-1.5">
-              <button
-                type="button"
-                aria-label={`${item.name} −`}
-                onClick={() => onSetEntry(entry.itemId, entry.qty - 1, entry.price)}
-                className="grid h-6 w-6 place-items-center text-[var(--octo-text-secondary)]"
-              >
-                <Minus size={16} />
-              </button>
-              <span className="min-w-[18px] text-center text-[15px] text-[var(--octo-text-primary)]">
-                {entry.qty}
-              </span>
-              <button
-                type="button"
-                aria-label={`${item.name} +`}
-                onClick={() => onSetEntry(entry.itemId, entry.qty + 1, entry.price)}
-                className="grid h-6 w-6 place-items-center rounded-full bg-[var(--octo-accent)] text-white"
-              >
-                <Plus size={15} />
-              </button>
-            </div>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-6">
+                    <span className={clsx("truncate text-[14px] font-medium leading-[14px]", TEXT)}>{item.name}</span>
+                    <div className={clsx("flex shrink-0 items-center gap-6 rounded-[4px] border px-3 py-1", LINE)}>
+                      <button
+                        type="button"
+                        aria-label={`${item.name} −`}
+                        // Quantities stop at one: removing the line is the bin's job.
+                        disabled={entry.qty <= 1}
+                        onClick={() => onSetEntry(entry.itemId, entry.qty - 1, entry.price)}
+                        className={clsx("grid size-6 place-items-center rounded-full text-[#687280] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60", SURFACE_SUBTLE)}
+                      >
+                        <MenuIcon name="menu-minus-bold.svg" size={24} />
+                      </button>
+                      <span className={clsx("min-w-[9px] text-center text-[14px] leading-none", TEXT)}>{entry.qty}</span>
+                      <button
+                        type="button"
+                        aria-label={`${item.name} +`}
+                        onClick={() => onSetEntry(entry.itemId, entry.qty + 1, entry.price)}
+                        className="grid size-6 place-items-center rounded-full bg-[#0D6EFD] text-white hover:opacity-90"
+                      >
+                        <MenuIcon name="menu-plus.svg" size={24} />
+                      </button>
+                    </div>
+                  </div>
 
-            {/* Line price, not unit price: three drinks cost three drinks. */}
-            <span className="w-[76px] shrink-0 text-end text-[16px] font-semibold text-[var(--octo-accent)]">
-              SAR {entry.price * entry.qty}
-            </span>
-            <button
-              type="button"
-              aria-label={t("menuOffer.editLine").replace("{name}", item.name)}
-              onClick={() => open(entry.itemId)}
-              className="shrink-0 rounded-[8px] p-1 text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-            >
-              <SquarePen size={20} />
-            </button>
-            <button
-              type="button"
-              aria-label={item.name}
-              onClick={() => onRemoveEntry(entry.itemId)}
-              className="shrink-0 rounded-[8px] p-1 text-error hover:bg-error/10"
-            >
-              <Trash2 size={20} />
-            </button>
-          </div>
-        );
-      })}
+                  <div className="flex shrink-0 items-center gap-3">
+                    {/* Line price, not unit price: three drinks cost three drinks. */}
+                    <span className={clsx("whitespace-nowrap text-end text-[14px] font-bold leading-[14px]", PRICE_TEXT)}>
+                      SAR {entry.price * entry.qty}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t("menuOffer.editLine").replace("{name}", item.name)}
+                      onClick={() => open(entry.itemId)}
+                      className={clsx("grid size-6 place-items-center rounded-[4px] hover:bg-[var(--octo-hover)]", TEXT)}
+                    >
+                      <MenuIcon name="menu-edit.svg" size={24} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("menuOffer.removeLine").replace("{name}", item.name)}
+                      onClick={() => {
+                        onRemoveEntry(entry.itemId);
+                        onTouch("entries");
+                      }}
+                      className="grid size-6 place-items-center rounded-[4px] text-[#d30202] hover:bg-[#fef0f0] [[data-theme=dark]_&]:hover:bg-[#d30202]/15"
+                    >
+                      <MenuIcon name="menu-trash.svg" size={24} />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      <button
-        type="button"
-        onClick={() => open("")}
-        disabled={!addable}
-        className="flex w-full items-center justify-center gap-2 rounded-[8px] border border-[var(--octo-accent)] bg-[var(--octo-card)] px-3 py-2.5 text-[15px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-selected)] disabled:opacity-50"
-      >
-        <Plus size={18} aria-hidden />
-        {t("menuOffer.addItem")}
-      </button>
-
-      <div className="flex flex-wrap items-center gap-2.5 rounded-[8px] bg-[var(--octo-selected)] px-3.5 py-3">
-        <Info size={20} className="shrink-0 text-[var(--octo-accent)]" aria-hidden />
-        <p className="flex-1 text-[15px] text-[var(--octo-accent)]" aria-live="polite">
+      <div className={clsx("flex items-center gap-2 rounded-[8px] px-3 py-2", INFO_STRIP)}>
+        <MenuIcon name="menu-info-circle.svg" size={24} />
+        <p className="min-w-0 flex-1 text-[14px] font-medium leading-[14px]" aria-live="polite">
           {offer.customerCanChange ? t("menuOffer.canChange") : t("menuOffer.cantChange")}
         </p>
         <button
           type="button"
           aria-pressed={offer.customerCanChange}
           onClick={() => onPatch({ customerCanChange: !offer.customerCanChange })}
-          className="text-[15px] font-semibold text-[var(--octo-accent)] underline underline-offset-2"
+          className="shrink-0 whitespace-nowrap text-[14px] font-bold leading-[14px] underline [text-underline-position:from-font]"
         >
           {t("menuOffer.change")}
         </button>
       </div>
 
+      <button
+        type="button"
+        onClick={() => open("")}
+        disabled={!addable}
+        className="flex h-10 w-full items-center justify-center gap-3 rounded-[4px] border border-[#0D6EFD] bg-[#f5f9ff] p-2 text-[14px] font-semibold leading-[14px] text-[#0D6EFD] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 [[data-theme=dark]_&]:bg-[#0d6efd]/15"
+      >
+        <MenuIcon name="menu-plus-line.svg" size={24} />
+        {t("menuOffer.addItem")}
+      </button>
+
+      {errors.entries && (
+        <p role="alert" className="-mt-2 text-[12px] leading-[14px] text-[#d30202]">
+          {t(errors.entries)}
+        </p>
+      )}
+
       <Modal
         open={editing !== null}
         onClose={() => setEditing(null)}
-        title={t("menuOffer.addItem")}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setEditing(null)}>
-              {t("menuWiz.cancel")}
-            </Button>
-            <Button disabled={pickId === "" || qty < 1} onClick={save}>
-              {t("menuOffer.addItem")}
-            </Button>
-          </div>
-        }
+        backdropClassName="bg-black/60"
+        className="!max-w-[738px] !rounded-[12px] !p-6 !shadow-none"
       >
-        <div className="flex items-center gap-3">
-          <Select className="flex-1" value={pickId} onChange={(e) => setPickId(e.target.value)}>
-            {candidates.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name} — SAR {item.pricing.price}
+        <form
+          noValidate
+          className="flex flex-col gap-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save();
+          }}
+        >
+          <h2 className="text-[24px] font-semibold leading-6 text-[#0e0e0e] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+            {t(editing === "" ? "menuOffer.addItem" : "menuOffer.editItem")}
+          </h2>
+
+          <Field label={t("menuOffer.itemField")} required error={itemError}>
+            <SelectBox
+              value={pickId}
+              ariaLabel={t("menuOffer.itemField")}
+              placeholderShown={pickId === ""}
+              invalid={itemError !== null}
+              onChange={setPickId}
+            >
+              <option value="" disabled>
+                {t("menuOffer.itemPlaceholder")}
               </option>
-            ))}
-          </Select>
-          <input
-            type="number"
-            min={1}
-            aria-label="qty"
-            value={qty}
-            onChange={(e) => setQty(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
-            className="w-[72px] rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-[7px] text-[13px] text-[var(--octo-text-primary)]"
-          />
-        </div>
+              {candidates.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} — SAR {item.pricing.price}
+                </option>
+              ))}
+            </SelectBox>
+          </Field>
+
+          <Field label={t("menuOffer.qtyField")} required error={qtyError}>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              aria-label={t("menuOffer.qtyField")}
+              aria-invalid={qtyError ? true : undefined}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              onBlur={() => setQtyTouched(true)}
+              className={clsx(TEXT_INPUT_CLASS, qtyError && FIELD_INVALID)}
+            />
+          </Field>
+
+          <button type="submit" className={MODAL_SUBMIT}>
+            {t(editing === "" ? "menuOffer.addItem" : "menuOffer.saveItem")}
+          </button>
+        </form>
       </Modal>
     </div>
   );

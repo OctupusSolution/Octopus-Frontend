@@ -1,7 +1,10 @@
 // Offer Channels — where the combo can be ordered.
-import { Checkbox } from "@ui/primitives";
+import clsx from "clsx";
 import type { Offer } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { CheckBox } from "../../_shared/controls";
+import { TEXT } from "../../_shared/theme";
+import type { OfferTabValidation } from "./index";
 
 const CHANNELS: (keyof Offer["channels"])[] = [
   "dineIn",
@@ -12,39 +15,43 @@ const CHANNELS: (keyof Offer["channels"])[] = [
   "mobileApp",
 ];
 
+const CHECKED_TEXT = "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]";
+
 export function TabChannels({
   offer,
   onPatch,
+  validation,
 }: {
   offer: Offer;
   onPatch: (patch: Partial<Offer>) => void;
+  validation: OfferTabValidation;
 }) {
   const { t } = useI18n();
+  const { errors, onTouch } = validation;
 
   return (
-    <div className="max-w-[720px]">
+    <div className="flex flex-col gap-3">
       {CHANNELS.map((channel) => (
-        <label key={channel} className="flex h-[50px] items-center gap-3 text-[16px]">
-          <Checkbox
-            className="[&_input]:h-6 [&_input]:w-6 [&>span]:h-6 [&>span]:w-6"
-            checked={offer.channels[channel]}
-            onChange={() =>
-              onPatch({
-                channels: { ...offer.channels, [channel]: !offer.channels[channel] },
-              })
-            }
-          />
-          <span
-            className={
-              offer.channels[channel]
-                ? "font-medium text-[var(--octo-accent)]"
-                : "font-medium text-[var(--octo-text-primary)]"
-            }
-          >
-            {t(`menuOffer.channel.${channel}`)}
-          </span>
-        </label>
+        <CheckBox
+          key={channel}
+          className="self-start"
+          checked={offer.channels[channel]}
+          onChange={(next) => {
+            onPatch({ channels: { ...offer.channels, [channel]: next } });
+            onTouch("channels");
+          }}
+          label={
+            <span className={clsx("text-[14px] font-semibold leading-[14px]", offer.channels[channel] ? CHECKED_TEXT : TEXT)}>
+              {t(`menuOffer.channel.${channel}`)}
+            </span>
+          }
+        />
       ))}
+      {errors.channels && (
+        <p role="alert" className="text-[12px] leading-[14px] text-[#d30202]">
+          {t(errors.channels)}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,40 +1,220 @@
-// Editor parts both review screens use: tag chips with an add list, the price
-// field, the confidence meter, the "why review" notes, the tab strip, and a
-// small kebab menu.
+// Editor parts both review screens use, drawn from the "Editing: …" panel of
+// the import frames: the 14px labelled field with its error line, the image
+// row, the price box, tag chips with an add list, the confidence bar and the
+// tab strip.
 //
 // This is a lean editor on purpose rather than the builder's item tabs. A
 // detection is not an Item yet (nullable price, confidence, dietary tags), and
-// the builder's tabs are being reworked by someone else right now — borrowing
-// them would couple the import to a moving target for fields it does not have.
+// borrowing the builder's tabs would couple the import to fields it does not
+// have.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { CheckCircle2, MoreVertical, Plus, X } from "lucide-react";
-import { Checkbox } from "@ui/primitives";
+import { CheckCircle2, MoreVertical } from "lucide-react";
 import {
   ALLERGENS,
   DIETARY,
   bandFor,
   openIssues,
+  type Band,
   type DetectedItem,
 } from "@/entities/menu/ai-import";
+import { priceText, type ItemField, type ItemFieldError } from "@/entities/menu/ai-import-forms";
+import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { AI, BAND_TONE } from "./ai-style";
+import { CheckBox } from "../_shared/controls";
+import { MenuIcon } from "../_shared/menu-icon";
+import {
+  FIELD_INVALID,
+  FOCUS,
+  LINE,
+  SURFACE_SUBTLE,
+  TEXT,
+  TEXT_GRAY,
+  TEXT_INPUT_CLASS,
+} from "../_shared/theme";
 
+/** Kept for the dialogs that still use the earlier input drawing. */
 export const inputClass =
   "w-full rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[13.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] focus:border-[#3D1DF3] focus:outline-none focus:ring-2 focus:ring-[#3D1DF3]/20";
 
-export function FieldLabel({ children, required, htmlFor }: { children: ReactNode; required?: boolean; htmlFor?: string }) {
+/** The panel's 12px medium description box. */
+export const PANEL_TEXTAREA = `w-full resize-none rounded-[12px] border ${LINE} bg-[var(--octo-card)] px-3 py-2 text-[12px] font-medium leading-[1.4] ${TEXT} placeholder:text-[#687280] ${FOCUS}`;
+
+/** What to say under a field for each validation code. */
+const ERROR_KEY: Record<ItemField, Partial<Record<ItemFieldError, string>>> = {
+  image: { required: "menuAi.error.imageRequired" },
+  name: { required: "menuAi.editor.nameRequired" },
+  price: {
+    required: "menuAi.error.priceRequired",
+    "not-a-number": "menuAi.error.priceNumber",
+    "not-positive": "menuAi.error.pricePositive",
+  },
+  description: { required: "menuAi.error.descriptionRequired" },
+  section: { required: "menuAi.error.sectionRequired" },
+};
+
+export function itemErrorText(t: (key: string) => string, field: ItemField, code: ItemFieldError | null): string | null {
+  const key = code ? ERROR_KEY[field][code] : undefined;
+  return key ? t(key) : null;
+}
+
+/** The panel's field: a 14px medium label (the shared Field's is 16px), the
+ *  control, and the error line once the field was touched or a save tried. */
+export function PanelField({
+  label,
+  required,
+  hint,
+  error,
+  htmlFor,
+  inset = true,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  /** The small aside after a label: "(SAR)". */
+  hint?: string;
+  error?: string | null;
+  htmlFor?: string;
+  /** The frames indent text-field labels by 8px and leave the others flush. */
+  inset?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-medium text-[var(--octo-text-primary)]">
+    <div className="flex flex-col gap-3">
+      <label htmlFor={htmlFor} className={clsx("text-[14px] font-medium leading-[14px]", inset && "px-2", TEXT)}>
+        {label}
+        {hint && <span className="ms-1 text-[12px] font-normal leading-3">{hint}</span>}
+        {required && <span className="text-[#d30202]"> *</span>}
+      </label>
       {children}
-      {required && " *"}
-    </label>
+      {error && (
+        <span role="alert" className={clsx("-mt-1 text-[12px] leading-[14px] text-[#d30202]", inset && "px-2")}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A price box that keeps exactly what was typed, so "abc" can be reported as
+ *  not a number rather than silently dropped. Re-syncs when the stored price
+ *  changes underneath it (bulk edit) while it is not being typed in. */
+export function PanelPriceInput({
+  id,
+  value,
+  onText,
+  onBlur,
+  invalid,
+}: {
+  id?: string;
+  value: number | null;
+  onText: (text: string) => void;
+  onBlur?: () => void;
+  invalid?: boolean;
+}) {
+  const [text, setText] = useState(priceText(value));
+  const focused = useRef(false);
+  const last = useRef(value);
+  useEffect(() => {
+    if (focused.current || last.current === value) return;
+    last.current = value;
+    setText(priceText(value));
+  }, [value]);
+  return (
+    <input
+      id={id}
+      inputMode="decimal"
+      value={text}
+      aria-invalid={invalid || undefined}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        last.current = value;
+        onBlur?.();
+      }}
+      onChange={(event) => {
+        setText(event.target.value);
+        onText(event.target.value);
+      }}
+      className={clsx(TEXT_INPUT_CLASS, "tabular-nums", invalid && FIELD_INVALID)}
+    />
+  );
+}
+
+/** "Section Image *": the dashed 82px thumbnail, Change Image, the red bin and
+ *  the recommended size. */
+export function ImageField({
+  image,
+  alt,
+  error,
+  onPick,
+  onRemove,
+  onTouched,
+}: {
+  image: string | null;
+  alt: string;
+  error?: string | null;
+  onPick: (url: string) => void;
+  onRemove: () => void;
+  onTouched?: () => void;
+}) {
+  const { t } = useI18n();
+  const picker = useFilePicker(onPick);
+  const pickError = picker.error ? t(`menuAi.imageError.${picker.error}`) : null;
+  return (
+    <PanelField label={t("menuAi.editor.sectionImage")} inset={false} error={pickError ?? error}>
+      {picker.input}
+      <div className="flex items-stretch gap-3">
+        <div
+          className={clsx(
+            "flex min-h-[57px] w-[82px] shrink-0 flex-col justify-center rounded-[12px] border border-dashed p-1",
+            LINE,
+            error && "!border-[#d30202]"
+          )}
+        >
+          {image ? (
+            <img src={image} alt={alt} className="min-h-0 w-full flex-1 rounded-[8px] object-cover" />
+          ) : (
+            <span className={clsx("grid flex-1 place-items-center rounded-[8px]", SURFACE_SUBTLE, TEXT_GRAY)} aria-hidden>
+              <MenuIcon name="menu-upload.svg" size={20} />
+            </span>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-start gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onTouched?.();
+                picker.open();
+              }}
+              className="h-9 min-w-0 flex-1 rounded-[8px] border border-[#0D6EFD] px-3 text-[12px] font-bold leading-3 text-[#0D6EFD] hover:bg-[#f5f9ff] [[data-theme=dark]_&]:hover:bg-[#0d6efd]/15"
+            >
+              {image ? t("menuAi.editor.changeImage") : t("menuAi.editor.addImage")}
+            </button>
+            <button
+              type="button"
+              aria-label={t("menuAi.editor.removeImage")}
+              disabled={!image}
+              onClick={() => {
+                onTouched?.();
+                onRemove();
+              }}
+              className="grid size-9 shrink-0 place-items-center rounded-[8px] bg-[#fef0f0] text-[#d30202] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 [[data-theme=dark]_&]:bg-[#d30202]/15"
+            >
+              <MenuIcon name="menu-trash.svg" size={24} />
+            </button>
+          </div>
+          <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuAi.editor.imageHint")}</p>
+        </div>
+      </div>
+    </PanelField>
   );
 }
 
 /** Keeps what the merchant typed ("72.00", "7.") while they type, and only
- *  hands a number — or `null` for empty — upward. Re-syncs when the item
- *  changes underneath it (prev/next, bulk edit). */
+ *  hands a number — or `null` for empty — upward. The earlier price box; the
+ *  panels now use PanelPriceInput. */
 export function PriceInput({
   id,
   value,
@@ -77,7 +257,8 @@ export function PriceInput({
   );
 }
 
-/** Chips for what is set, plus an "+ Add" that lists what is not. */
+/** Pale-blue chips for what is set, plus an outlined "+ Add Tag" that lists
+ *  what is not. A chip is removed by pressing it. */
 export function TagEditor({
   kind,
   values,
@@ -94,36 +275,36 @@ export function TagEditor({
   useDismiss(ref, open, () => setOpen(false));
 
   return (
-    <div ref={ref} className="relative flex flex-wrap items-center gap-2">
+    <div ref={ref} className="relative flex flex-wrap items-start gap-2">
       {values.map((v) => (
-        <span key={v} className={clsx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-medium", "bg-[var(--octo-tone-info-bg)] text-[var(--octo-tone-info-text)]")}>
+        <button
+          key={v}
+          type="button"
+          title={`${t("menuAi.removeTag")} ${t(`menuAi.${kind}.${v}`)}`}
+          aria-label={`${t("menuAi.removeTag")} ${t(`menuAi.${kind}.${v}`)}`}
+          onClick={() => onChange(values.filter((x) => x !== v))}
+          className="inline-flex items-center rounded-full bg-[#f5f9ff] px-2 py-1 text-[12px] font-medium leading-3 text-[#0058da] hover:line-through [[data-theme=dark]_&]:bg-[#0d6efd]/15 [[data-theme=dark]_&]:text-[#8ab8ff]"
+        >
           {t(`menuAi.${kind}.${v}`)}
-          <button
-            type="button"
-            aria-label={`${t("menuAi.removeTag")} ${t(`menuAi.${kind}.${v}`)}`}
-            onClick={() => onChange(values.filter((x) => x !== v))}
-            className="rounded-full hover:opacity-70"
-          >
-            <X size={13} aria-hidden />
-          </button>
-        </span>
+        </button>
       ))}
       {options.length > 0 && (
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className={clsx("inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12.5px] font-semibold hover:bg-[var(--octo-hover)]", AI.text)}
+          className={clsx(
+            "inline-flex items-center gap-1 rounded-full border px-[9px] py-[5px] text-[12px] font-medium leading-3 hover:bg-[var(--octo-hover)]",
+            LINE,
+            TEXT
+          )}
         >
-          <Plus size={14} aria-hidden />
-          {t("menuAi.add")}
+          <MenuIcon name="menu-plus-thin.svg" size={16} />
+          {t("menuAi.editor.addTag")}
         </button>
       )}
-      {values.length === 0 && options.length > 0 && !open && (
-        <span className="text-[12px] text-[var(--octo-text-muted)]">{t(`menuAi.${kind}.none`)}</span>
-      )}
       {open && (
-        <ul className="absolute start-0 top-full z-20 mt-1 max-h-[220px] w-[200px] overflow-y-auto rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg octo-scroll">
+        <ul className="absolute start-0 top-full z-20 mt-1 max-h-[220px] w-[200px] overflow-y-auto rounded-[12px] bg-[var(--octo-card)] p-1 shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)] octo-scroll">
           {options.map((o) => (
             <li key={o}>
               <button
@@ -132,7 +313,7 @@ export function TagEditor({
                   onChange([...values, o]);
                   setOpen(false);
                 }}
-                className="block w-full rounded-[7px] px-2.5 py-1.5 text-start text-[13px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                className={clsx("block w-full rounded-[8px] px-2 py-1.5 text-start text-[14px] hover:bg-[var(--octo-hover)]", TEXT)}
               >
                 {t(`menuAi.${kind}.${o}`)}
               </button>
@@ -144,39 +325,26 @@ export function TagEditor({
   );
 }
 
-export function ConfidenceMeter({ value, variant }: { value: number; variant: "review" | "edit" }) {
+const BAND_BAR: Record<Band, string> = { high: "bg-[#009a39]", medium: "bg-[#de9000]", low: "bg-[#d30202]" };
+
+/** "AI Confidence Score": a 6px bar in the band's colour and the percentage. */
+export function ConfidenceMeter({ value }: { value: number; variant?: "review" | "edit" }) {
   const { t } = useI18n();
-  const band = bandFor(value);
-  const tone = BAND_TONE[band];
-  const bar = (
-    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--octo-track)]">
-      <div className={clsx("h-full rounded-full", tone.bar)} style={{ width: `${value}%` }} />
-    </div>
-  );
-  if (variant === "edit") {
-    return (
-      <div>
-        <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("menuAi.editor.confidence")}</p>
-        <p className={clsx("mt-1 text-[13px] font-medium", tone.ink)}>
-          {value}% ({t(`menuAi.bandLong.${band}`)})
-        </p>
-        <div className="mt-1.5 flex">{bar}</div>
-      </div>
-    );
-  }
   return (
-    <div>
-      <p className="text-[12.5px] font-medium text-[var(--octo-text-primary)]">{t("menuAi.editor.aiConfidence")}</p>
-      <div className="mt-2 flex items-center gap-3">
-        {bar}
-        <span className="text-[14px] font-semibold tabular-nums text-[var(--octo-text-primary)]">{value}%</span>
+    <div className="flex flex-col gap-3">
+      <p className={clsx("text-[16px] font-medium leading-4", TEXT)}>{t("menuAi.editor.aiConfidence")}</p>
+      <div className="flex items-center gap-2">
+        <div className={clsx("h-[6px] min-w-0 flex-1 overflow-hidden rounded-full", SURFACE_SUBTLE)}>
+          <div className={clsx("h-full rounded-full", BAND_BAR[bandFor(value)])} style={{ width: `${value}%` }} />
+        </div>
+        <span className={clsx("text-[16px] font-medium leading-4 tabular-nums", TEXT)}>{value}%</span>
       </div>
-      <p className={clsx("mt-1 text-[12.5px] font-medium", tone.ink)}>{t(`menuAi.bandLong.${band}`)}</p>
     </div>
   );
 }
 
-/** The reader's notes on one item, in the two shapes the frames draw. */
+/** The reader's notes on one item. Not in the frames, so no screen renders it
+ *  today; kept for when the notes come back. */
 export function IssueNotes({ item, variant }: { item: DetectedItem; variant: "review" | "edit" }) {
   const { t } = useI18n();
   const issues = openIssues(item);
@@ -221,6 +389,8 @@ export function IssueNotes({ item, variant }: { item: DetectedItem; variant: "re
   );
 }
 
+/** Details / Modifiers / Allergens / Nutrition: 14px medium labels spread
+ *  across the panel, a grey rule under them and a blue one under the active. */
 export function EditorTabs<T extends string>({
   tabs,
   active,
@@ -232,7 +402,7 @@ export function EditorTabs<T extends string>({
 }) {
   const { t } = useI18n();
   return (
-    <div role="tablist" className="flex overflow-x-auto border-b border-[var(--octo-border-card)] octo-scroll">
+    <div role="tablist" className={clsx("flex items-center justify-between gap-2 overflow-x-auto border-b octo-scroll", LINE)}>
       {tabs.map((tab) => (
         <button
           key={tab}
@@ -241,10 +411,8 @@ export function EditorTabs<T extends string>({
           aria-selected={active === tab}
           onClick={() => onChange(tab)}
           className={clsx(
-            "-mb-px shrink-0 border-b-2 px-2.5 py-2.5 text-[13px] font-medium transition-colors",
-            active === tab
-              ? clsx(AI.border, AI.text)
-              : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
+            "-mb-px shrink-0 border-b pb-[11px] pt-1 text-center text-[14px] font-medium leading-[14px] transition-colors",
+            active === tab ? "border-[#0D6EFD] text-[#0D6EFD]" : clsx("border-transparent hover:text-[#0D6EFD]", TEXT_GRAY)
           )}
         >
           {t(`menuAi.tab.${tab}`)}
@@ -254,22 +422,19 @@ export function EditorTabs<T extends string>({
   );
 }
 
-export function AllergensTab({ item, onChange }: { item: DetectedItem; onChange: (allergens: string[]) => void }) {
+export function AllergensTab({ item, onChange }: { item: Pick<DetectedItem, "allergens">; onChange: (allergens: string[]) => void }) {
   const { t } = useI18n();
   return (
-    <div>
-      <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{t("menuAi.editor.allergensHint")}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+    <div className="flex flex-col gap-3">
+      <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuAi.editor.allergensHint")}</p>
+      <div className="grid grid-cols-2 gap-2">
         {ALLERGENS.map((a) => (
-          <label key={a} className="flex items-center gap-2 rounded-[8px] border border-[var(--octo-border-card)] px-3 py-2 text-[13px] text-[var(--octo-text-primary)]">
-            <Checkbox
-              checked={item.allergens.includes(a)}
-              onChange={() =>
-                onChange(item.allergens.includes(a) ? item.allergens.filter((x) => x !== a) : [...item.allergens, a])
-              }
-            />
-            {t(`menuAi.allergen.${a}`)}
-          </label>
+          <CheckBox
+            key={a}
+            checked={item.allergens.includes(a)}
+            onChange={() => onChange(item.allergens.includes(a) ? item.allergens.filter((x) => x !== a) : [...item.allergens, a])}
+            label={t(`menuAi.allergen.${a}`)}
+          />
         ))}
       </div>
     </div>
@@ -281,9 +446,9 @@ export function AllergensTab({ item, onChange }: { item: DetectedItem; onChange:
  *  that would be thrown away. */
 export function LaterTab({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-[10px] border border-dashed border-[var(--octo-border-card)] bg-[var(--octo-soft-bg)] px-4 py-6 text-center">
-      <p className="text-[13.5px] font-medium text-[var(--octo-text-primary)]">{title}</p>
-      <p className="mx-auto mt-1 max-w-[280px] text-[12.5px] text-[var(--octo-text-secondary)]">{body}</p>
+    <div className={clsx("rounded-[12px] border border-dashed px-4 py-6 text-center", LINE)}>
+      <p className={clsx("text-[14px] font-medium leading-[1.4]", TEXT)}>{title}</p>
+      <p className={clsx("mx-auto mt-1 max-w-[280px] text-[12px] leading-[1.4]", TEXT_GRAY)}>{body}</p>
     </div>
   );
 }
@@ -312,6 +477,8 @@ export interface KebabAction {
   disabled?: boolean;
 }
 
+/** The earlier inline kebab. The frames' section rows use the shared
+ *  PopoverMenu now; kept for the row actions that are hidden, not removed. */
 export function KebabMenu({ label, actions }: { label: string; actions: KebabAction[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -356,5 +523,15 @@ export function KebabMenu({ label, actions }: { label: string; actions: KebabAct
         </ul>
       )}
     </div>
+  );
+}
+
+/** The old field label, still used by nothing in the frames. */
+export function FieldLabel({ children, required, htmlFor }: { children: ReactNode; required?: boolean; htmlFor?: string }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1.5 block text-[12.5px] font-medium text-[var(--octo-text-primary)]">
+      {children}
+      {required && " *"}
+    </label>
   );
 }

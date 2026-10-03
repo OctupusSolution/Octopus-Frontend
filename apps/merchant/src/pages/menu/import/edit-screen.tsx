@@ -1,31 +1,13 @@
 // Screen 3 — "Edit Detected Items & Sections".
 //
 // Where the review screen confirms items one at a time, this one is for bulk
-// correction: a table per section, sections reorderable, prices adjustable in
-// one go. Edits apply as they are typed ("Changes are autosaved", the frame's
-// own promise), because in a table nobody expects to press Save per row.
+// correction: the sections on one side, the open section's items in a table,
+// and the selected item's editor beside it. Edits in the editor apply as they
+// are typed — there is no Save in this frame's panel — so the table always
+// shows what will be imported.
 import { useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import clsx from "clsx";
-import {
-  AlertTriangle,
-  ArrowDownUp,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  FilePenLine,
-  GripVertical,
-  Info,
-  Lightbulb,
-  ListChecks,
-  Plus,
-  Search,
-  ShieldCheck,
-  SquarePen,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
 import {
   addDetectedItem,
   addDetectedSection,
@@ -49,29 +31,59 @@ import {
   type DetectedSection,
   type DetectionResult,
 } from "@/entities/menu/ai-import";
-import { useFilePicker } from "@/shared/ui/use-file-picker";
+import {
+  hasErrors,
+  parsePrice,
+  priceText,
+  validateItemForm,
+  type ItemField,
+} from "@/entities/menu/ai-import-forms";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { AI, BAND_TONE, card, fill, outlineButton, tintedButton } from "./ai-style";
-import { BandPill, Breadcrumb, ConfidencePill, NextButton, PageTitle, SaveDraftButton, StatIcon } from "./chrome";
+import { PopoverMenu, SelectBox, type PopoverItem } from "../_shared/controls";
+import { MenuIcon } from "../_shared/menu-icon";
+import {
+  BIG_BUTTON,
+  BIG_OUTLINE,
+  ERROR_STRIP,
+  FIELD_INVALID,
+  LINE,
+  PANEL,
+  SURFACE_BLUE,
+  SURFACE_SUBTLE,
+  TEXT,
+  TEXT_GRAY,
+  TEXT_INPUT_CLASS,
+  TEXT_SECONDARY,
+} from "../_shared/theme";
+import { fill } from "./ai-style";
+import { BandPill, ConfidencePill, IMPORT_CARD, ImportFooter, ImportShell, StatTiles } from "./chrome";
 import {
   AllergensTab,
   ConfidenceMeter,
   EditorTabs,
-  FieldLabel,
-  IssueNotes,
+  ImageField,
   KebabMenu,
   LaterTab,
-  PriceInput,
+  PANEL_TEXTAREA,
+  PanelField,
+  PanelPriceInput,
   TagEditor,
-  inputClass,
+  itemErrorText,
 } from "./item-fields";
 import { BulkPriceModal, ConfirmModal, FindReplaceModal, SectionNameModal, SummaryModal } from "./modals";
-import { sessionId, updateResult, useImportSession } from "./session-store";
+import { resetImport, sessionId, updateResult, useImportSession } from "./session-store";
 import { useCommitImport } from "./use-commit";
 
-const PAGE_SIZE = 12;
-const EDIT_TABS = ["details", "modifiers", "allergens", "nutrition", "advanced"] as const;
+/** Six rows a page, as the frame draws the table. */
+const PAGE_SIZE = 6;
+const EDIT_TABS = ["details", "modifiers", "allergens", "nutrition"] as const;
 type EditTab = (typeof EDIT_TABS)[number];
+
+/** Not in the frame, so not rendered — but kept, not removed: the per-row
+ *  action menu, drag-to-reorder for items, A–Z section sort, the extraction
+ *  summary, the item's Advanced tab, the Status select and the pager's
+ *  arrows and "Showing x–y" line. */
+const SHOW_UNFRAMED: boolean = false;
 
 /** 1 2 3 … 7 — at most five numbers, with gaps collapsed. */
 export function pageList(current: number, total: number): (number | "gap")[] {
@@ -98,11 +110,18 @@ type ModalState =
   | { kind: "find" }
   | { kind: "summary" };
 
+type SectionAction = "rename" | "up" | "down" | "delete";
+
+const TABLE_GRID = "grid grid-cols-[minmax(0,1fr)_78px_66px_76px] items-center gap-x-2";
+const TOOL_BUTTON = `${BIG_BUTTON} w-full gap-2`;
+
 export function EditScreen() {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const session = useImportSession();
   const result = session.result as DetectionResult;
-  const { ready, commit } = useCommitImport();
+  const { commit } = useCommitImport();
   const summary = summarize(result);
 
   const [sectionId, setSectionId] = useState<string | null>(() => {
@@ -125,7 +144,10 @@ export function EditScreen() {
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [dragSection, setDragSection] = useState<number | null>(null);
   const [dragItem, setDragItem] = useState<number | null>(null);
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [sectionMenu, setSectionMenu] = useState<{ anchor: DOMRect; section: DetectedSection; index: number } | null>(null);
+  // The item whose editor a Next Step press found incomplete: its errors all
+  // show at once. Any other item still opens clean.
+  const [attemptedFor, setAttemptedFor] = useState<string | null>(null);
 
   const items = section?.items ?? [];
   const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -164,18 +186,58 @@ export function EditScreen() {
     selectItem(item.id, next);
   }
 
+  function duplicate(item: DetectedItem) {
+    const id = sessionId("ai-copy");
+    let next = result;
+    updateResult((r) => (next = duplicateDetectedItem(r, item.id, id)));
+    selectItem(id, next);
+  }
+
+  /** The open item must be complete before the menu moves on. */
+  function goNext() {
+    if (selected) {
+      const errors = validateItemForm({
+        name: selected.item.name,
+        priceText: priceText(selected.item.price),
+        description: selected.item.description,
+        image: selected.item.image,
+        sectionId: selected.section.id,
+      });
+      if (hasErrors(errors)) {
+        setAttemptedFor(selected.item.id);
+        flash("error", t("menuAi.edit.fixOpenItem"));
+        return;
+      }
+    }
+    void commit("publish");
+  }
+
   const csvPicker = useRef<HTMLInputElement>(null);
 
-  const quickActions = [
-    { icon: <Plus size={16} />, label: t("menuAi.edit.addItem"), onClick: addItem },
-    { icon: <Upload size={16} />, label: t("menuAi.edit.addSection"), onClick: () => setModal({ kind: "add-section" }) },
-    { icon: <FilePenLine size={16} />, label: t("menuAi.edit.bulkPrices"), onClick: () => setModal({ kind: "bulk" }) },
-    { icon: <Search size={16} />, label: t("menuAi.edit.findReplace"), onClick: () => setModal({ kind: "find" }) },
-    { icon: <Upload size={16} />, label: t("menuAi.edit.importCsv"), onClick: () => csvPicker.current?.click() },
+  const sectionActions = (index: number): PopoverItem<SectionAction>[] => [
+    { id: "rename", label: t("menuAi.edit.rename") },
+    ...(index > 0 ? [{ id: "up" as const, label: t("menuAi.edit.moveUp") }] : []),
+    ...(index < result.sections.length - 1 ? [{ id: "down" as const, label: t("menuAi.edit.moveDown") }] : []),
+    { id: "delete", label: t("menuAi.edit.deleteSection"), danger: true },
   ];
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
+    <ImportShell
+      step={3}
+      title={t("menuAi.edit.title")}
+      subtitle={t("menuAi.edit.subtitle")}
+      onStep={(n) => setSearchParams(n === 1 ? {} : { step: "review" })}
+      footer={
+        <ImportFooter
+          onCancel={() => {
+            resetImport();
+            navigate("/menu");
+          }}
+          onSaveDraft={() => void commit("draft")}
+          onNext={goNext}
+        />
+      }
+    >
       <input
         ref={csvPicker}
         type="file"
@@ -204,419 +266,350 @@ export function EditScreen() {
         }}
       />
 
-      <Breadcrumb current={t("menuAi.crumb.edit")} trail={[{ label: t("menuAi.crumb.upload"), to: "/menu/import" }]} />
-      <PageTitle
-        variant="badge"
-        title={t("menuAi.edit.title")}
-        subtitle={t("menuAi.edit.subtitle")}
-        actions={
-          <>
-            <SaveDraftButton onClick={() => commit("draft")} disabled={!ready} />
-            <NextButton label={t("menuAi.edit.next")} onClick={() => commit("publish")} disabled={!ready} />
-          </>
-        }
-      />
-
-      {/* Stats strip */}
-      <div className="mt-4 flex flex-wrap items-center gap-2.5">
-        <span className="inline-flex items-center gap-2 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2 text-[13px] text-[var(--octo-text-primary)]">
-          <StatIcon tone="success" size={26}><ShieldCheck size={14} /></StatIcon>
-          {fill(t("menuAi.edit.statSections"), { n: summary.sections })}
-        </span>
-        <span className="inline-flex items-center gap-2 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2 text-[13px] text-[var(--octo-text-primary)]">
-          <StatIcon tone="violet" size={26}><ListChecks size={14} /></StatIcon>
-          {fill(t("menuAi.edit.statItems"), { n: summary.items })}
-        </span>
-        <span className="inline-flex items-center gap-2 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2 text-[13px] text-[var(--octo-text-primary)]">
-          <StatIcon tone="success" size={26}><ShieldCheck size={14} /></StatIcon>
-          {fill(t("menuAi.edit.statHigh"), { n: summary.high })}
-        </span>
-        <button
-          type="button"
-          disabled={summary.needReview === 0}
-          onClick={() => {
-            const first = result.sections.flatMap((s) => s.items).find(needsReview);
-            if (first) selectItem(first.id);
-          }}
-          className="inline-flex items-center gap-2 rounded-[10px] border border-[var(--octo-tone-warning-border)] bg-[var(--octo-card)] px-3 py-2 text-[13px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-warning-bg)] disabled:cursor-default"
-        >
-          <StatIcon tone="warning" size={26}><AlertTriangle size={14} /></StatIcon>
-          <span>
-            <b className="font-semibold text-[var(--octo-tone-warning-text)]">{summary.needReview}</b>{" "}
-            {t("menuAi.edit.statReview")}
-          </span>
-        </button>
-        <span className="mx-1 hidden h-8 w-px bg-[var(--octo-border-card)] sm:block" aria-hidden />
-        <button type="button" onClick={() => setModal({ kind: "summary" })} className={clsx(tintedButton, "h-[42px] px-4")}>
-          <Info size={16} aria-hidden />
-          {t("menuAi.edit.viewSummary")}
-        </button>
-      </div>
-
-      {notice && (
-        <p
-          role="status"
-          className={clsx(
-            "mt-3 inline-flex items-center gap-2 rounded-[8px] px-3 py-2 text-[13px]",
-            notice.tone === "ok"
-              ? "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]"
-              : "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]"
+      <div className="flex flex-col gap-8">
+        <div className="flex flex-wrap items-center gap-4">
+          <StatTiles
+            summary={summary}
+            layout="inline"
+            onNeedReview={
+              summary.needReview > 0
+                ? () => {
+                    const first = result.sections.flatMap((s) => s.items).find(needsReview);
+                    if (first) selectItem(first.id);
+                  }
+                : undefined
+            }
+          />
+          {SHOW_UNFRAMED && (
+            <button type="button" onClick={() => setModal({ kind: "summary" })} className="text-[14px] font-bold leading-[14px] text-[#0D6EFD] underline">
+              {t("menuAi.edit.viewSummary")}
+            </button>
           )}
-        >
-          {notice.text}
-          <button type="button" aria-label={t("menuAi.dismiss")} onClick={() => setNotice(null)}>
-            <X size={14} aria-hidden />
-          </button>
-        </p>
-      )}
+        </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_290px] 2xl:grid-cols-[250px_minmax(0,1fr)_360px]">
-        {/* Sections */}
-        <section className={clsx(card, "flex flex-col p-3")}>
-          <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            <h2 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuAi.edit.sections")}</h2>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                aria-label={t("menuAi.edit.addSection")}
-                title={t("menuAi.edit.addSection")}
-                onClick={() => setModal({ kind: "add-section" })}
-                className={clsx(outlineButton, "h-8 gap-1 whitespace-nowrap px-2 text-[12px]", AI.text)}
-              >
-                <Plus size={14} aria-hidden />
-                {/* The column is at its narrowest between lg and 2xl; the dashed
-                    "Add Section" under the list still carries the words there. */}
-                <span className="lg:hidden 2xl:inline">{t("menuAi.edit.addSection")}</span>
-              </button>
-              <button
-                type="button"
-                aria-label={t("menuAi.edit.sortSections")}
-                title={t("menuAi.edit.sortSections")}
-                onClick={() =>
-                  updateResult((r) => ({ ...r, sections: [...r.sections].sort((a, b) => a.name.localeCompare(b.name)) }))
-                }
-                className={clsx(outlineButton, "h-8 w-8 px-0")}
-              >
-                <ArrowDownUp size={14} aria-hidden />
-              </button>
-            </div>
-          </div>
-          <ul className="space-y-2">
-            {result.sections.map((s, index) => {
-              const active = s.id === section?.id;
-              return (
-                <li
-                  key={s.id}
-                  draggable
-                  onDragStart={() => setDragSection(index)}
-                  onDragOver={(e) => dragSection !== null && e.preventDefault()}
-                  onDrop={() => {
-                    if (dragSection !== null) updateResult((r) => reorderSections(r, dragSection, index));
-                    setDragSection(null);
-                  }}
-                  onDragEnd={() => setDragSection(null)}
-                  className={clsx(
-                    "flex items-center gap-1.5 rounded-[10px] border px-2 py-2 transition-colors",
-                    active ? clsx(AI.border, AI.soft) : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]",
-                    dragSection === index && "opacity-50"
-                  )}
-                >
-                  <GripVertical size={15} className="shrink-0 cursor-grab text-[var(--octo-text-faint)]" aria-hidden />
-                  <button type="button" data-section={s.name} onClick={() => openSection(s.id)} className="min-w-0 flex-1 truncate text-start text-[13.5px] font-medium text-[var(--octo-text-primary)]">
-                    {s.name}
-                  </button>
-                  <span className={clsx("rounded-[6px] border px-1.5 text-[11.5px] tabular-nums", active ? clsx(AI.border, AI.text) : "border-[var(--octo-border-card)] text-[var(--octo-text-secondary)]")}>
-                    {s.items.length}
-                  </span>
-                  <KebabMenu
-                    label={fill(t("menuAi.edit.sectionActions"), { name: s.name })}
-                    actions={[
-                      { label: t("menuAi.edit.rename"), onSelect: () => setModal({ kind: "rename-section", section: s }) },
-                      { label: t("menuAi.edit.moveUp"), disabled: index === 0, onSelect: () => updateResult((r) => reorderSections(r, index, index - 1)) },
-                      { label: t("menuAi.edit.moveDown"), disabled: index === result.sections.length - 1, onSelect: () => updateResult((r) => reorderSections(r, index, index + 1)) },
-                      { label: t("menuAi.edit.deleteSection"), danger: true, onSelect: () => setModal({ kind: "delete-section", section: s }) },
-                    ]}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            type="button"
-            onClick={() => setModal({ kind: "add-section" })}
-            className={clsx("mt-2 flex w-full items-center justify-center gap-2 rounded-[10px] border border-dashed py-2.5 text-[13px] font-medium", AI.softBorder, AI.text, "hover:bg-[var(--octo-hover)]")}
-          >
-            <Plus size={15} aria-hidden />
-            {t("menuAi.edit.addSection")}
-          </button>
-          <div className={clsx("mt-auto flex items-start gap-2 rounded-[10px] px-3 py-3 text-[12.5px]", AI.soft, AI.text)}>
-            <Lightbulb size={16} className="mt-0.5 shrink-0" aria-hidden />
-            <span>
-              {t("menuAi.edit.dragTip")}
-              <span className="block opacity-80">{t("menuAi.edit.autosaved")}</span>
-            </span>
-          </div>
-        </section>
-
-        {/* Items table */}
-        <section className={clsx(card, "flex min-w-0 flex-col")} ref={tableRef}>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--octo-border-card)] px-4 py-3">
-            <h2 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-              {section ? section.name : t("menuAi.edit.noSection")}{" "}
-              {section && <span className="font-normal text-[var(--octo-text-secondary)]">({fill(t("menuAi.count.itemsN"), { n: items.length })})</span>}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={addItem} className={clsx(outlineButton, "h-9", AI.text)}>
-                <Plus size={15} aria-hidden />
-                {t("menuAi.edit.addItem")}
-              </button>
-              <button type="button" aria-pressed={reorderMode} onClick={() => setReorderMode((m) => !m)} className={clsx(reorderMode ? tintedButton : outlineButton, "h-9")}>
-                <ArrowDownUp size={15} aria-hidden />
-                {reorderMode ? t("menuAi.edit.doneReordering") : t("menuAi.edit.reorderItems")}
-              </button>
-              <button type="button" onClick={() => setModal({ kind: "bulk" })} className={clsx(outlineButton, "h-9")}>
-                <SquarePen size={15} aria-hidden />
-                {t("menuAi.edit.bulkEdit")}
-              </button>
-              <button
-                type="button"
-                disabled={!section}
-                onClick={() => section && setModal({ kind: "delete-section", section })}
-                className={clsx(outlineButton, "h-9 text-[var(--octo-tone-danger-text)]")}
-              >
-                <Trash2 size={15} aria-hidden />
-                {t("menuAi.edit.deleteSection")}
-              </button>
-            </div>
+        <div className="flex flex-col gap-[29px]">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3 md:grid-cols-3">
+            <button type="button" data-open-find onClick={() => setModal({ kind: "find" })} className={clsx(TOOL_BUTTON, "border", LINE, TEXT, "hover:bg-[var(--octo-hover)]")}>
+              <MenuIcon name="menu-search-replace.svg" size={24} />
+              {t("menuAi.edit.findReplace")}
+            </button>
+            <button type="button" data-open-bulk onClick={() => setModal({ kind: "bulk" })} className={clsx(TOOL_BUTTON, SURFACE_BLUE, TEXT, "hover:brightness-95")}>
+              <MenuIcon name="menu-price-cut.svg" size={24} />
+              {t("menuAi.edit.bulkPrices")}
+            </button>
+            <button
+              type="button"
+              onClick={() => csvPicker.current?.click()}
+              className={clsx(TOOL_BUTTON, SURFACE_BLUE, "text-[#0058da] hover:brightness-95 [[data-theme=dark]_&]:text-[#8ab8ff]")}
+            >
+              <MenuIcon name="menu-export.svg" size={24} />
+              {t("menuAi.edit.importCsv")}
+            </button>
           </div>
 
-          {reorderMode && (
-            <p className={clsx("px-4 pt-2 text-[12.5px]", AI.text)}>{t("menuAi.edit.reorderHint")}</p>
+          {notice && (
+            <p
+              role="status"
+              className={clsx(
+                "-my-3 flex items-center justify-between gap-2 rounded-[12px] p-2 text-[12px] font-medium leading-[1.4]",
+                notice.tone === "ok" ? "bg-[#dcffef] text-[#009a39] [[data-theme=dark]_&]:bg-[#009a39]/15" : ERROR_STRIP
+              )}
+            >
+              {notice.text}
+              <button type="button" onClick={() => setNotice(null)} className="font-bold underline">
+                {t("menuAi.dismiss")}
+              </button>
+            </p>
           )}
 
-          <div className="overflow-x-auto octo-scroll">
-            <table className="w-full min-w-[540px] border-separate border-spacing-y-1.5 px-3 text-[13px]">
-              <thead>
-                <tr className="text-start text-[12px] font-medium text-[var(--octo-text-secondary)]">
-                  <th className="w-8" />
-                  <th className="w-8 py-2 text-start font-medium">#</th>
-                  <th className="py-2 text-start font-medium">{t("menuAi.edit.colName")}</th>
-                  <th className="w-[90px] py-2 text-start font-medium">{t("menuAi.edit.colPrice")}</th>
-                  <th className="w-[78px] py-2 text-center font-medium">{t("menuAi.edit.colConfidence")}</th>
-                  <th className="w-[78px] py-2 text-center font-medium">{t("menuAi.edit.colStatus")}</th>
-                  <th className="w-10" />
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((item, i) => {
-                  const index = safePage * PAGE_SIZE + i;
-                  const active = item.id === itemId;
-                  const cell = clsx(
-                    "border-y py-2 align-middle first:rounded-s-[10px] first:border-s last:rounded-e-[10px] last:border-e",
-                    active ? clsx(AI.border, "bg-[var(--octo-tone-violet-bg)]") : "border-transparent border-b-[var(--octo-divider)]"
-                  );
-                  return (
-                    <tr
-                      key={item.id}
-                      data-item-row={item.id}
-                      draggable={reorderMode}
-                      onDragStart={() => setDragItem(index)}
-                      onDragOver={(e) => dragItem !== null && e.preventDefault()}
-                      onDrop={() => {
-                        if (dragItem !== null && section) updateResult((r) => reorderItems(r, section.id, dragItem, index));
-                        setDragItem(null);
-                      }}
-                      onDragEnd={() => setDragItem(null)}
-                      onClick={() => setItemId(item.id)}
-                      className={clsx("cursor-pointer", dragItem === index && "opacity-50")}
-                    >
-                      <td className={clsx(cell, "ps-2")}>
-                        <GripVertical size={16} className={clsx(reorderMode ? "cursor-grab text-[var(--octo-text-secondary)]" : "text-[var(--octo-text-faint)] opacity-60")} aria-hidden />
-                      </td>
-                      <td className={clsx(cell, "tabular-nums text-[var(--octo-text-primary)]")}>{index + 1}</td>
-                      <td className={cell}>
-                        <div className="flex items-center gap-3">
-                          <span className="h-10 w-12 shrink-0 overflow-hidden rounded-[8px] bg-[var(--octo-track)]">
-                            {item.image && <img src={item.image} alt="" className="h-full w-full object-cover" />}
-                          </span>
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <input
-                              aria-label={t("menuAi.editor.name")}
-                              value={item.name}
-                              onClick={(e) => e.stopPropagation()}
-                              onFocus={() => setItemId(item.id)}
-                              onChange={(e) => updateResult((r) => updateDetectedItem(r, item.id, { name: e.target.value }))}
-                              className="w-full rounded-[6px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[13px] font-medium text-[var(--octo-text-primary)] focus:border-[#3D1DF3] focus:outline-none"
-                            />
-                            <input
-                              aria-label={t("menuAi.editor.description")}
-                              value={item.description}
-                              placeholder={t("menuAi.edit.descPlaceholder")}
-                              onClick={(e) => e.stopPropagation()}
-                              onFocus={() => setItemId(item.id)}
-                              onChange={(e) => updateResult((r) => updateDetectedItem(r, item.id, { description: e.target.value }))}
-                              className="w-full rounded-[6px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2 py-1 text-[12px] text-[var(--octo-text-secondary)] placeholder:text-[var(--octo-text-faint)] focus:border-[#3D1DF3] focus:outline-none"
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className={cell} onClick={(e) => e.stopPropagation()}>
-                        <PriceInput
-                          ariaLabel={t("menuAi.editor.price")}
-                          value={item.price}
-                          onChange={(price) => updateResult((r) => updateDetectedItem(r, item.id, { price }))}
-                          className={clsx("w-[76px] py-1.5", item.price === null && "border-[var(--octo-tone-danger-dot)]")}
-                        />
-                      </td>
-                      <td className={clsx(cell, "text-center")}>
-                        <ConfidencePill value={item.confidence} />
-                      </td>
-                      <td className={clsx(cell, "text-center")}>
-                        <BandPill band={bandFor(item.confidence)} reviewed={item.reviewed && item.confidence < 90} />
-                      </td>
-                      <td className={clsx(cell, "pe-1")}>
-                        <KebabMenu
-                          label={fill(t("menuAi.edit.itemActions"), { name: item.name })}
-                          actions={[
-                            { label: t("menuAi.edit.editItem"), onSelect: () => setItemId(item.id) },
-                            {
-                              label: t("menuAi.edit.duplicate"),
-                              onSelect: () => {
-                                const id = sessionId("ai-copy");
-                                let next = result;
-                                updateResult((r) => (next = duplicateDetectedItem(r, item.id, id)));
-                                selectItem(id, next);
-                              },
-                            },
-                            item.reviewed
-                              ? { label: t("menuAi.edit.unmarkReviewed"), onSelect: () => updateResult((r) => updateDetectedItem(r, item.id, { reviewed: false })) }
-                              : { label: t("menuAi.edit.markReviewed"), onSelect: () => updateResult((r) => updateDetectedItem(r, item.id, { reviewed: true })) },
-                            { label: t("menuAi.edit.moveUp"), disabled: index === 0, onSelect: () => section && updateResult((r) => reorderItems(r, section.id, index, index - 1)) },
-                            { label: t("menuAi.edit.moveDown"), disabled: index === items.length - 1, onSelect: () => section && updateResult((r) => reorderItems(r, section.id, index, index + 1)) },
-                            { label: t("menuAi.editor.delete"), danger: true, onSelect: () => setModal({ kind: "delete-item", item }) },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {section && items.length === 0 && (
-              <div className="px-4 py-10 text-center">
-                <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">{t("menuAi.edit.emptySection")}</p>
-                <button type="button" onClick={addItem} className={clsx(tintedButton, "mt-3 h-9")}>
-                  <Plus size={15} aria-hidden />
-                  {t("menuAi.edit.addItem")}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {items.length > 0 && (
-            <div className="mt-auto flex flex-wrap items-center justify-center gap-3 border-t border-[var(--octo-border-card)] px-4 py-3 sm:justify-between">
-              <span className="hidden sm:block" />
-              <nav aria-label={t("menuAi.edit.pagination")} className="flex items-center gap-1.5">
-                <button type="button" aria-label={t("menuAi.review.prevPage")} disabled={safePage === 0} onClick={() => setPage(safePage - 1)} className={clsx(outlineButton, "h-8 w-8 px-0")}>
-                  <ChevronLeft size={15} className="rtl:rotate-180" aria-hidden />
-                </button>
-                {pageList(safePage, pages).map((p, i) =>
-                  p === "gap" ? (
-                    <span key={`gap-${i}`} className="px-1 text-[var(--octo-text-secondary)]">…</span>
-                  ) : (
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[293px_minmax(0,1fr)] 2xl:grid-cols-[293px_minmax(0,1fr)_301px] min-[1400px]:grid-cols-[293px_minmax(0,1fr)_301px]">
+            {/* Sections */}
+            <section className={clsx(PANEL, "flex flex-col gap-4")}>
+              <div className={clsx("flex flex-col gap-3 border-b pb-2", LINE)}>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className={clsx("text-[18px] font-bold leading-[18px]", TEXT)}>{t("menuAi.edit.sections")}</h2>
+                  {SHOW_UNFRAMED && (
                     <button
-                      key={p}
                       type="button"
-                      aria-current={p === safePage ? "page" : undefined}
-                      onClick={() => setPage(p)}
-                      className={clsx("h-8 min-w-8 rounded-[8px] px-2 text-[13px] font-medium tabular-nums", p === safePage ? AI.solid : clsx(outlineButton, "px-2"))}
+                      onClick={() => updateResult((r) => ({ ...r, sections: [...r.sections].sort((a, b) => a.name.localeCompare(b.name)) }))}
+                      className="text-[12px] font-bold leading-3 text-[#0D6EFD] underline"
                     >
-                      {p + 1}
+                      {t("menuAi.edit.sortSections")}
                     </button>
-                  )
-                )}
-                <button type="button" aria-label={t("menuAi.review.nextPage")} disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)} className={clsx(outlineButton, "h-8 w-8 px-0")}>
-                  <ChevronRight size={15} className="rtl:rotate-180" aria-hidden />
-                </button>
-              </nav>
-              <span className="text-[12.5px] text-[var(--octo-text-secondary)]">
-                {fill(t("menuAi.edit.showing"), {
-                  from: safePage * PAGE_SIZE + 1,
-                  to: safePage * PAGE_SIZE + visible.length,
-                  total: items.length,
+                  )}
+                </div>
+                <p className={clsx("text-[14px] font-medium leading-[14px]", TEXT_SECONDARY)}>{t("menuAi.edit.sectionsHint")}</p>
+              </div>
+              <ul className="flex flex-col">
+                {result.sections.map((s, index) => {
+                  const active = s.id === section?.id;
+                  const cover = s.items.find((i) => i.image)?.image ?? null;
+                  return (
+                    <li
+                      key={s.id}
+                      draggable
+                      onDragStart={() => setDragSection(index)}
+                      onDragOver={(e) => dragSection !== null && e.preventDefault()}
+                      onDrop={() => {
+                        if (dragSection !== null) updateResult((r) => reorderSections(r, dragSection, index));
+                        setDragSection(null);
+                      }}
+                      onDragEnd={() => setDragSection(null)}
+                      className={clsx("flex items-center justify-between gap-2 border-t p-2 transition-colors", LINE, active && SURFACE_BLUE, dragSection === index && "opacity-50")}
+                    >
+                      <span className={clsx("grid size-6 shrink-0 cursor-grab place-items-center", TEXT)} aria-hidden>
+                        <MenuIcon name="menu-drag.svg" size={12} />
+                      </span>
+                      <button type="button" data-section={s.name} onClick={() => openSection(s.id)} className="flex min-w-0 flex-1 items-center gap-2 text-start">
+                        <span className={clsx("grid size-12 shrink-0 place-items-center overflow-hidden rounded-[4px]", SURFACE_SUBTLE, TEXT_GRAY)}>
+                          {cover ? <img src={cover} alt="" className="size-full object-cover" /> : <MenuIcon name="menu-food-24.svg" size={24} />}
+                        </span>
+                        <span className="flex min-w-0 flex-col gap-2 font-medium">
+                          <span className={clsx("truncate text-[14px] leading-[14px]", TEXT)}>{s.name}</span>
+                          <span className={clsx("text-[12px] leading-3", TEXT_GRAY)}>
+                            {s.items.length === 1 ? t("menuAi.count.item1") : fill(t("menuAi.count.itemsN"), { n: s.items.length })}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-label={fill(t("menuAi.edit.sectionActions"), { name: s.name })}
+                        onClick={(e) => setSectionMenu({ anchor: e.currentTarget.getBoundingClientRect(), section: s, index })}
+                        className={clsx("grid size-6 shrink-0 place-items-center rounded-[4px] hover:bg-[var(--octo-hover)]", TEXT)}
+                      >
+                        <MenuIcon name="menu-more-vertical-fill.svg" size={24} />
+                      </button>
+                    </li>
+                  );
                 })}
-              </span>
-            </div>
-          )}
-        </section>
+              </ul>
+              <button
+                type="button"
+                onClick={() => setModal({ kind: "add-section" })}
+                className={clsx("flex w-full items-center justify-center gap-3 rounded-[4px] border border-[#0D6EFD] p-2 text-[14px] font-semibold leading-[14px] text-[#0D6EFD] hover:brightness-95", SURFACE_BLUE)}
+              >
+                <MenuIcon name="menu-plus-thin.svg" size={24} />
+                {t("menuAi.edit.addNewSection")}
+              </button>
+            </section>
 
-        {/* Editor */}
-        <aside className="min-w-0 lg:col-span-2 xl:col-span-1">
-          {selected ? (
-            <TableEditor
-              key={selected.item.id}
-              item={selected.item}
-              sectionId={selected.section.id}
-              result={result}
-              onSelect={(id) => selectItem(id)}
-              onClose={() => setItemId(null)}
-              onDelete={(item) => setModal({ kind: "delete-item", item })}
-              onDuplicate={(item) => {
-                const id = sessionId("ai-copy");
-                let next = result;
-                updateResult((r) => (next = duplicateDetectedItem(r, item.id, id)));
-                selectItem(id, next);
-              }}
-            />
-          ) : (
-            <div className={clsx(card, "flex min-h-[260px] flex-col items-center justify-center px-6 text-center")}>
-              <SquarePen size={28} className={AI.text} aria-hidden />
-              <p className="mt-3 text-[14px] font-medium text-[var(--octo-text-primary)]">{t("menuAi.editor.emptyTitle")}</p>
-              <p className="mt-1 text-[12.5px] text-[var(--octo-text-secondary)]">{t("menuAi.edit.emptyEditor")}</p>
-            </div>
-          )}
-        </aside>
+            {/* Items table */}
+            <section className={clsx(PANEL, "flex min-w-0 flex-col gap-6")}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className={clsx("text-[18px] font-bold leading-[18px]", TEXT)}>
+                  {section ? section.name : t("menuAi.edit.noSection")}{" "}
+                  {section && (
+                    <span className="text-[12px] font-normal leading-3">
+                      ({items.length === 1 ? t("menuAi.count.item1") : fill(t("menuAi.count.itemsN"), { n: items.length })})
+                    </span>
+                  )}
+                </h2>
+                <div className="flex flex-wrap items-center justify-end gap-4">
+                  {SHOW_UNFRAMED && (
+                    <button type="button" aria-pressed={reorderMode} onClick={() => setReorderMode((m) => !m)} className="text-[14px] font-semibold leading-[14px] text-[#0D6EFD] underline">
+                      {reorderMode ? t("menuAi.edit.doneReordering") : t("menuAi.edit.reorderItems")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!section}
+                    onClick={() => section && setModal({ kind: "delete-section", section })}
+                    className="flex h-9 items-center gap-1 rounded-[4px] bg-[#fef0f0] px-2 text-[14px] font-semibold leading-[14px] text-[#d30202] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60 [[data-theme=dark]_&]:bg-[#d30202]/15"
+                  >
+                    <MenuIcon name="menu-trash.svg" size={24} />
+                    {t("menuAi.edit.deleteSection")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className={clsx("flex h-9 items-center gap-1 rounded-[4px] border border-[#0D6EFD] px-2 text-[14px] font-semibold leading-[14px] text-[#0D6EFD] hover:brightness-95", SURFACE_BLUE)}
+                  >
+                    <MenuIcon name="menu-plus-thin.svg" size={24} />
+                    {t("menuAi.edit.addItem")}
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto octo-scroll">
+                <div className="flex min-w-[440px] flex-col gap-2" role="table">
+                  <div role="row" className={clsx(TABLE_GRID, "h-6 px-2 text-[12px] font-medium leading-3", SURFACE_SUBTLE, TEXT)}>
+                    <span role="columnheader">{t("menuAi.edit.colItem")}</span>
+                    <span role="columnheader">{t("menuAi.edit.colPriceShort")}</span>
+                    <span role="columnheader">{t("menuAi.edit.colConfidence")}</span>
+                    <span role="columnheader">{t("menuAi.edit.colStatus")}</span>
+                  </div>
+                  <div role="rowgroup" className="flex flex-col gap-4">
+                    {visible.map((item, i) => {
+                      const index = safePage * PAGE_SIZE + i;
+                      const active = item.id === itemId;
+                      return (
+                        <div
+                          key={item.id}
+                          role="row"
+                          tabIndex={0}
+                          aria-selected={active}
+                          data-item-row={item.id}
+                          draggable={reorderMode}
+                          onDragStart={() => setDragItem(index)}
+                          onDragOver={(e) => dragItem !== null && e.preventDefault()}
+                          onDrop={() => {
+                            if (dragItem !== null && section) updateResult((r) => reorderItems(r, section.id, dragItem, index));
+                            setDragItem(null);
+                          }}
+                          onDragEnd={() => setDragItem(null)}
+                          onClick={() => setItemId(item.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setItemId(item.id);
+                            }
+                          }}
+                          className={clsx(
+                            TABLE_GRID,
+                            "cursor-pointer border-b pb-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                            i === visible.length - 1 ? "border-transparent" : LINE,
+                            active && clsx("rounded-[4px]", SURFACE_BLUE),
+                            dragItem === index && "opacity-50"
+                          )}
+                        >
+                          <span role="cell" className="flex min-w-0 items-center gap-1">
+                            <span className={clsx("size-12 shrink-0 overflow-hidden rounded-[4px]", SURFACE_SUBTLE)}>
+                              {item.image && <img src={item.image} alt="" className="size-full object-cover" />}
+                            </span>
+                            <span className="flex min-w-0 flex-col gap-2 font-medium">
+                              <span className={clsx("truncate text-[14px] leading-[14px]", TEXT)}>{item.name || "—"}</span>
+                              <span className={clsx("truncate text-[12px] leading-3", TEXT_GRAY)}>{item.description}</span>
+                            </span>
+                          </span>
+                          <span role="cell" className={clsx("whitespace-nowrap text-[14px] font-medium leading-[14px] tabular-nums", item.price === null ? "text-[#d30202]" : TEXT)}>
+                            {item.price === null ? (
+                              t("menuAi.paper.priceUnclear")
+                            ) : (
+                              <>
+                                <span className="text-[12px] font-normal leading-3">{t("menuAi.bulk.currency")}</span> {item.price.toFixed(2)}
+                              </>
+                            )}
+                          </span>
+                          <span role="cell">
+                            <ConfidencePill value={item.confidence} />
+                          </span>
+                          <span role="cell" className="flex items-center justify-between gap-1">
+                            <BandPill band={bandFor(item.confidence)} reviewed={item.reviewed && item.confidence < 90} />
+                            {SHOW_UNFRAMED && (
+                              <KebabMenu
+                                label={fill(t("menuAi.edit.itemActions"), { name: item.name })}
+                                actions={[
+                                  { label: t("menuAi.edit.editItem"), onSelect: () => setItemId(item.id) },
+                                  { label: t("menuAi.edit.duplicate"), onSelect: () => duplicate(item) },
+                                  item.reviewed
+                                    ? { label: t("menuAi.edit.unmarkReviewed"), onSelect: () => updateResult((r) => updateDetectedItem(r, item.id, { reviewed: false })) }
+                                    : { label: t("menuAi.edit.markReviewed"), onSelect: () => updateResult((r) => updateDetectedItem(r, item.id, { reviewed: true })) },
+                                  { label: t("menuAi.edit.moveUp"), disabled: index === 0, onSelect: () => section && updateResult((r) => reorderItems(r, section.id, index, index - 1)) },
+                                  { label: t("menuAi.edit.moveDown"), disabled: index === items.length - 1, onSelect: () => section && updateResult((r) => reorderItems(r, section.id, index, index + 1)) },
+                                  { label: t("menuAi.editor.delete"), danger: true, onSelect: () => setModal({ kind: "delete-item", item }) },
+                                ]}
+                              />
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {section && items.length === 0 && (
+                  <p className={clsx("px-2 py-8 text-center text-[14px] font-medium leading-[1.4]", TEXT_GRAY)}>{t("menuAi.edit.emptySection")}</p>
+                )}
+              </div>
+
+              {pages > 1 && (
+                <nav aria-label={t("menuAi.edit.pagination")} className="flex flex-wrap items-center justify-center">
+                  {SHOW_UNFRAMED && (
+                    <button type="button" aria-label={t("menuAi.review.prevPage")} disabled={safePage === 0} onClick={() => setPage(safePage - 1)} className={clsx("grid size-8 place-items-center disabled:opacity-40", TEXT)}>
+                      <MenuIcon name="menu-arrow-down.svg" size={18} className="rotate-90 rtl:-rotate-90" />
+                    </button>
+                  )}
+                  {pageList(safePage, pages).map((p, i) =>
+                    p === "gap" ? (
+                      <span key={`gap-${i}`} className={clsx("grid size-8 place-items-center text-[12px] font-medium leading-3", TEXT)}>
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        aria-current={p === safePage ? "page" : undefined}
+                        onClick={() => setPage(p)}
+                        className={clsx(
+                          "grid size-8 place-items-center text-[12px] font-medium leading-3 tabular-nums",
+                          p === safePage ? "rounded-[8px] bg-[#0D6EFD] text-white" : clsx("rounded-[4px] hover:bg-[var(--octo-hover)]", TEXT)
+                        )}
+                      >
+                        {p + 1}
+                      </button>
+                    )
+                  )}
+                  {SHOW_UNFRAMED && (
+                    <>
+                      <button type="button" aria-label={t("menuAi.review.nextPage")} disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)} className={clsx("grid size-8 place-items-center disabled:opacity-40", TEXT)}>
+                        <MenuIcon name="menu-arrow-down.svg" size={18} className="-rotate-90 rtl:rotate-90" />
+                      </button>
+                      <span className={clsx("ms-3 text-[12px] leading-3", TEXT_GRAY)}>
+                        {fill(t("menuAi.edit.showing"), {
+                          from: safePage * PAGE_SIZE + 1,
+                          to: safePage * PAGE_SIZE + visible.length,
+                          total: items.length,
+                        })}
+                      </span>
+                    </>
+                  )}
+                </nav>
+              )}
+            </section>
+
+            {/* Editor */}
+            <aside className="min-w-0 lg:col-span-2 2xl:col-span-1 min-[1400px]:col-span-1">
+              {selected ? (
+                <TableEditor
+                  key={selected.item.id}
+                  item={selected.item}
+                  sectionId={selected.section.id}
+                  result={result}
+                  attempted={attemptedFor === selected.item.id}
+                  onSelect={(id) => selectItem(id)}
+                  onDelete={(item) => setModal({ kind: "delete-item", item })}
+                  onDuplicate={duplicate}
+                />
+              ) : (
+                <div className={clsx(IMPORT_CARD, "flex min-h-[260px] flex-col items-center justify-center gap-2 px-6 text-center")}>
+                  <p className={clsx("text-[14px] font-bold leading-[14px]", TEXT)}>{t("menuAi.editor.emptyTitle")}</p>
+                  <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuAi.edit.emptyEditor")}</p>
+                </div>
+              )}
+            </aside>
+          </div>
+        </div>
       </div>
 
-      {/* Quick actions, tips, legend */}
-      <section className={clsx(card, "mt-4 grid grid-cols-1 gap-5 p-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)]")}>
-        <div>
-          <h2 className={clsx("text-[13.5px] font-semibold", AI.text)}>{t("menuAi.edit.quickActions")}</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {quickActions.map((a) => (
-              <button key={a.label} type="button" onClick={a.onClick} className={clsx(outlineButton, "h-10")}>
-                <span className={AI.text} aria-hidden>{a.icon}</span>
-                {a.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="lg:border-s lg:border-[var(--octo-border-card)] lg:ps-5">
-          <h2 className={clsx("text-[13.5px] font-semibold", AI.text)}>{t("menuAi.edit.tips")}</h2>
-          <ul className="mt-2 list-disc space-y-1 ps-5 text-[12.5px] text-[var(--octo-text-secondary)]">
-            <li>{t("menuAi.edit.tip1")}</li>
-            <li>{t("menuAi.edit.tip2")}</li>
-            <li>{t("menuAi.edit.tip3")}</li>
-          </ul>
-        </div>
-        <div className="lg:border-s lg:border-[var(--octo-border-card)] lg:ps-5">
-          <h2 className={clsx("text-[13.5px] font-semibold", AI.text)}>{t("menuAi.edit.legend")}</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {(["high", "medium", "low"] as const).map((band) => (
-              <span key={band} className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-card)] px-2.5 py-1.5 text-[12px] text-[var(--octo-text-primary)]">
-                <span className={clsx("h-2.5 w-2.5 rounded-full", BAND_TONE[band].bar)} aria-hidden />
-                {t(`menuAi.legendBand.${band}`)}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PopoverMenu
+        anchor={sectionMenu?.anchor ?? null}
+        items={sectionMenu ? sectionActions(sectionMenu.index) : []}
+        onClose={() => setSectionMenu(null)}
+        onPick={(action) => {
+          if (!sectionMenu) return;
+          const { section: target, index } = sectionMenu;
+          setSectionMenu(null);
+          if (action === "rename") setModal({ kind: "rename-section", section: target });
+          else if (action === "delete") setModal({ kind: "delete-section", section: target });
+          else updateResult((r) => reorderSections(r, index, action === "up" ? index - 1 : index + 1));
+        }}
+      />
 
       {/* Dialogs */}
       <SectionNameModal
         open={modal.kind === "add-section"}
         initial=""
-        title={t("menuAi.edit.addSection")}
+        title={t("menuAi.edit.addNewSection")}
         onClose={() => setModal({ kind: "none" })}
         onSubmit={(name) => {
           const id = sessionId("ai-sec");
@@ -682,10 +675,10 @@ export function EditScreen() {
         result={result}
         sectionId={section?.id ?? null}
         onClose={() => setModal({ kind: "none" })}
-        onApply={(next) => {
+        onApply={(next, count) => {
           updateResult(() => next);
           setModal({ kind: "none" });
-          flash("ok", fill(t("menuAi.bulk.done"), { section: section?.name ?? "" }));
+          flash("ok", fill(t("menuAi.bulk.doneN"), { n: count }));
         }}
       />
       <FindReplaceModal
@@ -708,7 +701,7 @@ export function EditScreen() {
           if (item) selectItem(item.id);
         }}
       />
-    </div>
+    </ImportShell>
   );
 }
 
@@ -716,174 +709,162 @@ function TableEditor({
   item,
   sectionId,
   result,
+  attempted,
   onSelect,
-  onClose,
   onDelete,
   onDuplicate,
 }: {
   item: DetectedItem;
   sectionId: string;
   result: DetectionResult;
+  /** A Next Step press found this item incomplete: show every error. */
+  attempted: boolean;
   onSelect: (id: string) => void;
-  onClose: () => void;
   onDelete: (item: DetectedItem) => void;
   onDuplicate: (item: DetectedItem) => void;
 }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<EditTab>("details");
+  const [tab, setTab] = useState<EditTab | "advanced">("details");
+  const [touched, setTouched] = useState<ReadonlySet<ItemField>>(new Set());
+  // What is in the price box, kept so "abc" reads as "not a number" rather
+  // than as "empty". `null` until the merchant types.
+  const [typedPrice, setTypedPrice] = useState<string | null>(null);
   const patch = (p: Partial<DetectedItem>) => updateResult((r) => updateDetectedItem(r, item.id, p));
-  const picker = useFilePicker((url) => patch({ image: url }));
   const band = bandFor(item.confidence);
-  const prev = useMemo(() => siblingItem(result, item.id, -1), [result, item.id]);
-  const next = useMemo(() => siblingItem(result, item.id, 1), [result, item.id]);
-  const iconButton = "rounded-[6px] border border-[var(--octo-border-input)] p-1.5 text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)] disabled:opacity-40";
+
+  const errors = useMemo(
+    () =>
+      validateItemForm({
+        name: item.name,
+        priceText: typedPrice ?? priceText(item.price),
+        description: item.description,
+        image: item.image,
+        sectionId,
+      }),
+    [item.name, item.price, item.description, item.image, sectionId, typedPrice]
+  );
+  const shown = (field: ItemField) => (attempted || touched.has(field) ? itemErrorText(t, field, errors[field]) : null);
+  const touch = (field: ItemField) => setTouched((prev) => (prev.has(field) ? prev : new Set(prev).add(field)));
 
   return (
-    <section className={clsx(card, "xl:sticky xl:top-4")} aria-label={fill(t("menuAi.editor.editing"), { name: item.name })}>
-      {picker.input}
-      <header className="flex items-center justify-between gap-3 px-4 pb-1 pt-4">
-        <h2 className="min-w-0 truncate text-[15px] text-[var(--octo-text-secondary)]">
-          {t("menuAi.editor.editingLabel")} <b className="font-semibold text-[var(--octo-text-primary)]">{item.name || "—"}</b>
-        </h2>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button type="button" aria-label={t("menuAi.editor.prev")} disabled={!prev} onClick={() => prev && onSelect(prev.id)} className={iconButton}>
-            <ChevronLeft size={15} className="rtl:rotate-180" aria-hidden />
-          </button>
-          <button type="button" aria-label={t("menuAi.editor.next")} disabled={!next} onClick={() => next && onSelect(next.id)} className={iconButton}>
-            <ChevronRight size={15} className="rtl:rotate-180" aria-hidden />
-          </button>
-          <button type="button" aria-label={t("menuAi.editor.close")} onClick={onClose} className={iconButton}>
-            <X size={15} aria-hidden />
-          </button>
-        </div>
-      </header>
-      <div className="px-2">
-        <EditorTabs tabs={EDIT_TABS} active={tab} onChange={setTab} />
-      </div>
+    <div className="flex flex-col gap-4">
+      <section className={clsx(IMPORT_CARD, "flex flex-col gap-3")} aria-label={fill(t("menuAi.editor.editing"), { name: item.name })}>
+        <h2 className={clsx("truncate text-[14px] font-bold leading-[14px]", TEXT)}>{fill(t("menuAi.editor.editing"), { name: item.name || "—" })}</h2>
+        <EditorTabs tabs={SHOW_UNFRAMED ? ([...EDIT_TABS, "advanced"] as const) : EDIT_TABS} active={tab} onChange={setTab} />
 
-      <div className="space-y-3.5 px-4 py-4">
         {tab === "details" && (
           <>
-            <div>
-              <FieldLabel required htmlFor="ed-name">{t("menuAi.editor.name")}</FieldLabel>
-              <input id="ed-name" value={item.name} maxLength={80} onChange={(e) => patch({ name: e.target.value })} className={inputClass} />
-            </div>
-            <div>
-              <FieldLabel required htmlFor="ed-price">{t("menuAi.editor.price")}</FieldLabel>
-              <PriceInput id="ed-price" value={item.price} onChange={(price) => patch({ price })} />
-              {item.price === null && <p className="mt-1 text-[12px] text-[var(--octo-tone-danger-text)]">{t("menuAi.editor.priceMissing")}</p>}
-            </div>
-            <div>
-              <FieldLabel required htmlFor="ed-desc">{t("menuAi.editor.description")}</FieldLabel>
-              <textarea id="ed-desc" rows={2} maxLength={200} value={item.description} onChange={(e) => patch({ description: e.target.value })} className={clsx(inputClass, "resize-none")} />
-              <p className="mt-0.5 text-end text-[11.5px] tabular-nums text-[var(--octo-text-muted)]">{item.description.length} / 200</p>
-            </div>
-            <div>
-              <FieldLabel required htmlFor="ed-section">{t("menuAi.editor.section")}</FieldLabel>
-              <span className="relative flex items-center">
-                <select
-                  id="ed-section"
-                  value={sectionId}
-                  onChange={(e) => {
-                    const target = e.target.value;
-                    let moved = result;
-                    updateResult((r) => (moved = moveItemToSection(r, item.id, target)));
-                    // Follow the item to where it went.
-                    if (findItem(moved, item.id)) onSelect(item.id);
-                  }}
-                  className={clsx(inputClass, "appearance-none pe-8")}
-                >
-                  {result.sections.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-                <ChevronDown size={15} className="pointer-events-none absolute end-2.5 text-[var(--octo-text-muted)]" aria-hidden />
-              </span>
-            </div>
-            <div>
-              <FieldLabel>{t("menuAi.editor.image")}</FieldLabel>
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="h-[72px] w-[104px] shrink-0 overflow-hidden rounded-[8px] bg-[var(--octo-track)]">
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="flex h-full items-center justify-center text-[11.5px] text-[var(--octo-text-muted)]">{t("menuAi.editor.noImage")}</span>
-                  )}
-                </span>
-                <button type="button" onClick={picker.open} className={clsx(tintedButton, "h-9")}>
-                  <Upload size={15} aria-hidden />
-                  {item.image ? t("menuAi.editor.changeImage") : t("menuAi.editor.addImage")}
-                </button>
-                <button type="button" disabled={!item.image} onClick={() => patch({ image: null })} className={clsx(outlineButton, "h-9")}>
-                  <Trash2 size={15} aria-hidden />
-                  {t("menuAi.upload.remove")}
-                </button>
-              </div>
-              {picker.error && <p role="alert" className="mt-1 text-[12px] text-[var(--octo-tone-danger-text)]">{t(`menuAi.imageError.${picker.error}`)}</p>}
-            </div>
-            <ConfidenceMeter value={item.confidence} variant="edit" />
-            <div>
-              <FieldLabel htmlFor="ed-status">{t("menuAi.editor.status")}</FieldLabel>
-              <span className="relative flex items-center">
-                <select
-                  id="ed-status"
-                  value={item.reviewed ? "reviewed" : "auto"}
-                  onChange={(e) => patch({ reviewed: e.target.value === "reviewed" })}
-                  className={clsx(inputClass, "appearance-none pe-8")}
-                >
+            <ImageField
+              image={item.image}
+              alt={item.name}
+              error={shown("image")}
+              onPick={(url) => patch({ image: url })}
+              onRemove={() => patch({ image: null })}
+              onTouched={() => touch("image")}
+            />
+            <PanelField label={t("menuAi.editor.name")} required htmlFor="ed-name" error={shown("name")}>
+              <input
+                id="ed-name"
+                value={item.name}
+                maxLength={80}
+                aria-invalid={!!shown("name") || undefined}
+                onBlur={() => touch("name")}
+                onChange={(e) => patch({ name: e.target.value })}
+                className={clsx(TEXT_INPUT_CLASS, shown("name") && FIELD_INVALID)}
+              />
+            </PanelField>
+            <PanelField label={t("menuAi.editor.section")} required error={shown("section")}>
+              <SelectBox
+                value={sectionId}
+                ariaLabel={t("menuAi.editor.section")}
+                invalid={!!shown("section")}
+                onBlur={() => touch("section")}
+                onChange={(target) => {
+                  let moved = result;
+                  updateResult((r) => (moved = moveItemToSection(r, item.id, target)));
+                  // Follow the item to where it went.
+                  if (findItem(moved, item.id)) onSelect(item.id);
+                }}
+              >
+                {result.sections.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </SelectBox>
+            </PanelField>
+            <PanelField label={t("menuAi.editor.priceLabel")} hint={t("menuAi.editor.priceUnit")} required htmlFor="ed-price" error={shown("price")}>
+              <PanelPriceInput
+                id="ed-price"
+                value={item.price}
+                invalid={!!shown("price")}
+                onBlur={() => touch("price")}
+                onText={(text) => {
+                  setTypedPrice(text);
+                  // Anything that is not a valid price is stored as "no price",
+                  // the same state a detection uses for one it could not read.
+                  patch({ price: parsePrice(text).value });
+                }}
+              />
+            </PanelField>
+            <PanelField label={t("menuAi.editor.description")} required htmlFor="ed-desc" error={shown("description")}>
+              <textarea
+                id="ed-desc"
+                rows={3}
+                maxLength={200}
+                value={item.description}
+                aria-invalid={!!shown("description") || undefined}
+                onBlur={() => touch("description")}
+                onChange={(e) => patch({ description: e.target.value })}
+                className={clsx(PANEL_TEXTAREA, shown("description") && FIELD_INVALID)}
+              />
+            </PanelField>
+            <ConfidenceMeter value={item.confidence} />
+            {SHOW_UNFRAMED && (
+              <PanelField label={t("menuAi.editor.status")}>
+                <SelectBox value={item.reviewed ? "reviewed" : "auto"} ariaLabel={t("menuAi.editor.status")} onChange={(value) => patch({ reviewed: value === "reviewed" })}>
                   <option value="auto">{t(`menuAi.band.${band}`)}</option>
                   <option value="reviewed">{t("menuAi.status.reviewed")}</option>
-                </select>
-                <ChevronDown size={15} className="pointer-events-none absolute end-2.5 text-[var(--octo-text-muted)]" aria-hidden />
-              </span>
-            </div>
-            <IssueNotes item={item} variant="edit" />
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <button type="button" onClick={() => onDelete(item)} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-[rgb(239_68_68/0.25)] bg-[var(--octo-tone-danger-bg)] px-3.5 text-[13px] font-medium text-[var(--octo-tone-danger-text)] hover:brightness-95">
-                <Trash2 size={16} aria-hidden />
-                {t("menuAi.editor.delete")}
-              </button>
-              <button type="button" onClick={() => onDuplicate(item)} className={clsx(tintedButton, "h-10 px-3.5")}>
-                <Copy size={16} aria-hidden />
-                {t("menuAi.editor.duplicate")}
-              </button>
-            </div>
+                </SelectBox>
+              </PanelField>
+            )}
           </>
         )}
         {tab === "allergens" && (
           <>
             <AllergensTab item={item} onChange={(allergens) => patch({ allergens })} />
-            <div>
-              <FieldLabel>{t("menuAi.editor.dietaryTags")}</FieldLabel>
+            <PanelField label={t("menuAi.editor.dietaryTags")} inset={false}>
               <TagEditor kind="dietary" values={item.dietary} onChange={(dietary) => patch({ dietary })} />
-            </div>
+            </PanelField>
           </>
         )}
         {tab === "modifiers" && <LaterTab title={t("menuAi.later.modifiersTitle")} body={t("menuAi.later.modifiersBody")} />}
         {tab === "nutrition" && <LaterTab title={t("menuAi.later.nutritionTitle")} body={t("menuAi.later.nutritionBody")} />}
         {tab === "advanced" && (
-          <div className="space-y-3 text-[13px]">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-              <dt className="text-[var(--octo-text-secondary)]">{t("menuAi.advanced.id")}</dt>
-              <dd className="truncate font-mono text-[12px] text-[var(--octo-text-primary)]">{item.id}</dd>
-              <dt className="text-[var(--octo-text-secondary)]">{t("menuAi.advanced.rawConfidence")}</dt>
-              <dd className="text-[var(--octo-text-primary)]"><ConfidencePill value={item.confidence} /></dd>
-              <dt className="text-[var(--octo-text-secondary)]">{t("menuAi.advanced.flags")}</dt>
-              <dd className="text-[var(--octo-text-primary)]">
-                {item.issues.length === 0 ? t("menuAi.advanced.noFlags") : item.issues.map((k) => t(`menuAi.issue.${k}`)).join(", ")}
-              </dd>
-              <dt className="text-[var(--octo-text-secondary)]">{t("menuAi.advanced.onImport")}</dt>
-              <dd className="text-[var(--octo-text-primary)]">
-                {item.price === null ? t("menuAi.advanced.importDraft") : t("menuAi.advanced.importActive")}
-              </dd>
-            </dl>
-            <label className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--octo-border-card)] px-3 py-2.5">
-              <span className="text-[var(--octo-text-primary)]">{t("menuAi.advanced.markReviewed")}</span>
-              <input type="checkbox" checked={item.reviewed} onChange={(e) => patch({ reviewed: e.target.checked })} className="h-4 w-4 accent-[#3D1DF3]" />
-            </label>
-          </div>
+          <dl className={clsx("grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[12px] leading-[1.4]", TEXT)}>
+            <dt className={TEXT_GRAY}>{t("menuAi.advanced.id")}</dt>
+            <dd className="truncate font-mono">{item.id}</dd>
+            <dt className={TEXT_GRAY}>{t("menuAi.advanced.flags")}</dt>
+            <dd>{item.issues.length === 0 ? t("menuAi.advanced.noFlags") : item.issues.map((k) => t(`menuAi.issue.${k}`)).join(", ")}</dd>
+            <dt className={TEXT_GRAY}>{t("menuAi.advanced.onImport")}</dt>
+            <dd>{item.price === null ? t("menuAi.advanced.importDraft") : t("menuAi.advanced.importActive")}</dd>
+          </dl>
         )}
+      </section>
+
+      <div className="flex flex-col gap-4">
+        <button type="button" onClick={() => onDuplicate(item)} className={clsx(BIG_OUTLINE, "w-full")}>
+          {t("menuAi.editor.duplicate")}
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(item)}
+          className={clsx(BIG_BUTTON, "w-full gap-2 bg-[#fef0f0] text-[#d30202] hover:brightness-95 [[data-theme=dark]_&]:bg-[#d30202]/15")}
+        >
+          <MenuIcon name="menu-trash.svg" size={24} />
+          {t("menuAi.editor.delete")}
+        </button>
       </div>
-    </section>
+    </div>
   );
 }

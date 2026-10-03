@@ -1,12 +1,19 @@
 // The General tab: two columns, as the frame lays them out. Text and media on
 // the start side, image, tags, status and id on the end side.
+//
+// Item Name, Short Name and Item Image carry the frame's red asterisk. Their
+// messages come from the step's form (use-item-form), which shows one only
+// after its field has been left or a save was attempted.
 import { useState } from "react";
-import { Copy, Play, Plus, Tags, Trash2, Upload, X } from "lucide-react";
+import clsx from "clsx";
+import { X } from "lucide-react";
 import { Modal } from "@ui/primitives";
 import { useFilePicker, type FilePicker } from "@/shared/ui/use-file-picker";
 import { MediaTile } from "@/shared/ui/media-tile";
-import clsx from "clsx";
 import {
+  ITEM_NAME_MAX,
+  ITEM_SHORT_NAME_MAX,
+  ITEM_SKU_MAX,
   createNamedLabel,
   describeApiError,
   errorCodeOf,
@@ -20,6 +27,15 @@ import {
 import { useI18n } from "@/app/providers/i18n-provider";
 import { LabelsManager, useLabelName } from "../../labels-manager";
 import { useMenuCopy } from "../../copy";
+import { Field } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_INVALID, FOCUS, LINE, SURFACE_BLUE, SURFACE_SUBTLE, TEXT, TEXT_GRAY } from "../../_shared/theme";
+import { ACCENT_TEXT, FIELD_4, FieldError, LABEL_12, LABEL_14, LABEL_16, OUTLINE_36, RadioRow, TRASH_36 } from "./ui";
+import type { ItemForm } from "./use-item-form";
+
+/** "Manage labels" opens the business's label manager. No frame draws it;
+ *  flip this to offer it again under the tags. */
+const SHOW_MANAGE_LABELS: boolean = false;
 
 // The frame's four tags — shown only when the business's ItemTag labels
 // (GET /menu/labels) cannot be read; otherwise the chips are those labels.
@@ -32,51 +48,24 @@ const TAGS: { id: KnownItemTag; key: string }[] = [
 
 const STATUSES: Item["status"][] = ["active", "draft", "unavailable"];
 
-function Field({
-  label,
-  required,
-  hint,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-        {label}
-        {hint && <span className="font-normal text-[var(--octo-text-secondary)]"> ({hint})</span>}
-        {required && <span className="text-error"> *</span>}
-      </span>
-      <div className="mt-1.5">{children}</div>
-    </label>
-  );
-}
-
-const inputClass =
-  "w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]";
-
-const outlineAccent =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-[8px] border border-[var(--octo-accent)] px-3 text-[14px] font-medium text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]";
+const CHIP = "inline-flex items-center rounded-full px-2 py-1 text-[12px] font-medium leading-3";
+const CHIP_ON = "bg-[#0D6EFD] text-white";
+const CHIP_OFF = `${SURFACE_BLUE} ${ACCENT_TEXT}`;
 
 function PickerError({ picker, tooLargeKey }: { picker: FilePicker; tooLargeKey: string }) {
   const { t } = useI18n();
   if (!picker.error) return null;
-  return (
-    <p role="alert" className="mt-1 text-[12.5px] text-error">
-      {t(picker.error === "too-large" ? tooLargeKey : "menuWiz.item.error.unreadable")}
-    </p>
-  );
+  return <FieldError>{t(picker.error === "too-large" ? tooLargeKey : "menuWiz.item.error.unreadable")}</FieldError>;
 }
 
 export function TabGeneral({
   item,
   onPatch,
+  form,
 }: {
   item: Item;
   onPatch: (patch: Partial<Item>) => void;
+  form: ItemForm;
 }) {
   const { t } = useI18n();
   const image = useFilePicker((url) => onPatch({ image: url }));
@@ -88,6 +77,7 @@ export function TabGeneral({
   const [tagDraft, setTagDraft] = useState<string | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   // Server labels when there are any; the frame's presets otherwise.
   const serverTags = (labels.data ?? []).filter((l) => l.kind === "ItemTag");
   const chips =
@@ -96,6 +86,15 @@ export function TabGeneral({
       : TAGS.map((tag) => ({ id: tag.id as string, text: t(tag.key) }));
   const chipIds = chips.map((chip) => chip.id);
   const customTags = item.tags.filter((tag) => !chipIds.includes(tag));
+
+  const message = (field: string) => {
+    const key = form.error(field);
+    return key ? t(key) : null;
+  };
+  const nameError = message("name");
+  const shortNameError = message("shortName");
+  const skuError = message("sku");
+  const imageError = message("image");
 
   function toggleTag(tag: ItemTag) {
     onPatch({
@@ -130,187 +129,224 @@ export function TabGeneral({
     onPatch({ tags: [...item.tags, code] });
   }
 
+  function copyId() {
+    void navigator.clipboard?.writeText(item.id);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  }
+
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <div className="space-y-4">
-        <Field label={t("menuWiz.item.name")} required>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Field label={t("menuWiz.item.name")} required error={nameError}>
           <input
-            className={inputClass}
+            className={clsx(FIELD_4, nameError && FIELD_INVALID)}
             value={item.name}
+            maxLength={ITEM_NAME_MAX + 20}
+            aria-label={t("menuWiz.item.name")}
+            aria-invalid={nameError ? true : undefined}
             onChange={(e) => onPatch({ name: e.target.value })}
+            onBlur={() => form.touch("name")}
           />
         </Field>
 
-        <Field label={t("menuWiz.item.shortName")} hint={t("menuWiz.item.shortNameHint")} required>
+        <Field
+          label={t("menuWiz.item.shortName")}
+          hint={`(${t("menuWiz.item.shortNameHint")})`}
+          required
+          error={shortNameError}
+        >
           <input
-            className={inputClass}
+            className={clsx(FIELD_4, shortNameError && FIELD_INVALID)}
             value={item.shortName}
+            maxLength={ITEM_SHORT_NAME_MAX + 20}
+            aria-label={t("menuWiz.item.shortName")}
+            aria-invalid={shortNameError ? true : undefined}
             onChange={(e) => onPatch({ shortName: e.target.value })}
+            onBlur={() => form.touch("shortName")}
           />
         </Field>
 
-        <Field label={t("menuWiz.item.description")}>
+        <label className="flex flex-col gap-2">
+          <span className={LABEL_14}>{t("menuWiz.item.description")}</span>
           <textarea
             rows={3}
-            className={inputClass}
             value={item.description}
             onChange={(e) => onPatch({ description: e.target.value })}
+            className={clsx(
+              "w-full resize-y rounded-[12px] border bg-[var(--octo-card)] px-3 py-2 text-[12px] font-medium leading-[1.4]",
+              LINE,
+              TEXT,
+              FOCUS
+            )}
           />
-        </Field>
+        </label>
 
-        <Field label={t("menuWiz.item.sku")}>
+        <Field label={t("menuWiz.item.sku")} error={skuError}>
           <input
-            className={inputClass}
+            dir="ltr"
+            className={clsx(FIELD_4, "text-start", skuError && FIELD_INVALID)}
             value={item.sku}
+            maxLength={ITEM_SKU_MAX + 20}
+            aria-label={t("menuWiz.item.sku")}
+            aria-invalid={skuError ? true : undefined}
             onChange={(e) => onPatch({ sku: e.target.value })}
+            onBlur={() => form.touch("sku")}
           />
         </Field>
 
-        <div>
-          <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-            {t("menuWiz.item.video")}{" "}
-            <span className="font-normal text-[var(--octo-text-secondary)]">
+        <div className="flex flex-col gap-3">
+          <p className={clsx("px-2", LABEL_16)}>
+            {t("menuWiz.item.video")}
+            <span className={clsx("ms-1 text-[12px] font-normal leading-3", TEXT_GRAY)}>
               ({t("menuWiz.item.videoOptional")})
             </span>
           </p>
           <button
             type="button"
             onClick={video.open}
-            className="relative mt-1.5 grid h-[150px] w-full place-items-center overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]"
+            aria-label={t("menuWiz.item.uploadVideo")}
+            className={clsx("flex h-[120px] w-full rounded-[12px] border border-dashed p-2", LINE, FOCUS)}
           >
-            {item.video && (
-              <video
-                src={item.video}
-                className="absolute inset-0 h-full w-full object-cover"
-                muted
-                preload="metadata"
-              />
-            )}
-            <span
-              className="relative grid h-11 w-11 place-items-center rounded-full bg-[var(--octo-text-primary)] text-[var(--octo-card)]"
-              aria-hidden
-            >
-              <Play size={18} />
+            <span className={clsx("relative grid size-full place-items-center overflow-hidden", !item.video && SURFACE_SUBTLE)}>
+              {item.video && (
+                <>
+                  <video src={item.video} className="absolute inset-0 size-full object-cover" muted preload="metadata" />
+                  <span className="absolute inset-0 bg-black/25" aria-hidden />
+                </>
+              )}
+              <span className="relative grid size-10 place-items-center rounded-full bg-white text-black" aria-hidden>
+                <MenuIcon name="menu-video-circle.svg" size={40} />
+              </span>
             </span>
           </button>
           {video.input}
-          <button type="button" className={clsx(outlineAccent, "mt-2 w-full")} onClick={video.open}>
-            <Upload size={16} aria-hidden />
-            {t("menuWiz.item.uploadVideo")}
-          </button>
-          <PickerError picker={video} tooLargeKey="menuWiz.item.error.videoTooLarge" />
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">
-            {t("menuWiz.item.videoHint")}
-          </p>
+          <div className="flex flex-col gap-2">
+            <button type="button" className={clsx(OUTLINE_36, "w-full")} onClick={video.open}>
+              <MenuIcon name="menu-upload.svg" size={24} />
+              {t("menuWiz.item.uploadVideo")}
+            </button>
+            <PickerError picker={video} tooLargeKey="menuWiz.item.error.videoTooLarge" />
+            <p className={clsx("text-[12px] leading-3", TEXT_GRAY)}>{t("menuWiz.item.videoHint")}</p>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div>
-          <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-            {t("menuWiz.item.image")} <span className="text-error">*</span>
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-col gap-3">
+          <p className={LABEL_12}>
+            {t("menuWiz.item.image")} <span className="text-[#d30202]">*</span>
           </p>
           <button
             type="button"
             onClick={image.open}
-            className="mt-1.5 block h-[210px] w-full overflow-hidden rounded-[10px] border border-dashed border-[var(--octo-border-input)]"
+            onBlur={() => form.touch("image")}
+            aria-label={t(item.image ? "menuWiz.item.changeImage" : "menuWiz.item.uploadImage")}
+            aria-invalid={imageError ? true : undefined}
+            className={clsx(
+              "block aspect-[242/168] w-full rounded-[12px] border border-dashed p-1",
+              LINE,
+              FOCUS,
+              imageError && FIELD_INVALID
+            )}
           >
-            <MediaTile src={item.image} />
+            <MediaTile src={item.image} rounded="rounded-[8px]" />
           </button>
           {image.input}
-          <div className="mt-2 flex items-center gap-2">
-            <button type="button" className={clsx(outlineAccent, "flex-1")} onClick={image.open}>
-              {t("menuWiz.item.changeImage")}
-            </button>
-            <button
-              type="button"
-              aria-label={t("menuWiz.item.deleteImage")}
-              onClick={() => onPatch({ image: null })}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-[8px] border border-error/40 bg-error/10 text-error hover:bg-error/15"
-            >
-              <Trash2 size={18} />
-            </button>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-start gap-2">
+              <button
+                type="button"
+                className={clsx(OUTLINE_36, "min-w-0 flex-1")}
+                onClick={image.open}
+                onBlur={() => form.touch("image")}
+              >
+                <span className="truncate">{t(item.image ? "menuWiz.item.changeImage" : "menuWiz.item.uploadImage")}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={t("menuWiz.item.deleteImage")}
+                onClick={() => {
+                  onPatch({ image: null });
+                  form.touch("image");
+                }}
+                className={TRASH_36}
+              >
+                <MenuIcon name="menu-trash.svg" size={24} />
+              </button>
+            </div>
+            <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuWiz.item.imageHint")}</p>
+            <PickerError picker={image} tooLargeKey="menuWiz.item.error.imageTooLarge" />
+            {!image.error && <FieldError>{imageError}</FieldError>}
           </div>
-          <PickerError picker={image} tooLargeKey="menuWiz.item.error.imageTooLarge" />
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)]">
-            {t("menuWiz.item.imageHint")}
-          </p>
         </div>
 
-        <div>
-          <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-            {t("menuWiz.item.tags")}
-          </p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {chips.map(({ id, text }) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={item.tags.includes(id)}
-                onClick={() => toggleTag(id)}
-                className={clsx(
-                  "rounded-[8px] px-2.5 py-1.5 text-[13px]",
-                  item.tags.includes(id)
-                    ? "bg-[var(--octo-accent)] text-white"
-                    : "bg-[var(--octo-selected)] text-[var(--octo-accent)]"
-                )}
-              >
-                {text}
-              </button>
-            ))}
+        <div className="flex flex-col gap-3">
+          <p className={LABEL_12}>{t("menuWiz.item.tags")}</p>
+          <div className="flex flex-wrap items-start gap-2">
+            {chips.map(({ id, text }) => {
+              const on = item.tags.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleTag(id)}
+                  className={clsx(CHIP, on ? CHIP_ON : CHIP_OFF)}
+                >
+                  {text}
+                </button>
+              );
+            })}
             {/* A custom tag only exists because the merchant typed it, so it is
                 always "on"; removing the chip is how it is turned off. */}
             {customTags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--octo-accent)] py-1.5 pe-1.5 ps-2.5 text-[13px] text-white"
-              >
+              <span key={tag} className={clsx(CHIP, CHIP_ON, "gap-1")}>
                 {labelName({ code: tag, label: {} })}
                 <button
                   type="button"
                   aria-label={t("menuWiz.item.removeTag").replace("{name}", tag)}
                   onClick={() => toggleTag(tag)}
-                  className="grid h-4 w-4 place-items-center rounded-full hover:bg-white/20"
+                  className="grid size-3 place-items-center rounded-full hover:bg-white/20"
                 >
-                  <X size={12} aria-hidden />
+                  <X size={10} aria-hidden />
                 </button>
               </span>
             ))}
-          </div>
 
-          {tagError && (
-            <p role="alert" className="mt-1.5 text-[12px] text-error">
-              {tagError}
-            </p>
-          )}
-          {tagDraft === null ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            {tagDraft === null && (
               <button
                 type="button"
                 onClick={() => setTagDraft("")}
-                className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-card)] px-2.5 py-1.5 text-[13px] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                className={clsx(
+                  "inline-flex items-center gap-1 rounded-full border px-[9px] py-[5px] text-[12px] font-medium leading-3 hover:bg-[var(--octo-hover)]",
+                  LINE,
+                  TEXT
+                )}
               >
-                <Plus size={15} aria-hidden />
+                <MenuIcon name="menu-plus-line.svg" size={16} />
                 {t("menuWiz.item.addTag")}
               </button>
-              {labels.businessId && (
-                <button
-                  type="button"
-                  onClick={() => setManageOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] text-[var(--octo-accent)] hover:bg-[var(--octo-hover)]"
-                >
-                  <Tags size={15} aria-hidden />
-                  {c("labels.manage")}
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="mt-2 flex items-center gap-2">
+            )}
+            {SHOW_MANAGE_LABELS && labels.businessId && tagDraft === null && (
+              <button
+                type="button"
+                onClick={() => setManageOpen(true)}
+                className="inline-flex items-center rounded-full px-2 py-1 text-[12px] font-medium leading-3 text-[#0D6EFD] hover:bg-[var(--octo-hover)]"
+              >
+                {c("labels.manage")}
+              </button>
+            )}
+          </div>
+
+          {tagDraft !== null && (
+            <div className="flex items-center gap-2">
               <input
                 autoFocus
                 value={tagDraft}
                 maxLength={32}
                 placeholder={t("menuWiz.item.tagPlaceholder")}
+                aria-label={t("menuWiz.item.tagPlaceholder")}
                 onChange={(e) => setTagDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -319,12 +355,12 @@ export function TabGeneral({
                   }
                   if (e.key === "Escape") setTagDraft(null);
                 }}
-                className="h-9 min-w-0 flex-1 rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2.5 text-[13px] text-[var(--octo-text-primary)]"
+                className={clsx(FIELD_4, "!h-9 min-w-0 flex-1 !text-[12px]")}
               />
               <button
                 type="button"
                 onClick={() => void commitTag()}
-                className="h-9 rounded-[8px] bg-[var(--octo-accent)] px-3 text-[13px] font-medium text-white"
+                className="h-9 shrink-0 rounded-[8px] bg-[#0D6EFD] px-3 text-[12px] font-bold leading-3 text-white hover:opacity-90"
               >
                 {t("menuWiz.item.tagSave")}
               </button>
@@ -332,63 +368,48 @@ export function TabGeneral({
                 type="button"
                 aria-label={t("menuWiz.cancel")}
                 onClick={() => setTagDraft(null)}
-                className="grid h-9 w-9 place-items-center rounded-[8px] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
+                className={clsx("grid size-9 shrink-0 place-items-center rounded-[8px] hover:bg-[var(--octo-hover)]", TEXT_GRAY)}
               >
                 <X size={16} aria-hidden />
               </button>
             </div>
           )}
+          <FieldError>{tagError}</FieldError>
         </div>
 
         <Modal open={manageOpen} onClose={() => setManageOpen(false)} title={c("labels.manage")} className="max-w-[600px]">
           <LabelsManager initialKind="ItemTag" />
         </Modal>
 
-        <fieldset>
-          <legend className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-            {t("menuWiz.item.status")}
-          </legend>
-          <div className="mt-1.5 space-y-2">
-            {STATUSES.map((status) => (
-              <label key={status} className="flex items-center gap-2.5 text-[14px]">
-                <input
-                  type="radio"
-                  name={`status-${item.id}`}
-                  checked={item.status === status}
-                  onChange={() => onPatch({ status })}
-                  className="h-4 w-4 accent-[var(--octo-accent)]"
-                />
-                <span
-                  className={clsx(
-                    item.status === status
-                      ? "font-medium text-[var(--octo-accent)]"
-                      : "text-[var(--octo-text-primary)]"
-                  )}
-                >
-                  {t(`menuWiz.item.status.${status}`)}
-                </span>
-              </label>
-            ))}
-          </div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className={clsx("mb-3", LABEL_12)}>{t("menuWiz.item.status")}</legend>
+          {STATUSES.map((status) => (
+            <RadioRow
+              key={status}
+              name={`status-${item.id}`}
+              checked={item.status === status}
+              onChange={() => onPatch({ status })}
+            >
+              {t(`menuWiz.item.status.${status}`)}
+            </RadioRow>
+          ))}
         </fieldset>
 
-        <div>
-          <p className="text-[14px] font-medium text-[var(--octo-text-primary)]">
-            {t("menuWiz.item.id")}
-          </p>
+        <div className="flex flex-col gap-2">
+          <p className={clsx("px-2", LABEL_12)}>{t("menuWiz.item.id")}</p>
           {/* Read-only: the id identifies the row, so letting it be typed over
               would rename something the rest of the draft still points at. */}
-          <div className="mt-1.5 flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-2.5">
-            <span className="min-w-0 flex-1 truncate text-[14px] text-[var(--octo-text-secondary)]">
+          <div className={clsx("flex h-10 items-center justify-between gap-2 rounded-[4px] border p-2", LINE)}>
+            <span dir="ltr" className={clsx("min-w-0 flex-1 truncate text-start text-[14px] leading-[14px]", TEXT)}>
               {item.id}
             </span>
             <button
               type="button"
-              aria-label={t("menuWiz.item.id")}
-              onClick={() => navigator.clipboard?.writeText(item.id)}
-              className="shrink-0 text-[var(--octo-accent)]"
+              aria-label={t("menuWiz.item.copyId")}
+              onClick={copyId}
+              className={clsx("grid size-4 shrink-0 place-items-center rounded-[2px]", copied ? "text-[#009a39]" : "text-[#0D6EFD]")}
             >
-              <Copy size={15} />
+              <MenuIcon name={copied ? "menu-done-circle.svg" : "menu-copy.svg"} size={16} />
             </button>
           </div>
         </div>

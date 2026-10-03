@@ -3,17 +3,79 @@
 // that rail is not the storefront preview.
 //
 // Nothing here is operable: it depicts a customer's choices, it does not take
-// them. Every control is a span, so a screen reader is not told there is a form
-// to fill in and a click does not silently change the draft.
+// them. Every control is a glyph, so a screen reader is not told there is a
+// form to fill in and a click does not silently change the draft.
 import clsx from "clsx";
-import { Check } from "lucide-react";
-import { modifierTotal, type Item } from "@/entities/menu";
+import { modifierTotal, type Item, type ModifierGroup } from "@/entities/menu";
 import { MediaTile } from "@/shared/ui/media-tile";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { INFO_STRIP, LINE, SURFACE_BLUE, TEXT, TEXT_GRAY } from "../../_shared/theme";
+import { CheckGlyph, PRICE_TEXT, RadioGlyph } from "./ui";
 
 /** The storefront quotes modifier prices to the halala, so the preview does. */
 function money(value: number): string {
   return value.toFixed(2);
+}
+
+const ROW_RULE = "border-b border-[#e2e8f0] [[data-theme=dark]_&]:border-[var(--octo-border-card)]";
+
+function GroupPreview({ group, index }: { group: ModifierGroup; index: number }) {
+  const single = group.type === "single";
+  // A group nobody pays extra for (the frame's sauces) lists names only.
+  const priced = group.options.some((option) => option.price > 0);
+
+  return (
+    <div className={clsx("flex flex-col gap-2 rounded-[12px] border p-2", LINE)}>
+      <p className={clsx("truncate text-[14px] font-medium leading-[14px]", TEXT)}>
+        {index + 1}- {group.customerLabel || group.name}
+        {group.required && <span className="text-[#d30202]"> *</span>}
+      </p>
+
+      {group.options.length > 0 && (
+        <ul className="flex flex-col">
+          {group.options.map((option, optionIndex) => {
+            const selected = option.isDefault && option.available;
+            const last = optionIndex === group.options.length - 1;
+            return (
+              <li
+                key={option.id}
+                className={clsx(
+                  "flex items-center justify-between gap-2 px-1 py-2",
+                  !last && ROW_RULE,
+                  selected && single && `rounded-[4px] ${SURFACE_BLUE}`,
+                  !option.available && "opacity-50"
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {single ? <RadioGlyph checked={selected} /> : <CheckGlyph checked={selected} />}
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span
+                      className={clsx(
+                        "truncate font-medium",
+                        option.subLabel ? "text-[14px] leading-[14px]" : "text-[12px] leading-3",
+                        TEXT
+                      )}
+                    >
+                      {option.name}
+                    </span>
+                    {option.subLabel && (
+                      <span className={clsx("truncate text-[10px] font-medium leading-[10px]", TEXT_GRAY)}>{option.subLabel}</span>
+                    )}
+                  </span>
+                </span>
+                {priced && (
+                  <span dir="ltr" className={clsx("shrink-0 whitespace-nowrap text-[14px] font-semibold leading-[14px]", TEXT)}>
+                    {option.priceType === "add-amount" && option.price > 0 ? "+" : ""}
+                    SAR {money(option.price)}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function ModifierPreview({ item }: { item: Item }) {
@@ -21,115 +83,44 @@ export function ModifierPreview({ item }: { item: Item }) {
   const hasGroups = item.modifierGroups.length > 0;
 
   return (
-    <section className="self-start rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <h2 className="text-[20px] font-semibold text-[var(--octo-text-primary)]">
+    <section className="flex flex-col gap-4 overflow-hidden rounded-[28px] bg-[var(--octo-card)] p-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.05)] [[data-theme=dark]_&]:border [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
+      {/* The first-time frame titles the card in 18px bold; once there are
+          groups it drops to the 16px medium the other rails use. */}
+      <h2 className={clsx(hasGroups ? "text-[16px] font-medium leading-4" : "text-[18px] font-bold leading-[18px]", TEXT)}>
         {t("menuWiz.mod.summaryTitle")}
       </h2>
 
-      <div className="mt-3 flex gap-3 rounded-[12px] border border-[var(--octo-accent)] p-2.5">
-        <span className="h-[72px] w-[84px] shrink-0 overflow-hidden rounded-[8px]">
-          <MediaTile src={item.image} rounded="rounded-[8px]" />
+      <div className={clsx("flex h-[94px] items-center gap-2 rounded-[20px] border border-[#0D6EFD] p-2", SURFACE_BLUE)}>
+        <span className="size-[76px] shrink-0 overflow-hidden rounded-[4px]">
+          <MediaTile src={item.image} rounded="rounded-[4px]" />
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold text-[var(--octo-text-primary)]">
-            {item.name}
-          </p>
-          <p className="line-clamp-3 text-[12px] text-[var(--octo-text-secondary)]">
-            {item.description}
-          </p>
-          <p className="mt-0.5 text-[13.5px] font-semibold text-[var(--octo-accent)]">
-            SAR {item.pricing.price}
-          </p>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+          <div className="flex flex-col gap-1">
+            <p className={clsx("truncate text-[12px] font-semibold leading-3", TEXT)}>{item.name}</p>
+            <p className={clsx("line-clamp-3 text-[10px] leading-[1.4]", TEXT_GRAY)}>{item.description}</p>
+          </div>
+          <p className={clsx("text-[12px] font-semibold leading-3", PRICE_TEXT)}>SAR {item.pricing.price}</p>
         </div>
       </div>
 
       {/* The first-time frame shows the summary alone: an empty "customer
           view" with only a Total line would preview nothing. */}
       {hasGroups && (
-        <div className="mt-4 rounded-[12px] border border-[var(--octo-border-card)] p-2.5">
-          <p className="text-[14.5px] font-semibold text-[var(--octo-text-primary)]">
+        <div className={clsx("flex flex-col gap-4 rounded-[20px] border p-2", LINE)}>
+          <p className={clsx("text-[14px] font-bold leading-[14px]", TEXT)}>
             {t("menuWiz.mod.previewTitle")}{" "}
-            <span className="text-[11.5px] font-normal text-[var(--octo-text-secondary)]">
-              ({t("menuWiz.mod.previewHint")})
-            </span>
+            <span className="text-[10px] font-medium leading-[10px]">({t("menuWiz.mod.previewHint")})</span>
           </p>
 
-          <div className="mt-2.5 space-y-3">
-            {item.modifierGroups.map((group, index) => (
-              <div
-                key={group.id}
-                className="rounded-[10px] border border-[var(--octo-border-card)] px-2.5 py-2"
-              >
-                <p className="text-[14px] text-[var(--octo-text-primary)]">
-                  {index + 1}- {group.customerLabel || group.name}
-                  {group.required && <span className="text-error"> *</span>}
-                </p>
-
-                <ul className="mt-1 divide-y divide-[var(--octo-border-card)]">
-                  {group.options.map((option) => {
-                    const selected = option.isDefault && option.available;
-                    const single = group.type === "single";
-                    return (
-                      <li
-                        key={option.id}
-                        className={clsx(
-                          "flex items-center gap-2.5 rounded-[6px] px-1.5 py-2",
-                          selected && single && "bg-[var(--octo-hover)]",
-                          !option.available && "opacity-50"
-                        )}
-                      >
-                        <span
-                          aria-hidden
-                          className={clsx(
-                            "grid h-[18px] w-[18px] shrink-0 place-items-center border",
-                            single ? "rounded-full" : "rounded-[4px]",
-                            selected
-                              ? single
-                                ? "border-[var(--octo-accent)] border-[1.5px]"
-                                : "border-[var(--octo-accent)] bg-[var(--octo-accent)]"
-                              : "border-[var(--octo-border-input)]"
-                          )}
-                        >
-                          {single && selected && (
-                            <span className="h-2.5 w-2.5 rounded-full bg-[var(--octo-accent)]" />
-                          )}
-                          {!single && (
-                            <Check
-                              size={12}
-                              strokeWidth={3}
-                              className={selected ? "text-white" : "text-[var(--octo-border-card)]"}
-                            />
-                          )}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] text-[var(--octo-text-primary)]">
-                            {option.name}
-                          </span>
-                          {option.subLabel && (
-                            <span className="block text-[11px] text-[var(--octo-text-muted)]">
-                              {option.subLabel}
-                            </span>
-                          )}
-                        </span>
-                        <span className="shrink-0 text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-                          {option.priceType === "add-amount" && option.price > 0 ? "+" : ""}
-                          SAR {money(option.price)}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
+          {item.modifierGroups.map((group, index) => (
+            <GroupPreview key={group.id} group={group} index={index} />
+          ))}
 
           {/* Derived, never typed: base price plus every pre-selected surcharge.
               The frame's SAR 113 is 100 + 8 + 2 + 3. */}
-          <div className="mt-3 flex items-center justify-between rounded-[8px] bg-[var(--octo-hover)] px-3 py-2.5">
-            <span className="text-[14px] text-[var(--octo-text-primary)]">
-              {t("menuWiz.mod.previewTotal")}
-            </span>
-            <span className="text-[14.5px] font-semibold text-[var(--octo-accent)] underline underline-offset-2">
+          <div className={clsx("flex h-10 items-center justify-between gap-3 rounded-[8px] px-3 text-[14px] leading-[14px]", INFO_STRIP)}>
+            <span className={clsx("font-medium", TEXT)}>{t("menuWiz.mod.previewTotal")}</span>
+            <span className={clsx("font-bold underline [text-underline-position:from-font]", PRICE_TEXT)}>
               SAR {modifierTotal(item)}
             </span>
           </div>

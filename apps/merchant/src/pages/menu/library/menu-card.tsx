@@ -1,50 +1,43 @@
 // One menu card in the library grid. Counts and channel chips are derived from
 // the menu, never stored alongside it.
-import { CheckCircle2, ListTree, MoreVertical, Settings, UtensilsCrossed } from "lucide-react";
 import clsx from "clsx";
-import { Badge } from "@ui/primitives";
 import { entryCount, sectionCount, type ChannelState, type Menu, type MenuStatus } from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { menuAsset } from "@/shared/lib/menu-assets";
+import { KebabButton, StatusPill } from "../_shared/controls";
+import { MenuIcon } from "../_shared/menu-icon";
+import { LINE, TEXT, type PillTone } from "../_shared/theme";
 
 export type CardAction =
   | "edit" | "schedule" | "hold" | "resume" | "duplicate" | "archive" | "delete" | "versions" | "accessCode" | "bulkPrice" | "unpublish";
 
-export const STATUS_TONE: Record<MenuStatus, "success" | "warning" | "error" | "info" | "neutral"> = {
-  active: "success",
-  scheduled: "warning",
-  "on-hold": "error",
-  expired: "neutral",
-  pending: "warning",
-  archived: "info",
+export const STATUS_TONE: Record<MenuStatus, PillTone> = {
+  active: "green",
+  scheduled: "amber",
+  "on-hold": "red",
+  expired: "slate",
+  pending: "orange",
+  archived: "violet",
 };
 
-const CHANNEL_TONE: Record<ChannelState, "success" | "warning" | "error" | "info" | "neutral"> = {
-  live: "success",
-  scheduled: "warning",
-  "on-hold": "error",
-  expired: "neutral",
-  pending: "warning",
-  archived: "info",
-  off: "neutral",
+const CHANNEL_TONE: Record<ChannelState, PillTone> = {
+  live: "green",
+  scheduled: "amber",
+  "on-hold": "red",
+  expired: "slate",
+  pending: "orange",
+  archived: "violet",
+  off: "slate",
 };
 
-/** The placeholder cover every menu shares until it has its own. Decorative,
- *  and drawn rather than imported: an image would be the same bytes nine
- *  times over. */
+const COVER = menuAsset("menu-cover.jpg");
+
+/** The cover every menu shares until it has its own: the frame's dark-green
+ *  "MENU" artwork, cropped the way the frame crops it. Decorative. */
 export function MenuCover({ className }: { className?: string }) {
   return (
-    <div
-      aria-hidden
-      className={clsx(
-        "grid shrink-0 place-items-center rounded-[10px] bg-[radial-gradient(circle_at_30%_25%,#1f5a45,#0d2b21_70%)] leading-none",
-        className
-      )}
-    >
-      <span className="text-center font-serif tracking-[0.12em] text-white/75">
-        ME
-        <br />
-        NU
-      </span>
+    <div aria-hidden className={clsx("relative shrink-0 overflow-hidden rounded-[4px]", className)}>
+      <img src={COVER} alt="" className="absolute start-0 top-[-23.38%] h-[136.13%] w-full max-w-none object-cover" />
     </div>
   );
 }
@@ -63,66 +56,59 @@ export function MenuCard({
   const updated = `${at.toLocaleDateString(tag, { month: "short", day: "numeric", year: "numeric" })} - ${at.toLocaleTimeString(tag, { hour: "numeric", minute: "2-digit" })}`;
 
   return (
-    <article className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-      <div className="flex gap-3">
-        <MenuCover className="h-[92px] w-[92px] text-[19px]" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="truncate text-[17px] font-semibold text-[var(--octo-text-primary)]">{menu.name}</h3>
-            <Badge tone={STATUS_TONE[menu.status]} className="shrink-0">
-              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-              {t(`menuLib.status.${menu.status}`)}
-            </Badge>
+    <article
+      className={clsx(
+        "flex flex-col gap-2 rounded-[16px] border bg-[var(--octo-card)] p-3 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.08)]",
+        LINE,
+        TEXT
+      )}
+    >
+      <div className={clsx("flex items-center gap-2 border-b pb-2", LINE)}>
+        <MenuCover className="h-[86px] w-[81px]" />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="truncate text-[16px] font-semibold leading-4 text-black [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+              {menu.name}
+            </h3>
+            <StatusPill tone={STATUS_TONE[menu.status]}>{t(`menuLib.status.${menu.status}`)}</StatusPill>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--octo-text-secondary)]">
-            <span className="inline-flex items-center gap-1.5">
-              <ListTree size={14} aria-hidden />
-              {t("menuLib.sections")} <b className="text-[var(--octo-text-primary)]">{sectionCount(menu)}</b>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-3">
+            <span className="inline-flex items-center gap-1">
+              <MenuIcon name="menu-segment.svg" size={16} />
+              {t("menuLib.sections")} <b className="font-semibold">{sectionCount(menu)}</b>
             </span>
-            <span className="inline-flex items-center gap-1.5">
-              <UtensilsCrossed size={14} aria-hidden />
-              {t("menuLib.items")} <b className="text-[var(--octo-text-primary)]">{entryCount(menu)}</b>
+            <span className="inline-flex items-center gap-1">
+              <MenuIcon name="menu-food.svg" size={16} />
+              {t("menuLib.items")} <b className="font-semibold">{entryCount(menu)}</b>
             </span>
           </div>
 
-          <p className="mt-2 inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--octo-border-card)] px-2 py-1 text-[13px] text-[var(--octo-text-secondary)]">
-            <CheckCircle2 size={15} fill="var(--octo-accent)" className="text-white" aria-hidden />
-            {t("menuLib.schedule")}{" "}
-            <b className="text-[var(--octo-text-primary)]">{t(`menuLib.scheduleType.${menu.schedule.type}`)}</b>
+          <p className={clsx("inline-flex items-center gap-1 self-start rounded-[4px] border p-2 text-[12px] leading-3", LINE)}>
+            <MenuIcon name="menu-completed.svg" size={16} className="text-[#0D6EFD]" />
+            {t("menuLib.schedule")} <b className="font-semibold">{t(`menuLib.scheduleType.${menu.schedule.type}`)}</b>
           </p>
         </div>
       </div>
 
-      <hr className="my-3 border-[var(--octo-border-card)]" />
+      <p className="text-[14px] leading-[14px]">{t("menuLib.channels")}</p>
 
-      <p className="text-[13px] text-[var(--octo-text-secondary)]">{t("menuLib.channels")}</p>
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px]">
+      <div className={clsx("flex items-center justify-between gap-2 border-b pb-1", LINE)}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] leading-3">
           {(["pos", "publicLink"] as const).map((channel) => (
-            <span key={channel} className="inline-flex items-center gap-1.5">
-              <span className="text-[var(--octo-text-secondary)]">{t(`menuLib.channel.${channel}`)}</span>
-              <Badge tone={CHANNEL_TONE[menu.channels[channel]]}>
-                <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+            <span key={channel} className="inline-flex items-center gap-2">
+              {t(`menuLib.channel.${channel}`)}
+              <StatusPill tone={CHANNEL_TONE[menu.channels[channel]]}>
                 {t(`menuLib.status.${menu.channels[channel]}`)}
-              </Badge>
+              </StatusPill>
             </span>
           ))}
         </div>
-        <button
-          type="button"
-          aria-label={`${menu.name} actions`}
-          onClick={(e) => onOpenActions(menu, e.currentTarget.getBoundingClientRect())}
-          className="shrink-0 rounded-[8px] p-1.5 text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)]"
-        >
-          <MoreVertical size={18} aria-hidden />
-        </button>
+        <KebabButton label={`${menu.name} actions`} onOpen={(anchor) => onOpenActions(menu, anchor)} className="size-6" />
       </div>
 
-      <hr className="my-3 border-[var(--octo-border-card)]" />
-
-      <p className="inline-flex items-center gap-1.5 text-[12px] text-[var(--octo-text-secondary)]">
-        <Settings size={13} aria-hidden />
+      <p className="inline-flex items-center gap-1 text-[10px] leading-[10px]">
+        <MenuIcon name="menu-updated.svg" size={16} />
         {t("menuLib.updated")} {updated}
       </p>
     </article>

@@ -5,30 +5,29 @@
 // menu has none), its font codes, card/category/navigation style, item-details
 // behaviour, sticky cart and tag visibility. The site draft is only read, as the
 // seed and as the fallback while a menu's theme is still loading.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import {
-  AlignLeft,
-  ArrowUpToLine,
-  Check,
-  Grid2x2,
-  Image as ImageIcon,
-  LayoutList,
-  List,
-  PanelBottom,
-  Play,
-  ScrollText,
-  Trash2,
-  type LucideIcon,
-} from "lucide-react";
-import { Modal, Select } from "@ui/primitives";
+import { Modal } from "@ui/primitives";
 import { useFilePicker } from "@/shared/ui/use-file-picker";
 import { FONTS } from "@/shared/lib/brand-tokens";
-import { storefrontAsset } from "@/shared/lib/storefront-assets";
+import { menuAsset } from "@/shared/lib/menu-assets";
 import { useSiteDraft } from "@/entities/site-draft";
-import { useThemeChoices, type MenuBrand, type MenuTheme } from "@/entities/menu";
+import {
+  HERO_SUBTEXT_MAX,
+  HERO_TEXT_MAX,
+  normalizeHexColor,
+  useThemeChoices,
+  validateTheme,
+  type MenuBrand,
+  type MenuTheme,
+  type ThemeColorField,
+  type ThemeField,
+} from "@/entities/menu";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { useTenantConfig } from "@/app/providers/tenant-config-provider";
+import { SelectBox, Switch } from "../../_shared/controls";
+import { MenuIcon } from "../../_shared/menu-icon";
+import { FIELD_INVALID, FOCUS_WITHIN, LINE, PANEL, SURFACE_BLUE, TEXT, TEXT_GRAY, TEXT_INPUT_CLASS } from "../../_shared/theme";
 import { useDraft } from "../use-draft";
 import { MenuPreviewFrame } from "../preview/menu-preview-frame";
 import { QrPanel } from "./qr-panel";
@@ -36,25 +35,37 @@ import { MENU_PRESETS, presetFor, type MenuPreset } from "./presets";
 import { seedBrand } from "./seed-brand";
 import { serverFontCode } from "./font-code";
 
-const NAV: { id: MenuTheme["navStyle"]; icon: LucideIcon; key: string }[] = [
-  { id: "top-bar", icon: ArrowUpToLine, key: "menuTheme.nav.topBar" },
-  { id: "side-drawer", icon: List, key: "menuTheme.nav.sideDrawer" },
-  { id: "bottom-bar", icon: PanelBottom, key: "menuTheme.nav.bottomBar" },
-  { id: "pill-scroll", icon: ScrollText, key: "menuTheme.nav.pillScroll" },
+/** The frame draws every preset with the same photograph. Flip this to draw
+ *  each preset in its own four colours instead (PresetPalette below). */
+const USE_FRAME_PRESET_ART: boolean = true;
+
+const PRESET_ART = menuAsset("menu-theme-preset.jpg");
+
+type Option<T extends string> = { id: T; icon: string; size: number; key: string };
+
+// Glyph sizes are the exported artwork's own, centred in the frame's 24px box.
+const NAV: Option<MenuTheme["navStyle"]>[] = [
+  { id: "top-bar", icon: "menu-nav-top-bar.svg", size: 24, key: "menuTheme.nav.topBar" },
+  { id: "side-drawer", icon: "menu-nav-side-drawer.svg", size: 14.3, key: "menuTheme.nav.sideDrawer" },
+  { id: "bottom-bar", icon: "menu-nav-bottom-bar.svg", size: 19.2, key: "menuTheme.nav.bottomBar" },
+  { id: "pill-scroll", icon: "menu-nav-pill-scroll.svg", size: 20.2, key: "menuTheme.nav.pillScroll" },
 ];
 
-const CATEGORY: { id: MenuTheme["categoryStyle"]; icon: LucideIcon; key: string }[] = [
-  { id: "icon-text", icon: LayoutList, key: "menuTheme.cat.iconText" },
-  { id: "text-only", icon: AlignLeft, key: "menuTheme.cat.textOnly" },
-  { id: "icons-only", icon: Grid2x2, key: "menuTheme.cat.iconsOnly" },
-  { id: "image-text", icon: ImageIcon, key: "menuTheme.cat.imageText" },
+// The frame repeats the navigation glyphs for the category styles.
+const CATEGORY: Option<MenuTheme["categoryStyle"]>[] = [
+  { id: "icon-text", icon: "menu-nav-top-bar.svg", size: 24, key: "menuTheme.cat.iconText" },
+  { id: "text-only", icon: "menu-nav-side-drawer.svg", size: 14.3, key: "menuTheme.cat.textOnly" },
+  { id: "icons-only", icon: "menu-nav-bottom-bar.svg", size: 19.2, key: "menuTheme.cat.iconsOnly" },
+  { id: "image-text", icon: "menu-nav-pill-scroll.svg", size: 20.2, key: "menuTheme.cat.imageText" },
 ];
 
-const CARD: { id: MenuTheme["cardStyle"]; key: string }[] = [
-  { id: "classic", key: "menuTheme.card.classic" },
-  { id: "clean-minimal", key: "menuTheme.card.cleanMinimal" },
-  { id: "image-top", key: "menuTheme.card.imageTop" },
-  { id: "image-left", key: "menuTheme.card.imageLeft" },
+/** The four card thumbnails, each a crop of its exported artwork — the crop
+ *  box is the frame's own (image size and offset as percentages of the slot). */
+const CARD: { id: MenuTheme["cardStyle"]; key: string; art: string; width: number; crop: string | null }[] = [
+  { id: "classic", key: "menuTheme.card.classic", art: menuAsset("menu-card-classic.png"), width: 30, crop: "h-[197.68%] w-[158.27%] left-[-29.21%] top-[-48.65%]" },
+  { id: "clean-minimal", key: "menuTheme.card.cleanMinimal", art: menuAsset("menu-card-clean-minimal.png"), width: 31, crop: "h-[231.67%] w-[179.33%] left-[-39.93%] top-[-64.48%]" },
+  { id: "image-top", key: "menuTheme.card.imageTop", art: menuAsset("menu-card-image-top.jpg"), width: 30, crop: null },
+  { id: "image-left", key: "menuTheme.card.imageLeft", art: menuAsset("menu-card-image-left.png"), width: 31, crop: "h-[172.39%] w-[132.64%] left-[-16.32%] top-[-36.03%]" },
 ];
 
 const DETAILS: MenuTheme["itemDetails"][] = ["same-page", "overlay", "new-page"];
@@ -64,50 +75,38 @@ const DETAIL_KEYS: Record<MenuTheme["itemDetails"], string> = {
   "new-page": "menuTheme.details.newPage",
 };
 
-/** The frame's secondary actions: accent outline, accent text. */
-const ACCENT_OUTLINE =
-  "inline-flex items-center justify-center gap-2 rounded-[9px] border border-[var(--octo-accent)] bg-[var(--octo-card)] font-semibold text-[var(--octo-accent)] transition-colors hover:bg-[var(--octo-selected)]";
+const COLORS: { key: string; field: ThemeColorField }[] = [
+  { key: "menuTheme.primary", field: "primary" },
+  { key: "menuTheme.light", field: "light" },
+  { key: "menuTheme.accent", field: "accent" },
+  { key: "menuTheme.dark", field: "dark" },
+];
 
-const TILE =
-  "flex flex-col items-center justify-center gap-1.5 rounded-[8px] border px-2 py-2 text-[11.5px] transition-colors";
+const HEADING = `text-[14px] font-bold leading-[14px] ${TEXT}`;
+const SUB_LABEL = `text-[14px] font-medium leading-[14px] ${TEXT}`;
+const ACCENT_TEXT = "text-[#0058da] [[data-theme=dark]_&]:text-[#8ab8ff]";
+const OUTLINE_BUTTON =
+  "inline-flex items-center justify-center rounded-[8px] border border-[#0D6EFD] px-3 font-bold text-[#0D6EFD] hover:bg-[#f5f9ff] [[data-theme=dark]_&]:hover:bg-[#0d6efd]/15";
+const ERROR_TEXT = "text-[12px] leading-[14px] text-[#d30202]";
+const TILE = "flex shrink-0 flex-col items-center gap-2 rounded-[4px] border p-1 text-[10px] font-medium leading-[10px]";
 
 function tileTone(active: boolean): string {
-  return active
-    ? "border-[var(--octo-accent)] bg-[var(--octo-selected)] text-[var(--octo-accent)]"
-    : "border-[var(--octo-border-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
+  return active ? `border-[#0D6EFD] text-[#0D6EFD] ${SURFACE_BLUE}` : `${LINE} ${TEXT} hover:bg-[var(--octo-hover)]`;
 }
 
-/** A miniature storefront in the preset's own four colours — the palette is
- *  what differs between presets, so it is what the tile shows. */
-function PresetThumb({ preset, tall = false }: { preset: MenuPreset; tall?: boolean }) {
+/** A miniature storefront in the preset's own four colours — what a preset
+ *  the frame has no artwork for is drawn with. */
+function PresetPalette({ preset }: { preset: MenuPreset }) {
   const c = preset.colors;
-  const card = `color-mix(in srgb, ${c.light} 55%, #ffffff)`;
   return (
-    <span
-      className={clsx("relative block w-full overflow-hidden rounded-[7px]", tall ? "h-[96px]" : "h-[66px]")}
-      style={{ backgroundColor: c.light }}
-      aria-hidden
-    >
+    <span className="absolute inset-0 block" style={{ backgroundColor: c.light }} aria-hidden>
       <span className="absolute inset-x-0 top-0 flex h-[14px] items-center gap-1 px-1.5" style={{ backgroundColor: c.dark }}>
-        <span className="h-[6px] w-[6px] rounded-full" style={{ backgroundColor: c.primary }} />
+        <span className="size-[6px] rounded-full" style={{ backgroundColor: c.primary }} />
         <span className="h-[3px] w-5 rounded-full" style={{ backgroundColor: c.accent }} />
-      </span>
-      <span className="absolute inset-x-1.5 top-[19px] flex gap-1">
-        {[0, 1, 2, 3].map((i) => (
-          <span
-            key={i}
-            className="h-[9px] w-[9px] rounded-full"
-            style={{ backgroundColor: i === 0 ? c.primary : c.accent }}
-          />
-        ))}
       </span>
       <span className="absolute inset-x-1.5 bottom-1.5 grid grid-cols-3 gap-1">
         {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className={clsx("flex flex-col justify-end overflow-hidden rounded-[3px]", tall ? "h-[46px]" : "h-[26px]")}
-            style={{ backgroundColor: card }}
-          >
+          <span key={i} className="flex h-[26px] flex-col justify-end overflow-hidden rounded-[3px] bg-white/60">
             <span className="h-[4px]" style={{ backgroundColor: c.primary }} />
           </span>
         ))}
@@ -116,85 +115,27 @@ function PresetThumb({ preset, tall = false }: { preset: MenuPreset; tall?: bool
   );
 }
 
-function PresetTile({
-  preset,
-  active,
-  onSelect,
-  tall,
-}: {
-  preset: MenuPreset;
-  active: boolean;
-  onSelect: () => void;
-  tall?: boolean;
-}) {
+function PresetTile({ preset, active, onSelect }: { preset: MenuPreset; active: boolean; onSelect: () => void }) {
   const { t } = useI18n();
   return (
-    <button type="button" aria-pressed={active} onClick={onSelect} className="text-center">
-      <span
-        className={clsx(
-          "relative block rounded-[9px] border-2 p-[2px]",
-          active ? "border-[var(--octo-accent)]" : "border-transparent"
+    <button type="button" aria-pressed={active} onClick={onSelect} className="flex min-w-0 flex-col items-center gap-2">
+      <span className={clsx("relative block size-[70px] overflow-hidden rounded-[4px] border", active ? "border-[#0D6EFD]" : "border-transparent")}>
+        {USE_FRAME_PRESET_ART ? (
+          <img src={PRESET_ART} alt="" className="absolute start-0 top-[-63.99%] h-[177.72%] w-full max-w-none" />
+        ) : (
+          <PresetPalette preset={preset} />
         )}
-      >
-        <PresetThumb preset={preset} tall={tall} />
         {active && (
-          <span className="absolute end-1.5 top-1.5 grid h-[18px] w-[18px] place-items-center rounded-[4px] bg-[var(--octo-accent)] text-white">
-            <Check size={12} strokeWidth={3} aria-hidden />
+          <span className="absolute end-[2px] top-[2px] grid size-4 place-items-center">
+            <MenuIcon name="menu-checkbox-on.svg" size={16} className="text-[#0D6EFD]" />
           </span>
         )}
       </span>
-      <span
-        className={clsx(
-          "mt-1 block text-[13px]",
-          active ? "font-medium text-[var(--octo-accent)]" : "text-[var(--octo-text-primary)]"
-        )}
-      >
+      <span className={clsx("max-w-full truncate text-center text-[14px] font-medium leading-[14px]", active ? ACCENT_TEXT : TEXT)}>
         {t(preset.labelKey)}
       </span>
     </button>
   );
-}
-
-/** A small picture of each card layout, drawn around a real dish photo. */
-function CardThumb({ id }: { id: MenuTheme["cardStyle"] }) {
-  const photo = storefrontAsset("burger.webp");
-  const line = "block h-[3px] rounded-full bg-[var(--octo-border-input)]";
-  const frame = "h-[34px] w-[46px] overflow-hidden rounded-[4px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]";
-  switch (id) {
-    case "classic":
-      return (
-        <span className={clsx(frame, "flex flex-col items-center p-[3px]")} aria-hidden>
-          <img src={photo} alt="" className="h-[16px] w-auto object-contain" />
-          <span className={clsx(line, "mt-[3px] w-[70%]")} />
-          <span className={clsx(line, "mt-[2px] w-[45%]")} />
-        </span>
-      );
-    case "clean-minimal":
-      return (
-        <span className={clsx(frame, "flex flex-col justify-center gap-[3px] px-[5px]")} aria-hidden>
-          <span className={clsx(line, "w-[80%]")} />
-          <span className={clsx(line, "w-[60%]")} />
-          <span className={clsx(line, "w-[70%]")} />
-        </span>
-      );
-    case "image-top":
-      return (
-        <span className={clsx(frame, "flex flex-col")} aria-hidden>
-          <img src={photo} alt="" className="h-[20px] w-full object-cover" />
-          <span className={clsx(line, "mx-[4px] mt-[3px] w-[70%]")} />
-        </span>
-      );
-    case "image-left":
-      return (
-        <span className={clsx(frame, "flex items-center gap-[3px] p-[3px]")} aria-hidden>
-          <img src={photo} alt="" className="h-[24px] w-[18px] rounded-[2px] object-cover" />
-          <span className="flex flex-1 flex-col gap-[3px]">
-            <span className={clsx(line, "w-full")} />
-            <span className={clsx(line, "w-[70%]")} />
-          </span>
-        </span>
-      );
-  }
 }
 
 function Tiles<T extends string>({
@@ -204,24 +145,20 @@ function Tiles<T extends string>({
   onChange,
 }: {
   label: string;
-  options: { id: T; icon: LucideIcon; key: string }[];
+  options: Option<T>[];
   value: T;
   onChange: (id: T) => void;
 }) {
   const { t } = useI18n();
   return (
-    <div>
-      <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{label}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {options.map(({ id, icon: Icon, key }) => (
-          <button
-            key={id}
-            type="button"
-            aria-pressed={value === id}
-            onClick={() => onChange(id)}
-            className={clsx(TILE, "min-w-[60px]", tileTone(value === id))}
-          >
-            <Icon size={20} aria-hidden />
+    <div className="flex flex-col gap-4">
+      <p className={HEADING}>{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map(({ id, icon, size, key }) => (
+          <button key={id} type="button" aria-pressed={value === id} onClick={() => onChange(id)} className={clsx(TILE, tileTone(value === id))}>
+            <span className="grid size-6 place-items-center">
+              <MenuIcon name={icon} size={size} />
+            </span>
             <span className="whitespace-nowrap">{t(key)}</span>
           </button>
         ))}
@@ -230,26 +167,138 @@ function Tiles<T extends string>({
   );
 }
 
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+function HeroField({
+  label,
+  value,
+  placeholder,
+  error,
+  onChange,
+  onBlur,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  error: string | null;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+}) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={onChange}
-      className={clsx(
-        "h-[22px] w-[40px] shrink-0 rounded-full p-[2px] transition-colors",
-        checked ? "bg-[var(--octo-accent)]" : "bg-[var(--octo-switch-off)]"
-      )}
-    >
-      <span
-        className={clsx(
-          "block h-[18px] w-[18px] rounded-full bg-[var(--octo-knob)] transition-transform",
-          checked && "translate-x-[18px] rtl:-translate-x-[18px]"
-        )}
+    <label className="flex flex-col gap-2">
+      <span className={clsx("px-2", SUB_LABEL)}>{label}</span>
+      <input
+        value={value}
+        aria-invalid={error ? true : undefined}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        className={clsx(TEXT_INPUT_CLASS, "!rounded-[4px] placeholder:!text-[#58606c]", error && FIELD_INVALID)}
       />
-    </button>
+      {error && (
+        <span role="alert" className={clsx("px-2", ERROR_TEXT)}>
+          {error}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/** One brand colour: the swatch opens the system picker, the hex beside it can
+ *  be typed. Only a complete #RRGGBB is ever written to the theme; what is
+ *  half-typed lives here until it is one. */
+function ColorField({
+  label,
+  value,
+  pickLabel,
+  error,
+  onDraft,
+  onCommit,
+  onBlur,
+}: {
+  label: string;
+  value: string;
+  pickLabel: string;
+  error: string | null;
+  /** The text as typed, or null once it matches the stored colour again. */
+  onDraft: (text: string | null) => void;
+  onCommit: (hex: string) => void;
+  onBlur: () => void;
+}) {
+  const picker = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState<string | null>(null);
+  // The stored colour changed: keep the typed text only if it is that colour
+  // (the merchant just finished typing it); a preset's colour replaces it.
+  useEffect(() => {
+    setText((prev) => (prev !== null && normalizeHexColor(prev) === value.toUpperCase() ? prev : null));
+  }, [value]);
+  const shown = text ?? value.toUpperCase();
+  const swatch = normalizeHexColor(shown) ?? value;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <span className={clsx("text-[12px] font-medium leading-3", TEXT)}>{label}</span>
+      <div className={clsx("flex items-center gap-2 rounded-[4px] border bg-[var(--octo-card)] p-1", LINE, FOCUS_WITHIN, error && FIELD_INVALID)}>
+        <span className="relative size-8 shrink-0">
+          <button
+            type="button"
+            aria-label={pickLabel}
+            onClick={() => picker.current?.click()}
+            style={{ backgroundColor: swatch }}
+            className="block size-8 rounded-[4px] ring-1 ring-inset ring-black/5"
+          />
+          {/* Transparent rather than display:none — some browsers will not
+              open the picker for an input that is not rendered. */}
+          <input
+            ref={picker}
+            type="color"
+            tabIndex={-1}
+            aria-hidden
+            value={swatch.toLowerCase()}
+            onChange={(e) => {
+              setText(null);
+              onDraft(null);
+              onCommit(e.target.value.toUpperCase());
+            }}
+            className="pointer-events-none absolute inset-0 size-full opacity-0"
+          />
+        </span>
+        <input
+          dir="ltr"
+          value={shown}
+          aria-label={label}
+          aria-invalid={error ? true : undefined}
+          maxLength={7}
+          spellCheck={false}
+          onChange={(e) => {
+            const next = e.target.value;
+            const hex = normalizeHexColor(next);
+            setText(next);
+            onDraft(hex ? null : next);
+            if (hex) onCommit(hex);
+          }}
+          onBlur={() => {
+            // A finished colour snaps to its stored spelling; an unfinished one
+            // stays as typed, under its message.
+            if (normalizeHexColor(shown)) setText(null);
+            onBlur();
+          }}
+          className={clsx("w-full min-w-0 bg-transparent text-start text-[12px] font-semibold uppercase leading-3 outline-none", TEXT)}
+        />
+      </div>
+      {error && (
+        <span role="alert" className={ERROR_TEXT}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <p className={HEADING}>{title}</p>
+      {children}
+    </div>
   );
 }
 
@@ -266,10 +315,13 @@ function unknownPreset(code: string): MenuPreset {
 
 export function ThemeStep() {
   const { t, locale } = useI18n();
-  const { draft, setDraft } = useDraft();
+  const { draft, setDraft, setNextBlocked } = useDraft();
   const { draft: site } = useSiteDraft();
   const { activeBusiness } = useTenantConfig();
   const [moreThemes, setMoreThemes] = useState(false);
+  // Hex text that is not a colour yet, per field, and which fields were left.
+  const [hexDrafts, setHexDrafts] = useState<Partial<Record<ThemeColorField, string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<ThemeField, boolean>>>({});
   const language = locale === "ar" ? "ar" : "en";
 
   const theme = draft.theme;
@@ -293,6 +345,22 @@ export function ThemeStep() {
   // image's media reference no longer describes it.
   const logo = useFilePicker((dataUrl) => patchBrand({ logoUrl: dataUrl, logoRef: null }));
   const hero = useFilePicker((dataUrl) => patchBrand({ heroUrl: dataUrl, heroRef: null }));
+
+  // What the step refuses: a hex that is not #RRGGBB, hero copy that is too
+  // long. A message waits for its field to be left; Next Step does not.
+  const errors = validateTheme({
+    colors: { ...shownBrand.colors, ...hexDrafts },
+    heroText: shownBrand.heroText,
+    heroSubtext: shownBrand.heroSubtext,
+  });
+  const invalid = Object.keys(errors).length > 0;
+  useEffect(() => {
+    setNextBlocked(invalid);
+  }, [invalid, setNextBlocked]);
+  useEffect(() => () => setNextBlocked(false), [setNextBlocked]);
+  const shown = (field: ThemeField, max?: number) =>
+    touched[field] && errors[field] ? t(errors[field] as string).replace("{n}", String(max ?? "")) : null;
+  const touch = (field: ThemeField) => setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
 
   // The platform's preset and font codes (GET /theme-presets). When it lists
   // any, they are the choices — the API refuses a code it does not list — with
@@ -322,6 +390,7 @@ export function ThemeStep() {
   /** A preset is a palette: picking one sets all four brand colours, which
    *  the merchant can still fine-tune below. */
   function selectPreset(preset: MenuPreset) {
+    setHexDrafts({});
     patchTheme({
       presetId: preset.id,
       serverPresetCode: isServerPreset(preset.id) ? preset.id : undefined,
@@ -329,194 +398,177 @@ export function ThemeStep() {
     });
   }
 
-  const COLORS: { key: string; field: keyof MenuBrand["colors"] }[] = [
-    { key: "menuTheme.primary", field: "primary" },
-    { key: "menuTheme.light", field: "light" },
-    { key: "menuTheme.accent", field: "accent" },
-    { key: "menuTheme.dark", field: "dark" },
-  ];
-
   const titleFont = theme.titleFontCode ?? site.brand.typography.en.titles;
   const bodyFont = theme.bodyFontCode ?? site.brand.typography.en.body;
-  const card = "rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4";
-  const heading = "text-[16px] font-semibold text-[var(--octo-text-primary)]";
+  const fonts: { label: string; value: string; field: "titleFontCode" | "bodyFontCode" }[] = [
+    { label: t("menuTheme.titles"), value: titleFont, field: "titleFontCode" },
+    { label: t("menuTheme.body"), value: bodyFont, field: "bodyFontCode" },
+  ];
 
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,0.9fr)_minmax(0,1.15fr)]">
-      <div className={card}>
-        <h2 className={heading}>{t("menuTheme.presets")}</h2>
-        <div className="mt-2.5 grid grid-cols-3 gap-x-2.5 gap-y-3">
-          {presets.slice(0, 6).map((preset) => (
-            <PresetTile
-              key={preset.id}
-              preset={preset}
-              active={activePreset?.id === preset.id}
-              onSelect={() => selectPreset(preset)}
-            />
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => setMoreThemes(true)}
-          className={clsx(ACCENT_OUTLINE, "mt-3 w-full px-3 py-2 text-[14px] font-medium")}
-        >
-          {t("menuTheme.viewMore")}
-        </button>
+    // The frame's own column widths (269 / 269 / 562), kept as ratios.
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,269fr)_minmax(0,269fr)_minmax(0,562fr)]">
+      <section className={clsx("flex min-w-0 flex-col gap-4", PANEL)}>
+        <Section title={t("menuTheme.presets")}>
+          <div className="grid grid-cols-3 justify-items-center gap-x-2 gap-y-4">
+            {presets.slice(0, 6).map((preset) => (
+              <PresetTile key={preset.id} preset={preset} active={activePreset?.id === preset.id} onSelect={() => selectPreset(preset)} />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setMoreThemes(true)}
+            className={clsx("flex h-8 w-full items-center justify-center rounded-[4px] border border-[#0D6EFD] p-2 text-[14px] font-semibold leading-[14px] text-[#0D6EFD] hover:brightness-95", SURFACE_BLUE)}
+          >
+            {t("menuTheme.viewMore")}
+          </button>
+        </Section>
 
-        <h2 className={clsx(heading, "mt-5")}>{t("menuTheme.branding")}</h2>
-        <div className="mt-2.5 rounded-[12px] border border-dashed border-[var(--octo-border-input)] p-2">
+        <Section title={t("menuTheme.branding")}>
           <button
             type="button"
             onClick={logo.open}
             aria-label={t("menuTheme.changeLogo")}
-            className="grid h-[128px] w-full place-items-center overflow-hidden rounded-[10px] bg-[var(--octo-track)]"
+            className={clsx("flex h-[154px] w-full flex-col rounded-[12px] border border-dashed p-2", LINE)}
           >
-            {shownBrand.logoUrl ? (
-              <img src={shownBrand.logoUrl} alt="" className="h-full w-full object-contain p-3" />
-            ) : (
-              <span className="text-[16px] font-semibold text-[var(--octo-text-secondary)]">
-                {site.brand.businessName || activeBusiness?.businessName || "—"}
-              </span>
-            )}
+            <span className="grid min-h-0 w-full flex-1 place-items-center overflow-hidden rounded-[12px] bg-[var(--octo-track)] shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)]">
+              {shownBrand.logoUrl ? (
+                <img src={shownBrand.logoUrl} alt="" className="size-full object-cover" />
+              ) : (
+                <span className={clsx("px-2 text-[16px] font-semibold", TEXT_GRAY)}>
+                  {site.brand.businessName || activeBusiness?.businessName || "—"}
+                </span>
+              )}
+            </span>
           </button>
-        </div>
-        {logo.input}
-        <button type="button" onClick={logo.open} className={clsx(ACCENT_OUTLINE, "mt-3 h-11 w-full text-[16px]")}>
-          {t("menuTheme.changeLogo")}
-        </button>
-        <p className="mt-2 text-[12.5px] text-[var(--octo-text-muted)]">{t("menuTheme.logoHint")}</p>
+          {logo.input}
+          <div className="flex flex-col gap-3">
+            <button type="button" onClick={logo.open} className={clsx(OUTLINE_BUTTON, "h-12 w-full text-[16px] leading-4")}>
+              {t("menuTheme.changeLogo")}
+            </button>
+            {logo.error && (
+              <p role="alert" className={ERROR_TEXT}>
+                {t(logo.error === "too-large" ? "menuWiz.sec.error.tooLarge" : "menuWiz.sec.error.unreadable")}
+              </p>
+            )}
+            <p className={clsx("whitespace-pre-line text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuTheme.logoHint")}</p>
+          </div>
+        </Section>
 
-        <p className="mt-4 text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuTheme.heroMedia")}</p>
-        <div className="mt-2 rounded-[12px] border border-dashed border-[var(--octo-border-input)] p-2">
+        <div className="flex flex-col gap-3">
+          <p className={clsx("px-2", HEADING)}>{t("menuTheme.heroMedia")}</p>
           <button
             type="button"
             onClick={hero.open}
             aria-label={t("menuTheme.changeMedia")}
-            className="relative grid h-[118px] w-full place-items-center overflow-hidden rounded-[8px] bg-[var(--octo-track)]"
+            className={clsx("flex h-[120px] w-full flex-col rounded-[12px] border border-dashed p-2", LINE)}
           >
-            {shownBrand.heroUrl && (
-              <img
-                src={shownBrand.heroUrl}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            )}
-            <span
-              className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-black shadow"
-              aria-hidden
-            >
-              <span className="grid h-7 w-7 place-items-center rounded-full bg-black text-white">
-                <Play size={12} className="fill-current" />
+            <span className="relative grid min-h-0 w-full flex-1 place-items-center overflow-hidden bg-[var(--octo-track)]">
+              {shownBrand.heroUrl && <img src={shownBrand.heroUrl} alt="" className="absolute inset-0 size-full object-cover" />}
+              <span className="absolute inset-0 bg-black/25" aria-hidden />
+              <span className="relative grid size-10 place-items-center rounded-full bg-white text-[#0f172a]" aria-hidden>
+                <MenuIcon name="menu-video-circle.svg" size={40} />
               </span>
             </span>
           </button>
-        </div>
-        {hero.input}
-        <div className="mt-2.5 flex items-center gap-2">
-          <button type="button" onClick={hero.open} className={clsx(ACCENT_OUTLINE, "h-10 flex-1 text-[14px]")}>
-            {t("menuTheme.changeMedia")}
-          </button>
-          <button
-            type="button"
-            aria-label={t("menuTheme.heroMedia")}
-            onClick={() => patchBrand({ heroUrl: null, heroRef: null })}
-            className="grid h-10 w-10 place-items-center rounded-[9px] bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)] hover:brightness-95"
-          >
-            <Trash2 size={17} />
-          </button>
-        </div>
-        <p className="mt-1.5 text-[12.5px] text-[var(--octo-text-muted)]">{t("menuTheme.mediaHint")}</p>
-
-        <label className="mt-3 block">
-          <span className="text-[15px] text-[var(--octo-text-primary)]">{t("menuTheme.heroText")}</span>
-          <input
-            value={shownBrand.heroText}
-            onChange={(e) => patchBrand({ heroText: e.target.value })}
-            placeholder={t("menuTheme.heroTextPlaceholder")}
-            className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
-          />
-        </label>
-        <label className="mt-3 block">
-          <span className="text-[15px] text-[var(--octo-text-primary)]">{t("menuTheme.heroSubtext")}</span>
-          <input
-            value={shownBrand.heroSubtext}
-            onChange={(e) => patchBrand({ heroSubtext: e.target.value })}
-            placeholder={t("menuTheme.heroSubtextPlaceholder")}
-            className="mt-1.5 w-full rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2.5 text-[14px] text-[var(--octo-text-primary)]"
-          />
-        </label>
-      </div>
-
-      <section className={clsx(card, "space-y-4")}>
-        <h2 className={heading}>{t("menuTheme.lookFeel")}</h2>
-
-        {/* The menu's own font codes, only ever ones the platform lists
-            (GET /theme-presets). Until the menu has one, the site's
-            typography is shown. */}
-        <label className="block">
-          <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.titles")}</span>
-          <Select
-            className="mt-1.5"
-            disabled={!fontsEditable}
-            value={fontOptionId(fontOptions(titleFont), titleFont)}
-            onChange={(e) => {
-              const code = serverFontCode(e.target.value, serverFonts);
-              if (code) patchTheme({ titleFontCode: code });
-            }}
-          >
-            {fontOptions(titleFont).map((f) => (
-              <option key={f.id} value={f.id}>{f.label}</option>
-            ))}
-          </Select>
-        </label>
-        <label className="block">
-          <span className="text-[15px] font-medium text-[var(--octo-text-primary)]">{t("menuTheme.body")}</span>
-          <Select
-            className="mt-1.5"
-            disabled={!fontsEditable}
-            value={fontOptionId(fontOptions(bodyFont), bodyFont)}
-            onChange={(e) => {
-              const code = serverFontCode(e.target.value, serverFonts);
-              if (code) patchTheme({ bodyFontCode: code });
-            }}
-          >
-            {fontOptions(bodyFont).map((f) => (
-              <option key={f.id} value={f.id}>{f.label}</option>
-            ))}
-          </Select>
-        </label>
-        {!fontsEditable && (
-          <p className="-mt-2 text-[12.5px] text-[var(--octo-text-muted)]">{t("menuTheme.fontsUnavailable")}</p>
-        )}
-
-        <div>
-          <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuTheme.colors")}</p>
-          <div className="mt-1.5 grid grid-cols-2 gap-3">
-            {COLORS.map(({ key, field }) => (
-              <label key={key} className="block">
-                <span className="text-[13px] text-[var(--octo-text-secondary)]">{t(key)}</span>
-                <span className="mt-1 flex items-center gap-2 rounded-[9px] border border-[var(--octo-border-input)] px-2 py-1.5">
-                  <input
-                    type="color"
-                    value={shownBrand.colors[field]}
-                    onChange={(e) => patchBrand({ colors: { ...shownBrand.colors, [field]: e.target.value } })}
-                    className="h-8 w-8 shrink-0 cursor-pointer rounded-[6px] border-0 bg-transparent p-0"
-                  />
-                  <span className="text-[13px] font-medium uppercase text-[var(--octo-text-primary)]" dir="ltr">
-                    {shownBrand.colors[field]}
-                  </span>
-                </span>
-              </label>
-            ))}
+          {hero.input}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-start gap-2">
+              <button type="button" onClick={hero.open} className={clsx(OUTLINE_BUTTON, "h-9 min-w-0 flex-1 text-[12px] leading-3")}>
+                <span className="truncate">{t("menuTheme.changeMedia")}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={t("menuTheme.removeMedia")}
+                onClick={() => patchBrand({ heroUrl: null, heroRef: null })}
+                className="grid size-9 shrink-0 place-items-center rounded-[8px] bg-[#fef0f0] text-[#d30202] hover:brightness-95 [[data-theme=dark]_&]:bg-[#d30202]/15 [[data-theme=dark]_&]:text-[#ff6b6b]"
+              >
+                <MenuIcon name="menu-trash.svg" size={24} />
+              </button>
+            </div>
+            {hero.error && (
+              <p role="alert" className={ERROR_TEXT}>
+                {t(hero.error === "too-large" ? "menuWiz.sec.error.tooLarge" : "menuWiz.sec.error.unreadable")}
+              </p>
+            )}
+            <p className={clsx("text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuTheme.mediaHint")}</p>
           </div>
         </div>
 
-        <Tiles
-          label={t("menuTheme.navStyle")}
-          options={NAV}
-          value={theme.navStyle}
-          onChange={(navStyle) => patchTheme({ navStyle })}
+        <HeroField
+          label={t("menuTheme.heroText")}
+          value={shownBrand.heroText}
+          placeholder={t("menuTheme.heroTextPlaceholder")}
+          error={shown("heroText", HERO_TEXT_MAX)}
+          onChange={(heroText) => patchBrand({ heroText })}
+          onBlur={() => touch("heroText")}
         />
+        <HeroField
+          label={t("menuTheme.heroSubtext")}
+          value={shownBrand.heroSubtext}
+          placeholder={t("menuTheme.heroSubtextPlaceholder")}
+          error={shown("heroSubtext", HERO_SUBTEXT_MAX)}
+          onChange={(heroSubtext) => patchBrand({ heroSubtext })}
+          onBlur={() => touch("heroSubtext")}
+        />
+      </section>
+
+      <section className={clsx("flex min-w-0 flex-col gap-4", PANEL)}>
+        <Section title={t("menuTheme.lookFeel")}>
+          {/* The menu's own font codes, only ever ones the platform lists
+              (GET /theme-presets). Until the menu has one, the site's
+              typography is shown. */}
+          {fonts.map(({ label, value, field }) => (
+            <div key={field} className="flex flex-col gap-3">
+              <span className={SUB_LABEL}>{label}</span>
+              <SelectBox
+                ariaLabel={label}
+                disabled={!fontsEditable}
+                value={fontOptionId(fontOptions(value), value)}
+                onChange={(next) => {
+                  const code = serverFontCode(next, serverFonts);
+                  if (code) patchTheme(field === "titleFontCode" ? { titleFontCode: code } : { bodyFontCode: code });
+                }}
+              >
+                {fontOptions(value).map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </SelectBox>
+            </div>
+          ))}
+          {!fontsEditable && <p className={clsx("-mt-2 text-[12px] leading-[1.4]", TEXT_GRAY)}>{t("menuTheme.fontsUnavailable")}</p>}
+        </Section>
+
+        <Section title={t("menuTheme.colors")}>
+          <div className="grid grid-cols-2 gap-x-[11px] gap-y-3">
+            {COLORS.map(({ key, field }) => (
+              <ColorField
+                key={field}
+                label={t(key)}
+                pickLabel={t("menuTheme.colorPicker").replace("{name}", t(key))}
+                value={shownBrand.colors[field]}
+                error={shown(field)}
+                onDraft={(text) =>
+                  setHexDrafts((prev) => {
+                    if (text === null) {
+                      if (prev[field] === undefined) return prev;
+                      const rest = { ...prev };
+                      delete rest[field];
+                      return rest;
+                    }
+                    return { ...prev, [field]: text };
+                  })
+                }
+                onCommit={(hex) => patchBrand({ colors: { ...shownBrand.colors, [field]: hex } })}
+                onBlur={() => touch(field)}
+              />
+            ))}
+          </div>
+        </Section>
+
+        <Tiles label={t("menuTheme.navStyle")} options={NAV} value={theme.navStyle} onChange={(navStyle) => patchTheme({ navStyle })} />
         <Tiles
           label={t("menuTheme.categoryStyle")}
           options={CATEGORY}
@@ -524,91 +576,91 @@ export function ThemeStep() {
           onChange={(categoryStyle) => patchTheme({ categoryStyle })}
         />
 
-        <div>
-          <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("menuTheme.cardStyle")}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {CARD.map(({ id, key }) => (
+        <Section title={t("menuTheme.cardStyle")}>
+          <div className="flex flex-wrap gap-2">
+            {CARD.map(({ id, key, art, width, crop }) => (
               <button
                 key={id}
                 type="button"
                 aria-pressed={theme.cardStyle === id}
                 onClick={() => patchTheme({ cardStyle: id })}
-                className={clsx(TILE, "min-w-[68px]", tileTone(theme.cardStyle === id))}
+                className={clsx(TILE, tileTone(theme.cardStyle === id))}
               >
-                <CardThumb id={id} />
+                <span className="relative block h-6 overflow-hidden" style={{ width }} aria-hidden>
+                  <img src={art} alt="" className={clsx("absolute max-w-none", crop ?? "inset-0 size-full object-cover")} />
+                </span>
                 <span className="whitespace-nowrap">{t(key)}</span>
               </button>
             ))}
           </div>
-        </div>
+        </Section>
 
-        <fieldset>
-          <legend className="text-[15px] font-semibold text-[var(--octo-text-primary)]">
-            {t("menuTheme.itemDetails")}
-          </legend>
-          <div className="mt-1 divide-y divide-[var(--octo-border-card)]">
-            {DETAILS.map((id) => (
-              <label key={id} className="flex cursor-pointer items-center gap-2.5 py-2.5 text-[14px]">
-                <input
-                  type="radio"
-                  name="item-details"
-                  checked={theme.itemDetails === id}
-                  onChange={() => patchTheme({ itemDetails: id })}
-                  className="h-[18px] w-[18px] accent-[var(--octo-accent)]"
-                />
-                <span className="text-[var(--octo-text-primary)]">{t(DETAIL_KEYS[id])}</span>
+        <fieldset className="flex flex-col gap-1">
+          <legend className={clsx("mb-4", HEADING)}>{t("menuTheme.itemDetails")}</legend>
+          {DETAILS.map((id, index) => {
+            const checked = theme.itemDetails === id;
+            return (
+              <label
+                key={id}
+                className={clsx(
+                  "flex cursor-pointer items-center gap-2",
+                  index < DETAILS.length - 1 && "border-b border-[#e2e8f0] pb-2 [[data-theme=dark]_&]:border-[var(--octo-border-card)]"
+                )}
+              >
+                <input type="radio" name="item-details" checked={checked} onChange={() => patchTheme({ itemDetails: id })} className="peer sr-only" />
+                <span className="inline-flex rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-[#0D6EFD]/40">
+                  <MenuIcon
+                    name={checked ? "menu-radio-on.svg" : "menu-radio-off.svg"}
+                    size={24}
+                    className={checked ? "text-[#0D6EFD]" : "text-[#64748b]"}
+                  />
+                </span>
+                <span className={clsx("text-[12px] font-medium leading-3", TEXT)}>{t(DETAIL_KEYS[id])}</span>
               </label>
-            ))}
-          </div>
+            );
+          })}
         </fieldset>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-2.5">
-            <Switch
-              checked={theme.stickyAddToCart}
-              label={t("menuTheme.stickyCart")}
-              onChange={() => patchTheme({ stickyAddToCart: !theme.stickyAddToCart })}
-            />
-            <span className="text-[14.5px] text-[var(--octo-text-primary)]">{t("menuTheme.stickyCart")}</span>
-          </div>
-          <div className="flex items-start gap-2.5">
-            <Switch
-              checked={theme.showItemTags}
-              label={t("menuTheme.showTags")}
-              onChange={() => patchTheme({ showItemTags: !theme.showItemTags })}
-            />
-            <span className="text-[14.5px] text-[var(--octo-text-primary)]">
-              {t("menuTheme.showTags")}{" "}
-              <span className="text-[13px] text-[var(--octo-text-secondary)]">({t("menuTheme.showTagsHint")})</span>
-            </span>
-          </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={theme.stickyAddToCart} label={t("menuTheme.stickyCart")} onChange={(stickyAddToCart) => patchTheme({ stickyAddToCart })} />
+          <span className={SUB_LABEL}>{t("menuTheme.stickyCart")}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={theme.showItemTags} label={t("menuTheme.showTags")} onChange={(showItemTags) => patchTheme({ showItemTags })} />
+          <span className={clsx("min-w-0 flex-1 text-[14px] font-medium leading-[1.4]", TEXT)}>
+            {t("menuTheme.showTags")} (<span className="text-[12px] font-normal">{t("menuTheme.showTagsHint")})</span>
+          </span>
         </div>
       </section>
 
-      <div className="space-y-4">
-        <MenuPreviewFrame menu={draft} site={site} />
+      <div className="flex min-w-0 flex-col gap-4">
+        <MenuPreviewFrame menu={draft} site={site} height={913} />
         <QrPanel menuId={draft.id} />
       </div>
 
       <Modal
         open={moreThemes}
         onClose={() => setMoreThemes(false)}
-        title={t("menuTheme.allThemes")}
-        className="max-w-2xl"
+        backdropClassName="bg-black/60"
+        className="!max-w-[738px] !rounded-[12px] !p-6 !shadow-none"
       >
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {presets.map((preset) => (
-            <PresetTile
-              key={preset.id}
-              preset={preset}
-              tall
-              active={activePreset?.id === preset.id}
-              onSelect={() => {
-                selectPreset(preset);
-                setMoreThemes(false);
-              }}
-            />
-          ))}
+        <div className="flex flex-col gap-6">
+          <h2 className="text-[24px] font-semibold leading-6 text-[#0e0e0e] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+            {t("menuTheme.allThemes")}
+          </h2>
+          <div className="grid grid-cols-3 justify-items-center gap-4 sm:grid-cols-5">
+            {presets.map((preset) => (
+              <PresetTile
+                key={preset.id}
+                preset={preset}
+                active={activePreset?.id === preset.id}
+                onSelect={() => {
+                  selectPreset(preset);
+                  setMoreThemes(false);
+                }}
+              />
+            ))}
+          </div>
         </div>
       </Modal>
     </div>

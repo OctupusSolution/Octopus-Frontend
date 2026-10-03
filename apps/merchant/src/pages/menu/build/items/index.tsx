@@ -6,9 +6,14 @@
 // The Modifiers tab is the exception to that layout: its frames drop the entry
 // list and the Item Information card and give the whole width to Modifiers
 // Group | Edit Group | the customer preview, with the tab bar straight above.
+//
+// Validation: the selected item's form state lives here (use-item-form), so
+// the tabs, the schedule card and the footer all read one set of messages.
+// While any message is on screen the footer's Next Step is held back and the
+// red strip names where to look; "Save & Add another item" is a save attempt,
+// so it reveals every message and adds nothing while one stands.
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { AlertCircle } from "lucide-react";
 import { Button, Checkbox, EmptyState, Modal, Select } from "@ui/primitives";
 import {
   OFFERS_SECTION_ID,
@@ -61,9 +66,29 @@ import { MenuPreviewFrame } from "../preview/menu-preview-frame";
 import { ModifierPreview } from "./modifier-preview";
 import { OffersEditor, incompleteTabs, type OfferTabId } from "../offers";
 import { EntryList, type EntryAction } from "./entry-list";
-import { ITEM_TABS, ItemTabs, type ItemTabId } from "./item-tabs";
+import { ERROR_STRIP, PANEL } from "../../_shared/theme";
+import { ItemTabBar, ItemTabs, type ItemTabId } from "./item-tabs";
 import { TabModifiers } from "./tab-modifiers";
+import { useNutritionRows } from "./tab-nutrition";
 import { AvailabilityCard, NutritionStrip, ScheduleCard } from "./item-extras";
+import { useItemForm, type ItemFormArea } from "./use-item-form";
+
+/** "Add existing item" (the catalog picker) and "Reuse existing group" are in
+ *  the code but in no frame; flip these to offer them again. */
+const SHOW_ADD_EXISTING_ITEM: boolean = false;
+const SHOW_REUSE_GROUP: boolean = false;
+
+/** The frame's column widths (269 / 522 / 309), kept as ratios. */
+const COLUMNS = "grid gap-6 xl:grid-cols-[minmax(0,269fr)_minmax(0,522fr)_minmax(0,309fr)]";
+
+/** What the red strip calls each place a message can be. */
+const AREA_LABEL: Record<ItemFormArea, string> = {
+  general: "menuWiz.item.tab.general",
+  modifiers: "menuWiz.item.tab.modifiers",
+  pricing: "menuWiz.item.tab.pricing",
+  nutrition: "menuWiz.item.tab.nutrition",
+  schedule: "menuWiz.item.schedule",
+};
 
 /** Keeps a group's selection rules satisfiable after any edit to it.
  *
@@ -158,12 +183,22 @@ export function ItemsStep() {
   const offer = isOffers ? (offers.find((o) => o.id === offerId) ?? offers[0] ?? null) : null;
   // The frame's red bar names the tabs still missing something, so Next Step is
   // gated on the same list the bar prints rather than a separate boolean.
-  const missing = offer ? incompleteTabs(offer) : [];
-  const blocked = isOffers && missing.length > 0;
+  const missing = offer ? incompleteTabs(offer, draft) : [];
+  const offerBlocked = isOffers && missing.length > 0;
+
+  const nutrition = useNutritionRows();
+  const form = useItemForm(isOffers ? null : selected, nutrition.rows);
+  const itemBlocked = !isOffers && form.shownAreas.length > 0;
+  const blocked = offerBlocked || itemBlocked;
+  const blockedMessage = offerBlocked
+    ? t("menuOffer.incomplete")
+    : itemBlocked
+      ? t("menuWiz.item.incomplete").replace("{tabs}", form.shownAreas.map((area) => t(AREA_LABEL[area])).join(", "))
+      : null;
 
   useEffect(() => {
-    setNextBlocked(blocked);
-  }, [blocked, setNextBlocked]);
+    setNextBlocked(blocked, blockedMessage);
+  }, [blocked, blockedMessage, setNextBlocked]);
   // Released on unmount too, so leaving the step never strands the footer.
   useEffect(() => () => setNextBlocked(false), [setNextBlocked]);
 
@@ -191,10 +226,32 @@ export function ItemsStep() {
     setTab("general");
   }
 
-  // Re-pointed every render, so the footer always calls the addNewItem that
-  // closes over the current draft and section.
+  /** The footer's "Save & Add another item": a save attempt on the item being
+   *  edited. With something still wrong it shows every message, opens the first
+   *  tab that has one (unless the open tab already does), and adds nothing. */
+  function saveAndAddAnother() {
+    if (!isOffers && selected && form.invalidAreas.length > 0) {
+      form.revealAll();
+      const tabs = form.invalidAreas.filter((area): area is Exclude<ItemFormArea, "schedule"> => area !== "schedule");
+      const first = tabs[0];
+      if (first && !tabs.some((area) => area === tab)) {
+        setTab(first);
+        if (first === "modifiers") {
+          const bad = selected.modifierGroups.find((g) =>
+            Object.keys(form.errors).some((key) => key.startsWith(`g:${g.id}:`))
+          );
+          if (bad) setGroupId(bad.id);
+        }
+      }
+      return;
+    }
+    addNewItem();
+  }
+
+  // Re-pointed every render, so the footer always calls the function that
+  // closes over the current draft, section and form.
   useEffect(() => {
-    addAnother.current = addNewItem;
+    addAnother.current = saveAndAddAnother;
     return () => {
       addAnother.current = null;
     };
@@ -446,147 +503,126 @@ export function ItemsStep() {
 
   return (
     <>
-      {onModifiers && selected ? (
-        <>
-          {/* ItemTabs' own bar lives inside the Item Information card, which
-              these frames do not have — so the same tabs are drawn bare here,
-              and any of them leads back to the full layout. */}
-          <div
-            role="tablist"
-            className="mb-5 flex w-fit flex-wrap gap-x-10 border-b border-[var(--octo-border-card)]"
-          >
-            {ITEM_TABS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => setTab(id)}
-                className={clsx(
-                  "-mb-px border-b-2 pb-2.5 text-[16px]",
-                  tab === id
-                    ? "border-[var(--octo-accent)] font-medium text-[var(--octo-accent)]"
-                    : "border-transparent text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
-                )}
-              >
-                {t(`menuWiz.item.tab.${id}`)}
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-col gap-6">
+        {onModifiers && selected ? (
+          <>
+            {/* The Item Information card, which owns the tab bar on every other
+                tab, is not in these frames — so the same bar is drawn bare
+                here, and any of its tabs leads back to the full layout. */}
+            <ItemTabBar tab={tab} onTabChange={setTab} className="mt-2" />
 
-          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,370fr)_minmax(0,720fr)_minmax(0,430fr)]">
-            <TabModifiers item={selected} {...modifiers} onReuseGroup={activeBusinessId ? () => setPickGroup(true) : undefined} />
-            <ModifierPreview item={selected} />
-          </div>
-        </>
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,1fr)]">
-          <EntryList
-            sections={draft.sections}
-            sectionId={section?.id ?? OFFERS_SECTION_ID}
-            onSectionChange={(id) => {
-              setSectionId(id);
-              setSelectedId(null);
-              setPickGroup(false);
-            }}
-            entries={entries}
-            selectedId={isOffers ? (offer?.id ?? null) : (selected?.id ?? null)}
-            onSelect={isOffers ? setOfferId : setSelectedId}
-            onAdd={addNewItem}
-            onAction={runEntryAction}
-            priceOf={(entry) =>
-              isOffers
-                ? ((entry as unknown as Offer).pricing.offerPrice ?? 0)
-                : entry.pricing.price
-            }
-            addLabelKey={isOffers ? "menuOffer.addNew" : "menuWiz.item.addNew"}
-            onAddExisting={
-              activeBusinessId ? () => (isOffers ? setPickOffer(true) : setPickItems(true)) : undefined
-            }
-            addExistingLabel={isOffers ? c("offers.addExisting") : c("items.addExisting")}
-          />
-
-          {isOffers ? (
-            <OffersEditor
-              menu={draft}
-              offer={offer}
-              tab={offerTab}
-              onTabChange={setOfferTab}
-              onPatch={(patch) => offer && commitOffer(updateOffer(draft, offer.id, patch))}
-              onSetEntry={(itemId, qty, price) =>
-                offer && commitOffer(setOfferEntry(draft, offer.id, itemId, qty, price))
+            <div className={clsx(COLUMNS, "items-start")}>
+              <TabModifiers
+                item={selected}
+                form={form}
+                {...modifiers}
+                onReuseGroup={SHOW_REUSE_GROUP && activeBusinessId ? () => setPickGroup(true) : undefined}
+              />
+              <ModifierPreview item={selected} />
+            </div>
+          </>
+        ) : (
+          <div className={COLUMNS}>
+            <EntryList
+              sections={draft.sections}
+              sectionId={section?.id ?? OFFERS_SECTION_ID}
+              onSectionChange={(id) => {
+                setSectionId(id);
+                setSelectedId(null);
+                setPickGroup(false);
+              }}
+              entries={entries}
+              selectedId={isOffers ? (offer?.id ?? null) : (selected?.id ?? null)}
+              onSelect={isOffers ? setOfferId : setSelectedId}
+              onAdd={addNewItem}
+              onAction={runEntryAction}
+              priceOf={(entry) =>
+                isOffers
+                  ? ((entry as unknown as Offer).pricing.offerPrice ?? 0)
+                  : entry.pricing.price
               }
-              onRemoveEntry={(itemId) =>
-                offer && commitOffer(removeOfferEntry(draft, offer.id, itemId))
+              addLabelKey={isOffers ? "menuOffer.addNew" : "menuWiz.item.addNew"}
+              onAddExisting={
+                activeBusinessId && (isOffers || SHOW_ADD_EXISTING_ITEM)
+                  ? () => (isOffers ? setPickOffer(true) : setPickItems(true))
+                  : undefined
               }
-              onReplaceEntry={(fromId, toId, qty, price) =>
-                offer &&
-                commitOffer(
-                  updateOffer(draft, offer.id, {
-                    entries: offer.entries.map((e) =>
-                      e.itemId === fromId ? { itemId: toId, qty, price } : e
-                    ),
-                  })
-                )
-              }
+              addExistingLabel={isOffers ? c("offers.addExisting") : c("items.addExisting")}
             />
-          ) : selected ? (
-            <ItemTabs
-              item={selected}
-              sectionName={section?.name ?? ""}
-              tab={tab}
-              onTabChange={setTab}
-              onPatch={patchItem}
-              modifiers={modifiers}
-            />
-          ) : (
-            <section className="rounded-[14px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-              <EmptyState title={t("menuWiz.item.addNew")} />
-            </section>
-          )}
 
-          <MenuPreviewFrame
-            menu={draft}
-            selectedSectionId={section?.id ?? null}
-            onSelectSection={(id) => {
-              setSectionId(id);
-              setSelectedId(null);
-              setPickGroup(false);
-            }}
-          />
-        </div>
-      )}
+            {isOffers ? (
+              <OffersEditor
+                menu={draft}
+                offer={offer}
+                tab={offerTab}
+                onTabChange={setOfferTab}
+                onPatch={(patch) => offer && commitOffer(updateOffer(draft, offer.id, patch))}
+                onSetEntry={(itemId, qty, price) =>
+                  offer && commitOffer(setOfferEntry(draft, offer.id, itemId, qty, price))
+                }
+                onRemoveEntry={(itemId) =>
+                  offer && commitOffer(removeOfferEntry(draft, offer.id, itemId))
+                }
+                onReplaceEntry={(fromId, toId, qty, price) =>
+                  offer &&
+                  commitOffer(
+                    updateOffer(draft, offer.id, {
+                      entries: offer.entries.map((e) =>
+                        e.itemId === fromId ? { itemId: toId, qty, price } : e
+                      ),
+                    })
+                  )
+                }
+              />
+            ) : selected ? (
+              <ItemTabs
+                item={selected}
+                sectionName={section?.name ?? ""}
+                tab={tab}
+                onTabChange={setTab}
+                onPatch={patchItem}
+                form={form}
+                nutritionRows={nutrition.rows}
+              />
+            ) : (
+              <section className={clsx("flex flex-col gap-4", PANEL)}>
+                <EmptyState title={t("menuWiz.item.emptyTitle")} />
+              </section>
+            )}
 
-      {opError && (
-        <p role="alert" className="mt-4 flex items-center justify-between gap-2 rounded-[10px] bg-error/10 px-3.5 py-3 text-[14px] text-error">
-          <span>{opError}</span>
-          <button type="button" className="underline" onClick={() => setOpError(null)}>
-            {c("close")}
-          </button>
-        </p>
-      )}
-
-      {blocked && offer && (
-        <p
-          role="alert"
-          className="mt-4 flex items-center gap-2 rounded-[10px] bg-[var(--octo-tone-danger-bg)] px-3.5 py-3 text-[15px] text-[var(--octo-tone-danger-text)]"
-        >
-          <AlertCircle size={20} className="shrink-0" aria-hidden />
-          {t("menuOffer.incomplete")}
-        </p>
-      )}
-
-      {selected && !isOffers && !onModifiers && (
-        <>
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <AvailabilityCard item={selected} onPatch={patchItem} />
-            <ScheduleCard item={selected} onPatch={patchItem} />
+            <div className="min-w-0 self-start">
+              <MenuPreviewFrame
+                menu={draft}
+                selectedSectionId={section?.id ?? null}
+                onSelectSection={(id) => {
+                  setSectionId(id);
+                  setSelectedId(null);
+                  setPickGroup(false);
+                }}
+              />
+            </div>
           </div>
-          <div className="mt-4">
+        )}
+
+        {opError && (
+          <p role="alert" className={clsx("flex items-center justify-between gap-2 rounded-[12px] px-3 py-2 text-[14px] font-medium", ERROR_STRIP)}>
+            <span>{opError}</span>
+            <button type="button" className="underline" onClick={() => setOpError(null)}>
+              {c("close")}
+            </button>
+          </p>
+        )}
+
+        {selected && !isOffers && !onModifiers && (
+          <>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <AvailabilityCard item={selected} onPatch={patchItem} />
+              <ScheduleCard item={selected} onPatch={patchItem} form={form} />
+            </div>
             <NutritionStrip item={selected} onOpenNutrition={() => setTab("nutrition")} />
-          </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
 
       {/* "Add to Multiple Sections" — the frame offers it from the entry kebab
           but shows no picker, so this is the smallest thing that can honour it:

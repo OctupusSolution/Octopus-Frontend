@@ -24,8 +24,9 @@ export interface DraftContextValue {
    *  "add an item" and points this at it while it is mounted. */
   addAnother: MutableRefObject<(() => void) | null>;
   /** Lets a step hold the footer's Next Step back — the offer editor does
-   *  while its red bar lists missing details. Reset on every step change. */
-  setNextBlocked: (blocked: boolean) => void;
+   *  while its red bar lists missing details. Reset on every step change.
+   *  `message`, when given, is shown in the red strip above the footer. */
+  setNextBlocked: (blocked: boolean, message?: string | null) => void;
 }
 
 const DraftContext = createContext<DraftContextValue | null>(null);

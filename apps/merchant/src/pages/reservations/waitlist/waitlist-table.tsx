@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import clsx from "clsx";
-import { Check, CircleCheck, CircleX, Minus, Phone, Send } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import {
   estimatedSeatingMinutes,
   formatJoined,
@@ -14,6 +15,8 @@ import { useWaitlistExtraText } from "./_shared/extra-text";
 import { ChannelGlyph } from "./_shared/glyphs";
 import { apiStatusOf } from "./_shared/waitlist-api";
 import { STATUS_KEY, STATUS_TONE } from "./_shared/labels";
+import { INK, LINE_SOFT, SURFACE, TINT_CLASS } from "./_shared/theme";
+import { WaitlistIcon, WaitlistImg } from "./_shared/waitlist-icon";
 import { WaitlistRowMenu } from "./row-menu";
 
 export interface RowHandlers {
@@ -28,9 +31,23 @@ export interface RowHandlers {
   onReinstate: (entry: WaitlistEntry) => void;
 }
 
-const TH = "whitespace-nowrap px-2 py-3 2xl:px-2.5 text-center text-[13.5px] font-medium text-[var(--octo-text-primary)]";
-const TD = "whitespace-nowrap px-2 py-3 2xl:px-2.5 text-center text-[13.5px] text-[var(--octo-text-primary)]";
-const ICON_BTN = "grid h-8 w-10 place-items-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+// The frame's cells: a 36px header band and 56px rows, both in 12px type.
+const TH = clsx(INK, "h-9 whitespace-nowrap px-2 text-center text-[12px] font-medium capitalize leading-[12px]");
+const TD = clsx(INK, "h-14 whitespace-nowrap px-1 text-center text-[12px] font-normal leading-[12px]");
+const ICON_BTN = "grid h-8 w-10 shrink-0 place-items-center rounded-[8px] transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+
+/** The guest and trailing columns keep the frame's widths; the columns between
+ *  them share what is left, so they sit in the middle on a wide screen. */
+const COLUMNS: readonly { key: string; width?: number }[] = [
+  { key: "guest", width: 238 },
+  { key: "partySize" },
+  { key: "joined", width: 143 },
+  { key: "waittime" },
+  { key: "estSeating" },
+  { key: "area" },
+  { key: "status", width: 103 },
+  { key: "actions", width: 299 },
+];
 
 function Box({ checked, indeterminate, onChange, label }: { checked: boolean; indeterminate?: boolean; onChange: () => void; label: string }) {
   return (
@@ -41,11 +58,11 @@ function Box({ checked, indeterminate, onChange, label }: { checked: boolean; in
       aria-label={label}
       onClick={onChange}
       className={clsx(
-        "grid h-[18px] w-[18px] place-items-center rounded-[4px] border transition-colors",
-        checked || indeterminate ? "border-[#0D6EFD] bg-[#0D6EFD] text-white" : "border-[var(--octo-text-muted)] bg-[var(--octo-card)]"
+        "grid h-[13px] w-[13px] place-items-center rounded-[2px] border transition-colors",
+        checked || indeterminate ? "border-[#0D6EFD] bg-[#0D6EFD] text-white" : "border-[#767676] bg-white [[data-theme=dark]_&]:border-[var(--octo-text-muted)] [[data-theme=dark]_&]:bg-[var(--octo-card)]"
       )}
     >
-      {indeterminate ? <Minus size={12} strokeWidth={3} /> : checked && <Check size={12} strokeWidth={3} />}
+      {indeterminate ? <Minus size={9} strokeWidth={4} /> : checked && <Check size={9} strokeWidth={4} />}
     </button>
   );
 }
@@ -54,8 +71,11 @@ export function StatusPill({ entry }: { entry: WaitlistEntry }) {
   const { t } = useI18n();
   const tone = STATUS_TONE[entry.status];
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium" style={{ backgroundColor: tone.bg, color: tone.text }}>
-      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tone.dot }} />
+    <span
+      style={{ "--tint-fg": tone.text, "--tint-bg": tone.bg } as CSSProperties}
+      className={clsx(TINT_CLASS, "inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium leading-[12px]")}
+    >
+      <span className="h-[5px] w-[5px] rounded-full bg-current" />
       {t(STATUS_KEY[entry.status])}
     </span>
   );
@@ -86,14 +106,18 @@ export function WaitlistTable({
   const someSelected = !allSelected && rows.some((r) => selected.has(r.id));
   const minutes = (n: number) => `${n} ${t("waitlist.min")}`;
 
-  const headers = ["guest", "partySize", "joined", "waittime", "estSeating", "area", "status", "actions"];
-
   return (
-    <div className="octo-scroll overflow-x-auto rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
-      <table className="w-full min-w-[1080px] border-collapse">
+    <div className={clsx(SURFACE, LINE_SOFT, "octo-scroll overflow-x-auto rounded-[12px] border")}>
+      <table className="w-full min-w-[1180px] table-fixed border-collapse">
+        <colgroup>
+          <col style={{ width: 41 }} />
+          {COLUMNS.map((column) => (
+            <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+          ))}
+        </colgroup>
         <thead>
-          <tr className="border-b border-[var(--octo-border-card)] bg-[var(--octo-soft-bg)]">
-            <th className="w-12 px-4 py-3">
+          <tr className="border-b-[0.8px] border-[#E2E8F0] bg-[#F8FAFC] [[data-theme=dark]_&]:border-[var(--octo-border-card)] [[data-theme=dark]_&]:bg-[var(--octo-soft-bg)]">
+            <th className="h-9 px-[14px]">
               <Box
                 checked={allSelected}
                 indeterminate={someSelected}
@@ -101,9 +125,9 @@ export function WaitlistTable({
                 onChange={() => onSelectedChange(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
               />
             </th>
-            {headers.map((h) => (
-              <th key={h} className={TH}>
-                {t(`waitlist.table.${h}`)}
+            {COLUMNS.map((column) => (
+              <th key={column.key} className={TH}>
+                {t(`waitlist.table.${column.key}`)}
               </th>
             ))}
           </tr>
@@ -120,11 +144,11 @@ export function WaitlistTable({
               <tr
                 key={entry.id}
                 className={clsx(
-                  "border-b border-[var(--octo-row-border)] last:border-0 transition-colors",
-                  checked ? "bg-[var(--octo-tone-info-bg)]" : "hover:bg-[var(--octo-row-hover)]"
+                  "border-b-[0.8px] border-[#F1F5F9] transition-colors last:border-0 [[data-theme=dark]_&]:border-[var(--octo-row-border)]",
+                  checked ? "bg-[#F5F9FF] [[data-theme=dark]_&]:bg-[var(--octo-tone-info-bg)]" : "hover:bg-[#F8FAFC] [[data-theme=dark]_&]:hover:bg-[var(--octo-row-hover)]"
                 )}
               >
-                <td className="px-4 py-3">
+                <td className="h-14 px-[14px]">
                   <Box
                     checked={checked}
                     label={name}
@@ -137,30 +161,32 @@ export function WaitlistTable({
                   />
                 </td>
                 <td className={TD}>
-                  <p className="font-normal">{name}</p>
-                  <p className="mt-1 inline-flex items-center gap-2 text-[13.5px]">
-                    <ChannelGlyph channel={entry.channel} />
-                    <span dir="ltr">{entry.phone}</span>
-                  </p>
+                  <div className="flex flex-col items-center gap-2">
+                    <p>{name}</p>
+                    <p className="flex items-center gap-1.5">
+                      <ChannelGlyph channel={entry.channel} />
+                      <span dir="ltr">{entry.phone}</span>
+                    </p>
+                  </div>
                 </td>
                 <td className={TD}>{entry.partySize}</td>
                 <td className={TD}>{formatJoined(entry.joinedAt, locale, t("waitlist.at"))}</td>
-                <td className={clsx(TD, active && waited > entry.quotedMin && "text-[var(--octo-tone-danger-text)]")}>{minutes(waited)}</td>
+                <td className={clsx(TD, active && waited > entry.quotedMin && "!text-[#D30202]")}>{minutes(waited)}</td>
                 <td className={TD}>{est === null ? "—" : minutes(est)}</td>
                 <td className={TD}>{entry.status === "seated" && entry.seatedTable ? `${entry.seatedArea} · ${entry.seatedTable}` : entry.areaPreference || "—"}</td>
                 <td className={TD}>
                   <StatusPill entry={entry} />
                 </td>
-                <td className="px-2 py-3 2xl:px-2.5">
-                  <div className="flex items-center justify-center gap-1.5 2xl:gap-2">
+                <td className="h-14 px-3">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       type="button"
                       disabled={!active}
                       onClick={() => handlers.onSeat(entry)}
                       title={active && position ? `${t("waitlist.action.seat")} · #${position}` : t("waitlist.action.seat")}
-                      className="inline-flex h-8 items-center gap-2 rounded-lg bg-[#0D6EFD] pe-4 ps-2.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] bg-[#0D6EFD] px-3 text-[14px] font-medium leading-[14px] text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <CircleCheck size={20} fill="#fff" className="text-[#0D6EFD]" strokeWidth={2.2} />
+                      <WaitlistImg name="done.svg" />
                       {t("waitlist.action.seat")}
                     </button>
                     <button
@@ -168,9 +194,9 @@ export function WaitlistTable({
                       onClick={() => handlers.onCall(entry)}
                       title={t("waitlist.action.call")}
                       aria-label={`${t("waitlist.action.call")} ${name}`}
-                      className={clsx(ICON_BTN, "bg-[color-mix(in_srgb,#0D6EFD_5%,var(--octo-card))] text-[#0B4FC0] hover:bg-[var(--octo-tone-info-bg)] [[data-theme=dark]_&]:text-[var(--octo-tone-info-text)]")}
+                      className={clsx(ICON_BTN, "bg-[#F5F9FF] text-[#004BB9] hover:bg-[#E6F0FF] [[data-theme=dark]_&]:bg-[var(--octo-tone-info-bg)] [[data-theme=dark]_&]:text-[var(--octo-tone-info-text)]")}
                     >
-                      <Phone size={18} strokeWidth={1.6} />
+                      <WaitlistIcon name="call.svg" />
                     </button>
                     <button
                       type="button"
@@ -178,9 +204,9 @@ export function WaitlistTable({
                       onClick={() => handlers.onNotify(entry)}
                       title={t("waitlist.action.notify")}
                       aria-label={`${t("waitlist.action.notify")} ${name}`}
-                      className={clsx(ICON_BTN, "bg-[var(--octo-tone-warning-bg)] text-[#E3A008] hover:bg-[rgb(245_158_11/0.2)]")}
+                      className={clsx(ICON_BTN, "bg-[#FFF5E4] text-[#DE9000] hover:bg-[#FFEBC8] [[data-theme=dark]_&]:bg-[var(--octo-tone-warning-bg)]")}
                     >
-                      <Send size={18} strokeWidth={1.6} />
+                      <WaitlistIcon name="share.svg" />
                     </button>
                     <button
                       type="button"
@@ -188,9 +214,9 @@ export function WaitlistTable({
                       onClick={() => handlers.onRemove(entry)}
                       title={t("waitlist.action.remove")}
                       aria-label={`${t("waitlist.action.remove")} ${name}`}
-                      className={clsx(ICON_BTN, "bg-[var(--octo-tone-danger-bg)] text-[#D20000] hover:bg-[rgb(239_68_68/0.2)] [[data-theme=dark]_&]:text-[var(--octo-tone-danger-text)]")}
+                      className={clsx(ICON_BTN, "bg-[#FEF0F0] text-[#D30202] hover:bg-[#FDDCDC] [[data-theme=dark]_&]:bg-[var(--octo-tone-danger-bg)] [[data-theme=dark]_&]:text-[var(--octo-tone-danger-text)]")}
                     >
-                      <CircleX size={20} strokeWidth={2} />
+                      <WaitlistIcon name="error.svg" />
                     </button>
                     <WaitlistRowMenu
                       open={openMenuId === entry.id}

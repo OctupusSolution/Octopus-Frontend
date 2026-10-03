@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { Search, Share, SlidersHorizontal, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   CONTACT_CHANNELS,
   DEFAULT_FILTERS,
@@ -13,11 +13,33 @@ import {
   type WaitlistSort,
 } from "@/entities/waitlist-entry";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { Dropdown, MenuItem } from "@/pages/reservations/floor-plan/_shared/dropdown";
+import { MenuItem } from "@/pages/reservations/floor-plan/_shared/dropdown";
 import { useDismiss } from "@/pages/reservations/_shared/use-dismiss";
 import { BUCKET_KEY, CHANNEL_KEY, SORT_KEY, SOURCE_KEY, STATUS_KEY } from "./_shared/labels";
+import { INK, LINE_SOFT, SUB, SURFACE } from "./_shared/theme";
+import { WaitlistIcon } from "./_shared/waitlist-icon";
 
-const CONTROL = "h-10 rounded-[10px] text-[14px]";
+/** Every control in the frame's toolbar row: 40px tall, 24px glyph, 14px medium label. */
+const CONTROL = "h-10 rounded-[8px] px-4 text-[14px] font-medium leading-[14px]";
+const OUTLINE = clsx(SURFACE, LINE_SOFT, SUB, "border transition-colors hover:bg-[#F8FAFC] [[data-theme=dark]_&]:hover:bg-[var(--octo-hover)]");
+
+export function ToolbarSelect({ label, children }: { label: ReactNode; children: (close: () => void) => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useDismiss(open, () => setOpen(false));
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className={clsx(CONTROL, OUTLINE, "flex items-center gap-2 whitespace-nowrap")}>
+        {label}
+        <WaitlistIcon name="arrow-down.svg" className={clsx("transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div role="menu" className="absolute start-0 top-full z-40 mt-1.5 min-w-full rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)]">
+          {children(() => setOpen(false))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function WaitlistToolbar({
   filters,
@@ -40,26 +62,18 @@ export function WaitlistToolbar({
   const set = (patch: Partial<WaitlistFilters>) => onFiltersChange({ ...filters, ...patch });
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5 xl:gap-4">
-      <label className="relative min-w-[200px] flex-[1_1_260px] xl:max-w-[376px]">
+    <div className="flex flex-wrap items-center gap-3">
+      <label className={clsx(SURFACE, LINE_SOFT, SUB, "flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-[12px] border px-4 focus-within:border-[#0D6EFD]")}>
         <span className="sr-only">{t("waitlist.toolbar.search")}</span>
-        <Search size={20} strokeWidth={1.6} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-secondary)]" />
+        <WaitlistIcon name="search.svg" />
         <input
           value={filters.query}
           onChange={(e) => set({ query: e.target.value })}
           placeholder={t("waitlist.toolbar.search")}
-          className={clsx(
-            CONTROL,
-            "w-full border border-[var(--octo-border-input)] bg-[var(--octo-card)] pe-9 ps-11 text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-muted)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25"
-          )}
+          className={clsx(INK, "h-full min-w-0 flex-1 bg-transparent text-[14px] font-medium leading-[14px] placeholder:text-[#687280] focus:outline-none [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-muted)]")}
         />
         {filters.query && (
-          <button
-            type="button"
-            onClick={() => set({ query: "" })}
-            aria-label={t("waitlist.toolbar.clearSearch")}
-            className="absolute end-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]"
-          >
+          <button type="button" onClick={() => set({ query: "" })} aria-label={t("waitlist.toolbar.clearSearch")} className="grid h-6 w-6 shrink-0 place-items-center rounded-md hover:bg-[var(--octo-hover)]">
             <X size={14} />
           </button>
         )}
@@ -67,7 +81,7 @@ export function WaitlistToolbar({
 
       <FiltersPopover filters={filters} onChange={onFiltersChange} />
 
-      <Dropdown label={filters.area || t("waitlist.toolbar.allAreas")} align="start" buttonClassName={clsx(CONTROL, "min-w-[126px]")}>
+      <ToolbarSelect label={filters.area || t("waitlist.toolbar.allAreas")}>
         {(close) => (
           <>
             <MenuItem label={t("waitlist.toolbar.allAreas")} selected={!filters.area} onClick={() => { set({ area: "" }); close(); }} />
@@ -76,44 +90,37 @@ export function WaitlistToolbar({
             ))}
           </>
         )}
-      </Dropdown>
+      </ToolbarSelect>
 
-      <Dropdown label={t(BUCKET_KEY[filters.partySize])} align="start" buttonClassName={clsx(CONTROL, "min-w-[152px]")}>
+      <ToolbarSelect label={t(BUCKET_KEY[filters.partySize])}>
         {(close) =>
           PARTY_SIZE_BUCKETS.map((bucket) => (
             <MenuItem key={bucket} label={t(BUCKET_KEY[bucket])} selected={filters.partySize === bucket} onClick={() => { set({ partySize: bucket }); close(); }} />
           ))
         }
-      </Dropdown>
+      </ToolbarSelect>
 
-      <Dropdown
+      <ToolbarSelect
         label={
-          <span className="text-[var(--octo-text-secondary)]">
-            {t("waitlist.toolbar.sortedBy")}
-            <span className="me-1 text-[var(--octo-text-muted)]">:</span>
-            <span className="text-[13px]">{t(SORT_KEY[sort])}</span>
+          <span>
+            {t("waitlist.toolbar.sortedBy")}_<span className="text-[12px] font-normal leading-[12px]">{t(SORT_KEY[sort])}</span>
           </span>
         }
-        align="start"
-        buttonClassName={clsx(CONTROL, "min-w-[218px]")}
       >
         {(close) =>
           WAITLIST_SORTS.map((option) => (
             <MenuItem key={option} label={t(SORT_KEY[option])} selected={sort === option} onClick={() => { onSortChange(option); close(); }} />
           ))
         }
-      </Dropdown>
+      </ToolbarSelect>
 
       <button
         type="button"
         onClick={onExport}
         disabled={exportDisabled}
-        className={clsx(
-          CONTROL,
-          "ms-auto inline-flex items-center gap-2 bg-[#0D6EFD] px-4 font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        )}
+        className={clsx(CONTROL, "flex shrink-0 items-center gap-2 bg-[#007BFF] text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50")}
       >
-        <Share size={18} strokeWidth={1.8} />
+        <WaitlistIcon name="export.svg" />
         {t("waitlist.toolbar.export")}
       </button>
     </div>
@@ -158,20 +165,15 @@ function FiltersPopover({ filters, onChange }: { filters: WaitlistFilters; onCha
   );
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((o) => !o)}
-        className={clsx(
-          CONTROL,
-          "inline-flex items-center gap-2 border px-4 transition-colors",
-          count > 0 ? "border-[#0D6EFD] text-[#0D6EFD]" : "border-[var(--octo-border-input)] text-[var(--octo-text-secondary)]",
-          "bg-[var(--octo-card)] hover:bg-[var(--octo-hover)]"
-        )}
+        className={clsx(CONTROL, OUTLINE, "flex items-center gap-2", count > 0 && "!border-[#0D6EFD] !text-[#0D6EFD]")}
       >
-        <SlidersHorizontal size={19} strokeWidth={1.6} />
+        <WaitlistIcon name="filter.svg" />
         {t("waitlist.toolbar.filters")}
         {count > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-[#0D6EFD] px-1 text-[11px] font-semibold text-white">{count}</span>}
       </button>

@@ -1,24 +1,57 @@
-import { useMemo, useState } from "react";
-import { MapPin, Phone, Search, Settings, Users } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import clsx from "clsx";
 import { EmptyState } from "@ui/primitives";
 import { branches, type Branch } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { Avatar } from "./_shared/avatar";
 import { buttonClass } from "./_shared/buttons";
 import { ConfirmModal } from "./_shared/confirm-modal";
-import { SelectInput, TextInput } from "./_shared/form";
+import { StaffIcon } from "./_shared/icon";
 import { formatDateTime } from "./_shared/format";
 import { useStaffLabels } from "./_shared/labels";
 import { useCatalogNames } from "./_shared/catalog-names";
 import { RowMenu, type RowMenuItem } from "./_shared/row-menu";
 import { useStaffStore } from "./_shared/staff-store";
 import { StatusPill } from "./_shared/status-pill";
+import { INK, INK_LINK, INK_MUTED, INK_SOFT, LINE, LINE_SOFT } from "./_shared/theme";
 import { ToastBanner, useToast } from "./_shared/toast";
 import { AddMemberModal } from "./add-member-modal";
 import { AssignRoleModal } from "./assign-role-modal";
 import { MemberDetails, type MemberDraft } from "./member-details";
 
 type StatusFilter = "all" | "active" | "inactive";
+
+// The toolbar's filter buttons: a native select dressed as the frame's 40px
+// outlined button with its own arrow.
+function FilterSelect({
+  value,
+  onChange,
+  ariaLabel,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className="relative flex w-full items-center sm:w-auto">
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={clsx(
+          "h-10 w-full appearance-none rounded-[8px] border bg-[var(--octo-card)] pe-12 ps-4 text-[14px] leading-[14px] transition-colors focus:border-[#0D6EFD] focus:outline-none",
+          INK_MUTED,
+          LINE_SOFT
+        )}
+      >
+        {children}
+      </select>
+      <StaffIcon name="form-arrow-down.svg" size={24} className={clsx("pointer-events-none absolute end-4", INK_MUTED)} />
+    </span>
+  );
+}
 
 export function StaffTab({
   addOpen,
@@ -175,37 +208,37 @@ export function StaffTab({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-[240px] flex-1">
-              <TextInput
+            <label className={clsx("flex h-10 min-w-[240px] flex-1 items-center gap-2 rounded-[12px] border bg-[var(--octo-card)] px-4 transition-colors focus-within:border-[#0D6EFD]", LINE_SOFT)}>
+              <StaffIcon name="crm-search.svg" size={24} className={INK_MUTED} />
+              <input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("staff.grid.searchPlaceholder")}
                 aria-label={t("staff.grid.searchPlaceholder")}
-                leading={<Search size={20} />}
+                className={clsx(
+                  "h-full min-w-0 flex-1 bg-transparent text-[14px] leading-[14px] outline-none placeholder:text-[#687280] [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-secondary)]",
+                  INK
+                )}
               />
-            </div>
-            <div className="w-full sm:w-[190px]">
-              <SelectInput aria-label={t("staff.filter.allBranches")} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value as "all" | Branch)}>
-                <option value="all">{t("staff.filter.allBranches")}</option>
-                {branches.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </SelectInput>
-            </div>
-            <div className="w-full sm:w-[170px]">
-              <SelectInput aria-label={t("staff.filter.allStatuses")} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
-                <option value="all">{t("staff.filter.allStatuses")}</option>
-                <option value="active">{t("staff.status.active")}</option>
-                <option value="inactive">{t("staff.status.inactive")}</option>
-              </SelectInput>
-            </div>
+            </label>
+            <FilterSelect ariaLabel={t("staff.filter.allBranches")} value={branchFilter} onChange={(v) => setBranchFilter(v as "all" | Branch)}>
+              <option value="all">{t("staff.filter.allBranches")}</option>
+              {branches.map((b) => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </FilterSelect>
+            <FilterSelect ariaLabel={t("staff.filter.allStatuses")} value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <option value="all">{t("staff.filter.allStatuses")}</option>
+              <option value="active">{t("staff.status.active")}</option>
+              <option value="inactive">{t("staff.status.inactive")}</option>
+            </FilterSelect>
           </div>
 
           {rows.length === 0 ? (
-            <div className="mt-4 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)]">
+            <div className={clsx("mt-4 rounded-[8px] border bg-[var(--octo-card)]", LINE)}>
               <EmptyState
-                icon={<Users size={18} />}
+                icon={<StaffIcon name="staff-user.svg" size={20} />}
                 title={t("staff.grid.emptyTitle")}
                 description={t(hasFilters ? "staff.grid.emptyFiltered" : "staff.grid.emptyDescription")}
                 action={
@@ -218,7 +251,7 @@ export function StaffTab({
               />
             </div>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 min-[1400px]:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3 min-[1400px]:grid-cols-4">
               {rows.map((e) => {
                 const profile = store.profileOf(e.id)!;
                 const inactive = store.isInactive(e.id);
@@ -236,46 +269,49 @@ export function StaffTab({
                         onSelect(e.id);
                       }
                     }}
-                    className="group flex cursor-pointer flex-col rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 pb-3.5 pt-4 transition-[border-color,box-shadow] hover:border-[#0D6EFD]/40 hover:shadow-[0_4px_16px_rgba(16,24,40,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40"
+                    className={clsx(
+                      "flex cursor-pointer flex-col gap-1 rounded-[8px] border bg-[var(--octo-card)] p-3 transition-colors hover:border-[#0D6EFD] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                      LINE
+                    )}
                   >
-                    <div className="flex gap-3">
-                      <Avatar name={e.name} size={44} className={inactive ? "opacity-60" : undefined} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-[15px] font-semibold leading-snug text-[var(--octo-text-primary)]">{e.name}</p>
-                            <p className="truncate text-[13px] leading-snug text-[#0D6EFD]">{names.jobTitle(profile.jobTitle)}</p>
+                    <div className={clsx("flex items-start gap-2 border-b pb-2", LINE)}>
+                      <Avatar name={e.name} size={32} className={inactive ? "opacity-60" : undefined} />
+                      <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                        <div className="flex min-w-0 flex-col gap-2">
+                          <div className="flex min-w-0 flex-col gap-1">
+                            <p className={clsx("-my-0.5 truncate py-0.5 text-[14px] font-semibold leading-[14px]", INK)}>{e.name}</p>
+                            <p className={clsx("-my-0.5 truncate py-0.5 text-[12px] font-medium leading-3", INK_LINK)}>{names.jobTitle(profile.jobTitle)}</p>
                           </div>
-                          <RowMenu
-                            items={menuItemsFor(e.id, e.name)}
-                            open={menuId === e.id}
-                            onOpenChange={(open) => setMenuId(open ? e.id : null)}
-                            ariaLabel={t("staff.grid.moreActions").replace("{name}", e.name)}
-                          />
+                          <div className={clsx("flex min-w-0 flex-col gap-1 text-[12px] leading-3", INK_SOFT)}>
+                            <span className="flex min-w-0 items-center gap-0.5">
+                              <StaffIcon name="staff-call.svg" size={16} />
+                              <span dir="ltr" className="-my-0.5 truncate py-0.5">{e.phone}</span>
+                            </span>
+                            <span className="flex min-w-0 items-center gap-0.5">
+                              <StaffIcon name="staff-location.svg" size={16} />
+                              <span className="-my-0.5 truncate py-0.5">{e.branch}</span>
+                            </span>
+                          </div>
                         </div>
-                        <div className="mt-2 flex flex-col gap-1.5 text-[13px] text-[var(--octo-text-secondary)]">
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <Phone size={15} aria-hidden className="shrink-0" />
-                            <span dir="ltr" className="truncate">{e.phone}</span>
-                          </span>
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <MapPin size={15} aria-hidden className="shrink-0" />
-                            <span className="truncate">{e.branch}</span>
-                          </span>
-                        </div>
+                        <RowMenu
+                          items={menuItemsFor(e.id, e.name)}
+                          open={menuId === e.id}
+                          onOpenChange={(open) => setMenuId(open ? e.id : null)}
+                          ariaLabel={t("staff.grid.moreActions").replace("{name}", e.name)}
+                        />
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-[var(--octo-divider)] pt-3">
-                      <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--octo-text-primary)]">
-                        <Settings size={15} aria-hidden className="shrink-0" />
-                        <span className="truncate">
+                    <div className="flex min-h-4 items-center justify-between gap-2">
+                      <span className={clsx("flex min-w-0 items-center gap-1 text-[10px] leading-[10px]", INK)}>
+                        <StaffIcon name="staff-system-update.svg" size={16} glyph={[14, 14.33]} />
+                        <span className="-my-0.5 truncate py-0.5">
                           {t("staff.grid.lastAccess")}: {profile.lastAccess ? formatDateTime(profile.lastAccess, locale) : t("staff.grid.neverSignedIn")}
                         </span>
                       </span>
                       {profile.locked ? (
-                        <StatusPill tone="danger" label={t("staff.status.locked")} />
+                        <StatusPill tone="danger" label={t("staff.status.locked")} className="-my-1" />
                       ) : inactive ? (
-                        <StatusPill tone="neutral" label={t("staff.status.inactive")} />
+                        <StatusPill tone="neutral" label={t("staff.status.inactive")} className="-my-1" />
                       ) : null}
                     </div>
                   </article>

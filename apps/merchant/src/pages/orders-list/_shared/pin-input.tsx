@@ -4,6 +4,7 @@
 // orders-list doesn't reach into features/session under this codebase's
 // layering, and this modal's boxes are smaller than the auth screen's.
 import { useRef, type ChangeEvent, type ClipboardEvent, type KeyboardEvent } from "react";
+import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
 
 export const PIN_LENGTH = 4;
@@ -47,7 +48,7 @@ export function PinInput({ value, onChange }: { value: string[]; onChange: (next
   }
 
   return (
-    <div dir="ltr" className="flex items-center justify-center gap-3">
+    <div dir="ltr" className="flex items-center justify-center gap-4">
       {Array.from({ length: PIN_LENGTH }, (_, index) => (
         <input
           key={index}
@@ -63,7 +64,11 @@ export function PinInput({ value, onChange }: { value: string[]; onChange: (next
           maxLength={2}
           aria-label={t("orders.managerAuth.pinDigitLabel").replace("{n}", String(index + 1))}
           autoFocus={index === 0}
-          className="h-14 w-14 rounded-xl border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-center text-[20px] font-semibold text-[#0D6EFD] transition-colors focus:outline-none focus:ring-4 focus:ring-[#0D6EFD]/15 focus:border-[#0D6EFD]"
+          className={clsx(
+            "h-[58px] w-[58px] rounded-[8px] border bg-[#fbfafc] p-0 text-center text-[24px] font-semibold leading-6 text-[#0D6EFD] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25 [[data-theme=dark]_&]:bg-[var(--octo-soft-bg)] [[data-theme=dark]_&]:focus:border-[#0D6EFD]",
+            // A filled box keeps the blue outline the frame draws on its "5".
+            value[index] ? "border-[#0D6EFD]" : "border-[#cbd5e1] [[data-theme=dark]_&]:border-[var(--octo-border-input)]"
+          )}
         />
       ))}
     </div>

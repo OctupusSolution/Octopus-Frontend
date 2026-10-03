@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { listStaffMemberActivity, type StaffActivityResponse } from "@octopus/api-client";
-import { Modal } from "@ui/primitives";
 import { TODAY } from "@/shared/api/mock-staff";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { buttonClass } from "./_shared/buttons";
 import { formatAuditTime } from "./_shared/format";
+import { StaffIcon } from "./_shared/icon";
+import { StaffModal } from "./_shared/staff-modal";
 import { useStaffStore, type AuditEntry } from "./_shared/staff-store";
+import { INK, INK_SOFT, LINE } from "./_shared/theme";
 
 const PREVIEW = 5;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -20,21 +21,44 @@ function humanizeAction(action: string): string {
   return action.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ");
 }
 
+// One timeline stop as the frame draws it: a 16px green dot in a 24px mint
+// halo, a 12px title and 10px detail lines, with a mint rail running through
+// the dots' centres down to the next stop.
+function Stop({ title, lines, last, capitalize }: { title: string; lines: ReactNode[]; last: boolean; capitalize?: boolean }) {
+  return (
+    <li className="relative flex items-start gap-2 pb-8 last:pb-0">
+      {!last && <span aria-hidden className="absolute bottom-0 start-[11.5px] top-3 w-px bg-[#bef2da] [[data-theme=dark]_&]:bg-[#009a39]/40" />}
+      <span aria-hidden className="relative grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#dcffef] [[data-theme=dark]_&]:bg-[#009a39]/25">
+        <span className="h-4 w-4 rounded-full bg-[#009a39]" />
+      </span>
+      <div className="flex min-w-0 flex-col gap-2 font-medium">
+        <p className={clsx("truncate text-[12px] leading-3", INK, capitalize && "capitalize")}>{title}</p>
+        <div className={clsx("flex flex-col gap-2 text-[10px] leading-[10px]", INK_SOFT)}>{lines}</div>
+      </div>
+    </li>
+  );
+}
+
 function ServerTimeline({ entries, locale }: { entries: StaffActivityResponse[]; locale: string }) {
   const { t } = useI18n();
   const words = { today: t("staff.audit.today"), yesterday: t("staff.audit.yesterday") };
   return (
     <ol className="flex flex-col">
       {entries.map((entry, i) => (
-        <li key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
-          {i < entries.length - 1 && <span aria-hidden className="absolute start-[5px] top-4 h-full w-px bg-[var(--octo-divider)]" />}
-          <span aria-hidden className="relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full bg-[#16A34A]" />
-          <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold capitalize text-[var(--octo-text-primary)]">{humanizeAction(entry.action)}</p>
-            <p className="text-[13px] text-[var(--octo-text-secondary)]">{formatAuditTime(entry.occurredAtUtc, locale, TODAY, words)}</p>
-            {entry.actorDisplay && <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{t("staff.audit.by").replace("{name}", entry.actorDisplay)}</p>}
-          </div>
-        </li>
+        <Stop
+          key={entry.id}
+          capitalize
+          last={i === entries.length - 1}
+          title={humanizeAction(entry.action)}
+          lines={[
+            <p key="at">{formatAuditTime(entry.occurredAtUtc, locale, TODAY, words)}</p>,
+            entry.actorDisplay && (
+              <p key="by" className="truncate">
+                {t("staff.audit.by").replace("{name}", entry.actorDisplay)}
+              </p>
+            ),
+          ]}
+        />
       ))}
     </ol>
   );
@@ -53,19 +77,19 @@ function Timeline({ entries }: { entries: AuditEntry[] }) {
             ? t("staff.audit.by").replace("{name}", entry.actor)
             : null;
         return (
-          <li key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
-            {i < entries.length - 1 && <span aria-hidden className="absolute start-[5px] top-4 h-full w-px bg-[var(--octo-divider)]" />}
-            <span aria-hidden className="relative mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full bg-[#16A34A]" />
-            <div className="min-w-0">
-              <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t(`staff.audit.kind.${entry.kind}`)}</p>
-              <p className="text-[13px] text-[var(--octo-text-secondary)]">{formatAuditTime(entry.at, locale, TODAY, words)}</p>
-              {detail && (
-                <p className="truncate text-[13px] text-[var(--octo-text-secondary)]" dir={entry.ip ? "ltr" : undefined}>
+          <Stop
+            key={entry.id}
+            last={i === entries.length - 1}
+            title={t(`staff.audit.kind.${entry.kind}`)}
+            lines={[
+              <p key="at">{formatAuditTime(entry.at, locale, TODAY, words)}</p>,
+              detail && (
+                <p key="detail" className="truncate" dir={entry.ip ? "ltr" : undefined}>
                   {detail}
                 </p>
-              )}
-            </div>
-          </li>
+              ),
+            ]}
+          />
         );
       })}
     </ol>
@@ -101,53 +125,36 @@ export function ActivityAuditCard({ employeeId, name, className }: { employeeId:
 
   const useServer = serverEntries !== null && serverEntries.length > 0;
   const entries = useServer ? serverEntries : localEntries;
+  const empty = <p className={clsx("text-[12px] font-medium leading-[1.4]", INK_SOFT)}>{t("staff.audit.empty")}</p>;
 
   return (
-    <aside aria-label={t("staff.audit.title")} className={clsx("rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4", className)}>
-      <h2 className="text-[17px] font-bold text-[var(--octo-text-primary)]">{t("staff.audit.title")}</h2>
-      <div className="mt-4">
-        {entries.length ? (
-          useServer ? (
-            <ServerTimeline entries={serverEntries.slice(0, PREVIEW)} locale={locale} />
-          ) : (
-            <Timeline entries={localEntries.slice(0, PREVIEW)} />
-          )
+    <aside aria-label={t("staff.audit.title")} className={clsx("flex flex-col gap-4 rounded-[16px] border bg-[var(--octo-card)] p-3", LINE, className)}>
+      <h2 className={clsx("text-[14px] font-bold leading-[14px]", INK)}>{t("staff.audit.title")}</h2>
+      {entries.length ? (
+        useServer ? (
+          <ServerTimeline entries={serverEntries.slice(0, PREVIEW)} locale={locale} />
         ) : (
-          <p className="text-[14px] text-[var(--octo-text-secondary)]">{t("staff.audit.empty")}</p>
-        )}
-      </div>
+          <Timeline entries={localEntries.slice(0, PREVIEW)} />
+        )
+      ) : (
+        empty
+      )}
 
-      <button type="button" onClick={() => setFullOpen(true)} className={buttonClass("outline", "md", "mt-5 w-full")}>
+      <button type="button" onClick={() => setFullOpen(true)} className={buttonClass("outline", "md", "w-full")}>
         {t("staff.audit.viewAll")}
       </button>
 
-      <div className="mt-4 rounded-[10px] bg-[var(--octo-tone-warning-bg)] p-3 text-[var(--octo-tone-warning-text)]">
-        <p className="flex items-center gap-1.5 text-[14px] font-semibold">
-          <TriangleAlert size={16} aria-hidden />
+      <div className="flex flex-col gap-2 rounded-[12px] bg-[#fff5e4] p-2 [[data-theme=dark]_&]:bg-[#f59e0b]/15">
+        <p className="flex items-center gap-1 text-[12px] font-bold leading-3 text-[#f59e0b]">
+          <StaffIcon name="staff-error-circle.svg" size={16} />
           {t("staff.audit.importantTitle")}
         </p>
-        <p className="mt-1 text-[13px] leading-relaxed">{t("staff.audit.importantBody")}</p>
+        <p className={clsx("text-[12px] font-medium leading-[1.4]", INK_SOFT)}>{t("staff.audit.importantBody")}</p>
       </div>
 
-      <Modal
-        open={fullOpen}
-        onClose={() => setFullOpen(false)}
-        title={t("staff.audit.fullTitle").replace("{name}", name)}
-        className="max-w-lg"
-        footer={
-          <button type="button" onClick={() => setFullOpen(false)} className={buttonClass("secondary")}>
-            {t("staff.availability.close")}
-          </button>
-        }
-      >
-        <div className="octo-scroll mt-2 max-h-[60vh] overflow-y-auto pe-1">
-          {entries.length ? (
-            useServer ? <ServerTimeline entries={serverEntries} locale={locale} /> : <Timeline entries={localEntries} />
-          ) : (
-            <p className="text-[14px] text-[var(--octo-text-secondary)]">{t("staff.audit.empty")}</p>
-          )}
-        </div>
-      </Modal>
+      <StaffModal open={fullOpen} onClose={() => setFullOpen(false)} title={t("staff.audit.fullTitle").replace("{name}", name)}>
+        {entries.length ? useServer ? <ServerTimeline entries={serverEntries} locale={locale} /> : <Timeline entries={localEntries} /> : empty}
+      </StaffModal>
     </aside>
   );
 }

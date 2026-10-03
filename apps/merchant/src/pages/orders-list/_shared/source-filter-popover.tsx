@@ -1,8 +1,8 @@
 // apps/merchant/src/pages/orders-list/_shared/source-filter-popover.tsx
 import { useEffect, useRef, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import type { OrderSource } from "./types";
 
 const SOURCE_LABEL_KEY: Record<OrderSource, string> = {
@@ -45,16 +45,20 @@ export function SourceFilterPopover({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="grid h-[34px] w-[34px] place-items-center rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+        aria-label={t("orders.filter.sourceLabel")}
+        className={`relative grid h-6 w-6 place-items-center rounded-[4px] transition-colors hover:text-[#0d6efd] ${
+          open || selected.length > 0 ? "text-[#0d6efd]" : "text-[var(--octo-text-primary)]"
+        }`}
       >
-        <SlidersHorizontal size={14} />
+        <ShellIcon name="ord-filter.svg" size={24} />
+        {selected.length > 0 && <span className="absolute -end-0.5 -top-0.5 h-2 w-2 rounded-full bg-[#0d6efd]" />}
       </button>
 
       {open && (
         <div
           role="dialog"
           aria-label={t("orders.filter.sourceLabel")}
-          className="absolute start-0 top-[calc(100%+6px)] z-30 w-[200px] rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 shadow-lg"
+          className="absolute start-0 top-[calc(100%+8px)] z-30 w-[200px] rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3.5 shadow-lg"
         >
           <p className="text-[10.5px] font-semibold uppercase tracking-[0.06em] text-[var(--octo-text-faint)]">
             {t("orders.filter.sourceLabel")}

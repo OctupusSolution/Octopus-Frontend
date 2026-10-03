@@ -26,9 +26,10 @@ export function ActionButton({
       type="button"
       onClick={onClick}
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[8px] border font-medium transition-[filter,background-color] hover:brightness-[0.97]",
-        size === "md" ? "h-10 px-4 text-[14px]" : "h-8 px-2.5 text-[13px]",
-        !tint && "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-muted)] hover:bg-[var(--octo-hover)]",
+        "inline-flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] border text-[14px] font-medium leading-[14px] transition-[filter,background-color] hover:brightness-[0.97]",
+        size === "md" ? "h-10 px-3" : "h-8 px-2",
+        !tint &&
+          "border-[#e2e8f0] bg-[var(--octo-card)] text-[var(--octo-text-secondary)] hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]",
         className
       )}
       style={tint ? { color: tint.text, backgroundColor: tint.bg, borderColor: tint.border } : undefined}

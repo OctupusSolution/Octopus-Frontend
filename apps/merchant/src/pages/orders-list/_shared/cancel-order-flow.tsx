@@ -4,11 +4,15 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { cancelRealOrder, toCancelReasonCode } from "@/entities/order";
 import { ScopeReasonForm, type ScopeReasonPayload } from "./scope-reason-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
-import { ResultModal } from "./result-modal";
+import { ResultModal, StampArt } from "./result-modal";
 import { useActionFlow } from "./action-flow";
 import { useOrderActionConfirm } from "./use-order-action-confirm";
-import { ACTION_THEME } from "./theme";
+import { FLOW_BACKDROP_CLASS, FLOW_MODAL_CLASS } from "./form-bits";
 import type { OrderRecord } from "./types";
+
+// The fill of this flow's "Manager Authentication & Security" confirm button,
+// as its frame draws it.
+const CONFIRM_ACCENT = "#d30202";
 
 export function CancelOrderFlow({
   order,
@@ -23,7 +27,6 @@ export function CancelOrderFlow({
 }) {
   const { t } = useI18n();
   const flow = useActionFlow<ScopeReasonPayload>(["form", "pin", "result"], order !== null);
-  const accent = ACTION_THEME.cancel.accent;
   // Real cancel is always order-level: the scope form's "specific" option has
   // no line-selection UI behind it, so there is nothing to target lines with
   // yet — see BACKEND_GAPS.md 6b.
@@ -39,9 +42,8 @@ export function CancelOrderFlow({
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
+      <Modal open onClose={onClose} title={t("orders.cancel.title")} className={FLOW_MODAL_CLASS} backdropClassName={FLOW_BACKDROP_CLASS}>
         <ScopeReasonForm
-          title={t("orders.cancel.title")}
           scopeLabel={t("orders.cancel.scopeLabel")}
           scopeOptions={[
             { value: "entire", label: t("orders.cancel.scopeEntire") },
@@ -70,7 +72,7 @@ export function CancelOrderFlow({
         open
         onClose={onClose}
         onConfirm={confirm}
-        accent={accent}
+        accent={CONFIRM_ACCENT}
         promptKey="orders.managerAuth.prompt.cancel"
         confirmLabelKey="orders.managerAuth.confirm.cancel"
         errorText={errorText}
@@ -93,8 +95,10 @@ export function CancelOrderFlow({
       onClose={onClose}
       title={t("orders.result.cancelTitle")}
       subtitle={t("orders.result.cancelSubtitle").replace("{id}", order.id).replace("{date}", now)}
-      noteLines={[t("orders.result.cancelLine1"), t("orders.result.cancelLine2"), t("orders.result.cancelLine3")]}
-      noteClassName="bg-[#FEF2F2] text-[#991B1B]"
+      artwork={<StampArt />}
+      // The frame keeps its explanatory note box hidden, so no lines are passed.
+      noteLines={[]}
+      noteClassName=""
       primaryLabel={t("orders.result.done")}
       onPrimary={onClose}
     />

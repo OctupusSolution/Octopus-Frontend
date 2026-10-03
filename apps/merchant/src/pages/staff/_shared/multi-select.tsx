@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
-import { ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import { useFormLook } from "./form";
+import { StaffIcon } from "./icon";
+import { INK } from "./theme";
 import { useDismiss } from "./use-dismiss";
 
 export interface MultiOption {
@@ -38,6 +40,7 @@ export function MultiSelect({
   visible?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const look = useFormLook();
   const ref = useDismiss(open, () => setOpen(false));
 
   const selected = options.filter((o) => value.includes(o.value));
@@ -59,13 +62,15 @@ export function MultiSelect({
         aria-invalid={invalid || undefined}
         onClick={() => setOpen((o) => !o)}
         className={clsx(
-          "flex h-11 w-full items-center gap-2 rounded-[10px] border bg-[var(--octo-card)] px-3 text-start text-[14px] text-[var(--octo-text-primary)] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/20",
-          invalid ? "border-[#EF4444]" : "border-[var(--octo-border-input)]"
+          "flex h-10 w-full items-center gap-2 border bg-[var(--octo-card)] px-2 text-start text-[14px] leading-[14px] transition-colors focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25 [[data-theme=dark]_&]:focus:border-[#0D6EFD]",
+          INK,
+          look === "page" ? "rounded-[4px]" : "rounded-[12px]",
+          invalid ? "border-[#d30202]" : "border-[#cbd5e1] [[data-theme=dark]_&]:border-[var(--octo-border-input)]"
         )}
       >
         <span className="min-w-0 flex-1 truncate">
           {selected.length === 0 ? (
-            <span className="text-[var(--octo-text-faint)]">{placeholder}</span>
+            <span className="text-[#687280] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]">{placeholder}</span>
           ) : summary ? (
             summary(selected)
           ) : (
@@ -75,11 +80,11 @@ export function MultiSelect({
             </>
           )}
         </span>
-        <ChevronDown size={18} aria-hidden className={clsx("shrink-0 text-[var(--octo-text-secondary)] transition-transform", open && "rotate-180")} />
+        <StaffIcon name="form-arrow-down.svg" size={24} className={clsx("transition-transform", open && "-scale-y-100")} />
       </button>
 
       {open && (
-        <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-[12px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-[0_12px_32px_rgba(16,24,40,0.14)]">
+        <div className="absolute inset-x-0 top-full z-30 mt-1 rounded-[12px] bg-[var(--octo-card)] p-2 shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)] [[data-theme=dark]_&]:border [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
           <label className="flex cursor-pointer items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-[13px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]">
             <input
               type="checkbox"

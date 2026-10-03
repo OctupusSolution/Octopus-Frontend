@@ -28,7 +28,7 @@ export function ShiftsTab({
   return (
     <div>
       <PageTabs
-        size="md"
+        railClassName="sm:min-w-[502px]"
         ariaLabel={t("staff.shiftsTab.subnavAria")}
         value={sub}
         onChange={onSubChange}

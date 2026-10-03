@@ -4,11 +4,15 @@ import { useI18n } from "@/app/providers/i18n-provider";
 import { recordWastageForOrder, toWastageReasonCode } from "@/entities/order";
 import { WastageForm, type WastagePayload } from "./wastage-form";
 import { PinConfirmModal } from "./pin-confirm-modal";
-import { ResultModal } from "./result-modal";
+import { ResultModal, StampArt } from "./result-modal";
 import { useActionFlow } from "./action-flow";
 import { useOrderActionConfirm } from "./use-order-action-confirm";
-import { ACTION_THEME } from "./theme";
+import { FLOW_BACKDROP_CLASS, FLOW_MODAL_CLASS } from "./form-bits";
 import type { OrderRecord } from "./types";
+
+// The fill of this flow's "Manager Authentication & Security" confirm button,
+// as its frame draws it.
+const CONFIRM_ACCENT = "#7600b1";
 
 export function WastageOrderFlow({
   order,
@@ -21,7 +25,6 @@ export function WastageOrderFlow({
 }) {
   const { t } = useI18n();
   const flow = useActionFlow<WastagePayload>(["form", "pin", "result"], order !== null);
-  const accent = ACTION_THEME.wastage.accent;
   const { confirm, submitting, errorText } = useOrderActionConfirm(
     order,
     (businessId, orderId, version, approval) => {
@@ -43,9 +46,8 @@ export function WastageOrderFlow({
 
   if (flow.step === "form") {
     return (
-      <Modal open onClose={onClose} className="max-h-[88vh] max-w-[720px] overflow-y-auto">
+      <Modal open onClose={onClose} title={t("orders.wastage.title")} className={FLOW_MODAL_CLASS} backdropClassName={FLOW_BACKDROP_CLASS}>
         <WastageForm
-          title={t("orders.wastage.title")}
           selectLabel={t("orders.wastage.selectLabel")}
           itemsPlaceholder={t("orders.wastage.itemsPlaceholder")}
           decrementLabel={t("orders.wastage.decrement")}
@@ -74,7 +76,7 @@ export function WastageOrderFlow({
         open
         onClose={onClose}
         onConfirm={confirm}
-        accent={accent}
+        accent={CONFIRM_ACCENT}
         promptKey="orders.managerAuth.prompt.wastage"
         confirmLabelKey="orders.managerAuth.confirm.wastage"
         errorText={errorText}
@@ -97,8 +99,10 @@ export function WastageOrderFlow({
       onClose={onClose}
       title={t("orders.result.wastageTitle")}
       subtitle={t("orders.result.wastageSubtitle").replace("{id}", order.id).replace("{date}", now)}
-      noteLines={[t("orders.result.wastageLine1"), t("orders.result.wastageLine2")]}
-      noteClassName="bg-[#F5F3FF] text-[#5B21B6]"
+      artwork={<StampArt />}
+      // The frame keeps its explanatory note box hidden, so no lines are passed.
+      noteLines={[]}
+      noteClassName=""
       primaryLabel={t("orders.result.done")}
       onPrimary={onClose}
     />

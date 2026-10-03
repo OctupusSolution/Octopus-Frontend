@@ -1,5 +1,6 @@
 // apps/merchant/src/pages/orders-list/_shared/theme.ts
-import type { OrderState } from "./types";
+import type { CSSProperties } from "react";
+import type { OrderState, PaymentStatus } from "./types";
 
 export interface StateStyle {
   text: string;
@@ -7,19 +8,58 @@ export interface StateStyle {
   dot: string;
 }
 
-// Hex colors match this page's own design frames, not any shared token —
-// Ready/Accepted share the violet family, Served is the app's usual
-// accent blue, the rest follow the mockups' filter-pill dot colors.
+// Hex colors are this page's own Figma frame values, not shared tokens.
+// `text`/`bg` are the state chip a row shows under its timeline; `dot` is the
+// state's full-strength accent.
 export const STATE_STYLE: Record<OrderState, StateStyle> = {
-  New: { text: "var(--octo-text-secondary)", bg: "var(--octo-track)", dot: "#94A3B8" },
-  Accepted: { text: "#9333EA", bg: "#9333EA1A", dot: "#9333EA" },
-  Preparing: { text: "#D97706", bg: "#D977061A", dot: "#D97706" },
-  Ready: { text: "#9333EA", bg: "#9333EA1A", dot: "#9333EA" },
-  Served: { text: "#0D6EFD", bg: "#0D6EFD1A", dot: "#0D6EFD" },
-  Completed: { text: "#16A34A", bg: "#16A34A1A", dot: "#16A34A" },
-  Refunded: { text: "#A16207", bg: "#A162071A", dot: "#A16207" },
-  Voided: { text: "#6B7280", bg: "#6B72801A", dot: "#6B7280" },
-  Canceled: { text: "#DC2626", bg: "#DC26261A", dot: "#DC2626" },
+  New: { text: "#58606C", bg: "#E2E8F0", dot: "#58606C" },
+  Accepted: { text: "#9A0078", bg: "#FFDCF7", dot: "#9A0078" },
+  Preparing: { text: "#CE9633", bg: "#FFF5E1", dot: "#C27C00" },
+  Ready: { text: "#B233F1", bg: "#F8E9FF", dot: "#9F00EE" },
+  Served: { text: "#0D6EFD", bg: "#F5F9FF", dot: "#0D6EFD" },
+  Completed: { text: "#009A39", bg: "#F2FFF7", dot: "#009A39" },
+  Refunded: { text: "#9A9700", bg: "#FFFED3", dot: "#9A9700" },
+  Voided: { text: "#58606C", bg: "#F1F5F9", dot: "#58606C" },
+  Canceled: { text: "#D30202", bg: "#FEF0F0", dot: "#D30202" },
+};
+
+export interface Tint {
+  text: string;
+  bg: string;
+}
+
+/** Paints an element from a `Tint` passed through `tintVars`. The frames only
+ *  define the light pastels, so dark mixes the same hue into the card surface
+ *  and lifts the text towards white to keep it readable. */
+export const TINT_CLASS =
+  "bg-[var(--tint-bg)] text-[color:var(--tint-fg)] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,var(--tint-fg)_18%,var(--octo-card))] [[data-theme=dark]_&]:text-[color:color-mix(in_srgb,var(--tint-fg)_55%,white)]";
+
+export function tintVars(tint: Tint): CSSProperties {
+  return { "--tint-fg": tint.text, "--tint-bg": tint.bg } as CSSProperties;
+}
+
+// The filter pills use slightly different pastels from the row chips.
+export const ALL_PILL_TINT: Tint = { text: "#0D6EFD", bg: "#F5F9FF" };
+
+export const PILL_TINT: Record<OrderState, Tint> = {
+  New: { text: "#58606C", bg: "#E2E8F0" },
+  Accepted: { text: "#9A0078", bg: "#FFDCF7" },
+  Preparing: { text: "#C27C00", bg: "#FFF3DA" },
+  Ready: { text: "#9F00EE", bg: "#F6E4FF" },
+  Served: { text: "#0D6EFD", bg: "#F5F9FF" },
+  Completed: { text: "#009A39", bg: "#EFFFF5" },
+  Refunded: { text: "#9A9700", bg: "#FFFED3" },
+  Voided: { text: "#58606C", bg: "#F1F5F9" },
+  Canceled: { text: "#D30202", bg: "#FEF0F0" },
+};
+
+export const SOURCE_TINT: Tint = { text: "#0058DA", bg: "#F5F9FF" };
+
+export const PAYMENT_TINT: Record<PaymentStatus, Tint> = {
+  "Paid Online": { text: "#0058DA", bg: "#F5F9FF" },
+  "Paid Cash": { text: "#009A39", bg: "#F5FFF9" },
+  Unpaid: { text: "#58606C", bg: "#E2E8F0" },
+  "Partially Paid": { text: "#FFB020", bg: "#FFF5E4" },
 };
 
 export type OrderAction = "cancel" | "void" | "wastage" | "refund" | "payment";
@@ -42,3 +82,20 @@ export const ACTION_THEME: Record<OrderAction, ActionTheme> = {
   refund: { accent: "#A9A32B" },
   payment: { accent: "#16A34A" },
 };
+
+export interface ActionTint extends Tint {
+  border: string;
+}
+
+// The row's small action buttons. "payment" has no frame, so it borrows the
+// "Paid Cash" green.
+export const ACTION_TINT: Record<OrderAction, ActionTint> = {
+  payment: { text: "#009A39", bg: "#F2FFF7", border: "#B5E3C6" },
+  void: { text: "#58606C", bg: "#F1F5F9", border: "#CBD5E1" },
+  refund: { text: "#696700", bg: "#FFFEDC", border: "#CCCBA8" },
+  wastage: { text: "#7600B1", bg: "#F8E9FF", border: "#EBC0FF" },
+  cancel: { text: "#D30202", bg: "#FEF0F0", border: "#F6B1B1" },
+};
+
+/** The frames' #cbd5e1 hairline, swapped for the card-border token on dark. */
+export const LINE = "border-[#cbd5e1] [[data-theme=dark]_&]:border-[var(--octo-border-card)]";

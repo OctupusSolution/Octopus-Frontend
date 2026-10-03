@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { STATE_STYLE } from "./theme";
+import { STATE_STYLE, TINT_CLASS, tintVars } from "./theme";
 import { stageStatuses } from "./stepper-stages";
 import type { OrderRecord, OrderState, TimelineStage } from "./types";
 
@@ -29,19 +29,62 @@ function stageTime(iso: string): string {
   });
 }
 
+// The two-colour step dots are the frame's own artwork, so they are plain
+// images rather than a text-coloured mask.
+const STEP_DONE_URL = new URL("../../../../../assets/Dashboard/icons/ord-step-done.svg", import.meta.url).href;
+const STEP_PENDING_URL = new URL("../../../../../assets/Dashboard/icons/ord-step-pending.svg", import.meta.url).href;
+
+const DONE_LINE = "bg-[#d1efdc] [[data-theme=dark]_&]:bg-[#009a39]/40";
+const PENDING_LINE = "bg-[#e2e8f0] [[data-theme=dark]_&]:bg-[var(--octo-border-card)]";
+
 /** The state chip the row shows under its timeline, and the details modal
  *  shows beside the order id. */
 export function OrderStateBadge({ state, className }: { state: OrderState; className?: string }) {
   const { t } = useI18n();
-  const style = STATE_STYLE[state];
 
   return (
     <span
-      className={`inline-block rounded-full px-2 py-[3px] text-[11.5px] font-medium ${className ?? ""}`}
-      style={{ backgroundColor: style.bg, color: style.text }}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium leading-[12px] ${TINT_CLASS} ${className ?? ""}`}
+      style={tintVars(STATE_STYLE[state])}
     >
       {t(STATE_LABEL_KEY[state])}
     </span>
+  );
+}
+
+/** The list row's timeline: six 24px dots spread across the cell, each joined to the next
+ *  by a 2px line. Every stop draws its own two half-lines, so the track follows
+ *  the labels' real (localised) widths instead of a fixed 274px rule. */
+function RowTimeline({ order }: { order: OrderRecord }) {
+  const { t } = useI18n();
+  const stages = stageStatuses(order);
+
+  return (
+    <div className="flex w-full items-start">
+      {stages.map((stage, index) => {
+        const next = stages[index + 1];
+        return (
+          <div key={stage.stage} className="relative flex min-w-[62px] flex-1 flex-col items-center gap-1.5">
+            {index > 0 && <span className={`absolute end-1/2 start-0 top-[11px] h-0.5 ${stage.done ? DONE_LINE : PENDING_LINE}`} />}
+            {next && <span className={`absolute end-0 start-1/2 top-[11px] h-0.5 ${next.done ? DONE_LINE : PENDING_LINE}`} />}
+            <img
+              src={stage.done ? STEP_DONE_URL : STEP_PENDING_URL}
+              alt=""
+              width={24}
+              height={24}
+              className={`relative block h-6 w-6 ${stage.done ? "" : "[[data-theme=dark]_&]:opacity-40"}`}
+            />
+            <span
+              className={`whitespace-nowrap text-[12px] font-medium leading-[12px] ${
+                stage.done ? "text-[var(--octo-text-primary)]" : "text-[var(--octo-text-secondary)]"
+              }`}
+            >
+              {t(STAGE_LABEL_KEY[stage.stage])}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -59,6 +102,15 @@ export function Stepper({
 }) {
   const { t } = useI18n();
   const stages = stageStatuses(order);
+
+  if (variant === "row") {
+    return (
+      <div className={`flex w-full flex-col items-center gap-2 ${className ?? ""}`}>
+        <RowTimeline order={order} />
+        <OrderStateBadge state={order.state} />
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -84,16 +136,12 @@ export function Stepper({
             >
               {t(STAGE_LABEL_KEY[stage.stage])}
             </span>
-            {variant === "detail" && (
-              <span className="mt-0.5 whitespace-nowrap text-[10px] text-[var(--octo-text-faint)]">
-                {stage.timestamp ? stageTime(stage.timestamp) : t("orders.details.pending")}
-              </span>
-            )}
+            <span className="mt-0.5 whitespace-nowrap text-[10px] text-[var(--octo-text-faint)]">
+              {stage.timestamp ? stageTime(stage.timestamp) : t("orders.details.pending")}
+            </span>
           </div>
         ))}
       </div>
-
-      {variant === "row" && <OrderStateBadge state={order.state} className="mt-1.5" />}
     </div>
   );
 }

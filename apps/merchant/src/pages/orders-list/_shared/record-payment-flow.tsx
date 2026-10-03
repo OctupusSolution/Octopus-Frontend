@@ -4,16 +4,23 @@
 // API since 2026-09-21, but no screen ever called it — every design frame
 // this page was built from covers Cancel/Void/Wastage/Refund only, none of
 // them "take a payment". This is a new, undesigned flow: a minimal amount
-// form + result, built to this page's own shared pieces (FieldLabel,
-// PrimaryButton, ResultModal) rather than a bespoke look.
+// form + result, dressed in the Refund frames' controls (it is the cash
+// refund form's mirror image) rather than a bespoke look.
 import { useEffect, useState } from "react";
 import { Banknote, Check } from "lucide-react";
-import { Input, Modal } from "@ui/primitives";
+import { Modal } from "@ui/primitives";
 import { formatSar } from "@octopus/api-client";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { recordCashTender } from "@/entities/order";
-import { FieldLabel, PrimaryButton } from "./form-bits";
+import {
+  REFUND_BACKDROP_CLASS,
+  REFUND_INPUT_CLASS,
+  REFUND_MODAL_CLASS,
+  REFUND_SUBMIT_CLASS,
+  RefundFieldLabel,
+  RefundSummaryBar,
+} from "./refund-controls";
 import { clampAmountSar, maxRefundableSar } from "./refund-amount";
 import { ResultModal } from "./result-modal";
 import type { OrderRecord } from "./types";
@@ -121,34 +128,47 @@ export function RecordPaymentFlow({
   }
 
   return (
-    <Modal open onClose={onClose} className="max-w-[520px]">
-      <h2 className="text-[22px] font-bold text-[var(--octo-text-primary)]">{t("orders.payment.title")}</h2>
-      <p className="mt-1.5 text-[13.5px] text-[var(--octo-text-secondary)]">{t("orders.payment.subtitle")}</p>
-
-      <div className="mt-5">
-        <FieldLabel>{t("orders.payment.amountLabel")}</FieldLabel>
-        <Input
-          type="number"
-          min={0}
-          max={max}
-          step="0.01"
-          value={amountInput}
-          onChange={(e) => setAmountInput(e.target.value)}
-          placeholder={t("orders.payment.amountPlaceholder")}
-        />
-        <p className="mt-1.5 text-[12px] text-[var(--octo-text-muted)]">
-          {t("orders.payment.maxAmount").replace("{amount}", formatSar(max))}
+    <Modal
+      open
+      onClose={onClose}
+      title={t("orders.payment.title")}
+      // The subtitle sits 12px under the title, closer than a form section.
+      className={`${REFUND_MODAL_CLASS} [&>h2+div]:!mt-3`}
+      backdropClassName={REFUND_BACKDROP_CLASS}
+    >
+      <div className="flex flex-col gap-6">
+        <p className="text-[14px] font-medium leading-[1.3] text-[var(--octo-text-secondary)]">
+          {t("orders.payment.subtitle")}
         </p>
+
+        <div className="flex flex-col gap-3">
+          <RefundSummaryBar
+            label={t("orders.payment.maxAmount").replace("{amount}", "").trim()}
+            value={formatSar(max)}
+            strongLabel
+          />
+          <div className="flex flex-col gap-2">
+            <RefundFieldLabel>{t("orders.payment.amountLabel")}</RefundFieldLabel>
+            <input
+              className={REFUND_INPUT_CLASS}
+              type="number"
+              min={0}
+              max={max}
+              step="0.01"
+              value={amountInput}
+              onChange={(e) => setAmountInput(e.target.value)}
+              placeholder={t("orders.payment.amountPlaceholder")}
+              aria-label={t("orders.payment.amountLabel")}
+            />
+          </div>
+        </div>
+
+        {errorText && <p className="-mt-3 text-[14px] font-medium leading-[1.3] text-[#d30202]">{errorText}</p>}
+
+        <button type="button" disabled={!canSubmit} onClick={submit} className={REFUND_SUBMIT_CLASS}>
+          {submitting ? t("orders.payment.recording") : t("orders.payment.confirm")}
+        </button>
       </div>
-
-      {errorText && <p className="mt-3 text-[13px] text-[#DC2626]">{errorText}</p>}
-
-      <PrimaryButton
-        label={submitting ? t("orders.payment.recording") : t("orders.payment.confirm")}
-        disabled={!canSubmit}
-        onClick={submit}
-        className="mt-6"
-      />
     </Modal>
   );
 }

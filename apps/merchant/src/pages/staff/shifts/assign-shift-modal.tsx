@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
 import { bulkAssignShifts } from "@octopus/api-client";
-import { Modal } from "@ui/primitives";
 import type { Employee } from "@/shared/api/mock-staff";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "../_shared/buttons";
 import { Field, SelectInput } from "../_shared/form";
 import { formatWeekdayDate, fromISO, toISO } from "../_shared/format";
 import { useStaffLabels } from "../_shared/labels";
@@ -12,6 +9,7 @@ import { useCatalogNames } from "../_shared/catalog-names";
 import { MultiSelect } from "../_shared/multi-select";
 import { useStaffStore } from "../_shared/staff-store";
 import { serverShiftRoleId } from "../_shared/staff-shifts-sync";
+import { StaffModal } from "../_shared/staff-modal";
 import { serverMemberIdOrNull } from "../_shared/staff-sync";
 import { staffErrorText, useTx, UUID_RE } from "../_shared/text";
 import { approvedLeaveOn, rangeLabel, shiftKey } from "./schedule-utils";
@@ -160,20 +158,16 @@ export function AssignShiftModal({
   }));
 
   return (
-    <Modal
+    <StaffModal
       open={open}
       onClose={onClose}
       title={t(mode === "single" ? "staff.assignShift.title" : "staff.assignShift.bulkTitle")}
-      className="max-w-2xl p-6 [&>h2]:text-[22px] [&>h2]:font-bold"
+      submitLabel={t("staff.assignShift.submit")}
+      onSubmit={submit}
+      submitDisabled={saving}
     >
-      <form
-        noValidate
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-        className="mt-2 flex flex-col gap-5"
-      >
+      {/* This frame spaces its fields by 24px, the same step as its title and action. */}
+      <div className="flex flex-col gap-6">
         <Field label={t(mode === "single" ? "staff.assignShift.employee" : "staff.assignShift.employees")} htmlFor="as-employee" required error={errors.employee}>
           {mode === "single" ? (
             <SelectInput
@@ -259,12 +253,7 @@ export function AssignShiftModal({
             />
           )}
         </Field>
-
-        <button type="submit" disabled={saving} className={buttonClass("primary", "lg", "mt-1 h-12 w-full text-[16px]")}>
-          {saving && <Loader2 size={18} className="animate-spin" aria-hidden />}
-          {t("staff.assignShift.submit")}
-        </button>
-      </form>
-    </Modal>
+      </div>
+    </StaffModal>
   );
 }

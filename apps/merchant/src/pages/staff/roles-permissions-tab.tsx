@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { Plus, UserRound } from "lucide-react";
 import clsx from "clsx";
 import { duplicateStaffRole } from "@octopus/api-client";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "./_shared/buttons";
 import { ConfirmModal } from "./_shared/confirm-modal";
+import { StaffIcon } from "./_shared/icon";
 import { useStaffLabels } from "./_shared/labels";
 import { RowMenu, type RowMenuItem } from "./_shared/row-menu";
 import { useStaffStore, type RoleRecord } from "./_shared/staff-store";
 import { rememberRole, serverRoleId } from "./_shared/staff-sync";
 import { newKey, staffErrorText, useTx } from "./_shared/text";
 import { StatusPill } from "./_shared/status-pill";
+import { FILL_BLUE, INK, INK_LINK, INK_SOFT, LINE } from "./_shared/theme";
 import { ToastBanner, useToast } from "./_shared/toast";
 import { AssignUsersModal } from "./assign-users-modal";
 import { PermissionMatrix } from "./permission-matrix";
@@ -83,11 +83,19 @@ export function RolesPermissionsTab() {
 
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,366px)_minmax(0,1fr)]">
-      <section aria-labelledby="roles-heading" className="rounded-[16px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">
-        <h2 id="roles-heading" className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("staff.roles.heading")}</h2>
-        <p className="mt-1 text-[14px] text-[var(--octo-text-secondary)]">{t("staff.roles.subheading")}</p>
-        <button type="button" onClick={() => setFormState({ mode: "add" })} className={buttonClass("outline", "lg", "mt-3 w-full")}>
-          <Plus size={20} strokeWidth={2.2} />
+      <section aria-labelledby="roles-heading" className={clsx("rounded-[16px] border bg-[var(--octo-card)] p-3", LINE)}>
+        <h2 id="roles-heading" className={clsx("text-[14px] font-bold leading-[14px]", INK)}>{t("staff.roles.heading")}</h2>
+        {/* An 18px line box pulled back to the frame's 14px, so a wrapped line still breathes. */}
+        <p className={clsx("-mb-[2px] mt-[6px] text-[14px] leading-[18px]", INK)}>{t("staff.roles.subheading")}</p>
+        <button
+          type="button"
+          onClick={() => setFormState({ mode: "add" })}
+          className={clsx(
+            "mt-2 flex h-10 w-full items-center justify-center gap-1 rounded-[4px] border border-[#0d6efd] px-2 text-[14px] font-semibold leading-[14px] text-[#0d6efd] transition-[filter] hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+            FILL_BLUE
+          )}
+        >
+          <StaffIcon name="staff-role-plus.svg" size={24} />
           {t("staff.roles.addRole")}
         </button>
 
@@ -110,40 +118,40 @@ export function RolesPermissionsTab() {
                     }
                   }}
                   className={clsx(
-                    "flex cursor-pointer items-center gap-3 rounded-[10px] border px-3 py-2.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                    isSelected ? "border-[#0D6EFD] bg-[var(--octo-card)]" : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
+                    "flex cursor-pointer items-center gap-2 rounded-[4px] border p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                    isSelected ? "border-[#0d6efd]" : clsx(LINE, "hover:bg-[var(--octo-hover)]")
                   )}
                 >
                   <RoleIcon roleId={role.id} highlighted={role.isSystemRole} className={role.active ? undefined : "opacity-50"} />
-                  <div className={clsx("min-w-0 flex-1", !role.active && "opacity-60")}>
+                  <div className={clsx("flex min-w-0 flex-1 flex-col justify-center gap-2", !role.active && "opacity-60")}>
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-[15px] font-medium text-[var(--octo-text-primary)]">{labels.roleName(role)}</span>
+                      {/* The padding keeps descenders inside the truncation clip at a 14px line height. */}
+                      <span className={clsx("-my-[2px] truncate py-[2px] text-[14px] font-medium leading-[14px]", INK)}>{labels.roleName(role)}</span>
                       {role.isSystemRole && (
-                        <span className="shrink-0 rounded-full bg-[var(--octo-selected)] px-2 py-0.5 text-[12px] font-medium text-[#0D6EFD]">
+                        <span className={clsx("shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium leading-3", FILL_BLUE, INK_LINK)}>
                           {t("staff.roles.systemRole")}
                         </span>
                       )}
                       {!role.active && <StatusPill tone="neutral" label={t("staff.status.inactive")} />}
                     </div>
-                    <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{labels.roleDescription(role)}</p>
+                    <p className={clsx("-my-[2px] truncate py-[2px] text-[12px] font-medium leading-3", INK_SOFT)}>{labels.roleDescription(role)}</p>
                   </div>
                   <span
-                    className="flex shrink-0 items-center gap-1 text-[13px] text-[var(--octo-text-primary)]"
+                    className={clsx("flex shrink-0 items-end gap-[2px] text-[12px] font-medium leading-3", INK)}
                     title={t("staff.roles.memberCount").replace("{count}", String(count))}
                   >
-                    <UserRound size={17} strokeWidth={1.8} aria-hidden />
+                    <StaffIcon name="staff-role-user-16.svg" size={16} />
                     <span className="sr-only">{t("staff.roles.memberCount").replace("{count}", String(count))}</span>
                     <span aria-hidden>{count}</span>
                   </span>
                   {/* The Owner role offers only "duplicate" — that is how a business starts from full access. */}
-                  {(
-                    <RowMenu
-                      items={role.isSystemRole ? menuItemsFor(role).filter((i) => i.key === "duplicate") : menuItemsFor(role)}
-                      open={menuId === role.id}
-                      onOpenChange={(open) => setMenuId(open ? role.id : null)}
-                      ariaLabel={t("staff.roles.moreActions").replace("{name}", labels.roleName(role))}
-                    />
-                  )}
+                  <RowMenu
+                    items={role.isSystemRole ? menuItemsFor(role).filter((i) => i.key === "duplicate") : menuItemsFor(role)}
+                    open={menuId === role.id}
+                    onOpenChange={(open) => setMenuId(open ? role.id : null)}
+                    ariaLabel={t("staff.roles.moreActions").replace("{name}", labels.roleName(role))}
+                    iconSize={24}
+                  />
                 </div>
               </li>
             );

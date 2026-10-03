@@ -33,7 +33,7 @@ export function Switch({
     >
       <span
         className={clsx(
-          "inline-block transform rounded-full bg-white shadow-sm transition-transform",
+          "inline-block transform rounded-full bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-transform",
           md ? "h-[18px] w-[18px]" : "h-[14px] w-[14px]",
           checked
             ? md ? "translate-x-[20px] rtl:-translate-x-[20px]" : "translate-x-[16px] rtl:-translate-x-[16px]"

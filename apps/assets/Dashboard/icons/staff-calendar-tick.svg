@@ -1,0 +1,17 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="calendar-tick">
+<path id="Vector" d="M5.33333 1.33333V3.33333" stroke="#58606C" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_2" d="M10.6667 1.33333V3.33333" stroke="#58606C" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_3" d="M2.33333 6.06H13.6667" stroke="#58606C" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Group">
+<path id="Vector_4" d="M14.6667 12.6667C14.6667 13.1667 14.5267 13.64 14.28 14.04C13.82 14.8133 12.9733 15.3333 12 15.3333C11.3267 15.3333 10.7133 15.0867 10.2467 14.6667C10.04 14.4933 9.86 14.28 9.72 14.04C9.47333 13.64 9.33333 13.1667 9.33333 12.6667C9.33333 11.1933 10.5267 10 12 10C12.8 10 13.5133 10.3533 14 10.9067C14.4133 11.38 14.6667 11.9933 14.6667 12.6667Z" stroke="#58606C" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_5" d="M10.96 12.6667L11.62 13.3267L13.04 12.0133" stroke="#58606C" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path id="Vector_6" d="M14 5.66667V10.9067C13.5133 10.3533 12.8 10 12 10C10.5267 10 9.33333 11.1933 9.33333 12.6667C9.33333 13.1667 9.47333 13.64 9.72 14.04C9.86 14.28 10.04 14.4933 10.2467 14.6667H5.33333C3 14.6667 2 13.3333 2 11.3333V5.66667C2 3.66667 3 2.33333 5.33333 2.33333H10.6667C13 2.33333 14 3.66667 14 5.66667Z" stroke="#58606C" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"/>
+<g id="Vector_7" opacity="0">
+</g>
+<path id="Vector_8" d="M7.99699 9.13334H8.00298" stroke="#58606C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_9" d="M5.52954 9.13334H5.53553" stroke="#58606C" stroke-linecap="round" stroke-linejoin="round"/>
+<path id="Vector_10" d="M5.52954 11.1333H5.53553" stroke="#58606C" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

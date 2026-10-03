@@ -104,7 +104,7 @@ export const distributionCards: readonly DistributionCard[] = [
     id: "orders",
     titleKey: "dashboard.totalOrders",
     total: "10000",
-    color: "#16A34A",
+    color: "#009a39",
     branchRows: [
       { labelKey: "dashboard.branch.olayaCode", amount: "4600", percent: 46, branch: "olaya" },
       { labelKey: "dashboard.branch.cornicheCode", amount: "5400", percent: 54, branch: "corniche" },

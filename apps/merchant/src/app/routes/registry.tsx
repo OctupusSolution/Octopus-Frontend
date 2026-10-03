@@ -13,7 +13,9 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/dashboard").then(m => ({ default: m.DashboardPage }))) },
   { id: "orders",       path: "/orders",       section: "Orders",       page: "Live Orders",
     element: lazy(() => import("@/pages/orders-list").then(m => ({ default: m.OrdersListPage }))) },
-  { id: "kds",          path: "/kds",          section: "Orders",       page: "Kitchen Display",
+  { id: "order-detail", path: "/orders/:orderId", section: "Orders", page: "Order Details",
+    element: lazy(() => import("@/pages/orders-list/details").then(m => ({ default: m.OrderDetailsPage }))) },
+  { id: "kds",          path: "/kds",         section: "Orders",       page: "Kitchen Display",
     element: lazy(() => import("@/pages/kds").then(m => ({ default: m.KdsPage }))) },
   { id: "reservations", path: "/reservations", section: "Reservations", page: "Reservations",
     element: lazy(() => import("@/pages/reservations").then(m => ({ default: m.ReservationsPage }))) },
@@ -45,6 +47,12 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/public-link").then(m => ({ default: m.PublicLinkBuilderPage }))) },
   { id: "customers",    path: "/customers",    section: "Customers",    page: "Customer List",
     element: lazy(() => import("@/pages/customers").then(m => ({ default: m.CustomersPage }))) },
+  // Listed ahead of "/customers/:id" for the reader; the router itself ranks a
+  // static "segments" above the ":id" param whatever the order.
+  { id: "customer-segments", path: "/customers/segments", section: "Customers", page: "Segments",
+    element: lazy(() => import("@/pages/customers/segments").then(m => ({ default: m.SegmentsPage }))) },
+  { id: "customer-segment-detail", path: "/customers/segments/:id", section: "Customers", page: "Segment Details",
+    element: lazy(() => import("@/pages/customers/segments/detail").then(m => ({ default: m.SegmentDetailPage }))) },
   { id: "customer-detail", path: "/customers/:id", section: "Customers", page: "Customer Profile",
     element: lazy(() => import("@/pages/customers/detail").then(m => ({ default: m.CustomerDetailPage }))) },
   { id: "finance",      path: "/finance",      section: "Finance",      page: "Payments & ZATCA",

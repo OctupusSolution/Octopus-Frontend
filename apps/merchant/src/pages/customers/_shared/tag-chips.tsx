@@ -34,10 +34,10 @@ export function TagChips({
 }) {
   const { t } = useI18n();
   const label = useTagLabel();
-  const pill = size === "md" ? "px-2.5 py-1 text-[12.5px]" : "px-2 py-[3px] text-[11px]";
+  const pill = size === "md" ? "px-2.5 py-1 text-[12.5px]" : "px-2 py-1 text-[12px] leading-[12px]";
 
   return (
-    <div className={clsx("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={clsx("flex flex-wrap items-center gap-1.5 whitespace-nowrap", className)}>
       {blocked && (
         <span className={clsx("rounded-full font-medium", pill)} style={{ color: BLOCKED_STYLE.text, backgroundColor: BLOCKED_STYLE.bg }}>
           {t("customers.tag.blocked")}

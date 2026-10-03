@@ -1,9 +1,8 @@
 // apps/merchant/src/pages/customers/_shared/theme.ts
 // Hex colors match this page's own design frames, same convention as
 // orders-list/_shared/theme.ts — not shared design tokens.
-import type { ComponentType } from "react";
 import {
-  Crown, UtensilsCrossed, Cake, Sparkles, AlertTriangle, Ban, Utensils, ChartLine, RefreshCcwDot, BadgeCheck, Wallet,
+  Crown, UtensilsCrossed, Cake, Sparkles, AlertTriangle, Ban, Wallet,
   MapPin, Banknote, Clock, Star, ChartSpline,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -16,9 +15,9 @@ export interface TagStyle {
 }
 
 export const TAG_STYLE: Record<CustomerTag, TagStyle> = {
-  VIP: { text: "#B9860A", bg: "#FDF3D6", icon: Crown },
-  "Frequent Diner": { text: "#16A34A", bg: "#DCFCE7", icon: UtensilsCrossed },
-  "Birthday May": { text: "#9333EA", bg: "#F3E8FF", icon: Cake },
+  VIP: { text: "#7B6804", bg: "#FEF8D9", icon: Crown },
+  "Frequent Diner": { text: "#05752F", bg: "#EDFFF5", icon: UtensilsCrossed },
+  "Birthday May": { text: "#8D0DCE", bg: "#FAF1FF", icon: Cake },
   "New Customer": { text: "#0D6EFD", bg: "#DBEAFE", icon: Sparkles },
   "At Risk": { text: "#DC2626", bg: "#FEE2E2", icon: AlertTriangle },
 };
@@ -41,22 +40,23 @@ export const TAG_LABEL_KEY: Record<CustomerTag, string> = {
 export type StatCardKey = "total" | "active" | "newThisMonth" | "vip" | "returning" | "totalSpend";
 
 export interface StatCardTheme {
-  icon: ComponentType<{ className?: string }>;
+  /** A frame glyph (file under assets/Dashboard/icons) or a lucide icon. */
+  icon: string | LucideIcon;
   tile: string;
   cardBg: string;
 }
 
-// Icons follow CRM.png where the frame's glyph is meaningful (fork/knife,
-// chart, refresh, check badge). The frame reuses a placeholder "x in a
-// circle" for VIP and Total Spend; a crown and a wallet are used there
-// instead so a KPI never reads as an error state.
+// The frame reuses a placeholder "x in a circle" glyph for VIP and Total
+// Spend; a crown and a wallet are used there instead so a KPI never reads as
+// an error state. Card tints are the frame's pastels on light and the same
+// hue mixed into the card token on dark.
 export const STAT_CARD_THEME: Record<StatCardKey, StatCardTheme> = {
-  total: { icon: Utensils, tile: "#A855F7", cardBg: "bg-[#A855F7]/[0.08]" },
-  active: { icon: ChartLine, tile: "#22A45D", cardBg: "bg-[#22C55E]/[0.08]" },
-  newThisMonth: { icon: RefreshCcwDot, tile: "#F58A2E", cardBg: "bg-[#F97316]/[0.08]" },
-  vip: { icon: Crown, tile: "#2BA6B5", cardBg: "bg-[#06B6D4]/[0.07]" },
-  returning: { icon: BadgeCheck, tile: "#D49A1F", cardBg: "bg-[#EAB308]/[0.08]" },
-  totalSpend: { icon: Wallet, tile: "#3B82F6", cardBg: "bg-[#3B82F6]/[0.05]" },
+  total: { icon: "crm-stat-total.svg", tile: "#9133C1", cardBg: "bg-[#f9edff] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#9133c1_14%,var(--octo-card))]" },
+  active: { icon: "crm-stat-active.svg", tile: "#009A39", cardBg: "bg-[#e9fff2] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#009a39_14%,var(--octo-card))]" },
+  newThisMonth: { icon: "crm-stat-new.svg", tile: "#EA6D00", cardBg: "bg-[#fff0e3] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#ea6d00_14%,var(--octo-card))]" },
+  vip: { icon: Crown, tile: "#0296AD", cardBg: "bg-[#eafcff] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#0296ad_14%,var(--octo-card))]" },
+  returning: { icon: "crm-stat-returning.svg", tile: "#C27C00", cardBg: "bg-[#fff5e1] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#c27c00_14%,var(--octo-card))]" },
+  totalSpend: { icon: Wallet, tile: "#0D6EFD", cardBg: "bg-[#f5f9ff] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#0d6efd_14%,var(--octo-card))]" },
 };
 
 // The detail page's 5 header stat tiles (Total Visits / Total Spend / Last
@@ -88,12 +88,12 @@ export interface ActionTint {
 }
 
 export const ACTION_TINT = {
-  edit: { text: "#0D6EFD", bg: "#EEF4FF", border: "#EEF4FF" },
-  newReservations: { text: "#A07C0B", bg: "#FEFBE8", border: "#EFE3A6" },
-  paymentLink: { text: "#9333EA", bg: "#FAF5FF", border: "#E9D5FF" },
-  whatsapp: { text: "#16A34A", bg: "#F0FDF4", border: "#F0FDF4" },
-  email: { text: "#0D6EFD", bg: "#EFF6FF", border: "#EFF6FF" },
-  danger: { text: "#EF4444", bg: "#FEF2F2", border: "#FEF2F2" },
+  edit: { text: "#0058DA", bg: "#F5F9FF", border: "#F5F9FF" },
+  newReservations: { text: "#696700", bg: "#FFFEDC", border: "#CCCBA8" },
+  paymentLink: { text: "#7600B1", bg: "#F8E9FF", border: "#EBC0FF" },
+  whatsapp: { text: "#009A39", bg: "#F2F9F3", border: "#F2F9F3" },
+  email: { text: "#0D6EFD", bg: "#F5F9FF", border: "#F5F9FF" },
+  danger: { text: "#D30202", bg: "#FEF0F0", border: "#FEF0F0" },
 } satisfies Record<string, ActionTint>;
 
 export const RESERVATION_STATUS_STYLE: Record<ReservationStatus, { text: string; bg: string }> = {

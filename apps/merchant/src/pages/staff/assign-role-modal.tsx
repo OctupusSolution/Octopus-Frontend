@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
 import clsx from "clsx";
-import { Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { buttonClass } from "./_shared/buttons";
+import { StaffIcon } from "./_shared/icon";
 import { useStaffLabels } from "./_shared/labels";
+import { StaffModal } from "./_shared/staff-modal";
 import { useStaffStore } from "./_shared/staff-store";
+import { INK, INK_SOFT } from "./_shared/theme";
 import { useAssignableRoles } from "./_shared/use-assignable-roles";
 import { RoleIcon } from "./role-icon";
 
@@ -43,56 +43,49 @@ export function AssignRoleModal({
   };
 
   return (
-    <Modal
+    <StaffModal
       open={Boolean(profile)}
       onClose={onClose}
       title={t("staff.assignRole.title")}
-      className="max-w-lg"
-      footer={
-        <>
-          <button type="button" onClick={onClose} className={buttonClass("secondary")}>{t("common.cancel")}</button>
-          <button type="button" onClick={save} disabled={!roleId || roleId === profile?.assignedRole} className={buttonClass("primary")}>
-            {t("staff.assignRole.save")}
-          </button>
-        </>
-      }
+      submitLabel={t("staff.assignRole.save")}
+      onSubmit={save}
+      submitDisabled={!roleId || roleId === profile?.assignedRole}
     >
-      <p className="-mt-1 mb-4 text-[13px] text-[var(--octo-text-secondary)]">
-        {t("staff.assignRole.body").replace("{name}", profile?.employee.name ?? "")}
-      </p>
-      <div role="radiogroup" aria-label={t("staff.member.field.assignedRole")} className="octo-scroll flex max-h-[360px] flex-col gap-2 overflow-y-auto pe-1">
-        {selectable.map((role) => {
-          const checked = role.id === roleId;
-          return (
-            <button
-              key={role.id}
-              type="button"
-              role="radio"
-              aria-checked={checked}
-              onClick={() => setRoleId(role.id)}
-              className={clsx(
-                "flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-                checked ? "border-[#0D6EFD] bg-[var(--octo-selected)]" : "border-[var(--octo-border-card)] hover:bg-[var(--octo-hover)]"
-              )}
-            >
-              <RoleIcon roleId={role.id} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-medium text-[var(--octo-text-primary)]">{labels.roleName(role)}</span>
-                <span className="block truncate text-[12px] text-[var(--octo-text-secondary)]">{labels.roleDescription(role)}</span>
-              </span>
-              <span
-                aria-hidden
+      <div className="flex flex-col gap-4">
+        <p className={clsx("text-[14px] font-medium leading-[1.4]", INK_SOFT)}>
+          {t("staff.assignRole.body").replace("{name}", profile?.employee.name ?? "")}
+        </p>
+        {/* Rows follow the Roles list's own row: 4px radius, blue outline when chosen. */}
+        <div role="radiogroup" aria-label={t("staff.member.field.assignedRole")} className="flex flex-col gap-3">
+          {selectable.map((role) => {
+            const checked = role.id === roleId;
+            return (
+              <button
+                key={role.id}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                onClick={() => setRoleId(role.id)}
                 className={clsx(
-                  "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
-                  checked ? "border-[#0D6EFD] bg-[#0D6EFD] text-white" : "border-[var(--octo-border-input)]"
+                  "flex items-center gap-2 rounded-[4px] border p-1 text-start transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+                  checked ? "border-[#0D6EFD]" : "border-[#cbd5e1] hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:border-[var(--octo-border-input)]"
                 )}
               >
-                {checked && <Check size={12} strokeWidth={3} />}
-              </span>
-            </button>
-          );
-        })}
+                <RoleIcon roleId={role.id} />
+                <span className="flex min-w-0 flex-1 flex-col gap-1">
+                  <span className={clsx("truncate text-[14px] font-medium leading-[1.2]", INK)}>{labels.roleName(role)}</span>
+                  <span className={clsx("truncate text-[12px] font-medium leading-[1.2]", INK_SOFT)}>{labels.roleDescription(role)}</span>
+                </span>
+                <StaffIcon
+                  name={checked ? "form-radio-on.svg" : "form-radio-off.svg"}
+                  size={24}
+                  className={checked ? "text-[#0D6EFD]" : "text-[#64748b] [[data-theme=dark]_&]:text-[var(--octo-text-muted)]"}
+                />
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </Modal>
+    </StaffModal>
   );
 }

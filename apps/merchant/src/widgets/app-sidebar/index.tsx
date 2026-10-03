@@ -64,8 +64,9 @@ const SECTIONS: NavSection[] = [
       { id: "menu", label: "Menu", icon: "nav-menu.svg" },
       // No sub-items: Live Orders is the only Orders page.
       { id: "orders", label: "Orders", icon: "nav-orders.svg" },
-      // No sub-items: Customer CRM is a single list+detail page.
-      { id: "customers", label: "Customer CRM", icon: "nav-customers.svg" },
+      // "CRM" is the customer list and its profiles (/customers/<id>);
+      // "Segments" only wins the longest-match while under /customers/segments.
+      { id: "customers", label: "Customer CRM", icon: "nav-customers.svg", items: ["CRM", "Segments"] },
       { id: "pos", label: "POS", icon: "nav-pos.svg", placeholder: true },
     ],
   },
@@ -115,6 +116,8 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 const ITEM_PATHS: Record<string, string> = {
   "Live Floor Plan": "/reservations/floor-plan",
   "Floor Plan Builder": "/reservations/floor-plan/builder",
+  CRM: "/customers",
+  Segments: "/customers/segments",
   "Business & Legal Entities": "/settings/business",
   "Branches & Sections": "/settings/branches",
   "Devices & Printers": "/settings/devices",
@@ -223,7 +226,8 @@ function GroupButton({
       <ShellIcon name={group.icon} size={16} />
       {!collapsed && (
         <>
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {/* A 20px line box (pulled back to the row's 14px) so `truncate` doesn't clip Arabic glyphs, which run taller than Latin at the same size. */}
+          <span className="-my-[3px] min-w-0 flex-1 truncate py-[3px]">{label}</span>
           {group.items && (
             <ShellIcon name="nav-arrow-down.svg" size={16} className={clsx("transition-transform duration-300", isOpen && "rotate-180")} />
           )}
@@ -285,7 +289,7 @@ function GroupItems({ group, open, activePath }: { group: NavGroup; open: boolea
                 "relative rounded-[12px] px-2.5 py-1.5 text-start text-[12px] transition-colors",
                 "before:absolute before:start-[-13px] before:top-1/2 before:h-px before:w-2.5 before:bg-white/20",
                 isActive
-                  ? "bg-[#f5f9ff] font-medium text-[#004bb9]"
+                  ? "font-medium text-white underline underline-offset-2"
                   : "text-white/65 hover:bg-white/10 hover:text-white"
               )}
             >

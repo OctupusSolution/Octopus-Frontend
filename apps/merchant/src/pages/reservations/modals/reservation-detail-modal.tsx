@@ -6,26 +6,12 @@
 // needed the same two pieces.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import {
-  AlertCircle,
-  CheckCircle2,
-  CircleDashed,
-  Clock,
-  Copy,
-  FileDown,
-  Mail,
-  MessageCircle,
-  MoreVertical,
-  Phone,
-  RefreshCw,
-  RotateCcw,
-  Vault,
-} from "lucide-react";
 import { getReservationContactLink } from "@octopus/api-client";
-import { Button, Input, Modal } from "@ui/primitives";
+import { Input, Modal } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
 import type { Reservation } from "@/shared/api/mock-reservations";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { GuestCard } from "../_shared/guest-card";
 import { MetaRow } from "../_shared/meta-row";
 import { channelLabel, DEPOSIT_STATE_LABEL_KEY, detailState, STATE_LABEL_KEY, type DetailState } from "../_shared/model";
@@ -33,6 +19,21 @@ import { useDismiss } from "../_shared/use-dismiss";
 import { downloadFile } from "../_shared/download";
 import { buildReceiptHtml, paymentIssueMessage, whatsappHref } from "../_shared/guest-actions";
 import { useReservationsExtraText } from "../_shared/extra-text";
+import {
+  BORDER_200,
+  BORDER_300,
+  SURFACE_100,
+  SURFACE_BRAND_LIGHT,
+  SURFACE_RED_LIGHT,
+  SURFACE_WHITE,
+  TEXT_BRAND,
+  TEXT_BRAND_DEEP,
+  TEXT_ERROR,
+  TEXT_PRIMARY,
+  TEXT_SEC_GRAY,
+  TEXT_SECONDARY,
+  TEXT_SUCCESS,
+} from "../_shared/theme";
 
 export interface ReservationDetailModalProps {
   open: boolean;
@@ -58,42 +59,75 @@ export interface ReservationDetailModalProps {
   onReinstate?: () => void;
 }
 
-// Every tone reads off the `--octo-tone-*` tokens in index.css (fix round
-// 4, finding 27) instead of a literal hex — dark mode's contrast fix lives
-// in that one place, light stays byte-identical to the frames.
+// The dialog shell both reservation dialogs share (the cancel dialog imports
+// these): a 738px white card, 32px radius, 24px padding, on a 60% scrim. The
+// shared Modal draws its own small title bar, so that <h2> is hidden and
+// DialogTitle below draws the frame's 24px one inside the body instead —
+// `title` is still passed, as a string, so the dialog keeps its aria-label.
+export const DIALOG_CLASS = `!max-w-[738px] !rounded-[32px] !p-6 !shadow-none [&>h2]:hidden [&>h2+div]:!mt-0 ${SURFACE_WHITE}`;
+export const DIALOG_BACKDROP_CLASS = "bg-black/60";
+
+export function DialogTitle({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="text-[24px] font-semibold leading-6 text-[#0e0e0e] [overflow-wrap:anywhere] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+      {children}
+    </h2>
+  );
+}
+
+// The frames' 48px footer buttons: 12px radius, 18px bold label.
+export const FOOTER_BUTTON =
+  "inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[12px] px-3 py-2 text-center text-[18px] font-bold leading-[18px] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d6efd]/40 disabled:cursor-not-allowed disabled:opacity-50";
+export const FOOTER_PRIMARY = `${FOOTER_BUTTON} flex-auto bg-[#0d6efd] text-white`;
+const FOOTER_TINTED_BLUE = `${FOOTER_BUTTON} shrink-0 ${SURFACE_BRAND_LIGHT} ${TEXT_BRAND}`;
+const FOOTER_TINTED_RED = `${FOOTER_BUTTON} shrink-0 ${SURFACE_RED_LIGHT} ${TEXT_ERROR}`;
+
+// Banner tints sampled from the frames. The amber, violet and green pairs
+// aren't in _shared/theme.ts, so they're literal here with a dark override
+// in that file's style — dark mode's contrast fix (fix round 4, finding 27)
+// still lives in one place per tone, light stays byte-identical to the frames.
+const TONE_AMBER =
+  "bg-[#fff5e4] text-[#d96703] [[data-theme=dark]_&]:bg-[rgb(245_158_11_/_0.16)] [[data-theme=dark]_&]:text-[#fbbf24]";
+const TONE_VIOLET =
+  "bg-[#f7f4ff] text-[#6c4dff] [[data-theme=dark]_&]:bg-[rgb(108_77_255_/_0.18)] [[data-theme=dark]_&]:text-[#a99bff]";
+const TONE_GREEN = `bg-[#dcffef] [[data-theme=dark]_&]:bg-[rgb(34_197_94_/_0.16)] ${TEXT_SUCCESS}`;
+const TONE_RED = `${SURFACE_RED_LIGHT} ${TEXT_ERROR}`;
+const TONE_GREY = `${SURFACE_100} ${TEXT_SEC_GRAY}`;
+
 const BANNER_CLASS: Record<DetailState, string> = {
-  confirmed: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
-  pending: "bg-[var(--octo-tone-warning-bg)] text-[var(--octo-tone-warning-text)]",
-  "link-sent": "bg-[var(--octo-tone-violet-bg)] text-[var(--octo-tone-violet-text)]",
-  paid: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
-  failed: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
-  expired: "bg-[var(--octo-track)] text-[var(--octo-text-secondary)]",
-  "payment-cancelled": "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
-  // Fix round 1, finding 2 — not one of the eight frames. A cancelled
-  // reservation (status === "Cancelled") always wins over whatever its
-  // deposit is doing; see detailState() in _shared/model.ts. Same red
-  // treatment as "failed" since there's no cancelled-specific frame to
-  // draw the banner language from.
-  cancelled: "bg-[var(--octo-tone-danger-bg)] text-[var(--octo-tone-danger-text)]",
-  // Fix round 4, finding 5 — also not one of the eight frames. "progressed"
+  confirmed: TONE_GREEN,
+  pending: TONE_AMBER,
+  "link-sent": TONE_VIOLET,
+  paid: TONE_GREEN,
+  failed: TONE_RED,
+  expired: TONE_GREY,
+  "payment-cancelled": TONE_RED,
+  // Fix round 1, finding 2. A cancelled reservation (status === "Cancelled")
+  // always wins over whatever its deposit is doing; see detailState() in
+  // _shared/model.ts. Same red treatment as "failed", as its frame draws it.
+  cancelled: TONE_RED,
+  // Fix round 4, finding 5 — not one of the frames. "progressed"
   // (Arrived/Seated/Completed) reuses the same green as "confirmed"; the
   // booking is further along than confirmed, not in any kind of trouble.
-  // "no-show" gets the same neutral slate as the row pill's own No-show tone.
-  progressed: "bg-[var(--octo-tone-success-bg)] text-[var(--octo-tone-success-text)]",
-  "no-show": "bg-[var(--octo-tone-slate-bg)] text-[var(--octo-tone-slate-text)]",
+  // "no-show" gets the same neutral grey as the expired banner.
+  progressed: TONE_GREEN,
+  "no-show": TONE_GREY,
 };
 
-const BANNER_ICON: Record<DetailState, typeof CheckCircle2> = {
-  confirmed: CheckCircle2,
-  pending: AlertCircle,
-  "link-sent": AlertCircle,
-  paid: CheckCircle2,
-  failed: AlertCircle,
-  expired: AlertCircle,
-  "payment-cancelled": AlertCircle,
-  cancelled: AlertCircle,
-  progressed: CheckCircle2,
-  "no-show": AlertCircle,
+const ICON_ERROR_CIRCLE = "rsv-modal-error-circle.svg";
+const ICON_CHECK_DONE = "rsv-modal-check-done.svg";
+
+const BANNER_ICON: Record<DetailState, string> = {
+  confirmed: ICON_CHECK_DONE,
+  pending: ICON_ERROR_CIRCLE,
+  "link-sent": ICON_ERROR_CIRCLE,
+  paid: ICON_CHECK_DONE,
+  failed: ICON_ERROR_CIRCLE,
+  expired: ICON_ERROR_CIRCLE,
+  "payment-cancelled": ICON_ERROR_CIRCLE,
+  cancelled: ICON_ERROR_CIRCLE,
+  progressed: ICON_CHECK_DONE,
+  "no-show": ICON_ERROR_CIRCLE,
 };
 
 // The eight frames' own banner copy — distinct from the row pill's plainer
@@ -131,6 +165,17 @@ const BANNER_LABEL_KEY: Partial<Record<DetailState, string>> = {
   cancelled: "reservations.state.cancelled",
 };
 
+// The 40px tinted strip: the state banner, and the pending state's
+// auto-confirm note under the deposit card.
+function Banner({ icon, tone, children }: { icon: string; tone: string; children: ReactNode }) {
+  return (
+    <div className={clsx("flex min-h-10 items-center gap-1 rounded-[12px] px-3 py-2 text-[14px] font-medium leading-[1.3]", tone)}>
+      <ShellIcon name={icon} size={24} />
+      {children}
+    </div>
+  );
+}
+
 function DetailRow({
   icon,
   label,
@@ -143,37 +188,77 @@ function DetailRow({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex items-center justify-between text-[12.5px]">
-      <span className="inline-flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
+    <div className="flex items-center justify-between gap-3">
+      <span className={`inline-flex shrink-0 items-center gap-1 text-[12px] font-medium leading-3 ${TEXT_SECONDARY}`}>
         {icon}
         {label}
       </span>
-      <span className={clsx("font-medium text-[var(--octo-text-primary)]", valueClassName)}>{value}</span>
+      <span
+        className={clsx(
+          "min-w-0 text-end text-[14px] font-medium leading-[14px] [overflow-wrap:anywhere]",
+          valueClassName ?? TEXT_PRIMARY
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
+function DetailRows({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-4">{children}</div>;
+}
+
 function Panel({ children }: { children: ReactNode }) {
-  return <div className="rounded-[9px] border border-[var(--octo-border-card)] p-3.5">{children}</div>;
+  return <div className={`flex flex-col gap-2 rounded-[8px] border px-2 py-3 ${BORDER_300}`}>{children}</div>;
 }
 
 function PanelHeading({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={clsx("mb-3 flex items-center justify-between border-b border-[var(--octo-divider)] pb-3", className)}>
+    <div
+      className={clsx(
+        "flex items-center justify-between gap-3 border-b pb-3 text-[16px] font-medium leading-4",
+        BORDER_200,
+        className
+      )}
+    >
       {children}
     </div>
   );
 }
+
+// A panel's own action row (record cash / waive deposit) when it follows the
+// panel's rows — the frames don't draw one, so it sits under a divider in
+// the panel's own language.
+function PanelActions({ children }: { children: ReactNode }) {
+  return <div className={`mt-2 border-t pt-3 ${BORDER_200}`}>{children}</div>;
+}
+
+const PANEL_BUTTON =
+  "inline-flex h-10 items-center justify-center gap-1 rounded-[12px] px-3 text-[14px] font-medium leading-[14px] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d6efd]/40 disabled:cursor-not-allowed disabled:opacity-50";
+const PANEL_BUTTON_TINTED = `${PANEL_BUTTON} ${SURFACE_BRAND_LIGHT} ${TEXT_BRAND}`;
+const PANEL_BUTTON_PRIMARY = `${PANEL_BUTTON} bg-[#0d6efd] text-white`;
 
 // The plain single-line boxes for failed / expired / payment-cancelled — no
 // heading, just a bordered box holding one line of red (or grey) text.
 function MessageBox({ tone, children }: { tone: string; children: ReactNode }) {
   return (
-    <div className="rounded-[9px] border border-[var(--octo-border-card)] px-3.5 py-3 text-[12.5px] font-medium" style={{ color: tone }}>
+    <div className={clsx("rounded-[8px] border px-2 py-3 text-[16px] font-medium leading-4", BORDER_300, tone)}>
       {children}
     </div>
   );
 }
+
+// The second, grey line a cancelled / no-show box carries when a reason was
+// recorded.
+function MessageNote({ children }: { children: ReactNode }) {
+  return <span className={`mt-2 block text-[12px] font-medium leading-4 ${TEXT_SECONDARY}`}>{children}</span>;
+}
+
+// The floating menu card the Send Message frame draws; the "⋮" menu reuses it.
+const MENU_PANEL = `absolute z-20 flex w-max min-w-[146px] flex-col gap-2 rounded-[16px] p-3 shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)] ${SURFACE_WHITE}`;
+const MENU_ITEM = "flex w-full items-center gap-1 rounded-[4px] px-1 py-2 text-start text-[12px] font-semibold leading-3";
+const MENU_ICON_SLOT = "grid size-6 shrink-0 place-items-center";
 
 // The "Send Message" button + popover from the eighth frame — WhatsApp /
 // Call / Email, each a link to the same targets reservation-row.tsx's
@@ -190,30 +275,24 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
   const digits = reservation.phone.replace(/\D/g, "");
 
   const items = [
-    { key: "whatsapp", href: `https://wa.me/${digits}`, icon: <MessageCircle size={14} className="text-[#25D366]" />, label: t("reservations.list.row.whatsapp") },
-    { key: "call", href: `tel:${reservation.phone}`, icon: <Phone size={14} className="text-[#0D6EFD]" />, label: t("reservations.list.row.call") },
+    // The frame's WhatsApp glyph is 17 x 20 inside the 24px slot.
+    { key: "whatsapp", href: `https://wa.me/${digits}`, icon: <ShellIcon name="rsv-modal-menu-whatsapp.svg" size={20} />, label: t("reservations.list.row.whatsapp") },
+    { key: "call", href: `tel:${reservation.phone}`, icon: <ShellIcon name="rsv-row-call.svg" size={24} />, label: t("reservations.list.row.call") },
     {
       key: "email",
       href: reservation.email ? `mailto:${reservation.email}` : undefined,
-      icon: <Mail size={14} className="text-[var(--octo-text-muted)]" />,
+      icon: <ShellIcon name="rsv-modal-sms.svg" size={24} />,
       label: t("reservations.list.row.email"),
     },
   ];
 
   return (
-    <div ref={ref} className="relative">
-      <Button
-        variant="secondary"
-        className="!border-transparent !bg-[var(--octo-tone-info-bg)] !text-[var(--octo-tone-info-text)] hover:!bg-[var(--octo-tone-info-bg)]"
-        onClick={() => setOpen((v) => !v)}
-      >
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" className={FOOTER_TINTED_BLUE} onClick={() => setOpen((v) => !v)}>
         {t("reservations.detail.sendMessage")}
-      </Button>
+      </button>
       {open && (
-        <div
-          role="menu"
-          className="absolute top-full start-0 z-20 mt-1.5 w-48 space-y-1 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
-        >
+        <div role="menu" className={clsx(MENU_PANEL, "top-full start-0 mt-2")}>
           {items.map((item) =>
             item.href ? (
               <a
@@ -223,9 +302,9 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
                 rel={item.href.startsWith("http") ? "noreferrer" : undefined}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex w-full items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2 text-[12.5px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                className={clsx(MENU_ITEM, SURFACE_BRAND_LIGHT, TEXT_PRIMARY, "transition-opacity hover:opacity-80")}
               >
-                {item.icon}
+                <span className={MENU_ICON_SLOT}>{item.icon}</span>
                 {item.label}
               </a>
             ) : (
@@ -237,9 +316,9 @@ function SendMessageButton({ reservation, t }: { reservation: Reservation; t: (k
                 key={item.key}
                 role="menuitem"
                 aria-disabled="true"
-                className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-[9px] bg-[var(--octo-track)] px-3 py-2 text-[12.5px] font-medium text-[var(--octo-text-faint)]"
+                className={clsx(MENU_ITEM, SURFACE_BRAND_LIGHT, TEXT_PRIMARY, "cursor-not-allowed opacity-40")}
               >
-                {item.icon}
+                <span className={MENU_ICON_SLOT}>{item.icon}</span>
                 {item.label}
               </span>
             )
@@ -257,22 +336,19 @@ function MoreMenuButton({ onCancel, t }: { onCancel: () => void; t: (key: string
   const ref = useDismiss(open, () => setOpen(false));
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("reservations.list.row.more")}
         onClick={() => setOpen((v) => !v)}
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-[var(--octo-track)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-hover)]"
+        className={`grid size-12 shrink-0 place-items-center rounded-[8px] bg-[#f2f2f2] p-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0d6efd]/40 [[data-theme=dark]_&]:bg-[var(--octo-track)] ${TEXT_PRIMARY}`}
       >
-        <MoreVertical size={16} />
+        <ShellIcon name="rsv-modal-more.svg" size={24} />
       </button>
       {open && (
-        <div
-          role="menu"
-          className="absolute bottom-full start-0 z-20 mb-1.5 w-44 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
-        >
+        <div role="menu" className={clsx(MENU_PANEL, "bottom-full start-0 mb-2")}>
           <button
             type="button"
             role="menuitem"
@@ -280,7 +356,7 @@ function MoreMenuButton({ onCancel, t }: { onCancel: () => void; t: (key: string
               onCancel();
               setOpen(false);
             }}
-            className="flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] text-[#EF4444] transition-colors hover:bg-[var(--octo-hover)]"
+            className={clsx(MENU_ITEM, "!px-2 !py-3", SURFACE_RED_LIGHT, TEXT_ERROR, "transition-opacity hover:opacity-80")}
           >
             {t("reservations.detail.cancelReservation")}
           </button>
@@ -317,30 +393,30 @@ function DepositActions({
 
   if (waiving) {
     return (
-      <div ref={ref} className="flex items-center gap-2">
+      <div ref={ref} className="flex flex-wrap items-center gap-2">
         <Input
           autoFocus
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder={t("reservations.detail.waiveReasonPlaceholder")}
-          className="!h-9 !w-48 !text-[12px]"
+          className={`!h-10 !w-56 !max-w-full !rounded-[12px] !px-2 !text-[14px] ${BORDER_300}`}
           onKeyDown={(e) => e.key === "Enter" && confirmWaive()}
         />
-        <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" disabled={!reason.trim()} onClick={confirmWaive}>
+        <button type="button" className={PANEL_BUTTON_PRIMARY} disabled={!reason.trim()} onClick={confirmWaive}>
           {t("reservations.detail.waiveConfirm")}
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" onClick={onRecordCash}>
+      <button type="button" className={PANEL_BUTTON_TINTED} onClick={onRecordCash}>
         {t("reservations.detail.recordCash")}
-      </Button>
-      <Button variant="secondary" className="!h-9 !px-3 !text-[12px]" onClick={() => setWaiving(true)}>
+      </button>
+      <button type="button" className={PANEL_BUTTON_TINTED} onClick={() => setWaiving(true)}>
         {t("reservations.detail.waiveDeposit")}
-      </Button>
+      </button>
     </div>
   );
 }
@@ -426,7 +502,6 @@ export function ReservationDetailModal({
     }
   }
 
-  const BannerIcon = BANNER_ICON[state];
   // "progressed"/"no-show" have no frame-specific banner copy (fix round
   // 4, finding 5) — their label is the reservation's own status label
   // (Arrived/Seated/Completed/No-show), reusing STATE_LABEL_KEY rather
@@ -434,10 +509,9 @@ export function ReservationDetailModal({
   const bannerLabelKey = BANNER_LABEL_KEY[state] ?? STATE_LABEL_KEY[reservation.status];
 
   const banner = (
-    <div className={clsx("flex items-center gap-2 rounded-[9px] px-3.5 py-2.5 text-[13px] font-semibold", BANNER_CLASS[state])}>
-      <BannerIcon size={16} className="shrink-0" />
+    <Banner icon={BANNER_ICON[state]} tone={BANNER_CLASS[state]}>
       {t(bannerLabelKey)}
-    </div>
+    </Banner>
   );
 
   const guestCard = <GuestCard reservation={reservation} />;
@@ -454,15 +528,15 @@ export function ReservationDetailModal({
       panel = (
         <Panel>
           <PanelHeading>
-            <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[var(--octo-tone-success-text)]">
-              <CheckCircle2 size={16} />
+            <span className={`inline-flex items-center gap-2 ${TEXT_SUCCESS}`}>
+              <ShellIcon name={ICON_CHECK_DONE} size={24} />
               {t("reservations.detail.confirmedPanel")}
             </span>
           </PanelHeading>
-          <div className="space-y-2.5">
+          <DetailRows>
             <DetailRow label={t("reservations.detail.confirmedOn")} value={reservation.confirmedOn ?? "—"} />
             <DetailRow label={t("reservations.detail.confirmedMethod")} value={confirmedMethodLabel(t, reservation.confirmedMethod)} />
-          </div>
+          </DetailRows>
         </Panel>
       );
       break;
@@ -480,40 +554,37 @@ export function ReservationDetailModal({
         <>
           <Panel>
             <PanelHeading>
-              <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-                {t("reservations.detail.depositInfo")}
-              </span>
-              <span className="text-[13px] font-semibold text-[var(--octo-text-primary)]">
+              <span className={TEXT_PRIMARY}>{t("reservations.detail.depositInfo")}</span>
+              <span className={`text-[14px] leading-[14px] ${TEXT_PRIMARY}`}>
                 {deposit?.currency ?? "SAR"} {deposit?.amount ?? 0}{" "}
-                <span className="font-normal text-[var(--octo-text-muted)]">{t("reservations.detail.required")}</span>
+                <span className={`text-[12px] font-normal leading-3 ${TEXT_SECONDARY}`}>{t("reservations.detail.required")}</span>
               </span>
             </PanelHeading>
-            <div className="space-y-2.5">
+            <DetailRows>
               <DetailRow
-                icon={<CircleDashed size={14} className="text-[var(--octo-text-muted)]" />}
+                icon={<ShellIcon name="rsv-modal-status.svg" size={16} />}
                 label={t("reservations.detail.status")}
                 value={t(depositStateKey)}
-                valueClassName="!text-[var(--octo-tone-warning-text)]"
+                valueClassName="text-[#f59e00]"
               />
               <DetailRow
-                icon={<Vault size={14} className="text-[var(--octo-text-muted)]" />}
+                icon={<ShellIcon name="rsv-modal-money.svg" size={16} />}
                 label={t("reservations.detail.depositAmount")}
                 value={`${deposit?.currency ?? "SAR"} ${deposit?.amount ?? 0}`}
               />
               <DetailRow
-                icon={<Clock size={14} className="text-[var(--octo-text-muted)]" />}
+                icon={<ShellIcon name="rsv-modal-time.svg" size={16} />}
                 label={t("reservations.detail.dueBy")}
                 value={deposit?.dueBy ?? "—"}
               />
-            </div>
-            <div className="mt-3 border-t border-[var(--octo-divider)] pt-3">
+            </DetailRows>
+            <PanelActions>
               <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
-            </div>
+            </PanelActions>
           </Panel>
-          <div className="mt-3 flex items-center gap-2 rounded-[9px] bg-[var(--octo-tone-warning-bg)] px-3.5 py-2.5 text-[12px] text-[var(--octo-tone-warning-text)]">
-            <AlertCircle size={14} className="shrink-0" />
+          <Banner icon={ICON_ERROR_CIRCLE} tone={TONE_AMBER}>
             {t("reservations.detail.autoConfirmNote")}
-          </div>
+          </Banner>
         </>
       );
       break;
@@ -524,56 +595,47 @@ export function ReservationDetailModal({
       panel = (
         <Panel>
           <PanelHeading>
-            <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.detail.linkPanel")}</span>
+            <span className={TEXT_PRIMARY}>{t("reservations.detail.linkPanel")}</span>
           </PanelHeading>
-          <div className="space-y-3">
-            {/* border reads the dedicated -border token, not -text with a
-                /N opacity modifier (re-review fix) — Tailwind 3.4 drops an
-                opacity modifier on an arbitrary var() colour entirely, so
-                this border was compiling to nothing and falling back to
-                preflight's grey. */}
-            <div className="flex items-center justify-between gap-2 rounded-[9px] border border-[var(--octo-tone-info-border)] bg-[var(--octo-tone-info-bg)] px-3 py-2.5">
-              <a
-                href={link?.url ?? "#"}
-                target="_blank"
-                rel="noreferrer"
-                className="truncate text-[12.5px] font-semibold text-[var(--octo-tone-info-text)] hover:underline"
-              >
-                {link?.url}
-              </a>
-              <button
-                type="button"
-                onClick={copyLink}
-                className="shrink-0 text-[11.5px] font-medium text-[var(--octo-tone-info-text)] transition-opacity hover:opacity-75"
-                aria-label={t("reservations.detail.copyLink")}
-              >
-                {copied ? t("reservations.detail.copied") : <Copy size={14} />}
-              </button>
-            </div>
+          <div className={`flex items-center justify-between gap-2 overflow-hidden rounded-[12px] border border-[#abcdff] px-3 py-2 [[data-theme=dark]_&]:border-[var(--octo-accent)] ${SURFACE_100}`}>
+            <a
+              href={link?.url ?? "#"}
+              target="_blank"
+              rel="noreferrer"
+              className={`truncate text-[14px] font-semibold leading-4 hover:underline ${TEXT_BRAND_DEEP}`}
+            >
+              {link?.url}
+            </a>
             <button
               type="button"
-              onClick={onRecheckDeposit}
-              className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:text-[var(--octo-text-primary)]"
+              onClick={copyLink}
+              className={`inline-flex shrink-0 items-center text-[12px] font-medium leading-4 transition-opacity hover:opacity-75 ${TEXT_BRAND}`}
+              aria-label={t("reservations.detail.copyLink")}
             >
-              <RefreshCw size={13} />
-              {t("reservations.detail.recheckStatus")}
+              {copied ? t("reservations.detail.copied") : <ShellIcon name="rsv-modal-copy.svg" size={16} />}
             </button>
-            <div className="space-y-2.5">
-              {/* sentVia translated (fix round 4, finding 6) — this used to
-                  print the raw "WhatsApp"/"SMS"/"Email" value even on the
-                  Arabic page. */}
-              <DetailRow
-                label={t("reservations.detail.sentVia")}
-                value={link ? channelLabel(t, link.sentVia) : "—"}
-              />
-              <DetailRow label={t("reservations.detail.sentTo")} value={link?.sentTo ?? "—"} />
-              <DetailRow label={t("reservations.detail.sentOn")} value={link?.sentOn ?? "—"} />
-              <DetailRow label={t("reservations.detail.expireOn")} value={link?.expiresOn ?? "—"} />
+          </div>
+          <DetailRows>
+            {/* sentVia translated (fix round 4, finding 6) — this used to
+                print the raw "WhatsApp"/"SMS"/"Email" value even on the
+                Arabic page. */}
+            <DetailRow
+              label={t("reservations.detail.sentVia")}
+              value={link ? channelLabel(t, link.sentVia) : "—"}
+            />
+            <DetailRow label={t("reservations.detail.sentTo")} value={link?.sentTo ?? "—"} />
+            <DetailRow label={t("reservations.detail.sentOn")} value={link?.sentOn ?? "—"} />
+            <DetailRow label={t("reservations.detail.expireOn")} value={link?.expiresOn ?? "—"} />
+          </DetailRows>
+          <PanelActions>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={onRecheckDeposit} className={PANEL_BUTTON_TINTED}>
+                <ShellIcon name="refresh.svg" size={16} />
+                {t("reservations.detail.recheckStatus")}
+              </button>
+              <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
             </div>
-          </div>
-          <div className="mt-3 border-t border-[var(--octo-divider)] pt-3">
-            <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
-          </div>
+          </PanelActions>
         </Panel>
       );
       break;
@@ -584,16 +646,17 @@ export function ReservationDetailModal({
       panel = (
         <Panel>
           <PanelHeading>
-            <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
+            <span className={`inline-flex items-center gap-2 ${TEXT_SUCCESS}`}>
+              <ShellIcon name={ICON_CHECK_DONE} size={24} />
               {t("reservations.detail.paymentSuccessful")}
             </span>
           </PanelHeading>
-          <div className="space-y-2.5">
+          <DetailRows>
             <DetailRow label={t("reservations.detail.paidAmount")} value={`${deposit?.currency ?? "SAR"} ${deposit?.amount ?? 0}`} />
             <DetailRow label={t("reservations.detail.paidOn")} value={deposit?.paidOn ?? "—"} />
             <DetailRow label={t("reservations.detail.paymentMethod")} value={deposit?.method ?? "—"} />
             <DetailRow label={t("reservations.detail.transactionId")} value={deposit?.txnId ?? "—"} />
-          </div>
+          </DetailRows>
         </Panel>
       );
       break;
@@ -602,7 +665,7 @@ export function ReservationDetailModal({
     case "failed":
       panel = (
         <>
-          <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.noAmountCaptured")}</MessageBox>
+          <MessageBox tone={TEXT_ERROR}>{t("reservations.detail.noAmountCaptured")}</MessageBox>
           <Panel>
             <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
           </Panel>
@@ -613,7 +676,7 @@ export function ReservationDetailModal({
     case "expired":
       panel = (
         <>
-          <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.linkNoLongerValid")}</MessageBox>
+          <MessageBox tone={TEXT_ERROR}>{t("reservations.detail.linkNoLongerValid")}</MessageBox>
           <Panel>
             <DepositActions onRecordCash={onRecordCash} onWaiveDeposit={onWaiveDeposit} t={t} />
           </Panel>
@@ -622,22 +685,18 @@ export function ReservationDetailModal({
       break;
 
     case "payment-cancelled":
-      panel = <MessageBox tone="var(--octo-tone-danger-text)">{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
+      panel = <MessageBox tone={TEXT_ERROR}>{t("reservations.detail.guestCancelledPayment")}</MessageBox>;
       break;
 
-    // Fix round 1, finding 2 — not one of the eight frames (there's no
-    // "cancelled reservation" frame among them). Built from the same
-    // single message-box shape failed/expired/payment-cancelled already
-    // use, rather than inventing new furniture for a state the design
-    // never drew.
+    // Fix round 1, finding 2 — the same single message-box shape
+    // failed/expired/payment-cancelled use, which is also how the
+    // "Reservation Cancelled" frame draws it.
     case "cancelled":
       panel = (
         <>
-          <MessageBox tone="var(--octo-tone-danger-text)">
+          <MessageBox tone={TEXT_ERROR}>
             {t("reservations.list.row.cancelledOn").replace("{when}", reservation.cancelledAt ?? "—")}
-            {reservation.cancelReason && (
-              <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
-            )}
+            {reservation.cancelReason && <MessageNote>{reservation.cancelReason}</MessageNote>}
           </MessageBox>
           {/* The deposit's own state doesn't move to "refunded" on cancel —
               only a paid one that hasn't been refunded yet can still owe one,
@@ -648,13 +707,11 @@ export function ReservationDetailModal({
           {reservation.deposit?.state === "paid" && (
             <Panel>
               <PanelHeading>
-                <span className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-                  {t("reservations.detail.refundDue")}
-                </span>
+                <span className={TEXT_PRIMARY}>{t("reservations.detail.refundDue")}</span>
               </PanelHeading>
-              <Button variant="secondary" className="!h-9 w-full !text-[12px]" onClick={onIssueRefund}>
+              <button type="button" className={`${PANEL_BUTTON_TINTED} w-full`} onClick={onIssueRefund}>
                 {t("reservations.detail.issueRefund")}
-              </Button>
+              </button>
             </Panel>
           )}
         </>
@@ -667,21 +724,13 @@ export function ReservationDetailModal({
     // reason/note for it (see model.ts's applyCancel), showing that too.
     case "no-show":
       panel = (
-        <MessageBox tone="var(--octo-tone-slate-text)">
+        <MessageBox tone={TEXT_SEC_GRAY}>
           {t("reservations.state.noShow")}
-          {reservation.cancelReason && (
-            <span className="mt-1 block text-[var(--octo-text-muted)]">{reservation.cancelReason}</span>
-          )}
+          {reservation.cancelReason && <MessageNote>{reservation.cancelReason}</MessageNote>}
         </MessageBox>
       );
       break;
   }
-
-  // Every tinted footer button below reads off the `--octo-tone-*` tokens
-  // (fix round 4, finding 27), not a literal hex, for the same dark-mode
-  // contrast reason as BANNER_CLASS above.
-  const tintedBlue = "!border-transparent !bg-[var(--octo-tone-info-bg)] !text-[var(--octo-tone-info-text)] hover:!bg-[var(--octo-tone-info-bg)]";
-  const tintedRed = "!border-transparent !bg-[var(--octo-tone-danger-bg)] !text-[var(--octo-tone-danger-text)] hover:!bg-[var(--octo-tone-danger-bg)]";
 
   let footer: ReactNode;
   switch (state) {
@@ -694,9 +743,9 @@ export function ReservationDetailModal({
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
           <SendMessageButton reservation={reservation} t={t} />
-          <Button variant="primary" className="flex-1 justify-center" onClick={onEdit}>
+          <button type="button" className={FOOTER_PRIMARY} onClick={onEdit}>
             {t("reservations.detail.editReservation")}
-          </Button>
+          </button>
         </>
       );
       break;
@@ -705,12 +754,13 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <Button variant="secondary" className={tintedBlue} onClick={onEdit}>
+          {/* 261px in this frame; hugs its label in the link-sent one. */}
+          <button type="button" className={clsx(FOOTER_TINTED_BLUE, "sm:w-[261px]")} onClick={onEdit}>
             {t("reservations.detail.editReservation")}
-          </Button>
-          <Button
-            variant="primary"
-            className="flex-1 justify-center"
+          </button>
+          <button
+            type="button"
+            className={FOOTER_PRIMARY}
             // No deposit, no link to share (fix round 4, finding 9) —
             // disabled with a reason instead of the silent no-op this used
             // to be (onShareLink returned early with nothing visible
@@ -720,7 +770,7 @@ export function ReservationDetailModal({
             onClick={onShareLink}
           >
             {t("reservations.detail.shareLink")}
-          </Button>
+          </button>
         </>
       );
       break;
@@ -729,12 +779,12 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <Button variant="secondary" className={tintedBlue} onClick={onEdit}>
+          <button type="button" className={FOOTER_TINTED_BLUE} onClick={onEdit}>
             {t("reservations.detail.editReservation")}
-          </Button>
-          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+          </button>
+          <button type="button" className={FOOTER_PRIMARY} onClick={onResendLink}>
             {t("reservations.detail.resendLink")}
-          </Button>
+          </button>
         </>
       );
       break;
@@ -743,14 +793,11 @@ export function ReservationDetailModal({
       footer = (
         <>
           <MoreMenuButton onCancel={onCancel} t={t} />
-          <Button
-            variant="secondary"
-            icon={<FileDown size={14} />}
-            onClick={downloadReceipt}
-            className={clsx("!flex-1 !justify-center", tintedBlue)}
-          >
+          <SendMessageButton reservation={reservation} t={t} />
+          <button type="button" className={FOOTER_PRIMARY} onClick={downloadReceipt}>
+            <ShellIcon name="rsv-modal-document-download.svg" size={24} />
             {t("reservations.detail.downloadReceipt")}
-          </Button>
+          </button>
         </>
       );
       break;
@@ -758,15 +805,15 @@ export function ReservationDetailModal({
     case "failed":
       footer = (
         <>
-          <Button variant="secondary" className={tintedRed} onClick={onCancel}>
+          <button type="button" className={FOOTER_TINTED_RED} onClick={onCancel}>
             {t("reservations.detail.cancelReservation")}
-          </Button>
-          <Button variant="secondary" onClick={notifyGuest} className={tintedBlue}>
+          </button>
+          <button type="button" className={FOOTER_TINTED_BLUE} onClick={notifyGuest}>
             {t("reservations.detail.notifyGuest")}
-          </Button>
-          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+          </button>
+          <button type="button" className={FOOTER_PRIMARY} onClick={onResendLink}>
             {t("reservations.detail.resendNewLink")}
-          </Button>
+          </button>
         </>
       );
       break;
@@ -774,21 +821,21 @@ export function ReservationDetailModal({
     case "expired":
       footer = (
         <>
-          <Button variant="secondary" onClick={notifyGuest} className={tintedBlue}>
+          <button type="button" className={FOOTER_TINTED_BLUE} onClick={notifyGuest}>
             {t("reservations.detail.notifyGuest")}
-          </Button>
-          <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+          </button>
+          <button type="button" className={FOOTER_PRIMARY} onClick={onResendLink}>
             {t("reservations.detail.resendNewLink")}
-          </Button>
+          </button>
         </>
       );
       break;
 
     case "payment-cancelled":
       footer = (
-        <Button variant="primary" className="flex-1 justify-center" onClick={onResendLink}>
+        <button type="button" className={FOOTER_PRIMARY} onClick={onResendLink}>
           {t("reservations.detail.resendNewLink")}
-        </Button>
+        </button>
       );
       break;
 
@@ -800,40 +847,38 @@ export function ReservationDetailModal({
     // messaging action fits a guest who never arrived.
     case "no-show":
       footer = (
-        <Button variant="secondary" className="w-full justify-center" onClick={onEdit}>
+        <button type="button" className={clsx(FOOTER_TINTED_BLUE, "w-full")} onClick={onEdit}>
           {t("reservations.detail.editReservation")}
-        </Button>
+        </button>
       );
       break;
   }
 
+  const title = t("reservations.detail.title").replace("{ref}", reservation.ref);
+
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t("reservations.detail.title").replace("{ref}", reservation.ref)}
-      className="!max-w-[620px]"
-      footer={footer}
-    >
-      <div className="space-y-3">
+    <Modal open={open} onClose={onClose} title={title} className={DIALOG_CLASS} backdropClassName={DIALOG_BACKDROP_CLASS}>
+      <div className="flex flex-col gap-4">
+        <DialogTitle>{title}</DialogTitle>
         {banner}
         {expired && onReinstate && (
           <Panel>
             <PanelHeading>
-              <span className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-                <RotateCcw size={15} className="text-[var(--octo-text-muted)]" />
+              <span className={`inline-flex items-center gap-2 ${TEXT_PRIMARY}`}>
+                <ShellIcon name={ICON_ERROR_CIRCLE} size={24} className={TEXT_SEC_GRAY} />
                 {extra.expiredTitle}
               </span>
             </PanelHeading>
-            <p className="text-[12.5px] text-[var(--octo-text-secondary)]">{extra.expiredBody}</p>
-            <Button variant="primary" className="mt-3 !h-9 w-full justify-center !text-[12px]" onClick={onReinstate}>
+            <p className={`text-[12px] font-medium leading-4 ${TEXT_SECONDARY}`}>{extra.expiredBody}</p>
+            <button type="button" className={`${PANEL_BUTTON_PRIMARY} mt-1 w-full`} onClick={onReinstate}>
               {extra.reinstate}
-            </Button>
+            </button>
           </Panel>
         )}
         {guestCard}
         {metaRow}
         {panel}
+        <div className="flex flex-wrap items-center gap-4">{footer}</div>
       </div>
     </Modal>
   );

@@ -65,6 +65,9 @@ export interface OrderRecord {
   table: string | null;
   guests: number | null;
   totalSar: number;
+  /** What is still owed, from the real Order module. Absent on a seeded or
+   *  live row, where the whole total stands in for it. */
+  balanceDueSar?: number;
   source: OrderSource;
   payment: PaymentStatus;
   paymentMethod?: string;

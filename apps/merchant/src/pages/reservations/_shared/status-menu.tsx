@@ -1,9 +1,10 @@
 import clsx from "clsx";
-import { ChevronDown } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import type { ReservationStatus } from "@/shared/api/mock-reservations";
 import { STATE_LABEL_KEY } from "./model";
-import { TONE } from "./status-pill";
+import { MENU_TONE } from "./status-pill";
+import { BORDER_300, SURFACE_WHITE, TEXT_PRIMARY } from "./theme";
 import { useDismiss } from "./use-dismiss";
 
 // Declaration order matches the frame, not the enum's own order.
@@ -29,10 +30,15 @@ export function StatusMenu({ value, onSelect, open, onOpenChange }: StatusMenuPr
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
-        className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-[7px] text-[12px] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+        className={clsx(
+          "inline-flex h-8 items-center justify-center gap-1 rounded-[8px] border p-2 text-[14px] font-medium leading-[14px] transition-colors hover:bg-[var(--octo-hover)]",
+          BORDER_300,
+          SURFACE_WHITE,
+          TEXT_PRIMARY
+        )}
       >
         {t("reservations.list.row.status")}
-        <ChevronDown size={13} className="text-[var(--octo-text-muted)]" />
+        <ShellIcon name="rsv-row-arrow-down.svg" size={24} />
       </button>
 
       {open && (
@@ -41,10 +47,13 @@ export function StatusMenu({ value, onSelect, open, onOpenChange }: StatusMenuPr
           // Evenly separated pills, as the frame draws them. Stacked edge to
           // edge, their rounded corners notched into each other and the list
           // read as unevenly spaced — most visibly in dark mode.
-          className="absolute z-20 mt-1 w-44 space-y-1 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-lg"
+          className={clsx(
+            "absolute end-0 z-20 mt-[9px] flex w-[146px] flex-col gap-2 rounded-[16px] p-3 shadow-[0_0_12px_0_rgba(0,0,0,0.12)]",
+            SURFACE_WHITE
+          )}
         >
           {STATUS_OPTIONS.map((status) => {
-            const tone = TONE[status];
+            const tone = MENU_TONE[status];
             return (
               <button
                 key={status}
@@ -56,12 +65,12 @@ export function StatusMenu({ value, onSelect, open, onOpenChange }: StatusMenuPr
                   onOpenChange(false);
                 }}
                 className={clsx(
-                  "flex w-full items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-start text-[12px] font-medium transition-colors",
+                  "flex w-full items-center gap-1 rounded-[4px] p-2 text-start text-[12px] font-semibold leading-[12px] transition-opacity hover:opacity-80",
                   tone.bg,
                   tone.text
                 )}
               >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tone.dot }} />
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full" style={{ backgroundColor: tone.dot }} />
                 {t(STATE_LABEL_KEY[status])}
               </button>
             );

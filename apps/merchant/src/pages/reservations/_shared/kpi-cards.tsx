@@ -1,14 +1,15 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import clsx from "clsx";
-import { ChartNoAxesCombined, Hourglass, Timer, Users } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import type { Kpis } from "./model";
 
 interface CardSpec {
   key: string;
   cardBg: string;
   tile: string;
-  icon: ComponentType<{ className?: string }>;
+  /** A frame glyph under assets/Dashboard/icons. */
+  icon: string;
   value: number;
   label: string;
   percent: ReactNode;
@@ -22,15 +23,19 @@ export interface KpiCardsProps {
   totalLabel: string;
 }
 
+const PERCENT = "text-[14px] font-medium leading-[14px]";
+
 export function KpiCards({ kpis, totalLabel }: KpiCardsProps) {
   const { t } = useI18n();
 
+  // Card tints are the frame's pastels on light and the same hue mixed into
+  // the card token on dark (same approach as customers/_shared/theme.ts).
   const cards: CardSpec[] = [
     {
       key: "today",
-      cardBg: "bg-[#0D6EFD]/[0.06]",
-      tile: "#0D6EFD",
-      icon: Users,
+      cardBg: "bg-[#f0f6ff] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#0063f6_14%,var(--octo-card))]",
+      tile: "#0063F6",
+      icon: "rsv-kpi-people.svg",
       value: kpis.total,
       label: totalLabel,
       // No yesterday comparison comes from the API, so no trend is shown.
@@ -38,54 +43,67 @@ export function KpiCards({ kpis, totalLabel }: KpiCardsProps) {
     },
     {
       key: "confirmed",
-      cardBg: "bg-[#16A34A]/[0.06]",
-      tile: "#16A34A",
-      // Frame draws a chart-with-a-trend glyph here, not a calendar (fix round 1).
-      icon: ChartNoAxesCombined,
+      cardBg: "bg-[#effff5] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#01a036_14%,var(--octo-card))]",
+      tile: "#01A036",
+      icon: "rsv-kpi-chart.svg",
       value: kpis.confirmed,
       label: t("reservations.list.kpi.confirmed"),
-      percent: <span className="text-[12px] font-medium text-[#16A34A]">{kpis.confirmedPct}%</span>,
+      percent: <span className={clsx(PERCENT, "text-[#04783a] [[data-theme=dark]_&]:text-[#22c55e]")}>{kpis.confirmedPct}%</span>,
     },
     {
       key: "pending",
-      cardBg: "bg-[var(--octo-track)]",
-      tile: "#475569",
-      icon: Timer,
+      cardBg: "bg-[#f1f5f9] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#64748b_14%,var(--octo-card))]",
+      tile: "#64748B",
+      icon: "rsv-kpi-timer.svg",
       value: kpis.pending,
       label: t("reservations.list.kpi.pending"),
-      percent: <span className="text-[12px] font-medium text-[var(--octo-text-muted)]">{kpis.pendingPct}%</span>,
+      percent: <span className={clsx(PERCENT, "text-[#58606c] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]")}>{kpis.pendingPct}%</span>,
     },
     {
       key: "cancelled",
-      cardBg: "bg-[#EF4444]/[0.06]",
-      tile: "#DC2626",
-      icon: Hourglass,
+      cardBg: "bg-[#fef0f0] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#d30202_14%,var(--octo-card))]",
+      tile: "#D30202",
+      icon: "rsv-kpi-hourglass.svg",
       value: kpis.cancelled,
       label: t("reservations.list.kpi.cancelled"),
-      percent: <span className="text-[12px] font-medium text-[#DC2626]">{kpis.cancelledPct}%</span>,
+      percent: <span className={clsx(PERCENT, "text-[#d30202] [[data-theme=dark]_&]:text-[#f87171]")}>{kpis.cancelledPct}%</span>,
     },
     {
       key: "noShow",
-      cardBg: "bg-[#D97706]/[0.06]",
-      tile: "#D97706",
+      cardBg: "bg-[#fffaf0] [[data-theme=dark]_&]:bg-[color:color-mix(in_srgb,#c27c00_14%,var(--octo-card))]",
+      tile: "#C27C00",
       // Frame uses the same stopwatch glyph as Pending, not a plain clock (fix round 1).
-      icon: Timer,
+      icon: "rsv-kpi-timer.svg",
       value: kpis.noShow,
       label: t("reservations.list.kpi.noShow"),
-      percent: <span className="text-[12px] font-medium text-[#D97706]">{kpis.noShowPct}%</span>,
+      percent: <span className={clsx(PERCENT, "text-[#c27c00] [[data-theme=dark]_&]:text-[#f59e0b]")}>{kpis.noShowPct}%</span>,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-      {cards.map(({ key, cardBg, tile, icon: Icon, value, label, percent }) => (
-        <div key={key} className={clsx("rounded-xl p-5", cardBg)}>
-          <div className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ backgroundColor: tile }}>
-            <Icon className="h-5 w-5 text-white" />
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5 xl:gap-6">
+      {cards.map(({ key, cardBg, tile, icon, value, label, percent }) => (
+        <div
+          key={key}
+          className={clsx(
+            "flex min-w-0 flex-col gap-3 rounded-[12px] border-2 border-[#fefefe] p-4 drop-shadow-[0_4px_2.5px_rgba(0,0,0,0.05)] [[data-theme=dark]_&]:border-[var(--octo-card)]",
+            cardBg
+          )}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="grid h-12 w-12 place-items-center rounded-[12px] text-white" style={{ backgroundColor: tile }}>
+              <ShellIcon name={icon} size={32} />
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="truncate text-[32px] font-bold leading-[32px] text-[#0f172a] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">
+                {value}
+              </div>
+              <div className="truncate text-[14px] font-medium leading-[14px] text-[#6f6f6f] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]">
+                {label}
+              </div>
+            </div>
           </div>
-          <div className="mt-4 text-[26px] font-bold leading-none text-[var(--octo-text-primary)]">{value}</div>
-          <div className="mt-1 text-[12px] text-[var(--octo-text-muted)]">{label}</div>
-          <div className="mt-1.5">{percent}</div>
+          {percent && <div className="flex items-end">{percent}</div>}
         </div>
       ))}
     </div>

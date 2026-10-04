@@ -71,11 +71,32 @@ const ACTION_BUTTONS: readonly {
 // offers it just for orders that still owe money, which keeps a paid row at
 // the frame's four buttons.
 function owesPayment(order: OrderRecord): boolean {
+  if (order.balanceDueSar != null) return order.balanceDueSar > 0;
   return order.payment === "Unpaid" || order.payment === "Partially Paid";
 }
 
+// A voided or cancelled order is closed: the only thing left to do with it is
+// hand back money that was already taken.
+function isCalledOff(order: OrderRecord): boolean {
+  return order.state === "Voided" || order.state === "Canceled";
+}
+
+function openActions(order: OrderRecord) {
+  if (!isCalledOff(order)) return ACTION_BUTTONS;
+  return order.payment === "Unpaid" ? [] : ACTION_BUTTONS.filter((button) => button.action === "refund");
+}
+
 function rowActions(order: OrderRecord) {
-  return owesPayment(order) ? ACTION_BUTTONS : ACTION_BUTTONS.filter((button) => button.action !== "payment");
+  if (isCalledOff(order) || owesPayment(order)) return openActions(order);
+  return ACTION_BUTTONS.filter((button) => button.action !== "payment");
+}
+
+/** "1 Guest" / "2 Guests" / "{n} Guests" — Arabic needs its own singular and
+ *  dual, so the count is never just dropped into one template. */
+export function guestsLabel(t: (key: string) => string, n: number): string {
+  if (n === 1) return t("orders.row.guestOne");
+  if (n === 2) return t("orders.row.guestsTwo");
+  return t("orders.row.guests").replace("{n}", String(n));
 }
 
 /** The pedestal-table glyph the frames put before a table number — lucide has
@@ -115,9 +136,11 @@ export function OrderActionButtons({
   const { t } = useI18n();
 
   if (variant === "large") {
+    const actions = openActions(order);
+    if (actions.length === 0) return null;
     return (
       <div className={`grid grid-cols-2 gap-2 sm:grid-cols-5 ${className ?? ""}`}>
-        {ACTION_BUTTONS.map(({ action, labelKey, largeClassName, icon: Icon }) => (
+        {actions.map(({ action, labelKey, largeClassName, icon: Icon }) => (
           <button
             key={action}
             type="button"
@@ -132,9 +155,12 @@ export function OrderActionButtons({
     );
   }
 
+  const actions = rowActions(order);
+  if (actions.length === 0) return null;
+
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className ?? ""}`}>
-      {rowActions(order).map(({ action, labelKey, glyph }) => (
+      {actions.map(({ action, labelKey, glyph }) => (
         <button
           key={action}
           type="button"
@@ -200,7 +226,7 @@ function TableAndGuests({ order }: { order: OrderRecord }) {
           {order.table}
         </IconLine>
       )}
-      {order.guests != null && <IconLine icon="ord-user.svg">{t("orders.row.guests").replace("{n}", String(order.guests))}</IconLine>}
+      {order.guests != null && <IconLine icon="ord-user.svg">{guestsLabel(t, order.guests)}</IconLine>}
     </div>
   );
 }
@@ -258,7 +284,7 @@ export function OrderRowCard({
       <OrderActionButtons
         order={order}
         onAction={onAction}
-        className={`min-h-[60px] shrink-0 justify-end ps-1 ${owesPayment(order) ? "max-w-[300px] min-[1700px]:max-w-none" : ""}`}
+        className={`min-h-[60px] shrink-0 justify-end ps-1 ${owesPayment(order) && !isCalledOff(order) ? "max-w-[300px] min-[1700px]:max-w-none" : ""}`}
       />
     </div>
   );

@@ -1,9 +1,11 @@
-// Form controls drawn the way the Floor Plan frames draw them: 44px fields
-// with 10px corners, a medium label, and an optional quoted hint beside it
-// ("Prefix "Optional"").
+// Form controls drawn the way the Floor Plan frames draw them: 40px fields
+// with 12px corners on a #cbd5e1 hairline, a medium label, and an optional
+// quoted hint beside it ("Prefix "Optional""). `compact` is the inspector
+// variant: a 12px label flush with the field instead of 14px inset by 8px.
 import { useId, useState, type ReactNode } from "react";
-import { ChevronDown, Minus, Plus } from "lucide-react";
 import clsx from "clsx";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { BORDER_300, SURFACE_100, SURFACE_WHITE, TEXT_PRIMARY, TEXT_SEC_GRAY, TEXT_SECONDARY } from "../../_shared/theme";
 
 export function Field({
   label,
@@ -12,6 +14,7 @@ export function Field({
   error,
   children,
   className,
+  compact,
 }: {
   label: string;
   hint?: string;
@@ -19,12 +22,16 @@ export function Field({
   error?: string;
   children: ReactNode;
   className?: string;
+  compact?: boolean;
 }) {
   return (
     <div className={clsx("flex min-w-0 flex-col gap-2", className)}>
-      <label htmlFor={htmlFor} className="text-[14px] font-medium text-[var(--octo-text-primary)]">
+      <label
+        htmlFor={htmlFor}
+        className={clsx("font-medium", TEXT_PRIMARY, compact ? "text-[12px] leading-[12px]" : "px-2 text-[14px] leading-[14px]")}
+      >
         {label}
-        {hint && <span className="ms-1.5 text-[12px] font-normal text-[var(--octo-text-muted)]">“{hint}”</span>}
+        {hint && <span className={clsx("ms-1 text-[12px] leading-[12px]", TEXT_SECONDARY)}>“{hint}”</span>}
       </label>
       {children}
       {error && <p className="text-[12px] text-[var(--octo-tone-danger-text)]">{error}</p>}
@@ -32,8 +39,11 @@ export function Field({
   );
 }
 
-const CONTROL =
-  "h-11 w-full rounded-[10px] border bg-[var(--octo-card)] px-3.5 text-[14px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-faint)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25 focus:border-[#0D6EFD] disabled:cursor-not-allowed disabled:opacity-60";
+const CONTROL = clsx(
+  "h-10 w-full rounded-[12px] border px-2 text-[14px] transition-colors focus:border-[#0d6efd] focus:outline-none focus:ring-2 focus:ring-[#0d6efd]/25 disabled:cursor-not-allowed disabled:opacity-60",
+  "placeholder:text-[#58606c] [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-faint)]",
+  SURFACE_WHITE
+);
 
 export interface Option<T extends string> {
   value: T;
@@ -50,6 +60,8 @@ export function SelectField<T extends string>({
   mixedLabel,
   className,
   disabled,
+  compact,
+  muted,
 }: {
   label: string;
   hint?: string;
@@ -60,17 +72,20 @@ export function SelectField<T extends string>({
   mixedLabel?: string;
   className?: string;
   disabled?: boolean;
+  compact?: boolean;
+  /** Draws the value in the secondary grey, as the Add Tables form does. */
+  muted?: boolean;
 }) {
   const id = useId();
   return (
-    <Field label={label} hint={hint} htmlFor={id} className={className}>
+    <Field label={label} hint={hint} htmlFor={id} className={className} compact={compact}>
       <div className="relative">
         <select
           id={id}
           value={value ?? ""}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value as T)}
-          className={clsx(CONTROL, "appearance-none border-[var(--octo-border-input)] pe-10")}
+          className={clsx(CONTROL, BORDER_300, muted ? TEXT_SECONDARY : TEXT_PRIMARY, "appearance-none truncate pe-9")}
         >
           {value === null && (
             <option value="" disabled>
@@ -84,7 +99,11 @@ export function SelectField<T extends string>({
             </option>
           ))}
         </select>
-        <ChevronDown size={18} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[var(--octo-text-secondary)]" />
+        <ShellIcon
+          name="fp-builder-arrow-down.svg"
+          size={24}
+          className={clsx("pointer-events-none absolute end-2 top-1/2 -translate-y-1/2", muted ? TEXT_SECONDARY : TEXT_SEC_GRAY)}
+        />
       </div>
     </Field>
   );
@@ -102,6 +121,8 @@ export function TextField({
   inputMode,
   disabled,
   onBlur,
+  compact,
+  muted,
 }: {
   label: string;
   hint?: string;
@@ -114,10 +135,12 @@ export function TextField({
   inputMode?: "text" | "numeric";
   disabled?: boolean;
   onBlur?: () => void;
+  compact?: boolean;
+  muted?: boolean;
 }) {
   const id = useId();
   return (
-    <Field label={label} hint={hint} htmlFor={id} error={error} className={className}>
+    <Field label={label} hint={hint} htmlFor={id} error={error} className={className} compact={compact}>
       <input
         id={id}
         value={value}
@@ -128,7 +151,7 @@ export function TextField({
         onBlur={onBlur}
         aria-invalid={Boolean(error)}
         onChange={(event) => onChange(event.target.value)}
-        className={clsx(CONTROL, error ? "border-[#EF4444]" : "border-[var(--octo-border-input)]")}
+        className={clsx(CONTROL, muted ? TEXT_SECONDARY : TEXT_PRIMARY, error ? "border-[#d30202]" : BORDER_300)}
       />
     </Field>
   );
@@ -141,6 +164,7 @@ export function TextAreaField({
   placeholder,
   className,
   maxLength = 240,
+  compact,
 }: {
   label: string;
   value: string;
@@ -148,18 +172,19 @@ export function TextAreaField({
   placeholder?: string;
   className?: string;
   maxLength?: number;
+  compact?: boolean;
 }) {
   const id = useId();
   return (
-    <Field label={label} htmlFor={id} className={className}>
+    <Field label={label} htmlFor={id} className={className} compact={compact}>
       <textarea
         id={id}
         value={value}
         placeholder={placeholder}
         maxLength={maxLength}
-        rows={3}
+        rows={2}
         onChange={(event) => onChange(event.target.value)}
-        className={clsx(CONTROL, "h-auto min-h-[76px] resize-y border-[var(--octo-border-input)] py-2.5")}
+        className={clsx(CONTROL, BORDER_300, TEXT_PRIMARY, "!h-auto min-h-[56px] resize-y py-2 leading-[18px]")}
       />
     </Field>
   );
@@ -196,7 +221,9 @@ export function NumberStepper({
   return (
     <div
       className={clsx(
-        "flex h-11 items-center justify-center gap-4 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3",
+        "flex h-10 items-center justify-center gap-3 rounded-[12px] border px-2",
+        BORDER_300,
+        SURFACE_WHITE,
         disabled && "opacity-60",
         className
       )}
@@ -206,9 +233,9 @@ export function NumberStepper({
         aria-label={`${label} −`}
         disabled={disabled || (value !== null && value <= min)}
         onClick={() => commit((value ?? min) - 1)}
-        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--octo-track)] text-[var(--octo-text-secondary)] transition-colors hover:bg-[var(--octo-border-input)] disabled:opacity-40"
+        className={clsx("grid h-5 w-5 shrink-0 place-items-center rounded-full transition-opacity hover:opacity-80 disabled:opacity-40", SURFACE_100, TEXT_SECONDARY)}
       >
-        <Minus size={14} strokeWidth={2.4} />
+        <ShellIcon name="fp-builder-minus.svg" size={14} />
       </button>
       <span className="flex items-baseline gap-1">
         <input
@@ -225,18 +252,18 @@ export function NumberStepper({
           onKeyDown={(event) => {
             if (event.key === "Enter") (event.target as HTMLInputElement).blur();
           }}
-          className="w-[3.2ch] bg-transparent text-center text-[15px] font-medium text-[var(--octo-text-primary)] focus:outline-none"
+          className={clsx("w-[3.2ch] bg-transparent text-center text-[14px] leading-none focus:outline-none", TEXT_PRIMARY)}
         />
-        {suffix && <span className="text-[11px] text-[var(--octo-text-muted)]">{suffix}</span>}
+        {suffix && <span className={clsx("text-[10px] leading-none", TEXT_SECONDARY)}>{suffix}</span>}
       </span>
       <button
         type="button"
         aria-label={`${label} +`}
         disabled={disabled || (value !== null && value >= max)}
         onClick={() => commit((value ?? min - 1) + 1)}
-        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+        className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0d6efd] text-white transition-opacity hover:opacity-90 disabled:opacity-40"
       >
-        <Plus size={14} strokeWidth={2.4} />
+        <ShellIcon name="fp-builder-plus.svg" size={14} />
       </button>
     </div>
   );

@@ -90,7 +90,11 @@ export function OrdersListPage() {
   }, [detailsOrder, allRecords]);
 
   const visibleRows = useMemo(() => {
-    return allRecords.filter((order) => {
+    // Called-off orders always sink to the bottom; within each group the
+    // server's order is kept (Array.sort is stable).
+    const calledOff = (order: OrderRecord) => (order.state === "Voided" || order.state === "Canceled" ? 1 : 0);
+    const ordered = [...allRecords].sort((a, b) => calledOff(a) - calledOff(b));
+    return ordered.filter((order) => {
       if (selectedState && order.state !== selectedState) return false;
       if (selectedSources.length > 0 && !selectedSources.includes(order.source)) return false;
       if (search.trim()) {

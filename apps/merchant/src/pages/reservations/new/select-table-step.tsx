@@ -4,31 +4,28 @@
 // bookings it already holds, so the choice here is one Floor Plan agrees with.
 import { useMemo, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import {
-  CalendarDays,
-  Clock,
-  FileText,
-  Lightbulb,
-  MapPin,
-  MousePointerClick,
-  PartyPopper,
-  Scan,
-  SlidersHorizontal,
-  Sparkles,
-  SquarePen,
-  Timer,
-  Users,
-  UsersRound,
-  Utensils,
-} from "lucide-react";
 import { itemRect, sampleLayout, type FloorPlanDoc, type FloorTable, type LiveStatus } from "@/entities/floor-plan";
 import { PlanSvg, PlanViewport, TABLE_TONES, type ItemKind } from "@/widgets/floor-plan-canvas";
-import { Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { areaLabel } from "@/pages/reservations/floor-plan/_shared/labels";
 import { useBookings, useFloorPlan, useLiveTables } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
 import { clock12, formatDisplayDate, guestsText, hoursMinutesParts } from "../_shared/model";
 import type { DraftState } from "../_shared/reservation-form";
+import {
+  BORDER_200,
+  BORDER_300,
+  SURFACE_BRAND_LIGHT,
+  SURFACE_INFO,
+  SURFACE_RED_LIGHT,
+  SURFACE_WHITE,
+  TEXT_BRAND,
+  TEXT_BRAND_DEEP,
+  TEXT_ERROR,
+  TEXT_PRIMARY,
+  TEXT_SEC_GRAY,
+  TEXT_SECONDARY,
+} from "../_shared/theme";
 import {
   croppedToContent,
   NEAR_TIME_MS,
@@ -44,6 +41,11 @@ const TABLES_ONLY: ReadonlySet<ItemKind> = new Set(["table"]);
 const ALL_AREAS = "all";
 /** The legend the frame draws, in its order. */
 const LEGEND: readonly LiveStatus[] = ["reserved", "available", "cleaning", "occupied"];
+
+const TOOLBAR_CONTROL = "h-10 rounded-[8px] border text-[14px] font-medium leading-[14px] transition-colors";
+const TOOLBAR_IDLE = `${BORDER_200} ${SURFACE_WHITE} ${TEXT_SECONDARY} hover:bg-[var(--octo-hover)]`;
+const PANEL_TITLE = `text-[14px] font-semibold leading-[14px] ${TEXT_PRIMARY}`;
+const META_TEXT = `text-[12px] font-medium leading-3 ${TEXT_SECONDARY}`;
 
 /** Everything both the step and the page's footer need to know about tables
  *  for this draft. Called by the page so its Create button and this step agree. */
@@ -131,43 +133,53 @@ export function SelectTableStep({
   return (
     <div>
       {/* Toolbar: area, filter, fit, legend */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-hover)] px-3 py-2">
+      <div className={`flex flex-wrap items-center gap-2 rounded-[12px] border ${BORDER_200} bg-[#fbfafc] px-4 py-1 [[data-theme=dark]_&]:bg-[var(--octo-hover)]`}>
         {picking.doc.zones.length > 0 && (
-          <Select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="!w-auto !py-[7px]" aria-label={t("reservations.form.areaPreference")}>
-            <option value={ALL_AREAS}>{t("reservations.list.filter.allAreas")}</option>
-            {picking.doc.zones.map((zone) => (
-              <option key={zone.id} value={zone.id}>
-                {zone.name}
-              </option>
-            ))}
-          </Select>
+          <span className="relative inline-flex">
+            <select
+              value={zoneId}
+              onChange={(e) => setZoneId(e.target.value)}
+              aria-label={t("reservations.form.areaPreference")}
+              className={clsx(TOOLBAR_CONTROL, TOOLBAR_IDLE, "cursor-pointer appearance-none pe-12 ps-4 outline-none focus:border-[#0d6efd]")}
+            >
+              <option value={ALL_AREAS}>{t("reservations.list.filter.allAreas")}</option>
+              {picking.doc.zones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name}
+                </option>
+              ))}
+            </select>
+            <ShellIcon name="form-arrow-down.svg" className="pointer-events-none absolute end-4 top-2 text-[#687280]" />
+          </span>
         )}
         <ToolbarButton active={fitsOnly} onClick={() => setFitsOnly((v) => !v)} title={t("reservations.table.filterOn")}>
-          <SlidersHorizontal size={14} />
+          <ShellIcon name="filter.svg" className={fitsOnly ? undefined : TEXT_SEC_GRAY} />
           {t("reservations.table.filter")}
         </ToolbarButton>
         <ToolbarButton onClick={() => setViewKey((k) => k + 1)}>
-          <Scan size={14} />
+          <ShellIcon name="rsv-add-fit-view.svg" className={TEXT_SEC_GRAY} />
           {t("reservations.table.fitView")}
         </ToolbarButton>
+        {/* The chips take the canvas's own tones, so the legend always names
+            the colours the tables are actually drawn in. */}
         {LEGEND.map((status) => (
           <span
             key={status}
-            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-[7px] text-[12.5px] font-medium"
+            className="inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-[4px] p-2 text-[14px] font-medium leading-[14px]"
             style={{ color: TABLE_TONES[status].dot, backgroundColor: `color-mix(in srgb, ${TABLE_TONES[status].dot} 10%, var(--octo-card))` }}
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: TABLE_TONES[status].dot }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TABLE_TONES[status].dot }} />
             {t(`reservations.table.legend.${status}`)}
           </span>
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_261px]">
         <div className="min-w-0">
           {/* The frame's box takes the floor's own proportions, so "fit" fills it
               edge to edge instead of leaving empty bands either side. */}
           <div
-            className="relative w-full min-h-[320px] overflow-hidden rounded-xl border border-[var(--octo-border-card)] bg-white"
+            className="relative w-full min-h-[320px] overflow-hidden bg-white"
             style={{ aspectRatio: String(picking.doc.width) + " / " + String(picking.doc.height) }}
           >
             <PlanViewport
@@ -191,115 +203,119 @@ export function SelectTableStep({
             />
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-2">
-            <p className="flex min-w-[240px] flex-1 items-center gap-2 rounded-[9px] bg-[var(--octo-tone-info-bg)] px-3 py-2.5 text-[12.5px] text-[var(--octo-tone-info-text)]">
-              <Lightbulb size={16} className="shrink-0" />
-              {t("reservations.table.tip")}
-            </p>
-            <button
-              type="button"
-              onClick={() => pick(picking.best(draft.table)?.table.id ?? null)}
-              className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-tone-info-border)] bg-[var(--octo-card)] px-3 py-2.5 text-[12.5px] font-medium text-[var(--octo-tone-info-text)] transition-colors hover:bg-[var(--octo-tone-info-bg)]"
-            >
-              <Sparkles size={15} />
-              {t("reservations.table.autoSuggest")}
-            </button>
-            <button
-              type="button"
-              onClick={() => pick(null)}
-              disabled={!selectedId}
-              className="rounded-[9px] bg-[var(--octo-tone-danger-bg)] px-3 py-2.5 text-[12.5px] font-medium text-[var(--octo-tone-danger-text)] transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {t("reservations.table.clear")}
-            </button>
+          <div className={`mt-4 w-fit max-w-full rounded-[24px] ${SURFACE_WHITE} p-4 shadow-[0px_0px_12px_0px_rgba(0,0,0,0.12)]`}>
+            <div className="flex flex-wrap items-stretch gap-3">
+              <p className={`flex min-h-12 items-center gap-1 rounded-[8px] ${SURFACE_INFO} px-3 py-2 text-[14px] font-medium leading-[1.3] ${TEXT_BRAND_DEEP}`}>
+                <ShellIcon name="rsv-add-bulb.svg" />
+                {t("reservations.table.tip")}
+              </p>
+              <button
+                type="button"
+                onClick={() => pick(picking.best(draft.table)?.table.id ?? null)}
+                className="inline-flex min-h-12 items-center gap-1 whitespace-nowrap rounded-[8px] border border-[#abcdff] px-2 py-1 text-[16px] font-medium leading-4 text-[#0058da] transition-colors hover:bg-[var(--octo-hover)] [[data-theme=dark]_&]:text-[var(--octo-accent)]"
+              >
+                <ShellIcon name="rsv-add-sparkle.svg" />
+                {t("reservations.table.autoSuggest")}
+              </button>
+              <button
+                type="button"
+                onClick={() => pick(null)}
+                disabled={!selectedId}
+                className={`inline-flex min-h-12 items-center whitespace-nowrap rounded-[8px] ${SURFACE_RED_LIGHT} px-2 py-1 text-[16px] font-medium leading-4 ${TEXT_ERROR} transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                {t("reservations.table.clear")}
+              </button>
+            </div>
           </div>
         </div>
 
         <aside className="flex flex-col gap-3">
-          <Card>
-            <h3 className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.table.newReservation")}</h3>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-[12px] text-[var(--octo-text-secondary)]">{t("reservations.form.tab.details")}</span>
+          <div className={`flex flex-col gap-3 rounded-[8px] border ${BORDER_300} px-2 py-3`}>
+            <h3 className={PANEL_TITLE}>{t("reservations.table.newReservation")}</h3>
+            <div className="flex items-center justify-between gap-2">
+              <span className={`text-[12px] font-medium leading-3 ${TEXT_PRIMARY}`}>{t("reservations.form.tab.details")}</span>
               <button
                 type="button"
                 onClick={onEditDetails}
-                className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-2.5 py-1 text-[12px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
+                className={`inline-flex h-8 items-center gap-1 rounded-[4px] ${SURFACE_BRAND_LIGHT} px-2 py-1 text-[14px] font-medium leading-[14px] ${TEXT_PRIMARY} transition-opacity hover:opacity-80`}
               >
-                <SquarePen size={13} />
+                <ShellIcon name="crm-detail-edit.svg" />
                 {t("reservations.list.row.edit")}
               </button>
             </div>
-            <dl className="mt-3 space-y-2">
-              <SummaryRow icon={<CalendarDays size={14} />} label={t("reservations.table.date")} value={formatDisplayDate(draft.date, locale)} />
-              <SummaryRow icon={<Clock size={14} />} label={t("reservations.table.time")} value={clock12(draft.time)} ltr />
-              <SummaryRow icon={<Users size={14} />} label={t("reservations.table.partySize")} value={guestsText(t, draft.partySize)} />
-              <SummaryRow icon={<Timer size={14} />} label={t("reservations.table.duration")} value={durationText} />
-              <SummaryRow icon={<PartyPopper size={14} />} label={t("reservations.table.occasion")} value={draft.tags[0] ?? "—"} />
+            <dl className="flex flex-col gap-4">
+              <SummaryRow icon="crm-detail-calendar-16.svg" label={t("reservations.table.date")} value={formatDisplayDate(draft.date, locale)} />
+              <SummaryRow icon="rsv-add-time-16.svg" label={t("reservations.table.time")} value={clock12(draft.time)} ltr />
+              <SummaryRow icon="rsv-add-people-16.svg" label={t("reservations.table.partySize")} value={guestsText(t, draft.partySize)} />
+              <SummaryRow icon="rsv-add-timer-16.svg" label={t("reservations.table.duration")} value={durationText} />
+              <SummaryRow icon="rsv-add-party.svg" iconSize={14.33} label={t("reservations.table.occasion")} value={draft.tags[0] ?? "—"} />
             </dl>
-          </Card>
+          </div>
 
-          <div className="rounded-xl border-2 border-[#0D6EFD] bg-[var(--octo-card)] p-4">
-            <h3 className="border-b border-[var(--octo-divider)] pb-2 text-[13.5px] font-semibold text-[var(--octo-text-primary)]">
-              {t("reservations.table.selected")}
-            </h3>
+          <div className={`flex flex-col gap-3 rounded-[12px] border-[3px] border-[#0d6efd] ${SURFACE_BRAND_LIGHT} px-2 py-3`}>
+            <div className={`flex items-center border-b ${BORDER_300} pb-1`}>
+              <h3 className={PANEL_TITLE}>{t("reservations.table.selected")}</h3>
+            </div>
             {selected ? (
               <SelectedTable option={selected} tone={picking.toneOf(selected)} />
             ) : (
-              <p className="py-5 text-center text-[12.5px] text-[var(--octo-text-muted)]">{t("reservations.table.pick")}</p>
+              <p className={clsx(META_TEXT, "py-5 text-center")}>{t("reservations.table.pick")}</p>
             )}
             <button
               type="button"
               onClick={() => pick(null)}
               disabled={!selected}
-              className="mt-3 w-full rounded-[9px] border border-[#0D6EFD] py-2 text-[13px] font-medium text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5 disabled:cursor-not-allowed disabled:opacity-40"
+              className={`flex h-8 w-full items-center justify-center rounded-[4px] border border-[#0d6efd] px-2 py-1 text-[14px] font-medium leading-[14px] ${TEXT_BRAND} transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40`}
             >
               {t("reservations.table.change")}
             </button>
           </div>
 
-          <Card>
-            <h3 className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.table.alternatives")}</h3>
+          <div className={`flex flex-col gap-2 rounded-[12px] border ${BORDER_300} p-2`}>
+            <h3 className={PANEL_TITLE}>{t("reservations.table.alternatives")}</h3>
             {alternatives.length === 0 ? (
-              <p className="mt-3 text-[12.5px] text-[var(--octo-text-muted)]">{t("reservations.table.noAlternatives")}</p>
+              <p className={META_TEXT}>{t("reservations.table.noAlternatives")}</p>
             ) : (
-              <ul className="mt-3 space-y-2.5">
+              <ul className="flex flex-col gap-2">
                 {alternatives.map((option) => (
-                  <li key={option.table.id} className="rounded-[10px] bg-[var(--octo-hover)] p-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <MiniTable table={option.table} tone="available" />
-                      <div className="min-w-0 text-[12px]">
-                        <p className="flex items-center gap-1.5 text-[var(--octo-text-primary)]">
-                          <Utensils size={13} className="shrink-0 text-[var(--octo-text-muted)]" />
-                          <span className="font-semibold">{option.table.number}</span>,
-                          <span className="text-[var(--octo-text-secondary)]">{t("reservations.table.tableFor").replace("{n}", String(option.table.seats))}</span>
+                  <li key={option.table.id} className={`flex flex-col gap-1 rounded-[4px] ${SURFACE_BRAND_LIGHT} p-1`}>
+                    <div className="flex items-center gap-1">
+                      <MiniTable table={option.table} tone="available" size={49} />
+                      <div className="flex min-w-0 flex-1 flex-col gap-1">
+                        <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+                          <MetaIcon name="ord-table.svg" size={14.33} />
+                          <span>
+                            <span className={`font-bold ${TEXT_PRIMARY}`}>{option.table.number}</span>,{" "}
+                            {t("reservations.table.tableFor").replace("{n}", String(option.table.seats))}
+                          </span>
                         </p>
-                        <p className="mt-0.5 flex items-center gap-1.5 truncate text-[var(--octo-text-secondary)]">
-                          <MapPin size={13} className="shrink-0 text-[var(--octo-text-muted)]" />
-                          {[option.zoneName, areaLabel(option.table.area, t)].filter(Boolean).join(", ")}
+                        <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+                          <MetaIcon name="staff-location.svg" />
+                          <span className="truncate">{[option.zoneName, areaLabel(option.table.area, t)].filter(Boolean).join(", ")}</span>
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => pick(option.table.id)}
-                      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-[9px] border border-[#0D6EFD] bg-[var(--octo-card)] py-1.5 text-[12.5px] font-medium text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5"
+                      className={`flex h-8 w-full items-center justify-center gap-1 rounded-[4px] border border-[#0d6efd] px-2 py-1 text-[12px] font-semibold leading-3 ${TEXT_BRAND} transition-opacity hover:opacity-80`}
                     >
-                      <SquarePen size={13} />
+                      <ShellIcon name="rsv-add-edit-16.svg" size={16} />
                       {t("reservations.table.select")}
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </div>
         </aside>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-3 text-[13px] text-[var(--octo-text-primary)]">
-        <Hint icon={<MousePointerClick size={16} />} text={t("reservations.table.hint.click")} />
-        <Hint icon={<UsersRound size={16} />} text={t("reservations.table.hint.party")} />
-        <Hint icon={<Clock size={16} />} text={t("reservations.table.hint.time")} />
-        <Hint icon={<FileText size={16} />} text={t("reservations.table.hint.notes")} />
+      <div className={`mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-2 rounded-[24px] border ${BORDER_300} ${SURFACE_WHITE} px-4 py-3 shadow-[0px_0px_4px_0px_rgba(0,0,0,0.08)]`}>
+        <Hint icon="rsv-add-hint-click.svg" text={t("reservations.table.hint.click")} />
+        <Hint icon="rsv-add-hint-party.svg" text={t("reservations.table.hint.party")} />
+        <Hint icon="rsv-add-hint-time.svg" text={t("reservations.table.hint.time")} />
+        <Hint icon="rsv-add-hint-notes.svg" text={t("reservations.table.hint.notes")} />
       </div>
     </div>
   );
@@ -313,10 +329,9 @@ function ToolbarButton({ active, onClick, title, children }: { active?: boolean;
       title={title}
       aria-pressed={active}
       className={clsx(
-        "inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-[12.5px] transition-colors",
-        active
-          ? "border-[#0D6EFD] bg-[#0D6EFD] text-white"
-          : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+        TOOLBAR_CONTROL,
+        "inline-flex items-center gap-2 whitespace-nowrap px-4 py-2",
+        active ? "border-[#0d6efd] bg-[#0d6efd] text-white" : TOOLBAR_IDLE
       )}
     >
       {children}
@@ -324,28 +339,34 @@ function ToolbarButton({ active, onClick, title, children }: { active?: boolean;
   );
 }
 
-function Card({ children }: { children: ReactNode }) {
-  return <div className="rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4">{children}</div>;
+/** A 16px meta icon. A few of the frame's exports are cropped tighter than
+ *  their 16px slot, so the glyph keeps its own size inside the slot. */
+function MetaIcon({ name, size = 16 }: { name: string; size?: number }) {
+  return (
+    <span className="grid h-4 w-4 shrink-0 place-items-center">
+      <ShellIcon name={name} size={size} />
+    </span>
+  );
 }
 
-function SummaryRow({ icon, label, value, ltr }: { icon: ReactNode; label: string; value: string; ltr?: boolean }) {
+function SummaryRow({ icon, iconSize, label, value, ltr }: { icon: string; iconSize?: number; label: string; value: string; ltr?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-2 text-[12.5px]">
-      <dt className="flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
-        <span className="text-[var(--octo-text-muted)]">{icon}</span>
+    <div className="flex items-center justify-between gap-2">
+      <dt className={clsx(META_TEXT, "flex items-center gap-1")}>
+        <MetaIcon name={icon} size={iconSize} />
         {label}
       </dt>
-      <dd className="text-end font-medium text-[var(--octo-text-primary)]" dir={ltr ? "ltr" : undefined}>
+      <dd className={`text-end text-[14px] font-medium leading-[14px] ${TEXT_PRIMARY}`} dir={ltr ? "ltr" : undefined}>
         {value}
       </dd>
     </div>
   );
 }
 
-function Hint({ icon, text }: { icon: ReactNode; text: string }) {
+function Hint({ icon, text }: { icon: string; text: string }) {
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className="text-[var(--octo-text-secondary)]">{icon}</span>
+    <span className={`inline-flex items-center gap-2 text-[16px] font-semibold leading-4 ${TEXT_PRIMARY}`}>
+      <ShellIcon name={icon} />
       {text}
     </span>
   );
@@ -358,39 +379,39 @@ function SelectedTable({ option, tone }: { option: TableOption; tone: LiveStatus
   const status = available ? t("reservations.table.status.available") : t(`reservations.table.status.${unavailableReason(option, tone)}`);
 
   return (
-    <div className="mt-3">
+    <div>
       <div className="flex items-start gap-3">
-        <MiniTable table={option.table} tone={tone} size={64} />
-        <div className="min-w-0 flex-1 space-y-1.5 text-[12.5px]">
+        <MiniTable table={option.table} tone={tone} size={69} />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11.5px] font-medium"
+            className="inline-flex w-fit items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium leading-3"
             style={{ color: colors.text, backgroundColor: `color-mix(in srgb, ${colors.dot} 14%, var(--octo-card))` }}
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: colors.dot }} />
+            <span className="h-[5px] w-[5px] rounded-full" style={{ backgroundColor: colors.dot }} />
             {status}
           </span>
-          <p className="flex items-center gap-1.5 text-[var(--octo-text-primary)]">
-            <Utensils size={13} className="text-[var(--octo-text-muted)]" />
-            <span className="font-semibold">{option.table.number}</span>
+          <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+            <MetaIcon name="crm-detail-calendar-16.svg" />
+            {option.table.number}
           </p>
-          <p className="flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
-            <Users size={13} className="text-[var(--octo-text-muted)]" />
+          <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+            <MetaIcon name="rsv-add-time-16.svg" />
             {t("reservations.table.tableFor").replace("{n}", String(option.table.seats))}
           </p>
           {option.zoneName && (
-            <p className="flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
-              <MapPin size={13} className="text-[var(--octo-text-muted)]" />
+            <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+              <MetaIcon name="rsv-add-people-16.svg" />
               {option.zoneName}
             </p>
           )}
-          <p className="flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
-            <Timer size={13} className="text-[var(--octo-text-muted)]" />
+          <p className={clsx(META_TEXT, "flex items-center gap-1")}>
+            <MetaIcon name="rsv-add-timer-16.svg" />
             {areaLabel(option.table.area, t)}
           </p>
         </div>
       </div>
       {!available && (
-        <p className="mt-2.5 rounded-md bg-[var(--octo-track)] px-2.5 py-2 text-[12px] text-[var(--octo-text-secondary)]">
+        <p className={clsx(META_TEXT, `mt-3 rounded-[4px] ${SURFACE_WHITE} px-2 py-2 leading-[1.3]`)}>
           {t("reservations.table.needsTable")}
         </p>
       )}

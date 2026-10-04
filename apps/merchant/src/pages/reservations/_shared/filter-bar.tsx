@@ -1,9 +1,10 @@
 import clsx from "clsx";
-import { CalendarDays, SlidersHorizontal, ChevronDown } from "lucide-react";
-import { Select } from "@ui/primitives";
+import type { ReactNode } from "react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import type { ReservationSource } from "@/shared/api/mock-reservations";
 import { DISPLAY_STATE_OPTIONS, SOURCE_LABEL_KEY, STATE_LABEL_KEY, type ListFilters } from "./model";
+import { BORDER_200, BORDER_300, SURFACE_WHITE, TEXT_SECONDARY } from "./theme";
 
 const SOURCE_OPTIONS: readonly ReservationSource[] = [
   "Direct Booking", "Website", "Walk In", "Phone", "Instagram",
@@ -13,9 +14,42 @@ const SOURCE_OPTIONS: readonly ReservationSource[] = [
 // a base (layout) and two full colour variants rather than layering an
 // "active" override on top of the outline classes, so Tailwind's hover
 // utilities never fight each other over source order.
-const PILL_BASE = "inline-flex items-center gap-1.5 rounded-[9px] border px-3 py-[7px] text-[12px] transition-colors";
-const PILL_OUTLINE = "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
-const PILL_ACTIVE = "border-[#0D6EFD] bg-[#0D6EFD] text-white";
+const PILL_BASE = "inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-[8px] border p-2 text-[14px] font-medium leading-[14px] transition-colors";
+const PILL_OUTLINE = clsx(BORDER_200, SURFACE_WHITE, TEXT_SECONDARY, "hover:bg-[var(--octo-hover)]");
+// The frame draws the date pill with the darker of its two outline greys.
+const PILL_DATE = clsx(BORDER_300, SURFACE_WHITE, TEXT_SECONDARY, "hover:bg-[var(--octo-hover)]");
+const PILL_ACTIVE = "border-[#0d6efd] bg-[#0d6efd] text-white";
+
+// A native <select> drawn as one of the frame's dropdown pills: the browser's
+// own arrow is hidden and the frame's 24px chevron sits over the end padding.
+// field-sizing keeps the pill as wide as the picked option, like the frame,
+// instead of as wide as the longest option in the list.
+function FilterSelect({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+}) {
+  return (
+    <span className={clsx("relative inline-flex", TEXT_SECONDARY)}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={clsx(
+          "h-10 cursor-pointer appearance-none rounded-[8px] border py-2 pe-10 ps-2 text-[14px] font-medium leading-[14px] outline-none transition-colors [field-sizing:content] hover:bg-[var(--octo-hover)] focus-visible:border-[#0d6efd]",
+          BORDER_200,
+          SURFACE_WHITE
+        )}
+      >
+        {children}
+      </select>
+      <ShellIcon name="rsv-arrow-down.svg" size={24} className="pointer-events-none absolute end-2 top-2" />
+    </span>
+  );
+}
 
 // The frame draws the picked date as "Fri, Aug 14, 2026"; a bare
 // <input type="date"> renders the browser's own locale-native format
@@ -55,13 +89,13 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
   const { t, locale } = useI18n();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-3">
       <button
         type="button"
         onClick={() => onChange({ ...filters, day: "today" })}
         className={clsx(PILL_BASE, filters.day === "today" ? PILL_ACTIVE : PILL_OUTLINE)}
       >
-        <CalendarDays size={13} />
+        <ShellIcon name="rsv-calendar.svg" size={24} />
         {t("reservations.list.filter.today")}
       </button>
 
@@ -70,14 +104,14 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
         onClick={() => onChange({ ...filters, day: "tomorrow" })}
         className={clsx(PILL_BASE, filters.day === "tomorrow" ? PILL_ACTIVE : PILL_OUTLINE)}
       >
-        <CalendarDays size={13} />
+        <ShellIcon name="rsv-calendar.svg" size={24} />
         {t("reservations.list.filter.tomorrow")}
       </button>
 
       <label
-        className={clsx(PILL_BASE, "relative cursor-pointer", filters.day === "date" ? PILL_ACTIVE : PILL_OUTLINE)}
+        className={clsx(PILL_BASE, "relative cursor-pointer", filters.day === "date" ? PILL_ACTIVE : PILL_DATE)}
       >
-        <CalendarDays size={13} />
+        <ShellIcon name="rsv-calendar.svg" size={24} />
         <span>{formatDatePill(filters.date, locale)}</span>
         <input
           type="date"
@@ -92,54 +126,42 @@ export function FilterBar({ filters, onChange, areas }: FilterBarProps) {
           row actually shows — so "Confirmed" never returns a row whose
           pill reads "Link Sent", and Link Sent / Expired / Failed /
           Refunded / Payment Cancelled are all reachable here too. */}
-      <Select
-        value={filters.status}
-        onChange={(e) => onChange({ ...filters, status: e.target.value })}
-        className="!w-auto !py-[7px]"
-      >
+      <FilterSelect value={filters.status} onChange={(status) => onChange({ ...filters, status })}>
         <option value="">{t("reservations.list.filter.allStatus")}</option>
         {DISPLAY_STATE_OPTIONS.map((status) => (
           <option key={status} value={status}>
             {t(STATE_LABEL_KEY[status])}
           </option>
         ))}
-      </Select>
+      </FilterSelect>
 
-      <Select
-        value={filters.area}
-        onChange={(e) => onChange({ ...filters, area: e.target.value })}
-        className="!w-auto !py-[7px]"
-      >
+      <FilterSelect value={filters.area} onChange={(area) => onChange({ ...filters, area })}>
         <option value="">{t("reservations.list.filter.allAreas")}</option>
         {areas.map((area) => (
           <option key={area} value={area}>
             {area}
           </option>
         ))}
-      </Select>
+      </FilterSelect>
 
-      <Select
-        value={filters.source}
-        onChange={(e) => onChange({ ...filters, source: e.target.value })}
-        className="!w-auto !py-[7px]"
-      >
+      <FilterSelect value={filters.source} onChange={(source) => onChange({ ...filters, source })}>
         <option value="">{t("reservations.list.filter.allSources")}</option>
         {SOURCE_OPTIONS.map((source) => (
           <option key={source} value={source}>
             {t(SOURCE_LABEL_KEY[source])}
           </option>
         ))}
-      </Select>
+      </FilterSelect>
 
       <button
         type="button"
         disabled
         title={t("reservations.list.actions.noBackend")}
-        className={clsx(PILL_BASE, PILL_OUTLINE, "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[var(--octo-card)]")}
+        className={clsx(PILL_BASE, PILL_OUTLINE, "disabled:cursor-not-allowed disabled:opacity-50")}
       >
-        <SlidersHorizontal size={13} />
+        <ShellIcon name="rsv-filter.svg" size={24} />
         {t("reservations.list.filter.more")}
-        <ChevronDown size={13} className="text-[var(--octo-text-muted)]" />
+        <ShellIcon name="rsv-arrow-down.svg" size={24} />
       </button>
     </div>
   );

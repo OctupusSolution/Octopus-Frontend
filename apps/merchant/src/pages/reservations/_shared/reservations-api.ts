@@ -306,6 +306,11 @@ function remember(res: ReservationResponse): ReservationResponse {
   return res;
 }
 
+/** The floor-plan table (= the API's resource id) reservation `id` is booked on, when it holds one. */
+export function reservationTableId(id: string): string | undefined {
+  return targets.get(id)?.resourceId ?? resourceIds.get(id);
+}
+
 /** Whether the server's own status for `id` is "Expired" (see expiredIds). */
 export function isExpiredReservation(id: string): boolean {
   return expiredIds.has(id);

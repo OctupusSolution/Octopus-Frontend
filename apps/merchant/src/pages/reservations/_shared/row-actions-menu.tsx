@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import { MoreVertical } from "lucide-react";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { SURFACE_BRAND_LIGHT, SURFACE_RED_LIGHT, SURFACE_WHITE, TEXT_ERROR, TEXT_PRIMARY } from "./theme";
 import { useDismiss } from "./use-dismiss";
 
 export interface RowActionsMenuProps {
@@ -21,9 +22,9 @@ export interface RowActionsMenuProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ITEM = "flex w-full items-center rounded-[9px] px-2.5 py-1.5 text-start text-[12px] transition-colors";
-const ITEM_ENABLED = "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
-const ITEM_DISABLED = "text-[var(--octo-text-faint)] disabled:cursor-not-allowed";
+const ITEM = "flex w-full items-center whitespace-nowrap rounded-[4px] px-1 py-2 text-start text-[12px] font-semibold leading-[12px] transition-opacity";
+const ITEM_ENABLED = clsx(SURFACE_BRAND_LIGHT, TEXT_PRIMARY, "hover:opacity-80");
+const ITEM_DISABLED = clsx(SURFACE_BRAND_LIGHT, TEXT_PRIMARY, "opacity-50 disabled:cursor-not-allowed");
 
 export function RowActionsMenu({
   onDuplicate,
@@ -52,22 +53,25 @@ export function RowActionsMenu({
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative flex">
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={t("reservations.list.row.more")}
         onClick={() => onOpenChange(!open)}
-        className="grid h-8 w-8 place-items-center rounded-[9px] text-[var(--octo-text-muted)] transition-colors hover:bg-[var(--octo-hover)]"
+        className={clsx("grid h-6 w-6 place-items-center rounded-[8px] transition-colors hover:bg-[var(--octo-hover)]", TEXT_PRIMARY)}
       >
-        <MoreVertical size={15} />
+        <ShellIcon name="rsv-row-more.svg" size={24} />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute end-0 z-20 mt-1 w-52 rounded-[10px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1 shadow-lg"
+          className={clsx(
+            "absolute end-0 top-full z-20 mt-[13px] flex min-w-[146px] flex-col gap-3 rounded-[16px] p-3 shadow-[0_0_12px_0_rgba(0,0,0,0.12)]",
+            SURFACE_WHITE
+          )}
         >
           <button type="button" role="menuitem" onClick={run(onDuplicate)} className={clsx(ITEM, ITEM_ENABLED)}>
             {t("reservations.list.actions.duplicate")}
@@ -109,7 +113,7 @@ export function RowActionsMenu({
             type="button"
             role="menuitem"
             onClick={run(onCancel)}
-            className="mt-1 flex w-full items-center rounded-[9px] border-t border-[var(--octo-divider)] px-2.5 pb-1.5 pt-2 text-start text-[12px] text-[#EF4444] transition-colors hover:bg-[var(--octo-hover)]"
+            className={clsx(ITEM, SURFACE_RED_LIGHT, TEXT_ERROR, "hover:opacity-80")}
           >
             {t("reservations.list.actions.cancel")}
           </button>

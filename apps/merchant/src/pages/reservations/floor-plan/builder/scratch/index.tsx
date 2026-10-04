@@ -2,25 +2,7 @@
 // properties, drawing tools — editing the business's one draft.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  BrickWall,
-  Grid3x3,
-  Hand,
-  LayoutGrid,
-  LayoutTemplate,
-  Lasso,
-  Maximize2,
-  MousePointer2,
-  Redo2,
-  Ruler,
-  Shapes,
-  Square,
-  SquareDashedBottom,
-  Type,
-  Undo2,
-  Upload,
-  Users,
-} from "lucide-react";
+import { LayoutGrid, LayoutTemplate, Shapes, Upload } from "lucide-react";
 import clsx from "clsx";
 import {
   addItem,
@@ -50,16 +32,16 @@ import {
 } from "@/entities/floor-plan";
 import { ACTUAL_SIZE_SCALE, EditorCanvas, type EditorCanvasHandle, type EditorTool, type Point } from "@/widgets/floor-plan-canvas";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { BORDER_200, BORDER_300, TEXT_BRAND, TEXT_SEC_GRAY } from "../../../_shared/theme";
 import { formatNumber } from "../../_shared/format";
-import { TableIcon } from "../../_shared/icons";
-import { PageShell } from "../../_shared/page-header";
+import { PageHeader, PageShell } from "../../_shared/page-header";
 import { FLOOR_PLAN_BUILDER_PATH, LIVE_FLOOR_PLAN_PATH } from "../../_shared/paths";
-import { SwitchField } from "../../_shared/switch";
 import { ToastBanner, useToast } from "../../_shared/toast";
 import { useAdminText } from "../../_shared/admin-text";
 import { useBuilderStep, useFloorPlan } from "../../_shared/use-floor-plan";
 import { BuilderActions } from "../_shared/builder-actions";
-import { DEFAULT_VIEW, ZoomControls, type ViewOptions } from "../_shared/canvas-toolbar";
+import { CanvasToolbar, DEFAULT_VIEW, ToolbarButton, type ViewOptions } from "../_shared/canvas-toolbar";
 import { EditLockNotice, useEditLock } from "../_shared/edit-lock";
 import { FloatingToolbar } from "../_shared/floating-toolbar";
 import { PlanPreviewModal, PublishConfirmModal, PublishSuccessModal } from "../_shared/publish-flow";
@@ -106,6 +88,16 @@ function freeSpot(doc: FloorPlanDoc, rect: Rect, step: number): { x: number; y: 
     if (fits(spot.x, spot.y)) return spot;
   }
   return asked;
+}
+
+/** A frame icon in its 24px slot. Some were exported cropped to their artwork,
+ *  so `size` is the file's own longest edge — it is never scaled up to fill. */
+function Glyph({ name, size = 24, tint }: { name: string; size?: number; tint?: boolean }) {
+  return (
+    <span className={clsx("grid h-6 w-6 shrink-0 place-items-center", tint && TEXT_BRAND)}>
+      <ShellIcon name={name} size={size} />
+    </span>
+  );
 }
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -318,14 +310,14 @@ export function BuildFromScratchPage() {
   }
 
   const tools = [
-    { id: "select", label: t("floorPlan.tools.select"), icon: <MousePointer2 size={20} />, shortcut: "V" },
-    { id: "hand", label: t("floorPlan.tools.hand"), icon: <Hand size={20} />, shortcut: "H" },
-    { id: "wall", label: t("floorPlan.tools.drawWall"), icon: <BrickWall size={20} />, shortcut: "W" },
-    { id: "room", label: t("floorPlan.tools.room"), icon: <Square size={20} />, shortcut: "B" },
-    { id: "text", label: t("floorPlan.tools.text"), icon: <Type size={20} />, shortcut: "T" },
-    { id: "zone", label: t("floorPlan.tools.zone"), icon: <SquareDashedBottom size={20} />, shortcut: "Z", overflow: true },
-    { id: "lasso", label: t("floorPlan.tools.lasso"), icon: <Lasso size={20} />, shortcut: "Q", overflow: true },
-    { id: "measure", label: t("floorPlan.tools.measure"), icon: <Ruler size={20} />, shortcut: "M", overflow: true },
+    { id: "select", label: t("floorPlan.tools.select"), icon: <Glyph name="fp-scratch-tool-select.svg" />, shortcut: "V" },
+    { id: "hand", label: t("floorPlan.tools.hand"), icon: <Glyph name="fp-scratch-tool-hand.svg" size={21.5} />, shortcut: "H" },
+    { id: "wall", label: t("floorPlan.tools.drawWall"), icon: <Glyph name="fp-scratch-tool-wall.svg" size={21.5} />, shortcut: "W" },
+    { id: "room", label: t("floorPlan.tools.room"), icon: <Glyph name="fp-scratch-tool-room.svg" />, shortcut: "B" },
+    { id: "text", label: t("floorPlan.tools.text"), icon: <Glyph name="fp-scratch-tool-text.svg" />, shortcut: "T" },
+    { id: "zone", label: t("floorPlan.tools.zone"), icon: <Glyph name="fp-scratch-tool-zone.svg" />, shortcut: "Z" },
+    { id: "lasso", label: t("floorPlan.tools.lasso"), icon: <Glyph name="fp-scratch-tool-lasso.svg" />, shortcut: "Q" },
+    { id: "measure", label: t("floorPlan.tools.measure"), icon: <Glyph name="fp-scratch-tool-measure.svg" />, shortcut: "M" },
   ] as const;
 
   const hint =
@@ -338,229 +330,196 @@ export function BuildFromScratchPage() {
     tool === "hand" ? t("floorPlan.hint.hand") : null;
 
   return (
-    <PageShell fill>
+    <PageShell>
       <EditLockNotice lock={lock} onTookOver={() => notify(at("lock.tookOver"))} />
-      {/* No page header here — the app's own breadcrumb already names this
-          screen, and every control that lived in it (title aside, Undo, Redo,
-          Grid, Snap, Show Dimensions) moved into the Tools bar over the
-          canvas, so the library/canvas/layers section gets that height back. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 xl:flex-row">
-        {/* The tool row floats over the canvas's own bottom edge instead of
-            taking a row beneath it, so the drawing area keeps that height. */}
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          <EditorCanvas
-            ref={canvasRef}
-            className="h-full rounded-[18px] border border-[var(--octo-border-card)]"
-            doc={doc}
-            selection={editor.selection}
-            onSelectionChange={editor.select}
-            onCommit={editor.commit}
-            tool={tool}
-            onToolChange={setTool}
-            scale={scale}
-            onScaleChange={setScale}
-            showGrid={view.showGrid}
-            snapEnabled={view.snap}
-            snapStep={view.gridStep}
-            showLabels={view.showLabels}
-            showDimensions={view.showDimensions}
-            hiddenIds={hiddenIds}
-            conflictIds={conflictIds}
-            toneFor={toneFor}
-            newZoneName={(n) => t("floorPlan.defaults.zoneName").replace("{n}", String(n))}
-            newTextLabel={t("floorPlan.defaults.text")}
-            onCreated={(item) => {
-              if (item.kind !== "object" || item.type !== "wall") setTab("properties");
-            }}
-            onDropPayload={(payload, point) => {
-              try {
-                addFromLibrary(JSON.parse(payload) as LibraryPayload, point);
-              } catch {
-                // Not one of ours.
-              }
-            }}
-          >
-            {isEmpty && !doc.background && (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
-                <div className="pointer-events-auto flex max-w-[420px] flex-col items-center rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-6 text-center shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur">
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-[#6D28D9]/10 text-[#6D28D9]">
-                    <Shapes size={24} />
-                  </span>
-                  <h2 className="mt-3 text-[18px] font-bold text-[var(--octo-text-primary)]">{t("floorPlan.scratch.emptyTitle")}</h2>
-                  <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--octo-text-secondary)]">{t("floorPlan.scratch.emptyBody")}</p>
-                  <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => editor.commit(sampleLayout(doc.name))}
-                      className="flex h-10 items-center gap-2 rounded-[10px] bg-[#6D28D9] px-4 text-[13.5px] font-semibold text-white hover:opacity-90"
-                    >
-                      <LayoutTemplate size={16} />
-                      {t("floorPlan.scratch.useSample")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => uploadRef.current?.click()}
-                      className="flex h-10 items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-4 text-[13.5px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-                    >
-                      <Upload size={16} />
-                      {t("floorPlan.scratch.uploadPlan")}
-                    </button>
+      <PageHeader title={t("floorPlan.scratch.title")} subtitle={t("floorPlan.scratch.subtitle")} />
+
+      <CanvasToolbar
+        className="mt-6"
+        canUndo={editor.canUndo}
+        canRedo={editor.canRedo}
+        onUndo={editor.undo}
+        onRedo={editor.redo}
+        view={view}
+        onViewChange={setView}
+        secondToggle="dimensions"
+        zoomPercent={Math.round((scale / ACTUAL_SIZE_SCALE) * 100)}
+        onZoomIn={() => setScale((s) => Math.min(MAX_SCALE, s * 1.2))}
+        onZoomOut={() => setScale((s) => Math.max(MIN_SCALE, s / 1.2))}
+        onFit={() => canvasRef.current?.fitToView()}
+        // No counterpart in the frame — it sits with the frame's own pills.
+        extra={<ToolbarButton onClick={() => setGridOpen(true)} icon={<LayoutGrid size={20} />} label={at("grid.open")} />}
+      />
+
+      <div className="mt-6 flex flex-col gap-4 xl:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="relative">
+            <EditorCanvas
+              ref={canvasRef}
+              className="h-[clamp(520px,calc(100vh-200px),735px)]"
+              doc={doc}
+              selection={editor.selection}
+              onSelectionChange={editor.select}
+              onCommit={editor.commit}
+              tool={tool}
+              onToolChange={setTool}
+              scale={scale}
+              onScaleChange={setScale}
+              showGrid={view.showGrid}
+              snapEnabled={view.snap}
+              snapStep={view.gridStep}
+              showLabels={view.showLabels}
+              showDimensions={view.showDimensions}
+              hiddenIds={hiddenIds}
+              conflictIds={conflictIds}
+              toneFor={toneFor}
+              newZoneName={(n) => t("floorPlan.defaults.zoneName").replace("{n}", String(n))}
+              newTextLabel={t("floorPlan.defaults.text")}
+              onCreated={(item) => {
+                if (item.kind !== "object" || item.type !== "wall") setTab("properties");
+              }}
+              onDropPayload={(payload, point) => {
+                try {
+                  addFromLibrary(JSON.parse(payload) as LibraryPayload, point);
+                } catch {
+                  // Not one of ours.
+                }
+              }}
+            >
+              {isEmpty && !doc.background && (
+                <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
+                  <div className="pointer-events-auto flex max-w-[420px] flex-col items-center rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-6 text-center shadow-[0_18px_40px_rgba(15,23,42,0.12)] backdrop-blur">
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-[#6D28D9]/10 text-[#6D28D9]">
+                      <Shapes size={24} />
+                    </span>
+                    <h2 className="mt-3 text-[18px] font-bold text-[var(--octo-text-primary)]">{t("floorPlan.scratch.emptyTitle")}</h2>
+                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--octo-text-secondary)]">{t("floorPlan.scratch.emptyBody")}</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editor.commit(sampleLayout(doc.name))}
+                        className="flex h-10 items-center gap-2 rounded-[10px] bg-[#6D28D9] px-4 text-[13.5px] font-semibold text-white hover:opacity-90"
+                      >
+                        <LayoutTemplate size={16} />
+                        {t("floorPlan.scratch.useSample")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => uploadRef.current?.click()}
+                        className="flex h-10 items-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-4 text-[13.5px] font-semibold text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                      >
+                        <Upload size={16} />
+                        {t("floorPlan.scratch.uploadPlan")}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </EditorCanvas>
+            {hint && (
+              <p className="pointer-events-none absolute start-1/2 top-9 z-[4] -translate-x-1/2 rounded-full bg-[#111827]/85 px-3.5 py-1.5 text-[12.5px] font-medium text-white shadow-lg rtl:translate-x-1/2">
+                {hint}
+              </p>
             )}
-          </EditorCanvas>
-          {hint && (
-            <p className="pointer-events-none absolute start-1/2 top-9 z-[4] -translate-x-1/2 rounded-full bg-[#111827]/85 px-3.5 py-1.5 text-[12.5px] font-medium text-white shadow-lg rtl:translate-x-1/2">
-              {hint}
-            </p>
-          )}
-          <div className="pointer-events-none absolute inset-x-0 bottom-3 z-[5] flex justify-center px-3">
-            <FloatingToolbar
-              className="pointer-events-auto !bg-[var(--octo-card)] backdrop-blur"
-              tools={[
-                { id: "undo", label: t("floorPlan.toolbar.undo"), icon: <Undo2 size={18} />, shortcut: "Ctrl+Z", disabled: !editor.canUndo, onClick: editor.undo },
-                { id: "redo", label: t("floorPlan.toolbar.redo"), icon: <Redo2 size={18} />, shortcut: "Ctrl+Shift+Z", disabled: !editor.canRedo, onClick: editor.redo },
-                ...tools.map((item, index) => ({ ...item, active: tool === item.id, onClick: () => setTool(item.id), separator: index === 0 })),
-                { id: "grid-generate", label: at("grid.open"), icon: <LayoutGrid size={18} />, overflow: true, onClick: () => setGridOpen(true) },
-                {
-                  id: "view-settings",
-                  label: t("floorPlan.toolbar.grid"),
-                  icon: <Grid3x3 size={18} />,
-                  overflow: true,
-                  separator: true,
-                  overflowContent: (
-                    <div className="flex w-[220px] flex-col gap-2.5 px-1 py-1">
-                      <SwitchField checked={view.showGrid} onChange={(showGrid) => setView({ ...view, showGrid })} label={t("floorPlan.toolbar.showGrid")} size="sm" />
-                      <div className="grid grid-cols-2 gap-1.5 rounded-[10px] bg-[var(--octo-seg-bg)] p-1" role="radiogroup">
-                        {([0.5, 1] as const).map((step) => (
-                          <button
-                            key={step}
-                            type="button"
-                            role="radio"
-                            aria-checked={view.gridStep === step}
-                            onClick={() => setView({ ...view, gridStep: step })}
-                            className={clsx(
-                              "rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition-colors",
-                              view.gridStep === step ? "bg-[var(--octo-card)] text-[#0D6EFD] shadow-sm" : "text-[var(--octo-text-secondary)]"
-                            )}
-                          >
-                            {step === 0.5 ? t("floorPlan.toolbar.gridFine") : t("floorPlan.toolbar.gridStandard")}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="my-0.5 h-px bg-[var(--octo-border-input)]" />
-                      <SwitchField checked={view.snap} onChange={(snap) => setView({ ...view, snap })} label={t("floorPlan.toolbar.snap")} size="sm" />
-                      <SwitchField checked={view.showDimensions} onChange={(showDimensions) => setView({ ...view, showDimensions })} label={t("floorPlan.toolbar.showDimensions")} size="sm" />
-                    </div>
-                  ),
-                },
-              ]}
-            />
           </div>
-          <ZoomControls
-            className="pointer-events-auto absolute bottom-3 end-3 z-[5] !bg-[var(--octo-card)] backdrop-blur"
-            zoomPercent={Math.round((scale / ACTUAL_SIZE_SCALE) * 100)}
-            onZoomIn={() => setScale((s) => Math.min(MAX_SCALE, s * 1.2))}
-            onZoomOut={() => setScale((s) => Math.max(MIN_SCALE, s / 1.2))}
-            onFit={() => canvasRef.current?.fitToView()}
-          />
+          {/* Inset so the bar's own shadow has room inside the column. */}
+          <div className="px-2.5 pb-3">
+            <FloatingToolbar tools={tools.map((item) => ({ ...item, active: tool === item.id, onClick: () => setTool(item.id) }))} />
+          </div>
         </div>
 
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] xl:w-[340px] xl:shrink-0">
-          <div className="flex border-b border-[var(--octo-border-card)] px-2" role="tablist">
-            {(["library", "layers", "properties"] as const).map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => setTab(id)}
-                className={clsx(
-                  "relative flex flex-1 items-center justify-center gap-1.5 px-2 py-3.5 text-[16px] transition-colors",
-                  tab === id ? "font-medium text-[#0D6EFD]" : "text-[var(--octo-text-secondary)] hover:text-[var(--octo-text-primary)]"
-                )}
-              >
-                {t(`floorPlan.scratch.tab.${id}`)}
-                {id === "properties" && editor.selection.length > 0 && (
-                  <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-[#0D6EFD] px-1 text-[10.5px] font-semibold text-white">
-                    {editor.selection.length}
-                  </span>
-                )}
-                {tab === id && <span className="absolute inset-x-3 bottom-0 h-[2px] rounded-full bg-[#0D6EFD]" />}
-              </button>
-            ))}
-          </div>
-          <div className="octo-scroll min-h-0 flex-1 overflow-y-auto p-4">
-            {tab === "library" && (
-              <LibraryPanel
-                onAdd={(payload) => addFromLibrary(payload)}
-                background={doc.background}
-                onBackgroundFile={setBackgroundFile}
-                onBackgroundOpacity={(opacity) => doc.background && editor.commit({ ...doc, background: { ...doc.background, opacity } })}
-                onRemoveBackground={() => editor.commit({ ...doc, background: null })}
-              />
-            )}
-            {tab === "layers" && (
-              <LayersPanel
-                doc={doc}
-                selection={editor.selection}
-                hiddenIds={hiddenIds}
-                onSelect={editor.select}
-                onToggleHidden={(id) =>
-                  setHiddenIds((current) => {
-                    const next = new Set(current);
-                    if (next.has(id)) next.delete(id);
-                    else next.add(id);
-                    return next;
-                  })
-                }
-                onToggleLock={(id) => editor.commit(toggleLock(doc, [id]))}
-                onMoveZone={moveZone}
-              />
-            )}
-            {tab === "properties" && (
-              <PropertiesPanel
-                doc={doc}
-                items={editor.selectedItems}
-                toneFor={toneFor}
-                onDoc={(next) => editor.commit(next)}
-                onDuplicate={editor.duplicateSelected}
-                onDelete={editor.deleteSelected}
-                onRotate={editor.rotateSelected}
-                onToggleLock={editor.toggleLockSelected}
-                toolShortcuts={tools.map((item) => [item.shortcut, item.label] as [string, string])}
-              />
-            )}
-          </div>
-        </aside>
+        {/* On wide screens the panel takes the canvas column's height and
+            scrolls inside it, rather than stretching the row to its content. */}
+        <div className="relative xl:min-h-[min(860px,calc(100vh-75px))] xl:w-[232px] xl:shrink-0">
+          <aside className={clsx("flex max-h-[860px] flex-col overflow-hidden rounded-[20px] border px-2 py-3 xl:absolute xl:inset-0 xl:max-h-none", BORDER_300)}>
+            <div className={clsx("flex shrink-0 items-start justify-between border-b", BORDER_200)} role="tablist">
+              {(["library", "layers", "properties"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={clsx(
+                    "relative flex items-center gap-1 pb-3 pt-1 text-[14px] font-medium leading-[14px] transition-colors",
+                    tab === id ? TEXT_BRAND : clsx(TEXT_SEC_GRAY, "hover:text-[#0f172a] [[data-theme=dark]_&]:hover:text-[var(--octo-text-primary)]")
+                  )}
+                >
+                  {t(`floorPlan.scratch.tab.${id}`)}
+                  {id === "properties" && editor.selection.length > 0 && (
+                    <span className="grid h-[14px] min-w-[14px] place-items-center rounded-full bg-[#0d6efd] px-[3px] text-[9px] font-semibold leading-none text-white">
+                      {editor.selection.length}
+                    </span>
+                  )}
+                  {tab === id && <span className="absolute -bottom-px -end-[9px] start-0 h-[1.5px] bg-[#0d6efd] [[data-theme=dark]_&]:bg-[var(--octo-accent)]" />}
+                </button>
+              ))}
+            </div>
+            <div className="-mx-2 mt-4 min-h-0 flex-1 overflow-y-auto px-2 [scrollbar-width:thin]">
+              {tab === "library" && (
+                <LibraryPanel
+                  onAdd={(payload) => addFromLibrary(payload)}
+                  background={doc.background}
+                  onBackgroundFile={setBackgroundFile}
+                  onBackgroundOpacity={(opacity) => doc.background && editor.commit({ ...doc, background: { ...doc.background, opacity } })}
+                  onRemoveBackground={() => editor.commit({ ...doc, background: null })}
+                />
+              )}
+              {tab === "layers" && (
+                <LayersPanel
+                  doc={doc}
+                  selection={editor.selection}
+                  hiddenIds={hiddenIds}
+                  onSelect={editor.select}
+                  onToggleHidden={(id) =>
+                    setHiddenIds((current) => {
+                      const next = new Set(current);
+                      if (next.has(id)) next.delete(id);
+                      else next.add(id);
+                      return next;
+                    })
+                  }
+                  onToggleLock={(id) => editor.commit(toggleLock(doc, [id]))}
+                  onMoveZone={moveZone}
+                />
+              )}
+              {tab === "properties" && (
+                <PropertiesPanel
+                  doc={doc}
+                  items={editor.selectedItems}
+                  toneFor={toneFor}
+                  onDoc={(next) => editor.commit(next)}
+                  onDuplicate={editor.duplicateSelected}
+                  onDelete={editor.deleteSelected}
+                  onRotate={editor.rotateSelected}
+                  onToggleLock={editor.toggleLockSelected}
+                  toolShortcuts={tools.map((item) => [item.shortcut, item.label] as [string, string])}
+                />
+              )}
+            </div>
+          </aside>
+        </div>
       </div>
 
-      {/* One compact row, not two stacked ones: the stats strip and the save/
-          publish buttons share the width instead of each claiming a full-width
-          line, so the canvas above keeps more of the page. */}
-      <div className="mt-3 flex shrink-0 flex-col gap-2 xl:flex-row xl:items-center">
-        <StatsBar
-          className="xl:min-w-0 xl:flex-1"
-          items={[
-            { icon: <Maximize2 size={20} />, label: t("floorPlan.stats.canvasSize"), value: <span dir="ltr">{`${stats.widthMeters.toFixed(2)}m * ${stats.heightMeters.toFixed(2)}m`}</span> },
-            { icon: <Shapes size={20} />, label: t("floorPlan.stats.objects"), value: formatNumber(stats.objects, locale) },
-            { icon: <TableIcon size={22} />, label: t("floorPlan.stats.tables"), value: formatNumber(stats.tables, locale) },
-            { icon: <Users size={20} />, label: t("floorPlan.stats.capacity"), value: t("floorPlan.common.seatsCount").replace("{n}", formatNumber(stats.seats, locale)) },
-            { icon: <SquareDashedBottom size={20} />, label: t("floorPlan.stats.zones"), value: formatNumber(stats.zones, locale) },
-            { icon: <BrickWall size={20} />, label: t("floorPlan.stats.walls"), value: <span dir="ltr">{`${stats.wallsMeters.toFixed(1)}m`}</span> },
-          ]}
-        />
-        <BuilderActions
-          inline
-          className="xl:shrink-0"
-          onSaveDraft={saveNow}
-          onPreview={() => setModal("preview")}
-          onPublish={() => setModal("confirm")}
-          publishLabel={t("floorPlan.actions.publishLive")}
-          saveState={saveState}
-        />
-      </div>
+      <StatsBar
+        className="mt-8"
+        items={[
+          { icon: <Glyph name="fp-scratch-stat-canvas.svg" tint />, label: t("floorPlan.stats.canvasSize"), value: <span dir="ltr">{`${stats.widthMeters.toFixed(2)}m * ${stats.heightMeters.toFixed(2)}m`}</span> },
+          { icon: <Glyph name="fp-scratch-stat-objects.svg" tint />, label: t("floorPlan.stats.objects"), value: formatNumber(stats.objects, locale) },
+          { icon: <Glyph name="fp-scratch-stat-tables.svg" size={21.5} tint />, label: t("floorPlan.stats.tables"), value: formatNumber(stats.tables, locale) },
+          { icon: <Glyph name="fp-scratch-stat-capacity.svg" tint />, label: t("floorPlan.stats.capacity"), value: t("floorPlan.common.seatsCount").replace("{n}", formatNumber(stats.seats, locale)) },
+          { icon: <Glyph name="fp-scratch-stat-zones.svg" tint />, label: t("floorPlan.stats.zones"), value: formatNumber(stats.zones, locale) },
+          { icon: <Glyph name="fp-scratch-stat-walls.svg" tint />, label: t("floorPlan.stats.walls"), value: <span dir="ltr">{`${stats.wallsMeters.toFixed(1)}m`}</span> },
+        ]}
+      />
+      <BuilderActions
+        className="mt-8"
+        onSaveDraft={saveNow}
+        onPreview={() => setModal("preview")}
+        onPublish={() => setModal("confirm")}
+        publishLabel={t("floorPlan.actions.publishLive")}
+        saveState={saveState}
+      />
 
       <input
         ref={uploadRef}

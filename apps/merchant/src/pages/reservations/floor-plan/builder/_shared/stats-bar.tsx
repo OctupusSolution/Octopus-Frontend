@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { BORDER_300, SURFACE_BRAND_LIGHT, SURFACE_WHITE, TEXT_PRIMARY, TEXT_SEC_GRAY } from "../../../_shared/theme";
 
 export interface StatItem {
   icon: ReactNode;
@@ -8,12 +10,24 @@ export interface StatItem {
   sub?: ReactNode;
 }
 
+/** The frames' own stat glyphs, sized to sit in the 24px slot of the 40px
+ *  disc. Pass one as a `StatItem.icon`. */
+export const STAT_ICONS = {
+  tables: <ShellIcon name="fp-builder-stat-tables.svg" size={22} />,
+  capacity: <ShellIcon name="fp-builder-stat-capacity.svg" size={24} />,
+  categories: <ShellIcon name="fp-builder-stat-categories.svg" size={18} />,
+  blocked: <ShellIcon name="fp-builder-stat-blocked.svg" size={24} />,
+  edited: <ShellIcon name="fp-builder-stat-edited.svg" size={24} />,
+} as const;
+
 /** The rounded summary strip under the canvas. */
 export function StatsBar({ items, className }: { items: StatItem[]; className?: string }) {
   return (
     <section
       className={clsx(
-        "grid grid-cols-2 gap-y-2 rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:grid-cols-3 lg:flex lg:items-center lg:px-1.5",
+        "grid grid-cols-1 gap-y-1 rounded-[24px] border px-4 py-3 shadow-[0px_0px_4px_rgba(0,0,0,0.08)] sm:grid-cols-2 md:grid-cols-3 lg:flex lg:items-center lg:justify-between",
+        BORDER_300,
+        SURFACE_WHITE,
         className
       )}
     >
@@ -21,15 +35,22 @@ export function StatsBar({ items, className }: { items: StatItem[]; className?: 
         <div
           key={index}
           className={clsx(
-            "flex min-w-0 items-center gap-2 px-2 lg:flex-1 lg:justify-center",
-            index > 0 && "lg:border-s lg:border-[var(--octo-border-card)]"
+            "flex min-h-[70px] min-w-0 items-center gap-2 p-2 lg:flex-auto lg:border-s lg:first:border-s-0",
+            BORDER_300
           )}
         >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--octo-selected)] text-[#2563EB] [&>svg]:h-4 [&>svg]:w-4">{item.icon}</span>
-          <span className="min-w-0">
-            <span className="block truncate text-[11px] text-[var(--octo-text-secondary)]">{item.label}</span>
-            <span className="block truncate text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{item.value}</span>
-            {item.sub && <span className="block truncate text-[10.5px] text-[var(--octo-text-muted)]">{item.sub}</span>}
+          <span
+            className={clsx(
+              "grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#0d6efd] [&>svg]:h-6 [&>svg]:w-6",
+              SURFACE_BRAND_LIGHT
+            )}
+          >
+            {item.icon}
+          </span>
+          <span className={clsx("flex min-w-0 flex-col", item.sub ? "gap-1.5" : "gap-2")}>
+            <span className={clsx("block truncate text-[14px] font-medium leading-[14px]", TEXT_SEC_GRAY)}>{item.label}</span>
+            <span className={clsx("block truncate text-[16px] font-semibold leading-[16px]", TEXT_PRIMARY)}>{item.value}</span>
+            {item.sub && <span className={clsx("block truncate text-[12px] leading-[12px]", TEXT_PRIMARY)}>{item.sub}</span>}
           </span>
         </div>
       ))}

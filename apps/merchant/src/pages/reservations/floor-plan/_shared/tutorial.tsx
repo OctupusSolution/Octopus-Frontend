@@ -2,11 +2,13 @@
 // the dialog walks through the same four steps a video would, with the
 // shortcuts that make the builder fast.
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Keyboard, LayoutGrid, PlayCircle, Rocket, Settings2, Shapes } from "lucide-react";
+import { ArrowLeft, ArrowRight, Keyboard, LayoutGrid, Rocket, Settings2, Shapes } from "lucide-react";
 import clsx from "clsx";
 import { Button, Modal } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { FLOOR_PLAN_ASSETS } from "@/shared/lib/floor-plan-assets";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { SURFACE_BRAND_LIGHT, TEXT_BRAND, TEXT_PRIMARY } from "../../_shared/theme";
 
 const STEPS = [
   { id: "choose", Icon: LayoutGrid },
@@ -33,14 +35,15 @@ export function WatchTutorialButton({ className }: { className?: string }) {
         type="button"
         onClick={() => setOpen(true)}
         className={clsx(
-          "flex items-center gap-3 rounded-2xl bg-[var(--octo-selected)] px-4 py-2.5 text-start transition-colors hover:brightness-[0.98]",
+          "flex items-center gap-2 rounded-lg px-3 py-2 text-start transition-colors hover:brightness-[0.98]",
+          SURFACE_BRAND_LIGHT,
           className
         )}
       >
-        <PlayCircle size={28} strokeWidth={1.6} className="shrink-0 text-[#0D6EFD]" />
-        <span>
-          <span className="block text-[13px] leading-tight text-[var(--octo-text-primary)]">{t("floorPlan.tutorial.needHelp")}</span>
-          <span className="block text-[17px] font-bold leading-tight text-[#0D6EFD]">{t("floorPlan.tutorial.watch")}</span>
+        <ShellIcon name="fp-hub-video-circle.svg" size={24} className={TEXT_BRAND} />
+        <span className="flex flex-col gap-1 whitespace-nowrap">
+          <span className={clsx("text-[14px] leading-[14px]", TEXT_PRIMARY)}>{t("floorPlan.tutorial.needHelp")}</span>
+          <span className={clsx("text-[18px] font-bold leading-[18px]", TEXT_BRAND)}>{t("floorPlan.tutorial.watch")}</span>
         </span>
       </button>
       <TutorialModal open={open} onClose={() => setOpen(false)} />

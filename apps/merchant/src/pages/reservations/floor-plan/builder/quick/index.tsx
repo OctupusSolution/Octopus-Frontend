@@ -133,7 +133,7 @@ export function QuickBoxLayoutPage() {
         />
       </div>
 
-      <div className="mt-7">
+      <div className={step === 1 ? "mt-10" : "mt-6"}>
         {step === 1 && (
           <AddTablesStep
             doc={editor.doc}

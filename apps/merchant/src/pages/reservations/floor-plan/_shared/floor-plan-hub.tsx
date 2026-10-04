@@ -4,9 +4,11 @@
 // away.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FilePen, History, LayoutTemplate, Pencil, Settings2, SquareDashedBottom } from "lucide-react";
+import { FilePen, History, LayoutTemplate, Settings2, SquareDashedBottom } from "lucide-react";
+import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { FLOOR_PLAN_ASSETS } from "@/shared/lib/floor-plan-assets";
+import { BORDER_300, TEXT_PRIMARY, TEXT_SECONDARY } from "../../_shared/theme";
 import { useAdminText } from "./admin-text";
 import { ConfirmModal } from "./confirm-modal";
 import { DraftBanner } from "./draft-banner";
@@ -25,6 +27,9 @@ type Pending =
   | { kind: "replaceDraft"; method: Exclude<BuildMethod, "ai">; source?: ScratchSource }
   | { kind: "chooseSource" }
   | { kind: "discard" };
+
+const TOOL_BUTTON =
+  "flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-[14px] font-medium leading-[14px] transition-colors hover:bg-[var(--octo-hover)]";
 
 export function FloorPlanHub() {
   const { t } = useI18n();
@@ -70,74 +75,63 @@ export function FloorPlanHub() {
 
   return (
     <PageShell>
-      <PageHeader
-        title={t("floorPlan.hub.title")}
-        subtitle={t("floorPlan.hub.subtitle")}
-        aside={
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              aria-label={at("settings.open")}
-              title={at("settings.open")}
-              className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-3.5 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-            >
-              <Settings2 size={16} />
-              <span className="hidden sm:inline">{at("settings.open")}</span>
-            </button>
-            <WatchTutorialButton />
-          </div>
-        }
-      />
-
-      {draft && <DraftBanner className="mt-6" draft={draft} onContinue={continueDraft} onDiscard={() => setPending({ kind: "discard" })} />}
+      <PageHeader title={t("floorPlan.hub.title")} subtitle={t("floorPlan.hub.subtitle")} aside={<WatchTutorialButton />} />
 
       {hasPlan ? (
-        <>
+        <div className="mt-8 flex flex-col gap-8">
+          {draft && <DraftBanner draft={draft} onContinue={continueDraft} onDiscard={() => setPending({ kind: "discard" })} />}
           <PlanSummaryCard
-            className="mt-6"
             published={published}
             draft={draft}
             action={
               published ? (
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() => setVersionsOpen(true)}
-                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[var(--octo-border-input)] px-4 text-[14px] font-medium text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-                  >
-                    <History size={16} />
-                    {t("floorPlan.versions.open")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={editLive}
-                    className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#0D6EFD] px-5 text-[14px] font-semibold text-white transition-opacity hover:opacity-90"
-                  >
-                    <Pencil size={16} />
-                    {t("floorPlan.live.edit")}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={editLive}
+                  className="h-10 w-full whitespace-nowrap rounded-lg bg-[#0d6efd] px-3 py-2 text-[16px] font-bold leading-[16px] text-white transition-opacity hover:opacity-90 lg:w-[260px]"
+                >
+                  {t("floorPlan.live.edit")}
+                </button>
               ) : undefined
             }
           />
-          <h2 className="mt-9 text-[21px] font-bold text-[var(--octo-text-primary)]">{t("floorPlan.hub.getStartedTitle")}</h2>
-          <p className="mt-1 text-[14.5px] text-[var(--octo-text-secondary)]">{t("floorPlan.hub.getStartedSubtitle")}</p>
-          <MethodCards className="mt-5" onStart={start} />
-        </>
-      ) : (
-        <>
-          <div className="mt-6 flex flex-col items-center text-center">
-            <img src={FLOOR_PLAN_ASSETS.welcome} alt="" className="w-[360px] max-w-full" />
-            <h2 className="mt-5 text-[24px] font-bold text-[var(--octo-text-primary)] sm:text-[28px]">{t("floorPlan.hub.welcomeTitle")}</h2>
-            <p className="mt-2 text-[15px] text-[var(--octo-text-secondary)] sm:text-[17px]">{t("floorPlan.hub.welcomeSubtitle")}</p>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <h2 className={clsx("text-[20px] font-bold leading-[20px]", TEXT_PRIMARY)}>{t("floorPlan.hub.getStartedTitle")}</h2>
+              <p className={clsx("text-[14px] font-medium leading-[14px]", TEXT_SECONDARY)}>{t("floorPlan.hub.getStartedSubtitle")}</p>
+            </div>
+            <MethodCards onStart={start} />
           </div>
-          <MethodCards className="mt-10" onStart={start} />
-        </>
+        </div>
+      ) : (
+        <div className="mt-12 flex flex-col items-center gap-10">
+          <div className="flex w-full flex-col items-center gap-6 text-center">
+            <img src={FLOOR_PLAN_ASSETS.welcome} alt="" className="h-[125px] w-[255px] max-w-full object-contain" />
+            <div className="flex w-full flex-col gap-3">
+              <h2 className={clsx("text-[24px] font-semibold leading-[24px]", TEXT_PRIMARY)}>{t("floorPlan.hub.welcomeTitle")}</h2>
+              <p className={clsx("text-[16px] font-medium leading-[16px]", TEXT_SECONDARY)}>{t("floorPlan.hub.welcomeSubtitle")}</p>
+            </div>
+          </div>
+          <MethodCards className="w-full" onStart={start} />
+        </div>
       )}
 
+      {/* Below the frame's content: plan tools the frames don't draw. */}
+      <div className="mt-10 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setSettingsOpen(true)} className={clsx(TOOL_BUTTON, BORDER_300, TEXT_PRIMARY)}>
+          <Settings2 size={16} />
+          {at("settings.open")}
+        </button>
+        {published && (
+          <button type="button" onClick={() => setVersionsOpen(true)} className={clsx(TOOL_BUTTON, BORDER_300, TEXT_PRIMARY)}>
+            <History size={16} />
+            {t("floorPlan.versions.open")}
+          </button>
+        )}
+      </div>
+
       <PlansPanel
-        className="mt-9"
+        className="mt-4"
         activePlanId={activePlanId}
         onSwitch={switchPlan}
         onActiveChanged={(removed) => (removed ? switchPlan(null) : reload())}

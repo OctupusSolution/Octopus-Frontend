@@ -2,21 +2,8 @@
 // one. Only tables are edited here; walls, zones and décor copied in from the
 // live plan stay put and can be opened in the full builder.
 import { useMemo, useRef, useState } from "react";
-import {
-  Ban,
-  Copy,
-  Keyboard,
-  LayoutGrid,
-  Lock,
-  MousePointer2,
-  Move,
-  PencilLine,
-  PencilRuler,
-  Plus,
-  SquareDashedMousePointer,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { Copy, Keyboard, Lock, MousePointer2, Move, PencilRuler, Plus, SquareDashedMousePointer, Trash2 } from "lucide-react";
+import clsx from "clsx";
 import {
   LIVE_STATUSES,
   docStats,
@@ -28,22 +15,21 @@ import {
 import { ACTUAL_SIZE_SCALE, EditorCanvas, type EditorCanvasHandle, type EditorTool } from "@/widgets/floor-plan-canvas";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { formatEdited, formatNumber } from "../../_shared/format";
-import { TableIcon } from "../../_shared/icons";
+import { BORDER_200, BORDER_300, SURFACE_100, SURFACE_WHITE, TEXT_PRIMARY, TEXT_SEC_GRAY } from "../../../_shared/theme";
 import { StatusLegend } from "../../_shared/status-legend";
 import { BuilderActions } from "../_shared/builder-actions";
 import { CanvasToolbar, type ViewOptions } from "../_shared/canvas-toolbar";
 import { FloatingToolbar } from "../_shared/floating-toolbar";
-import { StatsBar } from "../_shared/stats-bar";
+import { STAT_ICONS, StatsBar } from "../_shared/stats-bar";
 import { TableSettings } from "../_shared/table-settings";
 import type { usePlanEditor } from "../_shared/use-plan-editor";
 
 const MIN_SCALE = 6;
 const MAX_SCALE = 60;
-// A ceiling, not a fixed height: the frame hugs the plan so a short floor
-// never leaves a dead white band under the grid, and scrolls once zoomed in.
 // A fixed height, not a ceiling: the drawing surface should occupy the whole
 // area it is given instead of shrinking to whatever the plan happens to need.
-export const CANVAS_HEIGHT = "h-[clamp(560px,74vh,960px)]";
+// The frame draws it 672px tall; taller screens get more of the floor.
+export const CANVAS_HEIGHT = "h-[clamp(672px,74vh,960px)]";
 
 export function ArrangeStep({
   editor,
@@ -93,7 +79,7 @@ export function ArrangeStep({
   const anyLocked = selectedItems.length > 0 && selectedItems.every((item) => item.locked);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <StatusLegend counts={counts} />
 
       <CanvasToolbar
@@ -110,11 +96,11 @@ export function ArrangeStep({
         onFit={() => canvasRef.current?.fitToView()}
       />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_249px]">
         <div className="flex min-w-0 flex-col gap-4">
           <EditorCanvas
             ref={canvasRef}
-            className={`${CANVAS_HEIGHT} rounded-[18px] border border-[var(--octo-border-card)]`}
+            className={clsx(CANVAS_HEIGHT, "border", BORDER_200)}
             doc={doc}
             selection={editor.selection}
             onSelectionChange={editor.select}
@@ -145,17 +131,16 @@ export function ArrangeStep({
           />
         </div>
 
-        <aside className={`octo-scroll flex flex-col rounded-[22px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-4 xl:max-h-[calc(clamp(520px,68vh,880px)+72px)] xl:overflow-y-auto`}>
-          <h2 className="text-[18px] font-medium text-[var(--octo-text-primary)]">
+        <aside className={clsx("octo-scroll flex min-w-0 flex-col gap-4 rounded-[20px] border p-3 xl:max-h-[calc(clamp(672px,74vh,960px)+72px)] xl:overflow-y-auto", BORDER_300, SURFACE_WHITE)}>
+          <h2 className={clsx("text-[16px] font-medium leading-[16px]", TEXT_PRIMARY)}>
             {t("floorPlan.selection.title")}{" "}
-            <span className="text-[13px] font-normal text-[var(--octo-text-secondary)]">
+            <span className={clsx("text-[12px] font-normal leading-[12px]", TEXT_SEC_GRAY)}>
               ({t(tables.length === 1 ? "floorPlan.selection.oneTable" : "floorPlan.selection.nTables").replace("{n}", String(tables.length))})
             </span>
           </h2>
 
           {tables.length > 0 ? (
             <TableSettings
-              className="mt-3"
               doc={doc}
               tables={tables}
               toneFor={toneFor}
@@ -170,39 +155,39 @@ export function ArrangeStep({
               onToggleLock={editor.toggleLockSelected}
             />
           ) : others.length > 0 ? (
-            <div className="mt-4 flex flex-col gap-3">
-              <p className="text-[13.5px] leading-relaxed text-[var(--octo-text-secondary)]">
+            <div className="flex flex-col gap-3">
+              <p className={clsx("text-[12px] font-medium leading-[1.4]", TEXT_SEC_GRAY)}>
                 {t("floorPlan.selection.otherItems").replace("{n}", String(others.length))}
               </p>
               <button
                 type="button"
                 onClick={onOpenFullBuilder}
-                className="flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#0D6EFD] text-[14px] font-semibold text-white hover:opacity-90"
+                className="flex h-9 items-center justify-center gap-2 rounded-[8px] bg-[#0d6efd] px-2 text-[14px] font-semibold text-white hover:opacity-90"
               >
                 <PencilRuler size={17} />
                 {t("floorPlan.selection.openBuilder")}
               </button>
             </div>
           ) : (
-            <div className="mt-4 flex flex-col gap-4">
-              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[var(--octo-border-input)] px-4 py-6 text-center">
-                <MousePointer2 size={24} className="text-[var(--octo-text-faint)]" />
-                <p className="text-[13.5px] text-[var(--octo-text-secondary)]">{t("floorPlan.selection.empty")}</p>
+            <div className="flex flex-col gap-3">
+              <div className={clsx("flex flex-col items-center gap-2 rounded-[12px] border border-dashed px-3 py-6 text-center", BORDER_300)}>
+                <MousePointer2 size={24} className={TEXT_SEC_GRAY} />
+                <p className={clsx("text-[12px] font-medium leading-[1.4]", TEXT_SEC_GRAY)}>{t("floorPlan.selection.empty")}</p>
               </div>
               <button
                 type="button"
                 onClick={onAddMore}
-                className="flex h-11 items-center justify-center gap-2 rounded-[10px] border border-[#0D6EFD] text-[14px] font-semibold text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5"
+                className="flex h-9 items-center justify-center gap-2 rounded-[8px] border border-[#0d6efd] px-2 text-[14px] font-semibold text-[#0d6efd] transition-colors hover:bg-[#0d6efd]/5"
               >
                 <Plus size={17} />
                 {t("floorPlan.selection.addMore")}
               </button>
-              <div className="rounded-2xl bg-[var(--octo-soft-bg)] p-3.5">
-                <p className="flex items-center gap-2 text-[13px] font-semibold text-[var(--octo-text-primary)]">
+              <div className={clsx("rounded-[12px] p-2", SURFACE_100)}>
+                <p className={clsx("flex items-center gap-2 text-[14px] font-medium leading-[14px]", TEXT_PRIMARY)}>
                   <Keyboard size={15} />
                   {t("floorPlan.tutorial.shortcuts")}
                 </p>
-                <dl className="mt-2 flex flex-col gap-1.5 text-[12.5px]">
+                <dl className="mt-3 flex flex-col gap-2 text-[12px]">
                   {[
                     ["Shift + Click", "floorPlan.shortcut.addToSelection"],
                     ["← ↑ → ↓", "floorPlan.shortcut.nudge"],
@@ -211,9 +196,9 @@ export function ArrangeStep({
                     ["Space", "floorPlan.tutorial.shortcut.pan"],
                   ].map(([keys, label]) => (
                     <div key={keys} className="flex items-center justify-between gap-2">
-                      <dt className="text-[var(--octo-text-secondary)]">{t(label)}</dt>
+                      <dt className={TEXT_SEC_GRAY}>{t(label)}</dt>
                       <dd dir="ltr">
-                        <kbd className="rounded-md border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-1.5 py-0.5 font-sans text-[11px] font-semibold">{keys}</kbd>
+                        <kbd className={clsx("rounded-md border px-1.5 py-0.5 font-sans text-[11px] font-semibold", BORDER_300, SURFACE_WHITE, TEXT_PRIMARY)}>{keys}</kbd>
                       </dd>
                     </div>
                   ))}
@@ -226,12 +211,12 @@ export function ArrangeStep({
 
       <StatsBar
         items={[
-          { icon: <TableIcon size={22} />, label: t("floorPlan.stats.tablesInPlan"), value: formatNumber(stats.tables, locale) },
-          { icon: <Users size={21} />, label: t("floorPlan.stats.totalCapacity"), value: t("floorPlan.common.seatsCount").replace("{n}", formatNumber(stats.seats, locale)) },
-          { icon: <LayoutGrid size={21} />, label: t("floorPlan.stats.categories"), value: formatNumber(stats.categories, locale) },
-          { icon: <Ban size={21} />, label: t("floorPlan.stats.blocked"), value: formatNumber(stats.blocked, locale) },
+          { icon: STAT_ICONS.tables, label: t("floorPlan.stats.tablesInPlan"), value: formatNumber(stats.tables, locale) },
+          { icon: STAT_ICONS.capacity, label: t("floorPlan.stats.totalCapacity"), value: t("floorPlan.common.seatsCount").replace("{n}", formatNumber(stats.seats, locale)) },
+          { icon: STAT_ICONS.categories, label: t("floorPlan.stats.categories"), value: formatNumber(stats.categories, locale) },
+          { icon: STAT_ICONS.blocked, label: t("floorPlan.stats.blocked"), value: formatNumber(stats.blocked, locale) },
           {
-            icon: <PencilLine size={21} />,
+            icon: STAT_ICONS.edited,
             label: t("floorPlan.stats.lastEdited"),
             value: lastEditedAt ? formatEdited(lastEditedAt, locale, t) : t("floorPlan.stats.notSaved"),
             sub: lastEditedAt && author ? t("floorPlan.stats.by").replace("{name}", author) : undefined,
@@ -240,6 +225,7 @@ export function ArrangeStep({
       />
 
       <BuilderActions
+        className="mt-2"
         onSaveDraft={onSaveDraft}
         onPreview={onPreview}
         onPublish={onPublish}

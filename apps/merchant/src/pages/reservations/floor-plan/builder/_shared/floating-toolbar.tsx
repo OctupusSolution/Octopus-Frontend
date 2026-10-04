@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
 import clsx from "clsx";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { BORDER_200, BORDER_300, SURFACE_WHITE, TEXT_PRIMARY } from "../../../_shared/theme";
 
 export interface FloatingTool {
   id: string;
@@ -13,7 +14,7 @@ export interface FloatingTool {
   disabled?: boolean;
   shortcut?: string;
   tone?: "danger";
-  /** Tucked behind the "More" button instead of shown as its own icon —
+  /** Tucked behind the "More" button instead of shown as its own button —
    *  for tools reached rarely enough that they don't need a seat on the bar. */
   overflow?: boolean;
   /** Renders a popover above the button on click instead of firing an action
@@ -28,16 +29,20 @@ export interface FloatingTool {
   overflowContent?: ReactNode;
 }
 
-const toneClasses = (tool: Pick<FloatingTool, "active" | "tone">) =>
-  tool.active
-    ? "border-[#6366F1] bg-[#6366F1]/10 text-[#4F46E5]"
-    : tool.tone === "danger"
-      ? "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:border-[#EF4444]/50 hover:text-[#DC2626]"
-      : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]";
+const ACTIVE = "border-[#0d6efd] bg-[#f5f9ff] text-[#0d6efd] [[data-theme=dark]_&]:border-[var(--octo-accent)] [[data-theme=dark]_&]:bg-[var(--octo-selected)] [[data-theme=dark]_&]:text-[var(--octo-accent)]";
+const IDLE = clsx(BORDER_300, SURFACE_WHITE, TEXT_PRIMARY);
+const HOVER = "hover:bg-[#f8fafc] [[data-theme=dark]_&]:hover:bg-[var(--octo-hover)]";
+const BUTTON = "flex h-[34px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border px-2 text-[16px] font-medium leading-4 transition-colors disabled:cursor-not-allowed disabled:opacity-45";
+const DIVIDER = "absolute -start-[6.5px] top-1/2 h-6 w-px -translate-y-1/2 bg-[#cbd5e1] [[data-theme=dark]_&]:bg-[var(--octo-border-input)]";
+const TOOLTIP =
+  "pointer-events-none absolute bottom-full start-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111827] px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/tool:opacity-100 rtl:translate-x-1/2";
 
-/** An icon button that shows its name in a small tooltip above it on hover —
- *  the bar stays a row of icons instead of growing with each tool's label.
- *  A tool with `menu` opens a popover above itself instead of firing onClick. */
+const toneClasses = (tool: Pick<FloatingTool, "active" | "tone">) =>
+  tool.active ? ACTIVE : tool.tone === "danger" ? clsx(IDLE, "hover:border-[#EF4444]/50 hover:text-[#DC2626]") : clsx(IDLE, HOVER);
+
+/** A labelled pill button, icon first. Its keyboard shortcut shows in a small
+ *  tooltip above it on hover. A tool with `menu` opens a popover above itself
+ *  instead of firing onClick. */
 function ToolButton({ tool }: { tool: FloatingTool }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -59,8 +64,8 @@ function ToolButton({ tool }: { tool: FloatingTool }) {
   }, [open]);
 
   return (
-    <div className="group/tool relative" ref={ref}>
-      {tool.separator && <span className="absolute -start-[7px] top-1/2 h-6 w-px -translate-y-1/2 bg-[var(--octo-border-input)]" />}
+    <div className="group/tool relative shrink-0" ref={ref}>
+      {tool.separator && <span className={DIVIDER} />}
       <button
         type="button"
         onClick={() => (tool.menu ? setOpen((o) => !o) : tool.onClick?.())}
@@ -69,25 +74,20 @@ function ToolButton({ tool }: { tool: FloatingTool }) {
         aria-expanded={tool.menu ? open : undefined}
         aria-haspopup={tool.menu ? "menu" : undefined}
         aria-label={tool.shortcut ? `${tool.label} (${tool.shortcut})` : tool.label}
-        className={clsx(
-          "grid h-12 w-12 shrink-0 place-items-center rounded-[10px] border transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-          toneClasses({ ...tool, active: tool.active || open })
-        )}
+        className={clsx(BUTTON, toneClasses({ ...tool, active: tool.active || open }))}
       >
-        {tool.icon}
+        <span className="grid h-6 w-6 shrink-0 place-items-center">{tool.icon}</span>
+        {tool.label}
       </button>
-      {!open && (
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute bottom-full start-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111827] px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/tool:opacity-100 rtl:translate-x-1/2"
-        >
-          {tool.shortcut ? `${tool.label} (${tool.shortcut})` : tool.label}
+      {!open && tool.shortcut && (
+        <span role="tooltip" className={TOOLTIP}>
+          {`${tool.label} (${tool.shortcut})`}
         </span>
       )}
       {tool.menu && open && (
         <div
           role="menu"
-          className="absolute bottom-full start-1/2 z-20 mb-2 w-max -translate-x-1/2 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-3 shadow-[0_12px_32px_rgba(15,23,42,0.14)] rtl:translate-x-1/2"
+          className={clsx("absolute bottom-full start-1/2 z-20 mb-2 w-max -translate-x-1/2 rounded-xl border p-3 shadow-[0_12px_32px_rgba(15,23,42,0.14)] rtl:translate-x-1/2", BORDER_200, SURFACE_WHITE)}
         >
           {tool.menu(() => setOpen(false))}
         </div>
@@ -96,9 +96,9 @@ function ToolButton({ tool }: { tool: FloatingTool }) {
   );
 }
 
-/** The rounded bar of tools floating over the canvas. Tools flagged
- *  `overflow` are hidden behind an icon-only "More" menu instead of crowding
- *  the bar; a tool with `menu` opens its own small popover (e.g. Grid). */
+/** The rounded, shadowed bar of tools under the canvas. Tools flagged
+ *  `overflow` are hidden behind a "More" menu instead of crowding the bar; a
+ *  tool with `menu` opens its own small popover (e.g. Grid). */
 export function FloatingToolbar({ tools, className }: { tools: FloatingTool[]; className?: string }) {
   const { t } = useI18n();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -127,49 +127,35 @@ export function FloatingToolbar({ tools, className }: { tools: FloatingTool[]; c
   return (
     <div
       role="toolbar"
-      className={clsx(
-        "mx-auto flex w-fit max-w-full items-center gap-1.5 rounded-[20px] border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-2.5 py-2.5 shadow-[0_10px_30px_rgba(15,23,42,0.08)]",
-        className
-      )}
+      className={clsx("mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-3 rounded-[24px] p-4 shadow-[0_0_12px_0_rgba(0,0,0,0.12)]", SURFACE_WHITE, className)}
     >
       {visible.map((tool) => (
         <ToolButton key={tool.id} tool={tool} />
       ))}
 
       {overflow.length > 0 && (
-        <div className="group/tool relative" ref={moreRef}>
-          <span className="absolute -start-[7px] top-1/2 h-6 w-px -translate-y-1/2 bg-[var(--octo-border-input)]" />
+        <div className="group/tool relative shrink-0" ref={moreRef}>
+          <span className={DIVIDER} />
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
             aria-haspopup="menu"
             aria-expanded={moreOpen}
-            aria-label={t("floorPlan.toolbar.more")}
-            className={clsx(
-              "grid h-12 w-12 shrink-0 place-items-center rounded-[10px] border transition-colors",
-              overflowActive || moreOpen
-                ? "border-[#6366F1] bg-[#6366F1]/10 text-[#4F46E5]"
-                : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
-            )}
+            className={clsx(BUTTON, overflowActive || moreOpen ? ACTIVE : clsx(IDLE, HOVER))}
           >
-            <MoreHorizontal size={20} />
-          </button>
-          {!moreOpen && (
-            <span
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full start-1/2 z-20 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#111827] px-2 py-1 text-[11.5px] font-medium text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover/tool:opacity-100 rtl:translate-x-1/2"
-            >
-              {t("floorPlan.toolbar.more")}
+            <span className="grid h-6 w-6 shrink-0 place-items-center">
+              <MoreHorizontal size={20} />
             </span>
-          )}
+            {t("floorPlan.toolbar.more")}
+          </button>
           {moreOpen && (
             <div
               role="menu"
-              className="absolute bottom-full end-0 z-20 mb-2 flex w-max flex-col gap-0.5 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+              className={clsx("absolute bottom-full end-0 z-20 mb-2 flex w-max flex-col gap-0.5 rounded-xl border p-1.5 shadow-[0_12px_32px_rgba(15,23,42,0.14)]", BORDER_200, SURFACE_WHITE)}
             >
               {overflow.map((tool) => (
                 <div key={tool.id}>
-                  {tool.separator && <div className="my-1 h-px bg-[var(--octo-border-input)]" />}
+                  {tool.separator && <div className="my-1 h-px bg-[#e2e8f0] [[data-theme=dark]_&]:bg-[var(--octo-border-input)]" />}
                   {tool.overflowContent ?? (
                     <button
                       type="button"
@@ -180,8 +166,8 @@ export function FloatingToolbar({ tools, className }: { tools: FloatingTool[]; c
                         setMoreOpen(false);
                       }}
                       className={clsx(
-                        "flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-start text-[13px] transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-                        tool.active ? "bg-[#6366F1]/10 font-medium text-[#4F46E5]" : "text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                        "flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-start text-[14px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                        tool.active ? ACTIVE.replace("border-[#0d6efd] ", "") : clsx(TEXT_PRIMARY, HOVER)
                       )}
                     >
                       <span className="grid h-6 w-6 shrink-0 place-items-center">{tool.icon}</span>

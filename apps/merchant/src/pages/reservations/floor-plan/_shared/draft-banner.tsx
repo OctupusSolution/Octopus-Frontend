@@ -1,7 +1,9 @@
-import { Lightbulb, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import clsx from "clsx";
 import type { FloorPlanDraft } from "@/entities/floor-plan";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
+import { TEXT_PRIMARY, TEXT_SECONDARY } from "../../_shared/theme";
 import { formatDateTime } from "./format";
 
 export function DraftBanner({
@@ -19,33 +21,35 @@ export function DraftBanner({
   return (
     <section
       className={clsx(
-        "flex flex-col gap-3 rounded-2xl bg-[var(--octo-warning-bg)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between",
+        "flex flex-col gap-3 rounded-lg bg-[#fdf8f4] px-3 py-2 sm:flex-row sm:items-center sm:justify-between [[data-theme=dark]_&]:bg-[var(--octo-warning-bg)]",
         className
       )}
     >
-      <div className="flex items-start gap-3">
-        <Lightbulb size={24} strokeWidth={1.7} className="mt-0.5 shrink-0 text-[#EA580C]" />
-        <div>
-          <p className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("floorPlan.draft.title")}</p>
-          <p className="mt-0.5 text-[13.5px] text-[var(--octo-text-secondary)]">
+      <div className="flex min-w-0 items-start gap-2">
+        <ShellIcon name="fp-hub-bulb.svg" size={24} className="text-[#e86607]" />
+        <div className="flex min-w-0 flex-col justify-center gap-2 text-[14px] leading-[14px]">
+          <p className={clsx("font-bold", TEXT_PRIMARY)}>{t("floorPlan.draft.title")}</p>
+          <p className={clsx("font-medium", TEXT_SECONDARY)}>
             {t("floorPlan.draft.updated").replace("{date}", formatDateTime(draft.savedAt, locale))}
             {draft.savedBy && ` · ${t("floorPlan.draft.by").replace("{name}", draft.savedBy)}`}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-2 sm:shrink-0">
+        {/* Not in the frame: discarding has no other home, so it stays as a quiet icon beside the frame's button. */}
         <button
           type="button"
           onClick={onDiscard}
-          className="flex h-11 items-center gap-1.5 rounded-[10px] px-3 text-[13px] font-medium text-[var(--octo-text-secondary)] transition-colors hover:bg-black/5 hover:text-[#DC2626]"
+          aria-label={t("floorPlan.draft.discard")}
+          title={t("floorPlan.draft.discard")}
+          className={clsx("grid h-10 w-10 shrink-0 place-items-center rounded-lg transition-colors hover:bg-black/5 hover:text-[#d30202]", TEXT_SECONDARY)}
         >
-          <Trash2 size={15} />
-          {t("floorPlan.draft.discard")}
+          <Trash2 size={18} />
         </button>
         <button
           type="button"
           onClick={onContinue}
-          className="h-11 flex-1 rounded-[10px] bg-[#FBBF24] px-5 text-[15px] font-bold text-[#111827] transition-colors hover:bg-[#F5B315] sm:flex-none"
+          className="h-10 flex-1 whitespace-nowrap rounded-lg bg-[#fec348] px-3 py-2 text-[16px] font-bold leading-[16px] text-[#0f172a] transition-[filter] hover:brightness-95 sm:flex-none"
         >
           {t("floorPlan.draft.continue")}
         </button>

@@ -41,6 +41,31 @@
   --octo-store-select-soft: #f5f9ff;
   --octo-store-select-text: #0058da;
 
+  /* Dine-in table flow (/table/*). Also Figma variables with no shared-palette
+     twin: its success and error are deeper than the console's semantic pair. */
+  --octo-store-success: #009a39;
+  --octo-store-danger: #d30202;
+  --octo-store-allergy: #fff7ea;
+  --octo-store-allergy-title: #c27a00;
+  --octo-store-photo: #f7f5f5;
+  --octo-store-chip: #ddebff;
+  --octo-store-pill: #f2f2f2;
+  --octo-store-success-soft: #ebfdf5;
+  --octo-store-pending: #feeed4;
+  --octo-store-pending-text: #bc7b03;
+  --octo-store-danger-soft: #fef0f0;
+  --octo-store-step-done: #dcffef;
+  --octo-store-step-idle: #f1f1f1;
+  --octo-store-info-soft: #f7f4ff;
+
+  /* Pickup, booking and waitlist (/pickup/*): more Figma values with no shared-palette twin. */
+  --octo-store-note-text: #946001;
+  --octo-store-notice-soft: #fff8ec;
+  --octo-store-notice-text: #9e6300;
+  --octo-store-ready-soft: #f3f7fe;
+  --octo-store-table-free: #dcffdc;
+  --octo-store-summary: #deebff;
+
   --octo-text-primary: #16161d;
   --octo-text-secondary: #6b6b74;
   --octo-text-muted: #8b8b93;
@@ -52,6 +77,15 @@
 
 body {
   @apply bg-[var(--octo-store-page)] text-[var(--octo-text-primary)] antialiased;
+}
+
+/* Dine-in table flow: copy set at line-height 1 in the designs, where it sits on
+   one line. On a narrower phone or in another language it can wrap, and lines
+   set solid would collide — so the line box is opened up and the difference is
+   taken back in the margins, leaving a single line exactly as tall as drawn. */
+.tbl-wrap-safe {
+  line-height: 1.3;
+  margin-block: -0.15em;
 }
 
 /* A published site's titles face (brand-theme.ts); unset, headings keep the body face. */

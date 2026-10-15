@@ -8,9 +8,16 @@ import {
   designFromServer,
   designToServer,
   errorKey,
+  fetchAllRows,
   joinRows,
+  oneAtATime,
   planGenerate,
+  planGenerateWithGaps,
+  replaceCount,
+  revisionOf,
+  selectionKey,
   toQrStatus,
+  withAllTablesShown,
 } from "./place-codes-model";
 
 const row = (over: Partial<PlaceCodeRow>): PlaceCodeRow => ({
@@ -125,7 +132,124 @@ describe("design mapping", () => {
   });
 });
 
+describe("fetchAllRows", () => {
+  it("pages at the backend's 100-row ceiling until it has totalCount rows", async () => {
+    const all = Array.from({ length: 230 }, (_, i) => row({ resourceId: `r${i}`, number: String(i) }));
+    const asked: { page: number; pageSize: number }[] = [];
+    const out = await fetchAllRows(async (page, pageSize) => {
+      asked.push({ page, pageSize });
+      const items = all.slice((page - 1) * pageSize, page * pageSize);
+      return { items, page, pageSize, totalCount: all.length, counts: null as never, attention: [], lastPrint: null };
+    });
+    expect(asked).toEqual([
+      { page: 1, pageSize: 100 },
+      { page: 2, pageSize: 100 },
+      { page: 3, pageSize: 100 },
+    ]);
+    expect(out.items).toHaveLength(230);
+  });
+  it("stops on an empty page even if totalCount promised more", async () => {
+    let calls = 0;
+    const out = await fetchAllRows(async (page, pageSize) => {
+      calls++;
+      return { items: page === 1 ? [row({})] : [], page, pageSize, totalCount: 5, counts: null as never, attention: [], lastPrint: null };
+    });
+    expect(calls).toBe(2);
+    expect(out.items).toHaveLength(1);
+  });
+});
+
+describe("planGenerate unmatched tables", () => {
+  it("reports chosen tables that have no row instead of dropping them silently", () => {
+    const doc = emptyDoc("Main");
+    const tables = [table("a", "1"), table("b", "2"), table("c", "3")];
+    const rows = new Map([["a", row({ resourceId: "srv-a" })]]);
+    const plan = planGenerateWithGaps({ selectedIds: new Set(["a", "b"]), tables, rows, doc });
+    expect(plan.selections).toEqual([{ mode: "one", resourceId: "srv-a" }]);
+    expect(plan.unmatched).toBe(1);
+  });
+});
+
+describe("replaceCount", () => {
+  const rows = [
+    row({ resourceId: "r1", codeId: "c1", zoneId: "z1", status: "active" }),
+    row({ resourceId: "r2", codeId: "c2", zoneId: "z1", status: "disabled", hiddenFromCustomers: true }),
+    row({ resourceId: "r3", codeId: null, zoneId: "z1", status: "notGenerated" }),
+    row({ resourceId: "r4", codeId: "c4", zoneId: "z2", status: "needsReprint" }),
+  ];
+  it("counts every coded place on the floor for all, hidden ones included", () => {
+    expect(replaceCount({ mode: "all" }, rows)).toBe(3);
+  });
+  it("counts the coded places of that server zone", () => {
+    expect(replaceCount({ mode: "zone", zoneId: "z1" }, rows)).toBe(2);
+  });
+  it("counts one for a coded place and zero for an uncoded one", () => {
+    expect(replaceCount({ mode: "one", resourceId: "r1" }, rows)).toBe(1);
+    expect(replaceCount({ mode: "one", resourceId: "r3" }, rows)).toBe(0);
+  });
+});
+
+describe("revisionOf", () => {
+  it("reads the current revision of a code from the rows or the attention list", () => {
+    const rows = [row({ codeId: "c1", revision: 7 })];
+    const attention = [{ codeId: "c9", floorId: "f", resourceId: "r9", lastKnownNumber: "9", lastKnownName: null, version: 1, revision: 4, candidate: null }];
+    expect(revisionOf("c1", rows, attention)).toBe(7);
+    expect(revisionOf("c9", rows, attention)).toBe(4);
+    expect(revisionOf("nope", rows, attention)).toBeUndefined();
+  });
+});
+
+describe("selectionKey", () => {
+  it("is the same for equal selections and different otherwise", () => {
+    expect(selectionKey({ mode: "one", resourceId: "a" })).toBe(selectionKey({ mode: "one", resourceId: "a" }));
+    expect(selectionKey({ mode: "one", resourceId: "a" })).not.toBe(selectionKey({ mode: "one", resourceId: "b" }));
+  });
+});
+
+describe("oneAtATime", () => {
+  it("ignores a second call while the first is still running, then allows the next", async () => {
+    let release!: () => void;
+    let runs = 0;
+    const guarded = oneAtATime(async () => {
+      runs++;
+      await new Promise<void>((r) => (release = r));
+    });
+    const first = guarded();
+    await guarded(); // a double click: returns at once, does nothing
+    expect(runs).toBe(1);
+    release();
+    await first;
+    const third = guarded();
+    expect(runs).toBe(2);
+    release();
+    await third;
+  });
+  it("frees the guard when the call fails", async () => {
+    let runs = 0;
+    const guarded = oneAtATime(async () => {
+      runs++;
+      throw new Error("x");
+    });
+    await expect(guarded()).rejects.toThrow("x");
+    await expect(guarded()).rejects.toThrow("x");
+    expect(runs).toBe(2);
+  });
+});
+
+describe("withAllTablesShown", () => {
+  it("draws tables hidden from customers too, without touching the original plan", () => {
+    const doc = { ...emptyDoc("Main"), tables: [{ ...table("a", "1"), visible: false }] };
+    const shown = withAllTablesShown(doc);
+    expect(shown.tables[0].visible).toBe(true);
+    expect(doc.tables[0].visible).toBe(false);
+  });
+});
+
 describe("errors", () => {
+  it("treats the backend's entitlement codes as the add-on being off", () => {
+    expect(classifyLoadError(problem(403, "entitlements.feature-disabled"))).toBe("notEnabled");
+    expect(classifyLoadError(problem(403, "entitlements.module-disabled"))).toBe("notEnabled");
+  });
   it("maps known place-code codes to keys and unknown ones to the generic key", () => {
     expect(errorKey(problem(409, "menu.place-code.stale"))).toBe("floorPlan.qr.error.stale");
     expect(errorKey(problem(409, "menu.place-code.relink-target-taken"))).toBe("floorPlan.qr.error.relinkTargetTaken");
@@ -134,7 +258,6 @@ describe("errors", () => {
     expect(errorKey(new Error("net"))).toBe("floorPlan.qr.error.generic");
   });
   it("classifies load failures", () => {
-    expect(classifyLoadError(problem(403, "entitlements.feature-not-enabled"))).toBe("notEnabled");
     expect(classifyLoadError(problem(403, "authorization.forbidden"))).toBe("forbidden");
     expect(classifyLoadError(problem(422, "menu.place-code.floor-not-published"))).toBe("notPublished");
     expect(classifyLoadError(new Error("x"))).toBe("failed");

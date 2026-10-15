@@ -14,6 +14,7 @@ import { useFloorPlan } from "../_shared/use-floor-plan";
 import { AttentionPanel } from "./attention-panel";
 import { GenerateFlow } from "./generate";
 import { formatDate, useZoneDimmed, ZoneSelect } from "./parts";
+import { withAllTablesShown } from "./place-codes-model";
 import { exportCodes, printCodes } from "./print-codes";
 import { PrintHistoryModal } from "./print-history-modal";
 import { QrLegend, QrPlan } from "./qr-plan";
@@ -26,7 +27,8 @@ import { usePrintDesign } from "./use-print-design";
 
 export function TableQrPage() {
   const { published } = useFloorPlan();
-  return published ? <TableQrCodes doc={published.doc} /> : <FloorPlanHub />;
+  const doc = useMemo(() => (published ? withAllTablesShown(published.doc) : null), [published]);
+  return doc ? <TableQrCodes doc={doc} /> : <FloorPlanHub />;
 }
 
 /** Loading, add-on missing, no permission, no published floor, or a failed read. */
@@ -58,7 +60,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
   const [preselect, setPreselect] = useState<string[]>([]);
   const [zoneId, setZoneId] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [relink, setRelink] = useState<{ codeId: string; revision?: number } | null>(null);
+  const [relinkCodeId, setRelinkCodeId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const dimmed = useZoneDimmed(doc, zoneId);
@@ -166,7 +168,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
             {t("floorPlan.qr.history.open")}
           </button>
         </div>
-        <AttentionPanel pc={pc} notify={notify} onRelink={(codeId, revision) => setRelink({ codeId, revision })} />
+        <AttentionPanel pc={pc} notify={notify} onRelink={setRelinkCodeId} />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <ZoneSelect doc={doc} value={zoneId} onChange={setZoneId} />
           <div className="lg:flex-1">
@@ -193,12 +195,12 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
         onClose={() => setOpenId(null)}
         onGenerate={() => open && startGenerate([open.id])}
         onRelink={(codeId) => {
-          setRelink({ codeId, revision: open ? pc.rows.get(open.id)?.revision ?? undefined : undefined });
+          setRelinkCodeId(codeId);
           setOpenId(null);
         }}
       />
       {historyOpen && <PrintHistoryModal pc={pc} notify={notify} onClose={() => setHistoryOpen(false)} />}
-      {relink && <RelinkModal doc={doc} pc={pc} codeId={relink.codeId} revision={relink.revision} notify={notify} onClose={() => setRelink(null)} />}
+      {relinkCodeId && <RelinkModal doc={doc} pc={pc} codeId={relinkCodeId} notify={notify} onClose={() => setRelinkCodeId(null)} />}
       <ToastBanner toast={toast} />
     </PageShell>
   );

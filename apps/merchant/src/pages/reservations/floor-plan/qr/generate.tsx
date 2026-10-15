@@ -11,7 +11,7 @@ import { BORDER_200, TEXT_PRIMARY, TEXT_SECONDARY } from "../../_shared/theme";
 import { PageShell } from "../_shared/page-header";
 import { Switch } from "../_shared/switch";
 import { byNumber, DetailRow, ServerSymbol, tableMeta, useZoneDimmed, ZoneSelect } from "./parts";
-import { chunkGuard, planGenerate } from "./place-codes-model";
+import { chunkGuard, errorKey, planGenerateWithGaps, replaceCount, selectionKey } from "./place-codes-model";
 import { QR_SIZE_PX, type QrDesign } from "./print";
 import { exportCodes, printCodes } from "./print-codes";
 import { QrLegend, QrPlan } from "./qr-plan";
@@ -53,14 +53,14 @@ export function GenerateFlow({
   const [pending, setPending] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [failedAt, setFailedAt] = useState<number | null>(null);
-  // One batch id per request of this choice, so a retry replays instead of duplicating.
-  const batchIds = useRef<string[]>([]);
+  // One batch id per request of this choice (by selection), so a retry replays instead of duplicating.
+  const batchIds = useRef(new Map<string, string>());
   const tables = useMemo(() => doc.tables.filter((tb) => tb.visible).sort(byNumber), [doc.tables]);
   const chosen = tables.filter((tb) => selected.has(tb.id));
   const alreadyCoded = chosen.filter((tb) => pc.statusOf(tb) !== "notGenerated").length;
 
   useEffect(() => {
-    batchIds.current = [];
+    batchIds.current = new Map();
     setFailedAt(null);
   }, [selected, replaceExisting]);
 
@@ -70,37 +70,45 @@ export function GenerateFlow({
   async function finish() {
     if (pending || !pc.floorId) return;
     if (!chunkGuard(chosen.length)) return notify(t("floorPlan.qr.error.selectionTooLarge"), "error");
-    const selections = planGenerate({ selectedIds: selected, tables, rows: pc.rows, doc });
-    if (selections.length === 0) return;
+    const { selections, unmatched } = planGenerateWithGaps({ selectedIds: selected, tables, rows: pc.rows, doc });
+    if (selections.length === 0) {
+      if (unmatched > 0) notify(t("floorPlan.qr.unmatched").replace("{n}", String(unmatched)), "error");
+      return;
+    }
+    const count = chosen.length - unmatched;
     setPending(true);
     setFailedAt(null);
     let done = 0;
     try {
-      // A design changed elsewhere reloads; the codes are still generated.
-      await printDesign.save().catch(() => notify(t("floorPlan.qr.error.designStale"), "info"));
+      // A failed design save is reported; the codes are still generated.
+      await printDesign.save().catch((e: unknown) => notify(t(errorKey(e)), "info"));
       for (let i = 0; i < selections.length; i++) {
         const selection = selections[i];
-        batchIds.current[i] ??= crypto.randomUUID();
-        const replacing = !replaceExisting
-          ? 0
-          : selection.mode === "one"
-            ? chosen.some((tb) => pc.rows.get(tb.id)?.resourceId === selection.resourceId && pc.statusOf(tb) !== "notGenerated") ? 1 : 0
-            : alreadyCoded;
+        const key = selectionKey(selection);
+        if (!batchIds.current.has(key)) batchIds.current.set(key, crypto.randomUUID());
+        const replacing = replaceExisting ? replaceCount(selection, pc.allRows) : 0;
         setProgress({ done: i, total: selections.length });
-        await pc.run((b) =>
-          generatePlaceCodes(b, {
-            batchId: batchIds.current[i],
-            floorId: pc.floorId!,
-            selection,
-            existing: replaceExisting ? "regenerate" : "keep",
-            ...(replacing ? { confirmReplaceCount: replacing } : {}),
-          })
+        await pc.run(
+          (b) =>
+            generatePlaceCodes(b, {
+              batchId: batchIds.current.get(key)!,
+              floorId: pc.floorId!,
+              selection,
+              existing: replaceExisting ? "regenerate" : "keep",
+              ...(replacing ? { confirmReplaceCount: replacing } : {}),
+            }),
+          { refresh: false }
         );
         done = i + 1;
       }
-      onExit(t("floorPlan.qr.generatedDone").replace("{n}", String(chosen.length)));
+      await pc.refresh();
+      onExit(
+        t("floorPlan.qr.generatedDone").replace("{n}", String(count)) +
+          (unmatched > 0 ? ` ${t("floorPlan.qr.unmatched").replace("{n}", String(unmatched))}` : "")
+      );
     } catch {
       // run() said why; Retry re-sends the same batch ids, so finished ones replay.
+      await pc.refresh();
       if (selections.length > 1) setFailedAt(done);
     } finally {
       setPending(false);

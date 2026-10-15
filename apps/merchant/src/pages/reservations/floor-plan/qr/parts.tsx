@@ -79,7 +79,7 @@ export function byNumber(a: FloorTable, b: FloorTable): number {
 const symbolCache = new Map<string, Promise<string>>();
 
 function symbolUrl(businessId: string, codeId: string, version: number | null | undefined): Promise<string> {
-  const key = `${businessId}:${codeId}:${version ?? ""}`;
+  const key = symbolKey(businessId, codeId, version);
   let hit = symbolCache.get(key);
   if (!hit) {
     hit = getPlaceCodeSymbol(businessId, codeId, "svg").then(({ blob }) => URL.createObjectURL(blob));
@@ -87,6 +87,20 @@ function symbolUrl(businessId: string, codeId: string, version: number | null | 
     symbolCache.set(key, hit);
   }
   return hit;
+}
+
+const symbolKey = (businessId: string, codeId: string, version: number | null | undefined) =>
+  `${businessId}:${codeId}:${version ?? ""}`;
+
+/** Whether a symbol is already fetched (or being fetched) — costs no request. */
+export function isSymbolCached(businessId: string, codeId: string, version: number | null | undefined): boolean {
+  return symbolCache.has(symbolKey(businessId, codeId, version));
+}
+
+/** A symbol's SVG markup, through the same cache the previews use. */
+export async function symbolSvg(businessId: string, codeId: string, version: number | null | undefined): Promise<string> {
+  const url = await symbolUrl(businessId, codeId, version);
+  return (await fetch(url)).text();
 }
 
 /** A place code's symbol, fetched from the server with the bearer token. */

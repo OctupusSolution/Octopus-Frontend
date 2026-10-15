@@ -2,8 +2,10 @@
 // view shapes. No React, no fetch — unit-tested.
 import {
   ApiError,
+  type PlaceCodeAttention,
   type PlaceCodeDesign,
   type PlaceCodeDesignRequest,
+  type PlaceCodeListResponse,
   type PlaceCodeRow,
   type PlaceCodeSelection,
   type PlaceCodeStatus,
@@ -37,6 +39,85 @@ export function joinRows(tables: readonly FloorTable[], rows: readonly PlaceCode
   return out;
 }
 
+/** The backend's list ceiling (BuildingBlocks PageRequest.MaxPageSize). */
+export const LIST_PAGE_SIZE = 100;
+
+/** Every row of a floor, page by page; counts and attention come from page 1. */
+export async function fetchAllRows(
+  fetchPage: (page: number, pageSize: number) => Promise<PlaceCodeListResponse>
+): Promise<PlaceCodeListResponse> {
+  const first = await fetchPage(1, LIST_PAGE_SIZE);
+  const items = [...first.items];
+  for (let page = 2; items.length < first.totalCount; page++) {
+    const next = await fetchPage(page, LIST_PAGE_SIZE);
+    if (next.items.length === 0) break;
+    items.push(...next.items);
+  }
+  return { ...first, items };
+}
+
+/** The plan as the code page draws it: tables hidden from customers still
+ *  get codes (the server marks them `hiddenFromCustomers`), so all are shown. */
+export function withAllTablesShown(doc: FloorPlanDoc): FloorPlanDoc {
+  return { ...doc, tables: doc.tables.map((t) => (t.visible ? t : { ...t, visible: true })) };
+}
+
+/** The number of already-coded places a regenerate of `selection` replaces,
+ *  counted from the server's own rows — what `confirmReplaceCount` must say. */
+export function replaceCount(selection: PlaceCodeSelection, rows: readonly PlaceCodeRow[]): number {
+  const coded = rows.filter((r) => r.codeId);
+  switch (selection.mode) {
+    case "all":
+      return coded.length;
+    case "zone":
+      return coded.filter((r) => r.zoneId === selection.zoneId).length;
+    case "one":
+      return coded.some((r) => r.resourceId === selection.resourceId) ? 1 : 0;
+    case "range":
+      return 0;
+  }
+}
+
+/** A code's current revision, from the floor rows or the attention list. */
+export function revisionOf(
+  codeId: string,
+  rows: Iterable<PlaceCodeRow>,
+  attention: readonly PlaceCodeAttention[]
+): number | undefined {
+  for (const r of rows) if (r.codeId === codeId) return r.revision ?? undefined;
+  return attention.find((a) => a.codeId === codeId)?.revision;
+}
+
+/** Wraps an async action so a call made while one is running does nothing
+ *  (a double click on Print must not record two print runs). */
+export function oneAtATime<A extends unknown[]>(fn: (...args: A) => Promise<void>): (...args: A) => Promise<void> {
+  let running = false;
+  return async (...args: A) => {
+    if (running) return;
+    running = true;
+    try {
+      await fn(...args);
+    } finally {
+      running = false;
+    }
+  };
+}
+
+/** Stable identity of one generate request, for reusing its batch id. */
+export const selectionKey = (s: PlaceCodeSelection): string => JSON.stringify(s);
+
+/** planGenerate, plus how many chosen tables have no row to generate for
+ *  (drawn after the code list was read, or not on the published floor). */
+export function planGenerateWithGaps(input: {
+  selectedIds: ReadonlySet<string>;
+  tables: readonly FloorTable[];
+  rows: ReadonlyMap<string, PlaceCodeRow>;
+  doc: FloorPlanDoc;
+}): { selections: PlaceCodeSelection[]; unmatched: number } {
+  const unmatched = input.tables.filter((t) => input.selectedIds.has(t.id) && !input.rows.has(t.id)).length;
+  return { selections: planGenerate(input), unmatched };
+}
+
 /** The fewest generate requests for a choice of tables: the whole floor, one
  *  whole zone, or else one request per table (the backend's `one` mode takes
  *  a single place). */
@@ -49,7 +130,8 @@ export function planGenerate(input: {
   const { selectedIds, tables, rows, doc } = input;
   const chosen = tables.filter((t) => selectedIds.has(t.id));
   if (chosen.length === 0) return [];
-  if (chosen.length === tables.length) return [{ mode: "all" }];
+  // "all" only when every table is chosen AND every table is known to the server.
+  if (chosen.length === tables.length && chosen.every((t) => rows.has(t.id))) return [{ mode: "all" }];
 
   const zoneOf = (t: FloorTable) => zoneForTable(doc, t)?.id ?? null;
   const zone = zoneOf(chosen[0]);
@@ -130,7 +212,7 @@ export function errorKey(e: unknown): string {
 /** What the whole page shows when its first read fails. */
 export function classifyLoadError(e: unknown): "notEnabled" | "forbidden" | "notPublished" | "failed" {
   const c = codeOf(e);
-  if (c === "entitlements.feature-not-enabled") return "notEnabled";
+  if (c === "entitlements.feature-disabled" || c === "entitlements.module-disabled") return "notEnabled";
   if (c === "authorization.forbidden") return "forbidden";
   if (c === "menu.place-code.floor-not-published") return "notPublished";
   return "failed";

@@ -16,7 +16,7 @@ export function AttentionPanel({
 }: {
   pc: PlaceCodesState;
   notify: Notify;
-  onRelink: (codeId: string, revision: number) => void;
+  onRelink: (codeId: string) => void;
 }) {
   const { t } = useI18n();
   const [pending, setPending] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export function AttentionPanel({
               <button
                 type="button"
                 disabled={pending !== null}
-                onClick={() => onRelink(a.codeId, a.revision)}
+                onClick={() => onRelink(a.codeId)}
                 className={clsx(SMALL_BTN, "border border-[#0d6efd] text-[#0d6efd] hover:bg-[#f5f9ff] [[data-theme=dark]_&]:hover:bg-[var(--octo-selected)]")}
               >
                 {t("floorPlan.qr.attention.chooseTable")}

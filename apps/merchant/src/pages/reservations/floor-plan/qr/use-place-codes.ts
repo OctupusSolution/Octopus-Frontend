@@ -15,7 +15,7 @@ import {
 import type { FloorPlanDoc, FloorTable } from "@/entities/floor-plan";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { classifyLoadError, errorKey, joinRows, MAX_BATCH, toQrStatus } from "./place-codes-model";
+import { classifyLoadError, errorKey, fetchAllRows, joinRows, toQrStatus } from "./place-codes-model";
 import type { QrStatus } from "./qr-store";
 
 export type Notify = (text: string, tone?: "success" | "error" | "info") => void;
@@ -30,9 +30,12 @@ export interface PlaceCodesState {
   lastPrint: PlaceCodeLastPrint | null;
   statusOf: (t: FloorTable) => QrStatus;
   refresh: () => Promise<void>;
-  /** Runs a mutation; on failure it toasts the translated error, refetches
-   *  when the server's state moved on, and rethrows. */
-  run: <T>(fn: (businessId: string) => Promise<T>) => Promise<T>;
+  /** Every row of the floor, including ones no drawn table matches. */
+  allRows: PlaceCodeRow[];
+  /** Runs a mutation, then refetches (skip with `refresh: false` inside a
+   *  loop and call `refresh()` once after). On failure it toasts the
+   *  translated error, refetches when the server's state moved on, and rethrows. */
+  run: <T>(fn: (businessId: string) => Promise<T>, options?: { refresh?: boolean }) => Promise<T>;
   businessId: string;
 }
 
@@ -54,6 +57,8 @@ export function usePlaceCodes(doc: FloorPlanDoc, notify: Notify): PlaceCodesStat
   const [floorId, setFloorId] = useState<string | null>(null);
   const [list, setList] = useState<PlaceCodeListResponse | null>(null);
   const seq = useRef(0);
+  const readyRef = useRef(false);
+  readyRef.current = phase === "ready";
 
   const refresh = useCallback(async () => {
     if (!businessId) return;
@@ -65,11 +70,13 @@ export function usePlaceCodes(doc: FloorPlanDoc, notify: Notify): PlaceCodesStat
         return;
       }
       // The floor whose rows overlap the drawn plan most; one floor is the usual case.
+      const floorRows = (floorId: string) =>
+        fetchAllRows((page, pageSize) => listPlaceCodes(businessId, { floorId, page, pageSize }));
       let best = floors[0].floorId;
-      let res = await listPlaceCodes(businessId, { floorId: best, pageSize: MAX_BATCH });
+      let res = await floorRows(best);
       let bestHits = joinRows(tables, res.items).size;
       for (const f of floors.slice(1)) {
-        const r = await listPlaceCodes(businessId, { floorId: f.floorId, pageSize: MAX_BATCH });
+        const r = await floorRows(f.floorId);
         const hits = joinRows(tables, r.items).size;
         if (hits > bestHits) {
           best = f.floorId;
@@ -82,9 +89,13 @@ export function usePlaceCodes(doc: FloorPlanDoc, notify: Notify): PlaceCodesStat
       setList(res);
       setPhase("ready");
     } catch (e) {
-      if (mine === seq.current) setPhase(classifyLoadError(e));
+      if (mine !== seq.current) return;
+      // Once the page is up, a failed background refresh keeps what is shown
+      // (and any flow in progress) and says so, instead of replacing the page.
+      if (readyRef.current) notify(t(errorKey(e)), "error");
+      else setPhase(classifyLoadError(e));
     }
-  }, [businessId, tables]);
+  }, [businessId, tables, notify, t]);
 
   useEffect(() => {
     void refresh();
@@ -100,10 +111,10 @@ export function usePlaceCodes(doc: FloorPlanDoc, notify: Notify): PlaceCodesStat
   );
 
   const run = useCallback(
-    async <T,>(fn: (businessId: string) => Promise<T>): Promise<T> => {
+    async <T,>(fn: (businessId: string) => Promise<T>, options: { refresh?: boolean } = {}): Promise<T> => {
       try {
         const out = await fn(businessId);
-        await refresh();
+        if (options.refresh !== false) await refresh();
         return out;
       } catch (e) {
         notify(t(errorKey(e)), "error");
@@ -118,6 +129,7 @@ export function usePlaceCodes(doc: FloorPlanDoc, notify: Notify): PlaceCodesStat
     phase,
     floorId,
     rows,
+    allRows: list?.items ?? [],
     counts: list?.counts ?? null,
     attention: list?.attention ?? [],
     lastPrint: list?.lastPrint ?? null,

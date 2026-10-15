@@ -7,6 +7,7 @@ import { Modal } from "@ui/primitives";
 import type { FloorPlanDoc, FloorTable } from "@/entities/floor-plan";
 import { useI18n } from "@/app/providers/i18n-provider";
 import { TEXT_SECONDARY } from "../../_shared/theme";
+import { revisionOf } from "./place-codes-model";
 import { QrPlan } from "./qr-plan";
 import { BTN_MODAL_OUTLINE, BTN_MODAL_PRIMARY, TEXT_BLACK } from "./theme";
 import type { Notify, PlaceCodesState } from "./use-place-codes";
@@ -15,14 +16,12 @@ export function RelinkModal({
   doc,
   pc,
   codeId,
-  revision,
   notify,
   onClose,
 }: {
   doc: FloorPlanDoc;
   pc: PlaceCodesState;
   codeId: string;
-  revision?: number;
   notify: Notify;
   onClose: () => void;
 }) {
@@ -38,7 +37,9 @@ export function RelinkModal({
     const id = opId.current.id;
     setPending(true);
     try {
-      await pc.run((b) => relinkPlaceCode(b, codeId, id, resourceId, revision));
+      // The revision as it is now: after a stale refusal the refetch moved it on.
+      const current = revisionOf(codeId, pc.allRows, pc.attention);
+      await pc.run((b) => relinkPlaceCode(b, codeId, id, resourceId, current));
       notify(t("floorPlan.qr.relink.done").replace("{number}", picked.number));
       onClose();
     } catch {

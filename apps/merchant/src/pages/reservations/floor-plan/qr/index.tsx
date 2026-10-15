@@ -15,6 +15,7 @@ import { AttentionPanel } from "./attention-panel";
 import { GenerateFlow } from "./generate";
 import { formatDate, useZoneDimmed, ZoneSelect } from "./parts";
 import { exportCodes, printCodes } from "./print-codes";
+import { PrintHistoryModal } from "./print-history-modal";
 import { QrLegend, QrPlan } from "./qr-plan";
 import { QR_STATUSES, type QrStatus } from "./qr-store";
 import { RelinkModal } from "./relink-modal";
@@ -58,6 +59,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
   const [zoneId, setZoneId] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [relink, setRelink] = useState<{ codeId: string; revision?: number } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const dimmed = useZoneDimmed(doc, zoneId);
 
@@ -159,6 +161,10 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
             <ShellIcon name="fp-qr-download.svg" size={24} />
             {t("floorPlan.qr.downloadAll")}
           </button>
+          <button type="button" onClick={() => setHistoryOpen(true)} className={BTN_OUTLINE}>
+            <ShellIcon name="fp-qr-timer-alt.svg" size={24} />
+            {t("floorPlan.qr.history.open")}
+          </button>
         </div>
         <AttentionPanel pc={pc} notify={notify} onRelink={(codeId, revision) => setRelink({ codeId, revision })} />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -191,6 +197,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
           setOpenId(null);
         }}
       />
+      {historyOpen && <PrintHistoryModal pc={pc} notify={notify} onClose={() => setHistoryOpen(false)} />}
       {relink && <RelinkModal doc={doc} pc={pc} codeId={relink.codeId} revision={relink.revision} notify={notify} onClose={() => setRelink(null)} />}
       <ToastBanner toast={toast} />
     </PageShell>

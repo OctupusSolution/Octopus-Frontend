@@ -46,7 +46,7 @@ apps/merchant/src/pages/reservations/floor-plan/qr
 | Feature | Route(s) | Behaviour |
 |---|---|---|
 | Overview counts, legend, last printed | `GET /place-codes/floors`, `GET /place-codes?floorId=` | counts from the list response; `lastPrint` replaces the local max-of-dates |
-| Status per table on the plan | `GET /place-codes?floorId=&size=500` | one call, all rows; zone filter stays client-side over the drawn plan |
+| Status per table on the plan | `GET /place-codes?floorId=&page=&pageSize=100` (paged; 100 is the backend ceiling) | one call, all rows; zone filter stays client-side over the drawn plan |
 | `hiddenFromCustomers` | row field | small marker on the table (eye-off icon) |
 | Generate (select → design → review) | `POST /place-codes/generate` | selection maps: individual→`one{resourceId}` — several hand-picked tables become sequential `one` requests (each with its own `batchId`), shown with one progress bar; if one fails the loop stops, the done tables keep their codes and the review screen names the failed one with Retry (unlike the other modes this is not all-or-nothing); zone→`zone`, range→`range{from,to}`, all→`all`. `existing: keep` by default; choosing "replace existing" sends `regenerate` + `confirmReplaceCount` = number of already-coded tables in the selection. `batchId` = `crypto.randomUUID()` made once per review screen, so a retry replays. |
 | Print / download after generate | `POST /print-runs` then `GET /print-runs/{runId}/bundle` (ZIP) or per-code `GET /{codeId}/symbol?format=svg` | the run is recorded **before** any file is fetched (backend rule). Print window uses the SVG symbols; "Download" saves the ZIP. |
@@ -65,7 +65,7 @@ Every request id sent as `operationId` / `batchId` is generated once per user ac
 ## 5. Error handling
 
 ProblemDetails `errorCode` → translated toast (en + ar) for: `menu.place-code.not-found`, `…revoked`, `…stale` (refetch and say "changed by someone else"), `…place-not-on-floor`, `…place-already-coded`, `…relink-target-taken`, `…floor-not-published` (send user to the floor plan builder), `…selection-too-large` (>500), `…confirm-count-mismatch` (refetch, re-show confirm), `…design-stale`, `…selection-invalid`, `…selection-empty`, `rate.limited` (symbol: retry after a moment).
-- **403 `entitlements.feature-not-enabled`** (`menu:place-codes` not purchased) → the whole page shows an "add-on not enabled" empty state instead of the plan.
+- **403 `entitlements.feature-disabled`** or `entitlements.module-disabled` (`menu:place-codes` not purchased; the backend contract doc says `feature-not-enabled`, but the code emits `feature-disabled`) → the whole page shows an "add-on not enabled" empty state instead of the plan.
 - **403 `authorization.forbidden`** on an action → toast "you don't have permission"; on the list → read-only empty state. Action buttons are not hidden in advance (no client permission helper exists); they fail politely.
 
 ## 6. Testing

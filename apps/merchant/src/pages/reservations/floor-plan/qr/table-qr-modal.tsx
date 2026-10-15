@@ -14,7 +14,8 @@ import { Modal } from "@ui/primitives";
 import type { FloorPlanDoc, FloorTable } from "@/entities/floor-plan";
 import { ShellIcon } from "@/shared/ui/shell-icon";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { TEXT_SECONDARY } from "../../_shared/theme";
+import { BORDER_200, TEXT_SECONDARY } from "../../_shared/theme";
+import { ActivityList } from "./activity-list";
 import { ConfirmDialog } from "./confirm-dialog";
 import { DetailBox, DetailRow, formatDate, ServerSymbol, tableMeta } from "./parts";
 import { toQrStatus } from "./place-codes-model";
@@ -60,10 +61,15 @@ export function TableQrModal({
   const codeId = row?.codeId ?? null;
   const status = row ? toQrStatus(row.status) : "notGenerated";
   const [detail, setDetail] = useState<PlaceCodeDetail | null>(null);
+  const [tab, setTab] = useState<"details" | "activity">("details");
   const [ask, setAsk] = useState<null | "regenerate" | "revoke">(null);
   const [pending, setPending] = useState(false);
   // One operation id per confirmed action, reused if that action is retried.
   const opId = useRef<{ kind: Action; id: string } | null>(null);
+
+  useEffect(() => {
+    setTab("details");
+  }, [table?.id]);
 
   useEffect(() => {
     setDetail(null);
@@ -127,6 +133,29 @@ export function TableQrModal({
             </div>
           </div>
 
+          {codeId && (
+            <div className={clsx("flex gap-1 self-start rounded-[10px] border p-1", BORDER_200)} role="tablist">
+              {(["details", "activity"] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  onClick={() => setTab(id)}
+                  className={clsx(
+                    "h-8 rounded-[8px] px-3 text-[14px] font-medium",
+                    tab === id ? "bg-[#0d6efd] text-white" : clsx(TEXT_SECONDARY, "hover:bg-[#f5f9ff] [[data-theme=dark]_&]:hover:bg-[var(--octo-selected)]")
+                  )}
+                >
+                  {t(`floorPlan.qr.tab.${id}`)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {tab === "activity" && codeId ? (
+            <ActivityList pc={pc} codeId={codeId} revision={row?.revision} />
+          ) : (
           <DetailBox title={t("floorPlan.qr.details")}>
             <DetailRow label={t("floorPlan.qr.field.status")} valueClassName={QR_STATUS_TEXT[status]}>
               {t(`floorPlan.qr.status.${status}`)}
@@ -163,6 +192,7 @@ export function TableQrModal({
               </DetailRow>
             )}
           </DetailBox>
+          )}
 
           <div className="flex flex-col gap-4">
             {!codeId ? (

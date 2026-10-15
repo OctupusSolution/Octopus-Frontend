@@ -152,6 +152,8 @@ function reducer(state: OrderingSessionState, action: Action): OrderingSessionSt
 
 interface OrderingSessionContextValue {
   state: OrderingSessionState;
+  /** True once the stored session has been read: before that `state` is the empty initial one. */
+  hydrated: boolean;
   setChannel: (tenantId: string, channel: FulfillmentChannel) => void;
   setDeliveryAddress: (address: string) => void;
   setBranch: (branchId: string) => void;
@@ -191,9 +193,21 @@ interface OrderingSessionProviderProps {
   children: ReactNode;
   /** False for the builder's canvas: the preview must never read or write the merchant's real cart. */
   persist?: boolean;
+  /** Where the session lives; a scanned place code keeps one cart per code (default: the site cart). */
+  storageKey?: string;
+  /** "session" keeps the cart for this tab only (a place code's table cart). */
+  storage?: "local" | "session";
 }
 
-export function OrderingSessionProvider({ children, persist = true }: OrderingSessionProviderProps) {
+function storeOf(kind: "local" | "session"): Storage | null {
+  try {
+    return kind === "session" ? window.sessionStorage : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function OrderingSessionProvider({ children, persist = true, storageKey = STORAGE_KEY, storage = "local" }: OrderingSessionProviderProps) {
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
 
   const [hydrated, setHydrated] = useState(false);
@@ -203,7 +217,7 @@ export function OrderingSessionProvider({ children, persist = true }: OrderingSe
       setHydrated(true);
       return;
     }
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = storeOf(storage)?.getItem(storageKey);
     if (raw) {
       try {
         const parsed = JSON.parse(raw) as OrderingSessionState;
@@ -214,7 +228,7 @@ export function OrderingSessionProvider({ children, persist = true }: OrderingSe
     }
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [persist]);
+  }, [persist, storageKey, storage]);
 
   useEffect(() => {
     // Skip writes until hydration has run — otherwise the pre-hydration
@@ -222,11 +236,16 @@ export function OrderingSessionProvider({ children, persist = true }: OrderingSe
     // (and React StrictMode's double-invoked effects turn that into a race
     // that can wipe a real session on reload).
     if (!hydrated || !persist) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, hydrated, persist]);
+    try {
+      storeOf(storage)?.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // Full or blocked storage: the cart still works for this page view.
+    }
+  }, [state, hydrated, persist, storageKey, storage]);
 
   const value: OrderingSessionContextValue = {
     state,
+    hydrated,
     setChannel: (tenantId, channel) => dispatch({ type: "SET_CHANNEL", tenantId, channel }),
     setDeliveryAddress: (address) => dispatch({ type: "SET_DELIVERY_ADDRESS", address }),
     setBranch: (branchId) => dispatch({ type: "SET_BRANCH", branchId }),

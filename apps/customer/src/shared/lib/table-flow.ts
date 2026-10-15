@@ -75,6 +75,8 @@ export interface MobileFlow {
   cart: string;
   /** Where the cart's "continue to payment" goes. */
   checkout: string;
+  /** The cart button's label when it is not "continue to pay" (a scanned code sends the order). */
+  checkoutLabelKey?: string;
   booking: string;
 }
 
@@ -104,6 +106,37 @@ export const MOBILE_FLOWS: Record<MobileFlow["mode"], MobileFlow> = {
 };
 
 export const flowItemHref = (flow: MobileFlow, itemId: string): string => `${flow.menu}/${itemId}`;
+
+/** A scanned place code's own screens (`/p/{key}`): no payment, the cart sends the order. */
+export const PLACE_ROUTES = (key: string) => {
+  const base = `/p/${encodeURIComponent(key)}`;
+  return {
+    welcome: base,
+    menu: `${base}/menu`,
+    cart: `${base}/cart`,
+    send: `${base}/send`,
+    order: `${base}/order`,
+    orders: `${base}/orders`,
+  };
+};
+
+/** The table flow's shared screens, aimed at a scanned code. It is a table (the top card shows
+ *  the table number), every link stays under the code, and checkout is the send screen. */
+export function placeFlow(key: string): MobileFlow {
+  const r = PLACE_ROUTES(key);
+  return {
+    mode: "table",
+    home: r.menu,
+    menu: r.menu,
+    menuIndex: r.menu,
+    bestSellers: `${r.menu}?best=1`,
+    offers: r.menu,
+    cart: r.cart,
+    checkout: r.send,
+    checkoutLabelKey: "store.place.send",
+    booking: r.menu,
+  };
+}
 
 /** The table a scanned code names. A table QR carries a link (…?table=12); a
  *  bare number is accepted too, so a code printed before links existed still works. */

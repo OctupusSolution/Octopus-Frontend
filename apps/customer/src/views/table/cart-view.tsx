@@ -102,7 +102,7 @@ export function TableCartView({ items }: TableCartViewProps) {
                     totalLabel={t("store.cart.total")}
                     totalSar={pricing.totalSar}
                   />
-                  <TableButton href={flow.checkout}>{t("store.fulfillment.continueToPay")}</TableButton>
+                  <TableButton href={flow.checkout}>{t(flow.checkoutLabelKey ?? "store.fulfillment.continueToPay")}</TableButton>
                 </div>
               </div>
             )}

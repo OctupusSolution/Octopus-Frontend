@@ -9,6 +9,7 @@ import { useFavorites } from "@/features/menu/toggle-favorite";
 import { useMobileFlow } from "@/shared/lib/flow-context";
 import { flowItemHref } from "@/shared/lib/table-flow";
 import { TableIcon, TableMoney } from "@/shared/ui/table";
+import { quickAddOf } from "./quick-add";
 
 export interface TableItemCardProps {
   item: MenuItem;
@@ -39,13 +40,15 @@ export function TableItemCard({ item, favorite = false }: TableItemCardProps) {
   const bestSeller = item.badges?.includes("best_seller") ?? false;
   const liked = isFavorite(item.id);
 
+  const quickAdd = quickAddOf(item);
+
   function handleAdd() {
     // An item with choices to make is added from its own screen, where they are made.
-    if (item.modifierGroups.length > 0) {
+    if (quickAdd === "open") {
       router.push(href);
       return;
     }
-    addLine(item.id, item.name, item.priceSar, 1, [], "");
+    if (quickAdd === "add") addLine(item.id, item.name, item.priceSar, 1, [], "");
   }
 
   return (
@@ -113,7 +116,8 @@ export function TableItemCard({ item, favorite = false }: TableItemCardProps) {
             type="button"
             aria-label={t("store.card.addToCart")}
             onClick={handleAdd}
-            className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-ocean-blue"
+            disabled={quickAdd === "none"}
+            className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-ocean-blue disabled:cursor-not-allowed disabled:opacity-40"
           >
             <TableIcon name="bag-white" />
           </button>

@@ -22,6 +22,7 @@ import { cookies } from "next/headers";
 import { locales } from "@i18n/index";
 import { PREVIEW_COOKIE_NAME, planApiRequest } from "@/shared/lib/preview";
 import type { PublicMenuDocument, Tenant } from "@octopus/api-client";
+import type { PlaceScan } from "@/shared/lib/place-order";
 
 const BASE = new URL(process.env.PUBLIC_API_URL ?? "http://localhost:8082");
 const SUFFIX = process.env.DEV_TENANT_DOMAIN_SUFFIX ?? "octopus.app";
@@ -90,12 +91,24 @@ function request(
   acceptLanguage?: string,
   extraHeaders: Record<string, string> = {}
 ): Promise<{ status: number; body: string }> {
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
+  return send("GET", host, path, { headers, timeoutMs: 5000 });
+}
+
+/** One call to PublicApi. Resolves with any HTTP status; rejects only when the API is not reached. */
+function send(
+  method: "GET" | "POST",
+  host: string,
+  path: string,
+  options: { body?: string; headers?: Record<string, string>; timeoutMs: number }
+): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const client = BASE.protocol === "https:" ? https : http;
-    const headers: Record<string, string> = { ...extraHeaders, Host: host, Accept: "application/json" };
-    if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
+    const headers: Record<string, string> = { ...options.headers, Host: host, Accept: "application/json" };
+    if (options.body !== undefined) headers["Content-Length"] = String(Buffer.byteLength(options.body));
     const req = client.request(
-      { hostname: BASE.hostname, port: BASE.port, path, method: "GET", headers, timeout: 5000 },
+      { hostname: BASE.hostname, port: BASE.port, path, method, headers, timeout: options.timeoutMs },
       (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (c: Buffer) => chunks.push(c));
@@ -104,7 +117,7 @@ function request(
     );
     req.on("timeout", () => req.destroy(new Error("timeout")));
     req.on("error", reject);
-    req.end();
+    req.end(options.body);
   });
 }
 
@@ -233,6 +246,35 @@ export const fetchSiteMenuDocument = (slug: string, publicLinkKey: string, lang?
   get<PublicMenuDocument>(slug, `/v1/public/site-menu/${encodeURIComponent(publicLinkKey)}${query({ lang })}`);
 
 /** A scanned QR code's menu. The code alone names the business (no Host needed); every failure reads as null. */
+export type PlaceScanResult = { kind: "ok"; scan: PlaceScan } | { kind: "notFound" } | { kind: "error" };
+
+/** A scanned place code (`/p/{key}`): its table, its menu and whether it takes orders.
+ *  Never cached: the backend answers `no-store`, and a disabled table must show at once. */
+export async function fetchPlaceScan(key: string, lang?: string | null): Promise<PlaceScanResult> {
+  const path = `/v1/public/place-codes/${encodeURIComponent(key)}${query({ lang: knownLocale(lang) })}`;
+  try {
+    const res = await request(BASE.host, path);
+    if (res.status === 404) return { kind: "notFound" };
+    if (res.status < 200 || res.status >= 300) return { kind: "error" };
+    return { kind: "ok", scan: JSON.parse(res.body) as PlaceScan };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+/** The place-code order request, forwarded as is. Status 0 means the API was not reached. */
+export async function postPlaceOrder(key: string, body: unknown, idempotencyKey: string): Promise<{ status: number; body: string }> {
+  try {
+    return await send("POST", BASE.host, `/v1/public/place-codes/${encodeURIComponent(key)}/orders`, {
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      timeoutMs: 10_000,
+    });
+  } catch {
+    return { status: 0, body: "" };
+  }
+}
+
 export async function fetchMenuDocumentByCode(key: string, lang?: string | null, label?: string | null): Promise<PublicMenuDocument | null> {
   const path = `/v1/public/menu-codes/${encodeURIComponent(key)}${query({ lang: knownLocale(lang), l: label })}`;
   const cacheKey = `code|${path}`;

@@ -57,6 +57,7 @@ import type {
   WastageResponse,
 } from "../contracts/order-admin";
 import type { ListEnvelope } from "../contracts/menu-admin";
+import type { OccupancyResponse } from "../contracts/occupancy";
 import { apiRequest } from "./http";
 
 const base = (businessId: string) => `/v1/businesses/${businessId}/orders`;
@@ -130,6 +131,9 @@ export function listOrders(businessId: string, params: ListOrdersParams = {}): P
       fulfilmentCode: params.fulfilmentCode,
       branchId: params.branchId,
       resourceId: params.resourceId,
+      selfService: params.selfService?.toString(),
+      intakeCodeId: params.intakeCodeId,
+      occupancyId: params.occupancyId,
       minAmount: params.minAmount?.toString(),
       maxAmount: params.maxAmount?.toString(),
       minAttendees: params.minAttendees?.toString(),
@@ -359,4 +363,25 @@ export function sendOrderReceipt(
   idempotencyKey: string
 ): Promise<ReceiptRequestResponse> {
   return apiRequest(`${base(businessId)}/${orderId}/receipt`, { method: "POST", body: request, idempotencyKey });
+}
+
+// ---- Table sessions (place occupancies, US-020) ------------------------------------
+
+/** The open session of a place; 404 `order.occupancy.none-open` when there is none. */
+export function getOpenOccupancy(businessId: string, resourceId: string): Promise<OccupancyResponse> {
+  return apiRequest(`${base(businessId)}/occupancies`, { query: { resourceId } });
+}
+
+export function getOccupancy(businessId: string, occupancyId: string): Promise<OccupancyResponse> {
+  return apiRequest(`${base(businessId)}/occupancies/${occupancyId}`);
+}
+
+/** 409 `order.occupancy.has-unaccepted-orders` names the orders still waiting for an answer. */
+export function closeOccupancy(businessId: string, occupancyId: string, expectedVersion: number): Promise<OccupancyResponse> {
+  return apiRequest(`${base(businessId)}/occupancies/${occupancyId}/close`, { method: "POST", body: { expectedVersion } });
+}
+
+/** 409 `order.occupancy.place-already-open` when the place has another open session. */
+export function reopenOccupancy(businessId: string, occupancyId: string, expectedVersion: number): Promise<OccupancyResponse> {
+  return apiRequest(`${base(businessId)}/occupancies/${occupancyId}/reopen`, { method: "POST", body: { expectedVersion } });
 }

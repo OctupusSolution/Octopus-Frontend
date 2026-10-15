@@ -52,7 +52,7 @@ const SECTIONS: NavSection[] = [
       // views of one floor, and every builder route sits under this path so
       // the group stays lit while the merchant is inside any of them.
       { id: "floor-plan", label: "Floor Plan", icon: "nav-floor-plan.svg", path: "/reservations/floor-plan",
-        items: ["Live Floor Plan", "Floor Plan Builder"] },
+        items: ["Live Floor Plan", "Floor Plan Builder", "Table QR Code"] },
       { id: "public-link", label: "Public Link Builder", icon: "nav-link.svg", path: "/public-link" },
     ],
   },
@@ -116,6 +116,7 @@ const ROUTES: Record<string, string> = Object.fromEntries(routes.map((r) => [r.i
 const ITEM_PATHS: Record<string, string> = {
   "Live Floor Plan": "/reservations/floor-plan",
   "Floor Plan Builder": "/reservations/floor-plan/builder",
+  "Table QR Code": "/reservations/floor-plan/qr",
   CRM: "/customers",
   Segments: "/customers/segments",
   "Business & Legal Entities": "/settings/business",

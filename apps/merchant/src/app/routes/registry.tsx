@@ -29,6 +29,8 @@ export const routes: AppRoute[] = [
     element: lazy(() => import("@/pages/reservations/floor-plan/builder/quick").then(m => ({ default: m.QuickBoxLayoutPage }))) },
   { id: "reservations-floor-plan-scratch", path: "/reservations/floor-plan/builder/scratch", section: "Floor Plan", page: "Build From Scratch",
     element: lazy(() => import("@/pages/reservations/floor-plan/builder/scratch").then(m => ({ default: m.BuildFromScratchPage }))) },
+  { id: "reservations-floor-plan-qr", path: "/reservations/floor-plan/qr", section: "Floor Plan", page: "Table QR Code",
+    element: lazy(() => import("@/pages/reservations/floor-plan/qr").then(m => ({ default: m.TableQrPage }))) },
   { id: "reservations-waitlist", path: "/reservations/waitlist", section: "Reservations", page: "Waitlist",
     element: lazy(() => import("@/pages/reservations/waitlist").then(m => ({ default: m.WaitlistPage }))) },
   { id: "reservations-waitlist-seat", path: "/reservations/waitlist/:entryId/seat", section: "Waitlist", page: "Seat Guest",

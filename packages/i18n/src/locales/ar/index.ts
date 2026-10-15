@@ -5013,6 +5013,8 @@ export const ar = {
   "store.place.unavailable.code.title": "هذا الرمز لا يعمل",
   "store.place.unavailable.code.body": "اطلب رمزًا جديدًا من أحد الموظفين.",
   "store.place.retry": "حاول مرة أخرى",
+  "store.preview.opening": "جارٍ فتح المعاينة…",
+  "store.preview.linkInvalid": "رابط المعاينة هذا غير مكتمل. اطلب رابطًا جديدًا.",
   "store.place.cartUpdated": "تغيّرت القائمة — تم تحديث سلتك.",
   "store.place.dismiss": "حسنًا",
   "store.place.backToMenu": "العودة إلى القائمة",

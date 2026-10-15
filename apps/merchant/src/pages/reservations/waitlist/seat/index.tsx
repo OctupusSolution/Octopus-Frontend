@@ -1,25 +1,34 @@
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import clsx from "clsx";
-import { type LucideIcon, Armchair, CircleDashed, Clock, Lightbulb, MapPinned, Star, UsersRound, UserX } from "lucide-react";
+import { MapPinned, UserX } from "lucide-react";
 import { boundsOf, itemRect, zoneForTable, type FloorItem, type FloorPlanDoc, type FloorTable, type LiveStatus } from "@/entities/floor-plan";
 import { estimatedSeatingMinutes, fullName, isActive, waitedMinutes, type WaitlistEntry } from "@/entities/waitlist-entry";
 import { PlanViewport, TABLE_TONES, type ItemKind } from "@/widgets/floor-plan-canvas";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { Dropdown, MenuItem } from "@/pages/reservations/floor-plan/_shared/dropdown";
+import { MenuItem } from "@/pages/reservations/floor-plan/_shared/dropdown";
 import { areaLabel } from "@/pages/reservations/floor-plan/_shared/labels";
 import { useLiveTables } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
 import { FLOOR_PLAN_BUILDER_PATH } from "@/pages/reservations/floor-plan/_shared/paths";
 import { SOURCE_KEY, fill } from "../_shared/labels";
 import { WAITLIST_PATH } from "../_shared/paths";
+import { BTN_NEUTRAL, BTN_PRIMARY, DEEP_BLUE, INK, LINE, SLATE, SUB, TINT_CLASS } from "../_shared/theme";
+import { WaitlistIcon, WaitlistImg } from "../_shared/waitlist-icon";
+import { ToolbarSelect } from "../toolbar";
 import { useSeatingFloor, useWaitlist } from "../_shared/use-waitlist";
 import { describeWaitlistError } from "../_shared/waitlist-api";
 
 const TABLES_ONLY: ReadonlySet<ItemKind> = new Set(["table"]);
 const NO_ZONE = "all";
 
-/** Legend chips in the frame's colour order, labelled by what the canvas paints. */
-const LEGEND: readonly LiveStatus[] = ["cleaning", "available", "reserved", "occupied"];
+/** Legend chips in the frame's order and colours. */
+const LEGEND = ["reserved", "available", "cleaning", "occupied"] as const;
+const LEGEND_TINT: Record<(typeof LEGEND)[number], { text: string; bg: string }> = {
+  reserved: { text: "#0D6EFD", bg: "#F5F9FF" },
+  available: { text: "#009A39", bg: "#EFFFF5" },
+  cleaning: { text: "#F59E0B", bg: "#FFFAF0" },
+  occupied: { text: "#D30202", bg: "#FEF0F0" },
+};
 
 function fits(table: FloorTable, partySize: number): boolean {
   if (table.seats < partySize) return false;
@@ -178,43 +187,45 @@ function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: 
   const zoneLabel = zoneId === NO_ZONE ? t("waitlist.seat.allAreas") : doc.zones.find((z) => z.id === zoneId)?.name ?? t("waitlist.seat.allAreas");
 
   return (
-    <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-8">
+    <div className="px-4 pb-10 pt-5 sm:px-6 sm:pt-8">
       {seatError && (
         <div role="alert" className="mb-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
           {seatError}
         </div>
       )}
-      <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">{t("waitlist.seat.title")}</h1>
-      <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)] sm:text-[15px]">{t("waitlist.subtitle")}</p>
+      <div className="flex flex-col gap-3">
+        <h1 className="text-[24px] font-bold leading-[24px] text-[#16161D] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">{t("waitlist.seat.title")}</h1>
+        <p className={clsx(SUB, "text-[14px] font-medium leading-[14px]")}>{t("waitlist.subtitle")}</p>
+      </div>
 
-      <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-xl border border-[var(--octo-border-input)] bg-[var(--octo-card)] sm:grid-cols-3 xl:grid-cols-[1.75fr_1.35fr_1.2fr_1.05fr_0.75fr_0.8fr]">
+      <div className={clsx(LINE, "mt-4 grid grid-cols-2 overflow-hidden rounded-[12px] border sm:grid-cols-3 xl:grid-cols-[287px_227px_200px_173px_126px_minmax(0,1fr)]")}>
         <Cell className="col-span-2 sm:col-span-1">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-[14px] font-semibold text-white">{initials}</span>
-          <div className="min-w-0">
-            <p className="truncate text-[15px] text-[var(--octo-text-primary)]">{name}</p>
-            <p dir="ltr" className="text-[13px] text-[var(--octo-text-secondary)] rtl:text-end">{entry.phone}</p>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#0D6EFD] text-[14px] font-bold leading-[14px] text-white">{initials}</span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className={clsx(INK, "truncate text-[14px] font-medium leading-[14px]")}>{name}</p>
+            <p dir="ltr" className={clsx(SLATE, "text-[12px] leading-[12px] rtl:text-end")}>{entry.phone}</p>
           </div>
         </Cell>
         <Cell value={String(entry.partySize)} label={t("waitlist.seat.guests")} />
         <Cell>
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--octo-tone-danger-bg)] text-[#E0561B]">
-            <Clock size={16} strokeWidth={1.6} />
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#FBEADF]">
+            <WaitlistImg name="time.svg" size={16} />
           </span>
-          <div>
-            <p className={clsx("text-[15px]", waited > entry.quotedMin ? "text-[#E0341B]" : "text-[var(--octo-text-primary)]")}>
+          <div className="flex flex-col gap-1">
+            <p className="text-[14px] font-medium leading-[14px] text-[#EC4D21]">
               {waited} {t("waitlist.min")}
             </p>
-            <p className="text-[13px] text-[var(--octo-text-secondary)]">{t("waitlist.seat.waitingTime")}</p>
+            <p className={clsx(SLATE, "whitespace-nowrap text-[12px] leading-[12px]")}>{t("waitlist.seat.waitingTime")}</p>
           </div>
         </Cell>
-        <Cell value={`${est} ${t("waitlist.min")}`} valueClass="text-[#009A39] [[data-theme=dark]_&]:text-[var(--octo-tone-success-text)]" label={t("waitlist.seat.estimated")} />
+        <Cell value={`${est} ${t("waitlist.min")}`} valueClass="!text-[#009A39]" label={t("waitlist.seat.estimated")} />
         <Cell value={entry.areaPreference || "—"} label={t("waitlist.seat.area")} />
         <Cell value={t(SOURCE_KEY[entry.source])} label={t("waitlist.seat.source")} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--octo-border-card)] bg-[var(--octo-soft-bg)] px-4 py-2">
+      <div className="mt-4 flex min-h-[50px] flex-wrap items-center gap-2 rounded-[12px] border border-[#E2E8F0] bg-[#FBFAFC] px-4 py-1 [[data-theme=dark]_&]:border-[var(--octo-border-card)] [[data-theme=dark]_&]:bg-[var(--octo-soft-bg)]">
         {doc.zones.length > 0 && (
-          <Dropdown label={<span className="text-[var(--octo-text-secondary)]">{zoneLabel}</span>} align="start" buttonClassName="h-11 min-w-[142px] rounded-lg !text-[15px]">
+          <ToolbarSelect label={zoneLabel}>
             {(close) => (
               <>
                 <MenuItem label={t("waitlist.seat.allAreas")} selected={zoneId === NO_ZONE} onClick={() => { setZoneId(NO_ZONE); close(); }} />
@@ -223,26 +234,26 @@ function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: 
                 ))}
               </>
             )}
-          </Dropdown>
+          </ToolbarSelect>
         )}
         {LEGEND.map((status) => (
           <span
             key={status}
-            className="inline-flex h-11 items-center gap-1.5 rounded-md px-2.5 text-[15px] font-medium"
-            style={{ color: TABLE_TONES[status].dot, backgroundColor: `color-mix(in srgb, ${TABLE_TONES[status].dot} 8%, var(--octo-card))` }}
+            style={{ "--tint-fg": LEGEND_TINT[status].text, "--tint-bg": LEGEND_TINT[status].bg } as CSSProperties}
+            className={clsx(TINT_CLASS, "inline-flex h-10 items-center gap-1 rounded-[4px] p-2 text-[14px] font-medium leading-[14px]")}
           >
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: TABLE_TONES[status].dot }} />
+            <span className="h-2 w-2 rounded-full bg-current" />
             {t(`waitlist.seat.legend.${status}`)}
           </span>
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_252px]">
-        <div className="relative overflow-hidden border border-[var(--octo-border-card)] bg-white">
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_261px]">
+        <div className="relative overflow-hidden bg-white">
           <PlanViewport
             doc={doc}
             zoom={{ mode: "fit" }}
-            className="h-[320px] sm:h-[clamp(420px,62vh,660px)]"
+            className="h-[320px] sm:h-[672px]"
             toneFor={toneFor}
             boxTables={boxLayout}
             showGrid
@@ -264,31 +275,22 @@ function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: 
           {selected ? (
             <TablePanel table={selected.table} status={toneFor(selected.table)} liveStatus={selected.state.status} areaName={zoneOf(selected.table)?.name ?? areaLabel(selected.table.area, t)} partySize={entry.partySize} />
           ) : (
-            <div className="rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-4 py-8 text-center text-[13.5px] text-[var(--octo-text-muted)]">
-              <Armchair size={26} className="mx-auto mb-2 text-[var(--octo-text-faint)]" />
+            <div className={clsx(LINE, SUB, "rounded-[8px] border px-4 py-8 text-center text-[14px] font-medium")}>
+              <WaitlistIcon name="table-round.svg" size={24} className="mx-auto mb-2 block" />
               {t("waitlist.seat.pickTable")}
             </div>
           )}
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={!selected || !selectable(selected.table)}
-            className="h-12 rounded-lg bg-[#0D6EFD] text-[17px] font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
-          >
+          <button type="button" onClick={confirm} disabled={!selected || !selectable(selected.table)} className={BTN_PRIMARY}>
             {t("waitlist.seat.confirm")}
           </button>
-          <button
-            type="button"
-            onClick={() => navigate(WAITLIST_PATH)}
-            className="h-12 rounded-lg bg-[#E2E8F0] text-[17px] font-semibold text-[#64748B] transition-colors hover:bg-[#CBD5E1] [[data-theme=dark]_&]:bg-[var(--octo-track)] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]"
-          >
+          <button type="button" onClick={() => navigate(WAITLIST_PATH)} className={BTN_NEUTRAL}>
             {t("waitlist.form.cancel")}
           </button>
         </aside>
       </div>
 
-      <p className="mt-4 flex items-center gap-2 rounded-xl bg-[color-mix(in_srgb,#0D6EFD_5%,var(--octo-card))] px-4 py-4 text-[14.5px] text-[#0B4FC0] [[data-theme=dark]_&]:text-[var(--octo-tone-info-text)]">
-        <Lightbulb size={22} strokeWidth={1.5} className="shrink-0" />
+      <p className={clsx(DEEP_BLUE, "mt-4 flex items-center gap-1 rounded-[8px] bg-[#F0F4FF] px-3 py-2 text-[14px] font-medium leading-[1.3] [[data-theme=dark]_&]:bg-[color-mix(in_srgb,#0D6EFD_10%,var(--octo-card))]")}>
+        <WaitlistIcon name="light-bulb.svg" />
         {t("waitlist.seat.tip")}
       </p>
     </div>
@@ -297,11 +299,11 @@ function SeatGuest({ entry, entries, onSeat }: { entry: WaitlistEntry; entries: 
 
 function Cell({ children, value, label, valueClass, className }: { children?: ReactNode; value?: string; label?: string; valueClass?: string; className?: string }) {
   return (
-    <div className={clsx("flex min-w-0 items-center gap-2 border-b border-e border-[var(--octo-border-input)] px-3 py-2 xl:border-b-0 xl:last:border-e-0", className)}>
+    <div className={clsx(LINE, "flex min-h-[50px] min-w-0 items-center gap-1 border-b border-e py-2 pe-1 ps-2 xl:border-b-0 xl:last:border-e-0", className)}>
       {children ?? (
-        <div className="min-w-0">
-          <p className={clsx("truncate text-[15px] text-[var(--octo-text-primary)]", valueClass)}>{value}</p>
-          <p className="truncate text-[13px] text-[var(--octo-text-secondary)]">{label}</p>
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className={clsx(INK, "truncate text-[14px] font-medium leading-[14px]", valueClass)}>{value}</p>
+          <p className={clsx(SLATE, "truncate text-[12px] leading-[12px]")}>{label}</p>
         </div>
       )}
     </div>
@@ -311,47 +313,55 @@ function Cell({ children, value, label, valueClass, className }: { children?: Re
 function TablePanel({ table, status, liveStatus, areaName, partySize }: { table: FloorTable; status: LiveStatus; liveStatus: LiveStatus; areaName: string; partySize: number }) {
   const { t } = useI18n();
   const tone = TABLE_TONES[status];
+  const available = status === "available";
   const tooSmall = liveStatus === "available" && status === "blocked";
   const statusText = tooSmall ? t("waitlist.seat.tooSmall") : t(`waitlist.seat.status.${status}`);
   const feature = table.note.trim() || t(`floorPlan.smoking.${table.smoking}`);
   const seats = (n: number) => fill(t(n === 1 ? "waitlist.seat.seatOne" : "waitlist.seat.seatMany"), { n });
+  // The frame's Available green; any other state keeps the canvas's own tone.
+  const accent = available ? "#009A39" : tone.stroke;
 
-  const rows: { icon: LucideIcon; label: string; value: string; valueClass?: string }[] = [
-    { icon: UsersRound, label: t("waitlist.seat.capacity"), value: seats(table.seats) },
-    { icon: UsersRound, label: t("waitlist.seat.minCapacity"), value: seats(minimumCapacity(table)) },
-    { icon: Armchair, label: t("waitlist.seat.area"), value: areaName },
-    { icon: Star, label: t("waitlist.seat.feature"), value: feature },
-    { icon: Clock, label: t("waitlist.seat.turnTime"), value: `${turnTimeMinutes(table)} ${t("waitlist.min")}` },
-    { icon: CircleDashed, label: t("waitlist.seat.status"), value: statusText, valueClass: "font-medium" },
+  const rows: { icon: ReactNode; label: string; value: string; accent?: boolean }[] = [
+    { icon: <WaitlistIcon name="people-16.svg" size={16} />, label: t("waitlist.seat.capacity"), value: seats(table.seats) },
+    { icon: <WaitlistIcon name="people-16.svg" size={16} />, label: t("waitlist.seat.minCapacity"), value: seats(minimumCapacity(table)) },
+    { icon: <WaitlistIcon name="table-round.svg" size={16} glyph="14.33px 12.33px" />, label: t("waitlist.seat.area"), value: areaName },
+    { icon: <WaitlistImg name="star.svg" size={16} />, label: t("waitlist.seat.feature"), value: feature },
+    { icon: <WaitlistIcon name="time-16.svg" size={16} />, label: t("waitlist.seat.turnTime"), value: `${turnTimeMinutes(table)} ${t("waitlist.min")}` },
+    { icon: <WaitlistImg name="status.svg" size={16} />, label: t("waitlist.seat.status"), value: statusText, accent: true },
   ];
 
   return (
-    <div className="rounded-lg border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 pb-3 pt-3">
-      <h2 className="text-[26px] font-semibold leading-tight" style={{ color: status === "available" ? "#009A39" : tone.stroke }}>
-        {fill(t("waitlist.seat.tableTitle"), { n: tableTitle(table.number) })}
-      </h2>
-      <p className="mt-0.5 text-[15px] font-medium text-[var(--octo-text-primary)]">
-        {seats(table.seats)} - {areaName}
-      </p>
-      <span className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[13px]" style={{ color: tone.dot, backgroundColor: `color-mix(in srgb, ${tone.dot} 14%, var(--octo-card))` }}>
-        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tone.dot }} />
-        {statusText}
-      </span>
-      <dl className="mt-3 flex flex-col gap-2 border-t border-[var(--octo-border-card)] pt-3">
-        {rows.map(({ icon: Icon, label, value, valueClass }) => (
-          <div key={label} className="flex items-center justify-between gap-2 text-[13.5px]">
-            <dt className="flex items-center gap-1.5 text-[var(--octo-text-secondary)]">
-              <Icon size={15} strokeWidth={1.5} />
-              {label}:
+    <div className={clsx(LINE, "flex flex-col gap-2 rounded-[8px] border px-2 py-3")}>
+      <div className="flex flex-col items-start gap-2 border-b border-[#E2E8F0] pb-3 [[data-theme=dark]_&]:border-[var(--octo-border-card)]">
+        <h2 className="text-[24px] font-semibold leading-[24px]" style={{ color: accent }}>
+          {fill(t("waitlist.seat.tableTitle"), { n: tableTitle(table.number) })}
+        </h2>
+        <p className={clsx(INK, "text-[14px] font-semibold leading-[14px]")}>
+          {seats(table.seats)} - {areaName}
+        </p>
+        <span
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium leading-[12px]"
+          style={{ color: available ? "#009A39" : tone.dot, backgroundColor: available ? "#DCFFEF" : `color-mix(in srgb, ${tone.dot} 14%, var(--octo-card))` }}
+        >
+          <span className="h-[5px] w-[5px] rounded-full bg-current" />
+          {statusText}
+        </span>
+      </div>
+      <dl className="flex flex-col gap-4">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-2">
+            <dt className={clsx(SUB, "flex items-center gap-1 text-[12px] font-medium leading-[12px]")}>
+              {row.icon}
+              {row.label}:
             </dt>
-            <dd className={clsx("text-end text-[var(--octo-text-primary)]", valueClass)} style={valueClass ? { color: status === "available" ? "#009A39" : tone.text } : undefined}>
-              {value}
+            <dd className={clsx(INK, "text-end text-[14px] font-medium leading-[14px]")} style={row.accent ? { color: available ? "#009A39" : tone.text } : undefined}>
+              {row.value}
             </dd>
           </div>
         ))}
       </dl>
-      {status !== "available" && (
-        <p className="mt-3 rounded-md bg-[var(--octo-track)] px-2.5 py-2 text-[12px] text-[var(--octo-text-secondary)]">
+      {!available && (
+        <p className="mt-1 rounded-md bg-[var(--octo-track)] px-2.5 py-2 text-[12px] text-[var(--octo-text-secondary)]">
           {tooSmall ? fill(t("waitlist.seat.tooSmallHint"), { n: partySize }) : t("waitlist.seat.unavailableHint")}
         </p>
       )}

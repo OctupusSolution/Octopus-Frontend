@@ -23,6 +23,16 @@ const EN = {
   reinstate: "Reinstate",
   revertedToast: "{name} is back to waiting",
   reinstatedToast: "{name} is back in the queue",
+  cancelTitle: "Cancel Waiting List Reservation?",
+  cancelTitleMany: "Cancel {n} Waiting List Reservations?",
+  cancelReason: "Cancellation Reason",
+  cancelReasonPlaceholder: "Choose cancellation reason",
+  cancelReasonRequired: "Choose a cancellation reason.",
+  cancelNext: "Next",
+  cancelAuthTitle: "Manager Authentication & Security",
+  cancelPinPrompt: "Please enter your PIN to confirm the cancellation.",
+  cancelConfirm: "Confirm Cancellation",
+  cancelToday: "Today",
 };
 
 type Text = typeof EN;
@@ -48,6 +58,16 @@ const AR: Text = {
   reinstate: "إعادة إلى الطابور",
   revertedToast: "عاد {name} إلى الانتظار",
   reinstatedToast: "عاد {name} إلى الطابور",
+  cancelTitle: "إلغاء حجز قائمة الانتظار؟",
+  cancelTitleMany: "إلغاء {n} من حجوزات قائمة الانتظار؟",
+  cancelReason: "سبب الإلغاء",
+  cancelReasonPlaceholder: "اختر سبب الإلغاء",
+  cancelReasonRequired: "اختر سبب الإلغاء.",
+  cancelNext: "التالي",
+  cancelAuthTitle: "مصادقة المدير والأمان",
+  cancelPinPrompt: "يرجى إدخال الرمز السري لتأكيد الإلغاء.",
+  cancelConfirm: "تأكيد الإلغاء",
+  cancelToday: "اليوم",
 };
 
 export function useWaitlistExtraText(): Text {

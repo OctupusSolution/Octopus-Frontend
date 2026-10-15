@@ -90,8 +90,8 @@ export function useWaitlist() {
       notify: async (id: string) => replace(await notifyEntry(need(), id)),
       // The API has no "called" state; calling is just the phone dialer.
       call: (_id: string) => undefined,
-      leave: async (id: string, pin: string) =>
-        replace(await removeEntry(need(), id, { approverAccountId: accountIdOf(user?.accessToken), pin })),
+      leave: async (id: string, pin: string, reasonCode?: string | null, note?: string) =>
+        replace(await removeEntry(need(), id, { approverAccountId: accountIdOf(user?.accessToken), pin, reasonCode, note })),
       /** `resourceId` is the table's id on the floor plan. */
       seat: async (id: string, _table: string, _area: string, resourceId?: string | null) =>
         replace(await seatEntry(need(), id, resourceId ?? null)),

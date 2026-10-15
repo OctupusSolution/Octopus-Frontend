@@ -203,11 +203,12 @@ export async function moveEntryUp(businessId: string, entries: readonly Waitlist
 export async function removeEntry(
   businessId: string,
   id: string,
-  approval: { approverAccountId: string; pin: string; reasonCode?: string }
+  approval: { approverAccountId: string; pin: string; reasonCode?: string | null; note?: string }
 ): Promise<WaitlistEntry> {
   return toEntry(
     await removeWaitingEntry(businessId, id, {
       reasonCode: approval.reasonCode ?? "left",
+      note: approval.note || null,
       approverAccountId: approval.approverAccountId,
       approvalPin: approval.pin,
       expectedVersion: versionOf(id),

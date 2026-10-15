@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { CalendarDays, CircleX, Plus, RefreshCw, Send, SearchX, Settings, X } from "lucide-react";
+import { CircleX, Send, SearchX, Settings, X } from "lucide-react";
 import {
   DEFAULT_FILTERS,
   computeStats,
@@ -23,7 +23,6 @@ import { downloadCsv } from "@/pages/reports/_shared/export";
 import { openExternal } from "@/pages/reservations/_shared/download";
 import { whatsappHref } from "@/pages/reservations/_shared/guest-actions";
 import { describeWaitlistError } from "./_shared/waitlist-api";
-import { ConfirmModal } from "@/pages/reservations/floor-plan/_shared/confirm-modal";
 import { ToastBanner, useToast } from "@/pages/reservations/floor-plan/_shared/toast";
 import { useNow } from "@/pages/reservations/floor-plan/_shared/use-floor-plan";
 import { EmptyWaitlistIllustration } from "./_shared/glyphs";
@@ -31,15 +30,20 @@ import { CHANNEL_KEY, SOURCE_KEY, STATUS_KEY, fill } from "./_shared/labels";
 import { waitlistSeatPath } from "./_shared/paths";
 import { useAreas, useSeatingFloor, useWaitlist, useWaitlistDayStats } from "./_shared/use-waitlist";
 import { useWaitlistExtraText } from "./_shared/extra-text";
+import { BTN_PRIMARY, GRAY, INK, LINE, SUB, SURFACE, SURFACE_GRAY } from "./_shared/theme";
+import { WaitlistIcon } from "./_shared/waitlist-icon";
+import { CancelWaitlistModal } from "./cancel-modal";
 import { GuestFormModal } from "./guest-form-modal";
 import { HistoryModal } from "./history-modal";
 import { WaitlistSettingsModal } from "./settings-modal";
 import { WaitlistStatCards } from "./stat-cards";
 import { WaitlistToolbar } from "./toolbar";
 import { WaitlistTable, type RowHandlers } from "./waitlist-table";
-import { ManageApprovalPinLink } from "@/features/session/approval-pin";
 
 type Confirm = { kind: "remove"; entries: WaitlistEntry[] } | null;
+
+/** The frame's 48px outlined square beside the Add button. */
+const HEADER_ICON_BTN = "grid h-12 w-12 place-items-center rounded-[8px] border transition-colors hover:bg-[#F8FAFC] [[data-theme=dark]_&]:hover:bg-[var(--octo-hover)]";
 
 export function WaitlistPage() {
   const { t, locale } = useI18n();
@@ -49,7 +53,6 @@ export function WaitlistPage() {
   const waitlist = useWaitlist();
   const { entries } = waitlist;
   const [actionError, setActionError] = useState<string | null>(null);
-  const [removePin, setRemovePin] = useState("");
   // A failed call shows in the banner instead of being dropped.
   function run(job: Promise<unknown> | undefined) {
     setActionError(null);
@@ -177,7 +180,7 @@ export function WaitlistPage() {
   };
 
   return (
-    <div className="px-4 pb-10 pt-5 sm:px-8 sm:pt-8">
+    <div className="px-4 pb-10 pt-5 sm:px-6 sm:pt-8">
       {(waitlist.error || actionError) && (
         <div role="alert" className="mb-4 flex items-center justify-between gap-3 rounded-[10px] bg-error/10 px-4 py-2.5 text-[13px] text-error">
           <span>{actionError ?? waitlist.error}</span>
@@ -188,58 +191,51 @@ export function WaitlistPage() {
           )}
         </div>
       )}
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[24px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[26px]">{t("waitlist.title")}</h1>
-          <p className="mt-1.5 text-[14px] text-[var(--octo-text-secondary)] sm:text-[15px]">{t("waitlist.subtitle")}</p>
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-[24px] font-bold leading-[24px] text-[#16161D] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">{t("waitlist.title")}</h1>
+          <p className={clsx(SUB, "text-[14px] font-medium leading-[14px]")}>{t("waitlist.subtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex h-10 items-center gap-2.5 rounded-lg bg-[var(--octo-track)] px-3 text-[15px] text-[var(--octo-text-primary)]">
-            <CalendarDays size={22} strokeWidth={1.5} className="text-[var(--octo-text-secondary)]" />
+          <span className={clsx(SURFACE_GRAY, "inline-flex items-center gap-2 rounded-[4px] p-2 text-[14px] font-medium leading-[14px] text-[#16161D] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]")}>
+            <WaitlistIcon name="calendar.svg" />
             {dateLabel}
           </span>
-          <button
-            type="button"
-            onClick={refresh}
-            aria-label={t("waitlist.refresh")}
-            title={t("waitlist.refresh")}
-            className="grid h-12 w-12 place-items-center rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
-            <RefreshCw size={22} strokeWidth={1.6} className={clsx(spinning && "animate-spin")} />
+          <button type="button" onClick={refresh} aria-label={t("waitlist.refresh")} title={t("waitlist.refresh")} className={clsx(HEADER_ICON_BTN, SURFACE, LINE, INK)}>
+            <WaitlistIcon name="refresh.svg" className={clsx(spinning && "animate-spin")} />
           </button>
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            aria-label={text.settings}
-            title={text.settings}
-            className="grid h-12 w-12 place-items-center rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] transition-colors hover:bg-[var(--octo-hover)]"
-          >
-            <Settings size={22} strokeWidth={1.6} />
+          {/* Not in the frame: the queue rules dialog has no other entry point. */}
+          <button type="button" onClick={() => setSettingsOpen(true)} aria-label={text.settings} title={text.settings} className={clsx(HEADER_ICON_BTN, SURFACE, LINE, INK)}>
+            <Settings size={24} strokeWidth={1.5} />
           </button>
-          <button type="button" onClick={openAdd} className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-[#0D6EFD] px-4 text-[17px] font-semibold text-white transition-opacity hover:opacity-90">
-            <Plus size={22} strokeWidth={2} />
+          <button type="button" onClick={openAdd} className={BTN_PRIMARY}>
+            <WaitlistIcon name="plus.svg" />
             {t("waitlist.add")}
           </button>
         </div>
       </header>
 
       {!hasQueue ? (
-        <section className="mx-auto flex max-w-[430px] flex-col items-center py-16 text-center sm:py-24">
-          <EmptyWaitlistIllustration className="w-[250px] max-w-full text-[var(--octo-text-primary)]" />
-          <h2 className="mt-5 text-[26px] font-medium text-[var(--octo-text-primary)]">{t("waitlist.empty.title")}</h2>
-          <p className="mt-1 text-[15px] text-[var(--octo-text-secondary)]">{t("waitlist.empty.body")}</p>
-          <button type="button" onClick={openAdd} className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-[10px] bg-[#0D6EFD] text-[18px] font-semibold text-white transition-opacity hover:opacity-90">
-            <Plus size={22} strokeWidth={2} />
+        <section className="mx-auto flex w-full max-w-[427px] flex-col items-center gap-6 py-16 sm:py-24">
+          <div className="flex w-full max-w-[322px] flex-col items-center gap-6">
+            <EmptyWaitlistIllustration />
+            <div className="flex w-full max-w-[282px] flex-col items-center gap-3 text-center font-medium">
+              <h2 className={clsx(INK, "text-[24px] leading-[24px]")}>{t("waitlist.empty.title")}</h2>
+              <p className={clsx(GRAY, "text-[14px] leading-[14px]")}>{t("waitlist.empty.body")}</p>
+            </div>
+          </div>
+          <button type="button" onClick={openAdd} className={clsx(BTN_PRIMARY, "w-full")}>
+            <WaitlistIcon name="plus.svg" />
             {t("waitlist.add")}
           </button>
         </section>
       ) : (
         <>
-          <div className="mt-8">
+          <div className="mt-10">
             <WaitlistStatCards stats={stats} />
           </div>
 
-          <div className="mt-8">
+          <div className="mt-10">
             <WaitlistToolbar
               filters={filters}
               onFiltersChange={setFilters}
@@ -283,7 +279,7 @@ export function WaitlistPage() {
             </div>
           )}
 
-          <div className="mt-5">
+          <div className="mt-6">
             {rows.length === 0 ? (
               <div className="flex flex-col items-center rounded-2xl border border-[var(--octo-border-card)] bg-[var(--octo-card)] px-4 py-14 text-center">
                 <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--octo-track)] text-[var(--octo-text-muted)]">
@@ -333,48 +329,18 @@ export function WaitlistPage() {
 
       <WaitlistSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
-      {confirm && (
-        <ConfirmModal
-          open
-          tone="danger"
-          icon={<CircleX size={20} />}
-          onClose={() => setConfirm(null)}
-          title={confirm.entries.length === 1 ? fill(t("waitlist.confirmRemove.title"), { name: fullName(confirm.entries[0]) }) : fill(t("waitlist.confirmRemove.titleMany"), { n: confirm.entries.length })}
-          body={
-            <>
-              <p>{t("waitlist.confirmRemove.body")}</p>
-              <label className="mt-3 block text-[12px] font-medium text-[var(--octo-text-primary)]">
-                Manager approval PIN
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  value={removePin}
-                  onChange={(e) => setRemovePin(e.target.value)}
-                  className="mt-1 block h-10 w-full rounded-[8px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 text-[14px]"
-                />
-              </label>
-              {/* The backend answers "PIN not set" until the approver sets one —
-                  this is the only place in the console that can. */}
-              <ManageApprovalPinLink className="mt-2" />
-            </>
-          }
-          actions={[
-            { label: t("waitlist.form.cancel"), variant: "secondary", onClick: () => setConfirm(null) },
-            {
-              label: t("waitlist.confirmRemove.confirm"),
-              variant: "danger",
-              onClick: () => {
-                confirm.entries.forEach((entry) => run(waitlist.leave(entry.id, removePin)));
-                setRemovePin("");
-                showToast(confirm.entries.length === 1 ? fill(t("waitlist.toast.removed"), { name: fullName(confirm.entries[0]) }) : fill(t("waitlist.toast.removedMany"), { n: confirm.entries.length }), "info");
-                setSelected(new Set());
-                setConfirm(null);
-              },
-            },
-          ]}
-        />
-      )}
+      <CancelWaitlistModal
+        open={confirm !== null}
+        count={confirm?.entries.length ?? 0}
+        onClose={() => setConfirm(null)}
+        onConfirm={({ reasonCode, note, pin }) => {
+          if (!confirm) return;
+          confirm.entries.forEach((entry) => run(waitlist.leave(entry.id, pin, reasonCode, note)));
+          showToast(confirm.entries.length === 1 ? fill(t("waitlist.toast.removed"), { name: fullName(confirm.entries[0]) }) : fill(t("waitlist.toast.removedMany"), { n: confirm.entries.length }), "info");
+          setSelected(new Set());
+          setConfirm(null);
+        }}
+      />
 
       <ToastBanner toast={toast} />
     </div>

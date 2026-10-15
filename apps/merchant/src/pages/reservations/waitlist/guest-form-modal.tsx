@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import clsx from "clsx";
-import { ChevronDown, CircleCheck, MessageCircleMore, Minus, Phone, Plus } from "lucide-react";
 import { Modal } from "@ui/primitives";
 import { zoneForTable, type FloorPlanDoc } from "@/entities/floor-plan";
 import {
@@ -18,8 +17,10 @@ import {
   type WaitlistSource,
 } from "@/entities/waitlist-entry";
 import { useI18n } from "@/app/providers/i18n-provider";
-import { SaudiFlag, WhatsAppGlyph } from "./_shared/glyphs";
+import { ChannelGlyph, SaudiFlag } from "./_shared/glyphs";
 import { CHANNEL_KEY, SOURCE_KEY, fill } from "./_shared/labels";
+import { BTN_NEUTRAL, BTN_PRIMARY, DEEP_BLUE, GRAY, INK, LINE, SURFACE_BLUE, SURFACE_GRAY } from "./_shared/theme";
+import { WaitlistIcon, WaitlistImg } from "./_shared/waitlist-icon";
 
 interface FormState {
   firstName: string;
@@ -59,21 +60,25 @@ function fromEntry(entry: WaitlistEntry): FormState {
   };
 }
 
-const FIELD =
-  "h-10 w-full rounded-[10px] border bg-[var(--octo-card)] px-3 text-[14.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-muted)] focus:border-[#0D6EFD] focus:outline-none focus:ring-2 focus:ring-[#0D6EFD]/25";
-const border = (error?: string) => (error ? "border-[#EF4444]" : "border-[var(--octo-border-input)]");
+// The frame's input: 40px tall, 12px radius, 14px text on a #CBD5E1 outline.
+const FIELD = clsx(
+  INK,
+  "h-10 w-full rounded-[12px] border bg-transparent px-2 text-[14px] leading-[14px] placeholder:text-[#687280] focus:border-[#0D6EFD] focus:outline-none [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-muted)]"
+);
+const border = (error?: string) => (error ? "border-[#D30202]" : LINE);
+const INFO_CARD = clsx(SURFACE_GRAY, INK, "flex flex-col gap-2 rounded-[8px] px-2 py-3");
 
-function Field({ label, required, hint, error, htmlFor, children }: { label: string; required?: boolean; hint?: string; error?: string; htmlFor?: string; children: ReactNode }) {
+function Field({ label, required, hint, error, htmlFor, className, children }: { label: string; required?: boolean; hint?: string; error?: string; htmlFor?: string; className?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={htmlFor} className="px-1 text-[15.5px] font-medium text-[var(--octo-text-primary)]">
+    <div className={clsx("flex flex-col gap-3", className)}>
+      <label htmlFor={htmlFor} className={clsx(INK, "px-2 text-[16px] font-medium leading-[16px]")}>
         {label}
-        {hint && <span className="ms-1.5 text-[14px] font-normal text-[var(--octo-text-secondary)]">{hint}</span>}
-        {required && <span className="ms-1 text-[#E00000]">*</span>}
+        {hint && <span className={clsx(GRAY, "ms-1 text-[14px] font-normal leading-[14px]")}>{hint}</span>}
+        {required && <span className="ms-1 text-[#D30202]">*</span>}
       </label>
       {children}
       {error && (
-        <p role="alert" className="px-1 text-[12px] text-[var(--octo-tone-danger-text)]">
+        <p role="alert" className="-mt-1 px-2 text-[12px] text-[#D30202]">
           {error}
         </p>
       )}
@@ -89,12 +94,12 @@ function SelectField({ id, value, onChange, placeholder, error, children }: { id
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={Boolean(error)}
-        className={clsx(FIELD, border(error), "appearance-none pe-10", !value && "text-[var(--octo-text-muted)]")}
+        className={clsx(FIELD, border(error), "appearance-none pe-10", !value && "!text-[#687280] [[data-theme=dark]_&]:!text-[var(--octo-text-muted)]")}
       >
         <option value="">{placeholder}</option>
         {children}
       </select>
-      <ChevronDown size={20} strokeWidth={1.5} className="pointer-events-none absolute end-3 text-[var(--octo-text-secondary)]" />
+      <WaitlistIcon name="arrow-down.svg" className="pointer-events-none absolute end-2 text-[#687280]" />
     </span>
   );
 }
@@ -169,24 +174,19 @@ export function GuestFormModal({
     });
   }
 
-  const CHANNEL_ICON: Record<ContactChannel, ReactNode> = {
-    whatsapp: <WhatsAppGlyph size={20} />,
-    call: <Phone size={17} strokeWidth={1.6} />,
-    sms: <MessageCircleMore size={18} strokeWidth={1.6} />,
-  };
-
   return (
-    <Modal open={open} onClose={onClose} className="octo-scroll max-h-[calc(100vh-32px)] !max-w-[740px] overflow-y-auto !rounded-2xl !p-6 sm:!p-8">
+    <Modal open={open} onClose={onClose} backdropClassName="bg-black/60" className="octo-scroll max-h-[calc(100vh-32px)] !max-w-[738px] overflow-y-auto !rounded-[12px] !p-6 !shadow-none">
       <form
         noValidate
+        className="flex flex-col gap-6"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
-        <h2 className="text-[24px] font-bold text-[var(--octo-text-primary)]">{t(editing ? "waitlist.form.editTitle" : "waitlist.form.title")}</h2>
+        <h2 className="text-[24px] font-semibold leading-[24px] text-[#0E0E0E] [[data-theme=dark]_&]:text-[var(--octo-text-primary)]">{t(editing ? "waitlist.form.editTitle" : "waitlist.form.title")}</h2>
 
-        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           <Field label={t("waitlist.form.firstName")} required htmlFor="wl-first" error={errorText.firstName}>
             <input id="wl-first" autoFocus value={form.firstName} onChange={(e) => set("firstName", e.target.value)} placeholder={t("waitlist.form.firstNamePlaceholder")} className={clsx(FIELD, border(errorText.firstName))} />
           </Field>
@@ -195,12 +195,11 @@ export function GuestFormModal({
           </Field>
 
           <Field label={t("waitlist.form.phone")} required htmlFor="wl-phone" error={errorText.phone}>
-            <span dir="ltr" className={clsx("flex h-10 items-center rounded-[10px] border bg-[var(--octo-card)] focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/25", border(errorText.phone))}>
-              <span className="flex h-full items-center gap-2 ps-3 pe-2 text-[14.5px] text-[var(--octo-text-primary)]">
-                <SaudiFlag size={22} />
+            <span dir="ltr" className={clsx(INK, "flex h-10 items-center gap-1 rounded-[12px] border px-3 text-[14px] leading-none focus-within:border-[#0D6EFD]", border(errorText.phone))}>
+              <span className="flex items-center gap-2">
+                <SaudiFlag size={24} />
                 +966
               </span>
-              <span className="h-6 w-px bg-[var(--octo-border-input)]" />
               <input
                 id="wl-phone"
                 type="tel"
@@ -208,7 +207,7 @@ export function GuestFormModal({
                 value={form.phone}
                 onChange={(e) => set("phone", e.target.value.replace(/[^\d\s]/g, "").slice(0, 12))}
                 placeholder="000 000 000"
-                className="h-full min-w-0 flex-1 rounded-e-[10px] bg-transparent px-3 text-[14.5px] text-[var(--octo-text-primary)] placeholder:text-[var(--octo-text-muted)] focus:outline-none"
+                className={clsx(LINE, "h-[30px] min-w-0 flex-1 border-l bg-transparent px-2 text-[14px] leading-none placeholder:text-[#58606C] focus:outline-none [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-muted)]")}
               />
             </span>
           </Field>
@@ -223,17 +222,17 @@ export function GuestFormModal({
           </Field>
 
           <Field label={t("waitlist.form.partySize")} required>
-            <span className="flex h-10 items-center justify-center gap-5 rounded-[10px] border border-[var(--octo-border-input)] bg-[var(--octo-card)]">
+            <span className={clsx(LINE, "flex h-10 items-center justify-center gap-6 rounded-[12px] border")}>
               <button
                 type="button"
                 aria-label={t("waitlist.form.decrease")}
                 disabled={form.partySize <= 1}
                 onClick={() => set("partySize", Math.max(1, form.partySize - 1))}
-                className="grid h-7 w-7 place-items-center rounded-full bg-[var(--octo-track)] text-[var(--octo-text-primary)] transition-opacity disabled:opacity-40"
+                className={clsx(SURFACE_GRAY, "grid h-6 w-6 place-items-center rounded-full text-[#687280] transition-opacity disabled:opacity-40")}
               >
-                <Minus size={15} strokeWidth={2.2} />
+                <WaitlistIcon name="minus.svg" size={16} />
               </button>
-              <output aria-live="polite" className="min-w-6 text-center text-[15px] text-[var(--octo-text-primary)]">
+              <output aria-live="polite" className={clsx(INK, "min-w-[9px] text-center text-[14px] leading-none")}>
                 {form.partySize}
               </output>
               <button
@@ -241,14 +240,14 @@ export function GuestFormModal({
                 aria-label={t("waitlist.form.increase")}
                 disabled={form.partySize >= 30}
                 onClick={() => set("partySize", Math.min(30, form.partySize + 1))}
-                className="grid h-7 w-7 place-items-center rounded-full bg-[#0D6EFD] text-white transition-opacity disabled:opacity-40"
+                className="grid h-6 w-6 place-items-center rounded-full bg-[#0D6EFD] transition-opacity disabled:opacity-40"
               >
-                <Plus size={15} strokeWidth={2.2} />
+                <WaitlistImg name="plus-16.svg" size={16} />
               </button>
             </span>
           </Field>
           <Field label={t("waitlist.form.channel")} required>
-            <div role="radiogroup" aria-label={t("waitlist.form.channel")} className="flex flex-wrap gap-2.5">
+            <div role="radiogroup" aria-label={t("waitlist.form.channel")} className="flex flex-wrap gap-2">
               {CONTACT_CHANNELS.map((channel) => {
                 const on = form.channel === channel;
                 return (
@@ -259,13 +258,11 @@ export function GuestFormModal({
                     aria-checked={on}
                     onClick={() => set("channel", channel)}
                     className={clsx(
-                      "flex h-10 items-center gap-2.5 rounded-[10px] border px-3 text-[15px] font-semibold transition-colors",
-                      on
-                        ? "border-[#0D6EFD] bg-[color-mix(in_srgb,#0D6EFD_5%,var(--octo-card))] text-[#0D6EFD]"
-                        : "border-[var(--octo-border-input)] bg-[var(--octo-card)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+                      "flex h-10 items-center gap-2 rounded-[12px] border p-2 text-[14px] font-semibold leading-[14px] transition-colors",
+                      on ? clsx(SURFACE_BLUE, "border-[#0D6EFD] text-[#0D6EFD]") : clsx(LINE, INK, "hover:bg-[#F8FAFC] [[data-theme=dark]_&]:hover:bg-[var(--octo-hover)]")
                     )}
                   >
-                    {CHANNEL_ICON[channel]}
+                    <ChannelGlyph channel={channel} />
                     {t(CHANNEL_KEY[channel])}
                   </button>
                 );
@@ -273,7 +270,7 @@ export function GuestFormModal({
             </div>
           </Field>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             <Field label={t("waitlist.form.areaPreference")} htmlFor="wl-area">
               <SelectField id="wl-area" value={form.areaPreference} onChange={(v) => set("areaPreference", v)} placeholder={t("waitlist.form.chooseArea")}>
                 {floor.zones.map((zone) => (
@@ -292,39 +289,39 @@ export function GuestFormModal({
                 ))}
               </SelectField>
             </Field>
-            <Field label={t("waitlist.form.note")} hint={t("waitlist.form.noteHint")} htmlFor="wl-note">
+            <Field label={t("waitlist.form.note")} hint={t("waitlist.form.noteHint")} htmlFor="wl-note" className="flex-1">
               <textarea
                 id="wl-note"
                 value={form.note}
                 maxLength={300}
                 onChange={(e) => set("note", e.target.value)}
                 placeholder={t("waitlist.form.notePlaceholder")}
-                className={clsx(FIELD, border(), "h-auto min-h-[150px] flex-1 resize-none py-2.5")}
+                className={clsx(FIELD, border(), "h-auto min-h-[116px] flex-1 resize-none py-3")}
               />
             </Field>
           </div>
 
-          <div className="flex flex-col gap-5 sm:pt-1">
-            <section className="rounded-[10px] bg-[var(--octo-track)] px-3 py-3">
-              <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("waitlist.form.estimatedWait")}</h3>
-              <p className="mt-1 text-[13px] text-[var(--octo-text-primary)]">{t("waitlist.form.estimatedWaitHint")}</p>
-              <p className="mt-1 text-[26px] font-bold leading-tight text-[var(--octo-text-primary)]">
+          <div className="flex flex-col gap-6">
+            <section className={INFO_CARD}>
+              <h3 className="text-[14px] font-semibold leading-[14px]">{t("waitlist.form.estimatedWait")}</h3>
+              <p className="text-[12px] leading-[12px]">{t("waitlist.form.estimatedWaitHint")}</p>
+              <p className="text-[24px] font-semibold leading-[24px]">
                 {estimate}-{estimate + 5} {t("waitlist.min")}
               </p>
-              <p className="mt-0.5 text-[13px] text-[var(--octo-text-secondary)]">{t("waitlist.form.estimatedWaitNotify")}</p>
+              <p className={clsx(GRAY, "text-[12px] leading-[12px]")}>{t("waitlist.form.estimatedWaitNotify")}</p>
             </section>
-            <section className="rounded-[10px] bg-[var(--octo-track)] px-3 py-3">
-              <h3 className="text-[15px] font-semibold text-[var(--octo-text-primary)]">{t("waitlist.form.queuePreview")}</h3>
-              <p className="mt-1 text-[13px] text-[var(--octo-text-primary)]">{t(editing ? "waitlist.form.queueCurrent" : "waitlist.form.queuePosition")}</p>
-              <p className="mt-1 text-[26px] font-bold leading-tight text-[#0B4FC0] [[data-theme=dark]_&]:text-[var(--octo-tone-info-text)]">#{position}</p>
-              <p className="mt-0.5 text-[13px] text-[var(--octo-text-secondary)]">{fill(t(position - 1 === 1 ? "waitlist.form.behindOne" : "waitlist.form.behind"), { n: position - 1 })}</p>
+            <section className={INFO_CARD}>
+              <h3 className="text-[14px] font-semibold leading-[14px]">{t("waitlist.form.queuePreview")}</h3>
+              <p className="text-[12px] leading-[12px]">{t(editing ? "waitlist.form.queueCurrent" : "waitlist.form.queuePosition")}</p>
+              <p className={clsx(DEEP_BLUE, "text-[24px] font-semibold leading-[24px]")}>#{position}</p>
+              <p className={clsx(GRAY, "text-[12px] leading-[12px]")}>{fill(t(position - 1 === 1 ? "waitlist.form.behindOne" : "waitlist.form.behind"), { n: position - 1 })}</p>
             </section>
             <div className="mt-auto flex flex-col gap-3">
-              <button type="submit" className="flex h-12 items-center justify-center gap-3 rounded-[10px] bg-[#0D6EFD] text-[18px] font-semibold text-white transition-opacity hover:opacity-90">
-                <CircleCheck size={24} fill="#fff" className="text-[#0D6EFD]" strokeWidth={2.2} />
+              <button type="submit" className={clsx(BTN_PRIMARY, "w-full !gap-2")}>
+                <WaitlistImg name="done.svg" />
                 {t(editing ? "waitlist.form.save" : "waitlist.form.add")}
               </button>
-              <button type="button" onClick={onClose} className="h-12 rounded-[10px] bg-[#E2E8F0] text-[18px] font-semibold text-[#64748B] transition-colors hover:bg-[#CBD5E1] [[data-theme=dark]_&]:bg-[var(--octo-track)] [[data-theme=dark]_&]:text-[var(--octo-text-secondary)]">
+              <button type="button" onClick={onClose} className={clsx(BTN_NEUTRAL, "w-full")}>
                 {t("waitlist.form.cancel")}
               </button>
             </div>

@@ -8,13 +8,14 @@ export const STATUS_KEY: Record<WaitlistStatus, string> = {
   left: "waitlist.status.left",
 };
 
-/** Theme tokens, sampled against the frame's pills. */
-export const STATUS_TONE: Record<WaitlistStatus, { bg: string; text: string; dot: string }> = {
-  waiting: { bg: "var(--octo-tone-info-bg)", text: "var(--octo-tone-info-text)", dot: "var(--octo-tone-info-text)" },
-  notified: { bg: "var(--octo-tone-warning-bg)", text: "var(--octo-tone-warning-dot)", dot: "var(--octo-tone-warning-dot)" },
-  onTheWay: { bg: "var(--octo-tone-success-bg)", text: "var(--octo-tone-completed-text)", dot: "var(--octo-tone-completed-dot)" },
-  seated: { bg: "var(--octo-tone-violet-bg)", text: "var(--octo-tone-violet-text)", dot: "var(--octo-tone-violet-dot)" },
-  left: { bg: "var(--octo-tone-slate-bg)", text: "var(--octo-tone-slate-text)", dot: "var(--octo-tone-slate-text)" },
+/** The frame's pill colours. The frame draws no Seated pill; it takes the
+ *  violet of the Left Queue card. */
+export const STATUS_TONE: Record<WaitlistStatus, { bg: string; text: string }> = {
+  waiting: { bg: "#F5F9FF", text: "#0D6EFD" },
+  notified: { bg: "#FFF5E4", text: "#DE9000" },
+  onTheWay: { bg: "#EFFFF5", text: "#009A39" },
+  seated: { bg: "#F7F4FF", text: "#7900F3" },
+  left: { bg: "#E2E8F0", text: "#58606C" },
 };
 
 export const SOURCE_KEY: Record<WaitlistSource, string> = {

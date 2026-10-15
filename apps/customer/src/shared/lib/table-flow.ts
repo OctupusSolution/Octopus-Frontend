@@ -75,6 +75,8 @@ export interface MobileFlow {
   cart: string;
   /** Where the cart's "continue to payment" goes. */
   checkout: string;
+  /** The cart button's label when it is not "continue to pay" (a scanned code sends the order). */
+  checkoutLabelKey?: string;
   booking: string;
 }
 
@@ -131,6 +133,7 @@ export function placeFlow(key: string): MobileFlow {
     offers: r.menu,
     cart: r.cart,
     checkout: r.send,
+    checkoutLabelKey: "store.place.send",
     booking: r.menu,
   };
 }

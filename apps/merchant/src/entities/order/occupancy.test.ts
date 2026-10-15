@@ -5,14 +5,20 @@ import { isOccupancyOpen, occupancyProblemOf } from "./occupancy";
 const err = (status: number, errorCode: string, detail?: string) => new ApiError(status, { status, errorCode, detail });
 
 describe("occupancyProblemOf", () => {
-  it("names the orders to answer before a session can close", () => {
-    expect(occupancyProblemOf(err(409, "order.occupancy.has-unaccepted-orders", "#101, #102"))).toEqual({
-      problem: "hasUnaccepted",
-      detail: "#101, #102",
-    });
+  it("names the orders to answer before a session can close, from the problem's orderCodes", () => {
+    const e = new ApiError(409, {
+      status: 409,
+      errorCode: "order.occupancy.has-unaccepted-orders",
+      detail: "Accept or decline the waiting orders before closing.",
+      orderCodes: ["O-000101", "O-000102"],
+    } as never);
+    expect(occupancyProblemOf(e)).toEqual({ problem: "hasUnaccepted", detail: "O-000101, O-000102" });
   });
-  it("says another session holds the table", () => {
-    expect(occupancyProblemOf(err(409, "order.occupancy.place-already-open", "S-9")).problem).toBe("alreadyOpen");
+  it("never shows the backend's English sentence as the detail", () => {
+    expect(occupancyProblemOf(err(409, "order.occupancy.has-unaccepted-orders", "English text")).detail).toBeNull();
+  });
+  it("says another session holds the table, without an id staff cannot use", () => {
+    expect(occupancyProblemOf(err(409, "order.occupancy.place-already-open", "S-9"))).toEqual({ problem: "alreadyOpen", detail: null });
   });
   it("treats a version conflict and an already-changed state as stale", () => {
     expect(occupancyProblemOf(err(409, "order.concurrency.stale")).problem).toBe("stale");

@@ -84,30 +84,52 @@ export function toScanLines(
   return { lines: out, unknown };
 }
 
-/** The cart against a newer menu: lines that can no longer be sent go, changed prices follow the menu. */
-export function reconcileCart(
+/** The cart moved from the menu it was filled from to a newer one. Refs (i1, m1, option
+ *  positions) are numbered per response and shift when the menu is republished, so each line is
+ *  followed through its stable ids — the catalog entry and option ids of the old scan — to where
+ *  those ids sit now. A line whose dish or option is gone is dropped; a changed price follows the
+ *  menu and is reported. */
+export function remapCart(
   lines: readonly OrderLine[],
+  from: PlaceOrdering,
   menu: Menu,
-  ordering: PlaceOrdering | null
+  to: PlaceOrdering | null
 ): { keep: OrderLine[]; dropped: OrderLine[]; repriced: OrderLine[] } {
+  if (!to) return { keep: [], dropped: [...lines], repriced: [] };
+  const refByEntry = new Map(Object.entries(to.items).map(([ref, entry]) => [entry, ref]));
+  const itemByRef = new Map<string, Menu["items"][number]>();
+  for (const i of menu.items) if (!itemByRef.has(itemRefOf(i.id))) itemByRef.set(itemRefOf(i.id), i);
+  const optionAt = new Map<string, { groupRef: string; index: number }>();
+  for (const [groupRef, ids] of Object.entries(to.optionGroups)) ids.forEach((id, index) => optionAt.set(id, { groupRef, index }));
+
   const keep: OrderLine[] = [];
   const dropped: OrderLine[] = [];
   const repriced: OrderLine[] = [];
-  const byId = new Map(menu.items.map((i) => [i.id, i]));
   for (const l of lines) {
-    const item = byId.get(l.menuItemId);
-    const sendable = ordering ? toScanLines([l], ordering).unknown.length === 0 : false;
-    if (!item || !sendable) {
+    const entry = from.items[itemRefOf(l.menuItemId)];
+    const ref = entry ? refByEntry.get(entry) : undefined;
+    const item = ref ? itemByRef.get(ref) : undefined;
+    if (!item) {
       dropped.push(l);
       continue;
     }
-    if (item.priceSar !== l.unitPriceSar) {
-      const next = { ...l, unitPriceSar: item.priceSar };
-      repriced.push(next);
-      keep.push(next);
-    } else {
-      keep.push(l);
+    const modifiers = l.modifiers.map((m) => {
+      const id = optionIdOf(from, m.groupId, m.optionId);
+      const at = id ? optionAt.get(id) : undefined;
+      if (!at) return null;
+      const optionId = `${at.groupRef}-${at.index}`;
+      const now = item.modifierGroups.find((g) => g.id === at.groupRef)?.options.find((o) => o.id === optionId);
+      return { ...m, groupId: at.groupRef, optionId, label: now?.label ?? m.label, priceDeltaSar: now?.priceDeltaSar ?? m.priceDeltaSar };
+    });
+    if (modifiers.some((m) => m === null)) {
+      dropped.push(l);
+      continue;
     }
+    const next: OrderLine = { ...l, menuItemId: item.id, name: item.name, unitPriceSar: item.priceSar, modifiers: modifiers as OrderLine["modifiers"] };
+    const changedPrice =
+      item.priceSar !== l.unitPriceSar || next.modifiers.some((m, i) => m.priceDeltaSar !== l.modifiers[i].priceDeltaSar);
+    if (changedPrice) repriced.push(next);
+    keep.push(next);
   }
   return { keep, dropped, repriced };
 }

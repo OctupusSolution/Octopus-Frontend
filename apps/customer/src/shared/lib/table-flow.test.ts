@@ -10,7 +10,8 @@ describe("placeFlow", () => {
     expect(flow.cart).toBe("/p/K1/cart");
     expect(flow.checkout).toBe("/p/K1/send");
     expect(flowItemHref(flow, "cat-1-i1")).toBe("/p/K1/menu/cat-1-i1");
-    expect(Object.values(flow).filter((v) => v !== "table").every((v) => String(v).startsWith("/p/K1"))).toBe(true);
+    const { mode: _mode, checkoutLabelKey: _label, ...routes } = flow;
+    expect(Object.values(routes).every((v) => v.startsWith("/p/K1"))).toBe(true);
   });
 
   it("escapes the key", () => {
@@ -31,5 +32,10 @@ describe("placeFlow", () => {
 
   it("leaves the table flow as it was", () => {
     expect(MOBILE_FLOWS.table.checkout).toBe("/table/pay");
+    expect(MOBILE_FLOWS.table.checkoutLabelKey).toBeUndefined();
+  });
+
+  it("labels the cart's button as sending the order, never as paying", () => {
+    expect(placeFlow("K").checkoutLabelKey).toBe("store.place.send");
   });
 });

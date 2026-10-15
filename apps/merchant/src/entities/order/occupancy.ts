@@ -9,9 +9,13 @@ export const isOccupancyOpen = (status: string): boolean => status.toLowerCase()
 export function occupancyProblemOf(e: unknown): { problem: OccupancyProblem; detail: string | null } {
   if (!(e instanceof ApiError)) return { problem: "generic", detail: null };
   const code = e.problem?.errorCode;
-  const detail = e.problem?.detail ?? null;
-  if (code === "order.occupancy.has-unaccepted-orders") return { problem: "hasUnaccepted", detail };
-  if (code === "order.occupancy.place-already-open") return { problem: "alreadyOpen", detail };
+  if (code === "order.occupancy.has-unaccepted-orders") {
+    // The codes travel as a ProblemDetails extension; `detail` is the backend's English sentence.
+    const codes = (e.problem as { orderCodes?: unknown } | null)?.orderCodes;
+    const list = Array.isArray(codes) ? codes.filter((c): c is string => typeof c === "string") : [];
+    return { problem: "hasUnaccepted", detail: list.length ? list.join(", ") : null };
+  }
+  if (code === "order.occupancy.place-already-open") return { problem: "alreadyOpen", detail: null };
   // Someone else moved the session first: the card reloads and shows where it stands.
   if (code === "order.concurrency.stale" || code === "order.occupancy.already-closed" || code === "order.occupancy.already-open") {
     return { problem: "stale", detail: null };

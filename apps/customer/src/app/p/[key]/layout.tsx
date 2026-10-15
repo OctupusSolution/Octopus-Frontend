@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { defaultLocale, getDirection, locales, type Locale } from "@i18n/index";
 import { StoreI18nProvider } from "@/app/providers";
 import { OrderingSessionProvider } from "@/entities/order";
+import { PlaceCartGuard } from "@/features/place/cart-guard";
 import { PlaceScanProvider } from "@/features/place/place-scan-context";
 import { fetchPlaceScan, menuFromDocument } from "@/shared/api/public-api";
 import { MobileFlowProvider } from "@/shared/lib/flow-context";
@@ -56,7 +57,10 @@ export default async function PlaceLayout({ params, children }: { params: { key:
           >
             <MobileFlowProvider flow={placeFlow(params.key)}>
               <OrderingSessionProvider storageKey={cartStorageKey(params.key)} storage="session">
-                <PlaceScanProvider value={{ key: params.key, scan, menu, ordering }}>{children}</PlaceScanProvider>
+                <PlaceScanProvider value={{ key: params.key, scan, menu, ordering }}>
+                  <PlaceCartGuard />
+                  {children}
+                </PlaceScanProvider>
               </OrderingSessionProvider>
             </MobileFlowProvider>
           </TableBrandProvider>

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { ScanOrderConfirmation } from "./place-order";
-import { appendSentOrder, cartStorageKey, readSentOrders, sentOrdersKey } from "./place-storage";
+import {
+  appendSentOrder,
+  cartStorageKey,
+  clearPendingSend,
+  readCartOrdering,
+  readPendingSend,
+  readSentOrders,
+  sentOrdersKey,
+  writeCartOrdering,
+  writePendingSend,
+} from "./place-storage";
 
 function memory(): Storage {
   const m = new Map<string, string>();
@@ -23,6 +33,29 @@ const confirmation = (reference: string): ScanOrderConfirmation => ({
   netTotal: 8.7,
   taxTotal: 1.3,
   grandTotal: 10,
+});
+
+describe("cart basis snapshot", () => {
+  it("remembers which menu the cart was filled from, per code", () => {
+    const s = memory();
+    const ordering = { basis: "b1", items: { i1: "e-1" }, optionGroups: {} };
+    writeCartOrdering(s, "A", ordering);
+    expect(readCartOrdering(s, "A")).toEqual(ordering);
+    expect(readCartOrdering(s, "B")).toBeNull();
+    s.setItem("octo.placeCartBasis.C", "{broken");
+    expect(readCartOrdering(s, "C")).toBeNull();
+  });
+});
+
+describe("pending send key", () => {
+  it("survives leaving the page, until the order is confirmed", () => {
+    const s = memory();
+    writePendingSend(s, "A", { signature: "sig", key: "k1" });
+    expect(readPendingSend(s, "A")).toEqual({ signature: "sig", key: "k1" });
+    expect(readPendingSend(s, "B")).toBeNull();
+    clearPendingSend(s, "A");
+    expect(readPendingSend(s, "A")).toBeNull();
+  });
 });
 
 describe("place storage", () => {

@@ -47,7 +47,8 @@ export function SessionCard({ order }: { order: OrderResponse }) {
       setSession(next);
     } catch (e) {
       const { problem, detail } = occupancyProblemOf(e);
-      setMessage(t(`orders.session.error.${problem}`).replace("{detail}", detail ?? ""));
+      const text = t(`orders.session.error.${problem}`);
+      setMessage(detail ? text.replace("{detail}", detail) : text.replace(/[:：]?\s*\{detail\}/, ""));
       if (problem === "stale") await load();
     } finally {
       setPending(false);

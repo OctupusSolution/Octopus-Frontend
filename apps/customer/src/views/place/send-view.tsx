@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useI18n } from "@/app/providers";
 import { useOrderingSession } from "@/entities/order";
 import { usePlaceScan } from "@/features/place/place-scan-context";
@@ -10,67 +10,76 @@ import {
   cartSignature,
   idempotencyKeyFor,
   placeProblemOf,
-  reconcileCart,
   toScanLines,
   type PlaceProblem,
   type ScanOrderConfirmation,
 } from "@/shared/lib/place-order";
-import { appendSentOrder, safeLocalStorage } from "@/shared/lib/place-storage";
+import {
+  appendSentOrder,
+  clearPendingSend,
+  readPendingSend,
+  safeLocalStorage,
+  safeSessionStorage,
+  writePendingSend,
+} from "@/shared/lib/place-storage";
 import { PLACE_ROUTES, computeTableBill } from "@/shared/lib/table-flow";
 import { TableBackTitle, TableButton, TableMoney } from "@/shared/ui/table";
 
+/** A request id that also works off a secure context (crypto.randomUUID needs HTTPS). */
+function newRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = b.map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 /** The cart sent as an order: the backend's order request for this code. No payment here —
- *  the bill is settled at the table. A retry of the same cart reuses its Idempotency-Key. */
+ *  the bill is settled at the table. The Idempotency-Key of an unconfirmed send is kept per code
+ *  in sessionStorage, so a retry — even from a reloaded page — replays instead of ordering twice.
+ *  Keeping the cart in line with menu updates is PlaceCartGuard's job (in the layout). */
 export function PlaceSendView() {
   const { t } = useI18n();
   const router = useRouter();
-  const { key, menu, ordering } = usePlaceScan();
-  const { state, removeLine, replaceLine, clearCart } = useOrderingSession();
+  const { key, ordering } = usePlaceScan();
+  const { state, removeLine, clearCart } = useOrderingSession();
   const routes = PLACE_ROUTES(key);
-  const idem = useRef<{ signature: string; key: string } | null>(null);
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<PlaceProblem | null>(null);
   const [removed, setRemoved] = useState(0);
-  // The basis the cart was last checked against; a newer scan after a refresh re-checks it.
-  const checkedBasis = useRef<string | null>(ordering?.basis ?? null);
-
-  // After "the menu was updated", the layout re-reads the scan; bring the cart in line with it.
-  useEffect(() => {
-    if (!ordering || checkedBasis.current === ordering.basis) return;
-    checkedBasis.current = ordering.basis;
-    const r = reconcileCart(state.lines, menu, ordering);
-    r.dropped.forEach((l) => removeLine(l.lineId));
-    r.repriced.forEach((l) =>
-      replaceLine(l.lineId, l.menuItemId, l.name, l.unitPriceSar, l.quantity, l.modifiers, l.notes, l.customerImageName, l.customerImageSize)
-    );
-    setRemoved(r.dropped.length);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordering?.basis]);
 
   const bill = computeTableBill(state.lines, 0, null);
 
   async function send() {
     if (pending || !ordering) return;
     const { lines, unknown } = toScanLines(state.lines, ordering);
-    if (unknown.length > 0 || lines.length === 0) {
-      setProblem("basisChanged");
+    if (unknown.length > 0) {
+      // Lines this code cannot take (not orderable here, or no longer on the menu): take them out
+      // and say so, rather than refusing the whole cart without saying which.
+      unknown.forEach((lineId) => removeLine(lineId));
+      setRemoved(unknown.length);
       return;
     }
-    idem.current = idempotencyKeyFor(cartSignature(state.lines), idem.current, () => crypto.randomUUID());
+    if (lines.length === 0) return;
+    const session = safeSessionStorage();
+    const idem = idempotencyKeyFor(cartSignature(state.lines), readPendingSend(session, key), newRequestId);
+    writePendingSend(session, key, idem);
     setPending(true);
     setProblem(null);
+    setRemoved(0);
     try {
       const res = await fetch(`/api/place-orders?code=${encodeURIComponent(key)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Idempotency-Key": idem.current.key },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": idem.key },
         body: JSON.stringify({ basis: ordering.basis, lines }),
       });
       const text = await res.text();
       if (res.ok) {
         const confirmation = JSON.parse(text) as ScanOrderConfirmation;
         appendSentOrder(safeLocalStorage(), key, confirmation);
+        clearPendingSend(session, key);
         clearCart();
-        idem.current = null;
         router.push(`${routes.order}?ref=${encodeURIComponent(confirmation.reference)}`);
         return;
       }
@@ -81,7 +90,8 @@ export function PlaceSendView() {
         // Not JSON: the status alone decides.
       }
       const next = res.status === 502 ? "network" : placeProblemOf(res.status, code);
-      if (next === "basisChanged") router.refresh(); // the layout re-scans; the effect above re-checks the cart
+      // The layout re-reads the scan; PlaceCartGuard moves the cart onto the new menu.
+      if (next === "basisChanged") router.refresh();
       setProblem(next);
     } catch {
       setProblem("network");

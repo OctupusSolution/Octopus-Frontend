@@ -8,7 +8,7 @@ import {
   optionIdOf,
   orderableMenu,
   placeProblemOf,
-  reconcileCart,
+  remapCart,
   toScanLines,
   type PlaceOrdering,
 } from "./place-order";
@@ -102,23 +102,78 @@ describe("toScanLines", () => {
   });
 });
 
-describe("reconcileCart", () => {
-  it("drops lines whose item or option vanished and flags a changed price", () => {
-    const next: Menu = { categories: [], items: [item("cat-1-i1", 12)] };
-    const nextOrdering: PlaceOrdering = { basis: "b2", items: { i1: "e-1" }, optionGroups: { m1: ["o-a"] } };
-    const r = reconcileCart(
+describe("remapCart — a republish renumbers the menu's refs", () => {
+  // Old menu: i1 = Tea (e-1), i2 = Coffee (e-2); options of m1 = [o-a, o-b, o-c].
+  // New menu: a dish was added first, so Tea is i2, Coffee is i3, and m1's options are reordered.
+  // The new menu describes m1's options in their new order: [L, S, M].
+  const reordered = (id: string, priceSar: number): MenuItem => ({
+    ...item(id, priceSar),
+    modifierGroups: [
+      {
+        id: "m1",
+        label: "Size",
+        required: false,
+        multiple: false,
+        options: [
+          { id: "m1-0", label: "L", priceDeltaSar: 4 },
+          { id: "m1-1", label: "S", priceDeltaSar: 0 },
+          { id: "m1-2", label: "M", priceDeltaSar: 2 },
+        ],
+      },
+    ],
+  });
+  const newMenu: Menu = { categories: [], items: [reordered("cat-1-i1", 30), reordered("cat-1-i2", 10), reordered("cat-1-i3", 12)] };
+  const newOrdering: PlaceOrdering = {
+    basis: "b2",
+    items: { i1: "e-new", i2: "e-1", i3: "e-2" },
+    optionGroups: { m1: ["o-c", "o-a", "o-b"] },
+  };
+
+  it("follows each line to its dish and options by their stable ids, not by position", () => {
+    const r = remapCart(
       [
-        line({ lineId: "a" }),
-        line({ lineId: "b", menuItemId: "cat-1-i2" }),
-        line({ lineId: "c", modifiers: [{ groupId: "m1", optionId: "m1-2", label: "L", priceDeltaSar: 4 }] }),
+        line({ lineId: "tea", menuItemId: "cat-1-i1", modifiers: [{ groupId: "m1", optionId: "m1-1", label: "M", priceDeltaSar: 2 }] }),
+        line({ lineId: "coffee", menuItemId: "cat-2-i2", unitPriceSar: 10 }),
       ],
-      next,
-      nextOrdering
+      ordering,
+      newMenu,
+      newOrdering
     );
-    expect(r.keep.map((l) => l.lineId)).toEqual(["a"]);
-    expect(r.dropped.map((l) => l.lineId)).toEqual(["b", "c"]);
-    expect(r.repriced.map((l) => l.lineId)).toEqual(["a"]);
-    expect(r.keep[0].unitPriceSar).toBe(12);
+    expect(r.dropped).toEqual([]);
+    const tea = r.keep.find((l) => l.lineId === "tea")!;
+    expect(tea.menuItemId).toBe("cat-1-i2");
+    expect(tea.modifiers[0].optionId).toBe("m1-2"); // o-b now sits third
+    const coffee = r.keep.find((l) => l.lineId === "coffee")!;
+    expect(coffee.menuItemId).toBe("cat-1-i3");
+    expect(coffee.unitPriceSar).toBe(12);
+    expect(r.repriced.map((l) => l.lineId)).toEqual(["coffee"]);
+    // What is sent is the same dish and option as before the republish.
+    expect(toScanLines(r.keep, newOrdering).lines).toEqual([
+      { entryId: "e-1", quantity: 1, optionIds: ["o-b"] },
+      { entryId: "e-2", quantity: 1 },
+    ]);
+  });
+
+  it("drops a line whose dish or option no longer exists", () => {
+    const gone: PlaceOrdering = { basis: "b3", items: { i1: "e-1" }, optionGroups: { m1: ["o-a"] } };
+    const menu3: Menu = { categories: [], items: [item("cat-1-i1")] };
+    const r = remapCart(
+      [
+        line({ lineId: "coffee", menuItemId: "cat-1-i2" }),
+        line({ lineId: "large-tea", menuItemId: "cat-1-i1", modifiers: [{ groupId: "m1", optionId: "m1-2", label: "L", priceDeltaSar: 4 }] }),
+        line({ lineId: "tea", menuItemId: "cat-1-i1" }),
+      ],
+      ordering,
+      menu3,
+      gone
+    );
+    expect(r.dropped.map((l) => l.lineId)).toEqual(["coffee", "large-tea"]);
+    expect(r.keep.map((l) => l.lineId)).toEqual(["tea"]);
+  });
+
+  it("drops everything when ordering is off now, and keeps everything when nothing changed", () => {
+    expect(remapCart([line({})], ordering, menu, null).dropped).toHaveLength(1);
+    expect(remapCart([line({})], ordering, menu, ordering).keep).toHaveLength(1);
   });
 });
 

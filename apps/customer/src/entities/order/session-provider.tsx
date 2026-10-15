@@ -152,6 +152,8 @@ function reducer(state: OrderingSessionState, action: Action): OrderingSessionSt
 
 interface OrderingSessionContextValue {
   state: OrderingSessionState;
+  /** True once the stored session has been read: before that `state` is the empty initial one. */
+  hydrated: boolean;
   setChannel: (tenantId: string, channel: FulfillmentChannel) => void;
   setDeliveryAddress: (address: string) => void;
   setBranch: (branchId: string) => void;
@@ -243,6 +245,7 @@ export function OrderingSessionProvider({ children, persist = true, storageKey =
 
   const value: OrderingSessionContextValue = {
     state,
+    hydrated,
     setChannel: (tenantId, channel) => dispatch({ type: "SET_CHANNEL", tenantId, channel }),
     setDeliveryAddress: (address) => dispatch({ type: "SET_DELIVERY_ADDRESS", address }),
     setBranch: (branchId) => dispatch({ type: "SET_BRANCH", branchId }),

@@ -62,4 +62,14 @@ describe("bare documents", () => {
     expect(isBareDocumentPath("/menu")).toBe(false);
     expect(isBareDocumentPath("/preview/menu")).toBe(true);
   });
+
+  it("covers a scanned place code and its order proxy, which name no tenant on the host", () => {
+    expect(isBareDocumentPath("/p/ABC")).toBe(true);
+    expect(isBareDocumentPath("/p/ABC/menu")).toBe(true);
+    expect(isBareDocumentPath("/p/")).toBe(false);
+    expect(isBareDocumentPath("/pickup")).toBe(false);
+    expect(isBareDocumentPath("/pickup/menu")).toBe(false);
+    expect(isBareDocumentPath("/api/place-orders/ABC")).toBe(true);
+    expect(isBareDocumentPath("/api/public-site")).toBe(false);
+  });
 });

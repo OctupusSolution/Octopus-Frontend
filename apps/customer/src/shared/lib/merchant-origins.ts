@@ -36,8 +36,13 @@ export const isCanvasPath = (pathname: string): boolean => {
   return path === BUILDER_PREVIEW_PATH || path === MENU_PREVIEW_PATH;
 };
 
-/** Pages drawn without the site's chrome and without resolving a tenant from the host: the canvases and the QR menu. */
-export const isBareDocumentPath = (pathname: string): boolean => isCanvasPath(pathname) || /^\/c\/[^/]+/.test(pathname);
+/** Pages drawn without the site's chrome and without resolving a tenant from the host: the canvases,
+ *  the QR menu (`/c/*`), a scanned place code (`/p/*`, the code names the business) and its order proxy. */
+export const isBareDocumentPath = (pathname: string): boolean =>
+  isCanvasPath(pathname) ||
+  /^\/c\/[^/]+/.test(pathname) ||
+  /^\/p\/[^/]+/.test(pathname) ||
+  /^\/api\/place-orders\/[^/]+/.test(pathname);
 
 export function builderCanvasResponseHeaders(origins: readonly string[]): Record<string, string> {
   return {

@@ -724,7 +724,7 @@ if (pc.phase !== "ready") {
 ```
 
 - pass `pc` instead of `qr` to `GenerateFlow` (prop renamed `pc: PlaceCodesState`) and pass `row={open ? pc.rows.get(open.id) : undefined}` instead of `qr=` to `TableQrModal` (both components are rewritten in Tasks 5–6; in this task just change the props and the modal's `qr`→`row` reads to keep it compiling: status from `toQrStatus(row.status)`, id `row.codeId`, generatedAt `row.generatedAtUtc`).
-- `print`/`download` handlers: temporarily `notify(t("floorPlan.qr.error.generic"), "info")` placeholders are **not allowed** — instead wire them in Task 4 and leave the buttons as they are calling `print(list)` / `download(list)` whose bodies Task 4 replaces. In this task make their bodies `void list;` and disable the two buttons (`disabled`) so nothing half-works between commits.
+- `print`/`download` handlers: Task 4 replaces their bodies. In this task make their bodies `void list;` and set `disabled` on the Print all / Download all buttons so nothing half-works between commits.
 
 i18n keys (en / ar):
 
@@ -1264,7 +1264,6 @@ i18n:
 | `floorPlan.qr.history.count` | Codes | الأكواد |
 | `floorPlan.qr.history.format` | Format | الصيغة |
 | `floorPlan.qr.history.empty` | Nothing printed yet. | لم تتم طباعة أي شيء بعد. |
-| `floorPlan.qr.download` | (exists) | (exists) |
 
 - [ ] **Step 3: Type-check, manual** — after Task 4's print and export, both runs appear; Download gives a ZIP with `manifest.json`.
 

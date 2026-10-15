@@ -531,7 +531,12 @@ function TentCard({ doc, table, pc, design }: { doc: FloorPlanDoc; table: FloorT
         <ServerSymbol businessId={pc.businessId} codeId={row.codeId} version={row.version} size={qrPx} />
       ) : (
         // Not generated yet: the code exists once the server answers.
-        <span className="block rounded-[4px] border border-dashed border-[#94a3b8]" style={{ width: qrPx, height: qrPx }} />
+        <span
+          className="grid place-items-center rounded-[4px] border border-dashed border-[#94a3b8] px-1 text-center text-[7px] font-medium leading-tight text-[#64748b]"
+          style={{ width: qrPx, height: qrPx }}
+        >
+          {t("floorPlan.qr.codeAfterGenerate")}
+        </span>
       )}
       <span className="px-1 text-center text-[7px] font-semibold leading-tight text-[#0f172a]">{t("floorPlan.qr.card.cta")}</span>
       {design.showMessage && design.message && <span className="px-1 text-center text-[7px] leading-tight text-[#0f172a]">{design.message}</span>}

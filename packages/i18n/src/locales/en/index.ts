@@ -3019,6 +3019,7 @@ export const en = {
   "floorPlan.qr.downloadAll": "Download All",
   "floorPlan.qr.tableTitle": "Table {number}",
   "floorPlan.qr.noCode": "No QR code yet",
+  "floorPlan.qr.codeAfterGenerate": "The code appears after you generate it",
   "floorPlan.qr.details": "QR Details",
   "floorPlan.qr.field.status": "QR Status:",
   "floorPlan.qr.field.lastPrinted": "Last Printed:",

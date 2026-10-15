@@ -3023,6 +3023,7 @@ export const ar = {
   "floorPlan.qr.downloadAll": "تنزيل الكل",
   "floorPlan.qr.tableTitle": "طاولة {number}",
   "floorPlan.qr.noCode": "لا يوجد رمز QR بعد",
+  "floorPlan.qr.codeAfterGenerate": "يظهر الكود بعد الإنشاء",
   "floorPlan.qr.details": "تفاصيل QR",
   "floorPlan.qr.field.status": "حالة QR:",
   "floorPlan.qr.field.lastPrinted": "آخر طباعة:",

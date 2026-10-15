@@ -3,11 +3,11 @@
 // (modals/reservation-form-modal.tsx). The two only differ in how they frame
 // these fields — a two-step page versus a tabbed dialog — so the fields live
 // here once rather than drifting apart in two copies.
-import { type ReactNode } from "react";
+import { type ReactNode, type SelectHTMLAttributes } from "react";
 import clsx from "clsx";
-import { Calendar, Check, Info, Plus, X } from "lucide-react";
-import { Button, Checkbox, Input, Select, Textarea } from "@ui/primitives";
+import { Button, Checkbox, Select } from "@ui/primitives";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import {
   branches,
   TODAY,
@@ -32,6 +32,21 @@ import {
   timeSlotOptions,
 } from "./model";
 import { openDatePicker } from "./filter-bar";
+import {
+  BORDER_300,
+  SURFACE_100,
+  SURFACE_BRAND_LIGHT,
+  SURFACE_INFO,
+  SURFACE_WHITE,
+  TEXT_BRAND,
+  TEXT_BRAND_DEEP,
+  TEXT_ERROR,
+  TEXT_PRIMARY,
+  TEXT_SEC_GRAY,
+  TEXT_SECONDARY,
+} from "./theme";
+
+const FLAG_URL = new URL("../../../../../assets/Dashboard/icons/form-flag-sa.png", import.meta.url).href;
 
 export type FormMode = "add" | "edit";
 
@@ -220,15 +235,35 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={clsx("flex flex-col gap-1.5", className)}>
-      <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+    <div className={clsx("flex flex-col gap-3", className)}>
+      <span className={`px-2 text-[16px] font-medium leading-4 ${TEXT_PRIMARY}`}>
         {label}
-        {required && <span className="text-[#EF4444]"> *</span>}
-        {sub && <span className="ms-1.5 font-normal text-[var(--octo-text-muted)]">{sub}</span>}
-        {optional && <span className="ms-1.5 font-normal text-[var(--octo-text-faint)]">{optional}</span>}
+        {required && <span className={TEXT_ERROR}> *</span>}
+        {sub && <span className={`ms-1 text-[14px] font-normal leading-[14px] ${TEXT_SEC_GRAY}`}>{sub}</span>}
+        {optional && <span className={`ms-1 text-[12px] font-normal leading-3 ${TEXT_SECONDARY}`}>{optional}</span>}
       </span>
       {children}
     </div>
+  );
+}
+
+// The frame's field box: 40px tall, 12px radius, 1px #cbd5e1, 8px padding,
+// 14px text. Shared by every native input/select so they can't drift apart.
+const CONTROL_BASE = `w-full rounded-[12px] border ${BORDER_300} ${SURFACE_WHITE} text-[14px] leading-[14px] ${TEXT_PRIMARY} outline-none transition-colors placeholder:text-[#687280] focus:border-[#0d6efd] focus:ring-2 focus:ring-[#0D6EFD]/30 disabled:cursor-not-allowed disabled:opacity-50`;
+const CONTROL = `${CONTROL_BASE} h-10 p-2`;
+/** The same box around a control that brings its own inner layout. */
+const CONTROL_SHELL = `flex h-10 items-center rounded-[12px] border ${BORDER_300} ${SURFACE_WHITE} transition-colors focus-within:border-[#0d6efd] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30`;
+const SECTION_LABEL = `px-2 text-[16px] font-medium leading-4 ${TEXT_PRIMARY}`;
+
+/** A real <select> drawn as the frame's field, with the frame's arrow laid over it. */
+function FieldSelect({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <span className="relative block">
+      <select className={clsx(CONTROL, "cursor-pointer appearance-none pe-10", className)} {...props}>
+        {children}
+      </select>
+      <ShellIcon name="form-arrow-down.svg" className="pointer-events-none absolute end-2 top-2 text-[#687280]" />
+    </span>
   );
 }
 
@@ -246,14 +281,14 @@ function DepositSwitch({ checked, onChange, label }: { checked: boolean; onChang
       aria-label={label}
       onClick={onChange}
       className={clsx(
-        "relative inline-flex h-[20px] w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
-        checked ? "bg-[#0D6EFD]" : "bg-[var(--octo-switch-off)]"
+        "relative inline-flex h-[18px] w-8 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0D6EFD]/40",
+        checked ? "bg-[#0d6efd]" : "bg-[var(--octo-switch-off)]"
       )}
     >
       <span
         className={clsx(
-          "inline-block h-4 w-4 transform rounded-full bg-[var(--octo-card)] shadow transition-transform",
-          checked ? "translate-x-[17px] rtl:-translate-x-[17px]" : "translate-x-[2px] rtl:-translate-x-[2px]"
+          "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-[0px_1px_3px_0px_rgba(0,0,0,0.1),0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-transform",
+          checked ? "translate-x-[15px] rtl:-translate-x-[15px]" : "translate-x-[3px] rtl:-translate-x-[3px]"
         )}
       />
     </button>
@@ -268,20 +303,13 @@ function SourceRadioPill({ active, label, onSelect }: { active: boolean; label: 
       aria-checked={active}
       onClick={onSelect}
       className={clsx(
-        "inline-flex items-center gap-2 rounded-[9px] border px-3 py-[9px] text-[12.5px] font-medium transition-colors",
+        "inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-[12px] border p-2 text-[14px] font-semibold leading-[14px] transition-colors",
         active
-          ? "border-[#0D6EFD] text-[#0D6EFD]"
-          : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+          ? `border-[#0d6efd] ${SURFACE_BRAND_LIGHT} ${TEXT_BRAND}`
+          : `${BORDER_300} ${TEXT_PRIMARY} hover:bg-[var(--octo-hover)]`
       )}
     >
-      <span
-        className={clsx(
-          "inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border",
-          active ? "border-[#0D6EFD]" : "border-[var(--octo-border-input)]"
-        )}
-      >
-        {active && <span className="h-1.5 w-1.5 rounded-full bg-[#0D6EFD]" />}
-      </span>
+      <ShellIcon name={active ? "form-radio-on.svg" : "form-radio-off.svg"} className={active ? undefined : "text-[#64748b]"} />
       {label}
     </button>
   );
@@ -291,38 +319,24 @@ function ChannelPill({ checked, label, onToggle }: { checked: boolean; label: st
   return (
     <label
       className={clsx(
-        "inline-flex cursor-pointer items-center gap-2 rounded-[9px] border px-3 py-[9px] text-[12.5px] font-medium transition-colors",
+        "inline-flex h-10 cursor-pointer items-center whitespace-nowrap rounded-[12px] border px-3 py-2 text-[14px] font-semibold leading-[14px] transition-colors focus-within:ring-2 focus-within:ring-[#0D6EFD]/30",
         checked
-          ? "border-[#0D6EFD] bg-[#0D6EFD] text-white"
-          : "border-[var(--octo-border-input)] text-[var(--octo-text-primary)] hover:bg-[var(--octo-hover)]"
+          ? `gap-1 border-[#0d6efd] ${SURFACE_BRAND_LIGHT} ${TEXT_BRAND}`
+          : `gap-2 ${BORDER_300} ${TEXT_SECONDARY} hover:bg-[var(--octo-hover)]`
       )}
     >
       <input type="checkbox" checked={checked} onChange={onToggle} className="sr-only" />
-      <span
-        className={clsx(
-          "inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px] border",
-          checked ? "border-white/70 bg-white/15" : "border-[var(--octo-border-input)]"
-        )}
-      >
-        {/* Unchecked pills still show a faint check glyph in the frame. */}
-        <Check size={10} strokeWidth={3} className={checked ? "text-white" : "text-[var(--octo-text-faint)]"} />
-      </span>
+      {/* Unchecked pills still show a faint check glyph in the frame. */}
+      <ShellIcon name={checked ? "form-checkbox-on.svg" : "form-checkbox-off.svg"} className={checked ? undefined : "text-[#cbd5e1]"} />
       {label}
     </label>
   );
 }
 
 // Flag emoji don't render on Windows — Chrome shows the regional-indicator
-// letters "SA" instead — so draw the round green flag the frame shows.
+// letters "SA" instead — so use the round flag image the frame shows.
 function SaudiFlag() {
-  return (
-    <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0" aria-hidden="true">
-      <circle cx="10" cy="10" r="10" fill="#006C35" />
-      <path d="M5.5 8h9" stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M6.8 10.2h6.4" stroke="#fff" strokeWidth="1" strokeLinecap="round" />
-      <path d="M5.2 13.2h9.6" stroke="#fff" strokeWidth="1.1" strokeLinecap="round" />
-    </svg>
-  );
+  return <img src={FLAG_URL} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-cover" />;
 }
 
 /** "A payment link will be sent to the guest after saving this reservation." */
@@ -331,12 +345,12 @@ export function LinkNotice({ className }: { className?: string }) {
   return (
     <div
       className={clsx(
-        "flex items-center gap-2 rounded-[9px] bg-[#0D6EFD]/[0.06] px-3 py-2.5 text-[12px] text-[var(--octo-tone-info-text)]",
+        `flex min-h-10 items-center gap-1 rounded-[8px] ${SURFACE_INFO} px-3 py-2 text-[14px] font-medium leading-[1.3] ${TEXT_BRAND_DEEP}`,
         className
       )}
     >
-      <Info size={14} className="shrink-0" />
-      {t("reservations.form.linkNotice")}
+      <ShellIcon name="ord-refund-info-circle.svg" />
+      <span className="min-w-0 flex-1">{t("reservations.form.linkNotice")}</span>
     </div>
   );
 }
@@ -345,11 +359,12 @@ export function NoteField({ draft, update }: { draft: DraftState; update: Update
   const { t } = useI18n();
   return (
     <Field label={t("reservations.form.note")} sub={t("reservations.form.noteSub")}>
-      <Textarea
+      <textarea
         rows={4}
         value={draft.notes}
         onChange={(e) => update("notes", e.target.value)}
         placeholder={t("reservations.form.notePlaceholder")}
+        className={`${CONTROL_BASE} block min-h-[102px] px-2 py-3`}
       />
     </Field>
   );
@@ -390,106 +405,108 @@ export function ReservationDetailsFields({
         : t("marketing.channel.sms");
 
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={t("reservations.form.date")} required>
-          {/* Formatted date with a calendar icon, as the frame shows, with the
-              real input laid invisibly on top so the picker still opens. */}
-          <label className="relative flex cursor-pointer items-center justify-between rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
-            <span dir="ltr">{draft.date ? formatDisplayDate(draft.date, locale) : "—"}</span>
-            <Calendar size={15} className="shrink-0 text-[var(--octo-text-muted)]" />
-            <input
-              type="date"
-              aria-label={t("reservations.form.date")}
-              value={draft.date}
-              onChange={(e) => update("date", e.target.value)}
-              onClick={(e) => openDatePicker(e.currentTarget)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </label>
-        </Field>
-        <Field label={t("reservations.form.time")} required>
-          <Select value={String(draft.time)} onChange={(e) => update("time", Number(e.target.value))}>
-            {timeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+    <div className="flex flex-col gap-6">
+      <div className={`flex flex-col gap-4 border-b ${BORDER_300} pb-3`}>
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          <Field label={t("reservations.form.date")} required>
+            {/* Formatted date with a calendar icon, as the frame shows, with the
+                real input laid invisibly on top so the picker still opens. */}
+            <label className={`relative cursor-pointer justify-between p-2 text-[14px] leading-[14px] ${TEXT_PRIMARY} ${CONTROL_SHELL}`}>
+              <span dir="ltr">{draft.date ? formatDisplayDate(draft.date, locale) : "—"}</span>
+              <ShellIcon name="form-calendar.svg" />
+              <input
+                type="date"
+                aria-label={t("reservations.form.date")}
+                value={draft.date}
+                onChange={(e) => update("date", e.target.value)}
+                onClick={(e) => openDatePicker(e.currentTarget)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+          </Field>
+          <Field label={t("reservations.form.time")} required>
+            <FieldSelect value={String(draft.time)} onChange={(e) => update("time", Number(e.target.value))}>
+              {timeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
 
-        <Field label={t("reservations.form.partySize")} required>
-          <Select value={String(draft.partySize)} onChange={(e) => update("partySize", Number(e.target.value))}>
-            {PARTY_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {guestsText(t, n)}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label={t("reservations.form.duration")}>
-          <Select value={String(draft.durationMinutes)} onChange={(e) => update("durationMinutes", Number(e.target.value))}>
-            {durationOptions.map((minutes) => (
-              <option key={minutes} value={minutes}>
-                {minutes % 60 === 0
-                  ? t("reservations.form.durationHours").replace("{n}", String(minutes / 60))
-                  : t("reservations.cancel.hoursMinutes")
-                      .replace("{h}", String(hoursMinutesParts(minutes).h))
-                      .replace("{m}", String(hoursMinutesParts(minutes).m))}
-              </option>
-            ))}
-          </Select>
-        </Field>
+          <Field label={t("reservations.form.partySize")} required>
+            <FieldSelect value={String(draft.partySize)} onChange={(e) => update("partySize", Number(e.target.value))}>
+              {PARTY_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {guestsText(t, n)}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
+          <Field label={t("reservations.form.duration")}>
+            <FieldSelect value={String(draft.durationMinutes)} onChange={(e) => update("durationMinutes", Number(e.target.value))}>
+              {durationOptions.map((minutes) => (
+                <option key={minutes} value={minutes}>
+                  {minutes % 60 === 0
+                    ? t("reservations.form.durationHours").replace("{n}", String(minutes / 60))
+                    : t("reservations.cancel.hoursMinutes")
+                        .replace("{h}", String(hoursMinutesParts(minutes).h))
+                        .replace("{m}", String(hoursMinutesParts(minutes).m))}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
 
-        <Field label={t("reservations.form.areaPreference")}>
-          <Select value={draft.area} onChange={(e) => update("area", e.target.value)}>
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label={t("reservations.form.tablePreference")}>
-          <Select value={draft.table} onChange={(e) => update("table", e.target.value)}>
-            <option value="">{t("reservations.form.tableAny")}</option>
-            {tableOptions.map((table) => (
-              <option key={table} value={table}>
-                {tableLabel(table)}
-              </option>
-            ))}
-          </Select>
-        </Field>
+          <Field label={t("reservations.form.areaPreference")}>
+            <FieldSelect value={draft.area} onChange={(e) => update("area", e.target.value)}>
+              {areas.map((area) => (
+                <option key={area} value={area}>
+                  {area}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
+          <Field label={t("reservations.form.tablePreference")}>
+            <FieldSelect value={draft.table} onChange={(e) => update("table", e.target.value)}>
+              <option value="">{t("reservations.form.tableAny")}</option>
+              {tableOptions.map((table) => (
+                <option key={table} value={table}>
+                  {tableLabel(table)}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
+        </div>
+
+        {mode === "add" ? (
+          <div className="flex flex-col gap-3">
+            <p className={SECTION_LABEL}>{t("reservations.form.source")}</p>
+            <div role="radiogroup" className="flex flex-wrap gap-2">
+              {SOURCE_OPTIONS.map((source) => (
+                <SourceRadioPill
+                  key={source}
+                  active={draft.source === source}
+                  label={t(SOURCE_LABEL_KEY[source])}
+                  onSelect={() => update("source", source)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <Field label={t("reservations.form.source")}>
+              <input className={CONTROL} value={reservation ? t(SOURCE_LABEL_KEY[reservation.source]) : ""} disabled />
+            </Field>
+            <Field label={t("reservations.form.reference")}>
+              <input className={CONTROL} value={`#${reservation?.ref ?? ""}`} readOnly />
+            </Field>
+          </div>
+        )}
       </div>
 
-      {mode === "add" ? (
-        <div>
-          <p className="mb-2 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.source")}</p>
-          <div role="radiogroup" className="flex flex-wrap gap-2">
-            {SOURCE_OPTIONS.map((source) => (
-              <SourceRadioPill
-                key={source}
-                active={draft.source === source}
-                label={t(SOURCE_LABEL_KEY[source])}
-                onSelect={() => update("source", source)}
-              />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label={t("reservations.form.source")}>
-            <Input value={reservation ? t(SOURCE_LABEL_KEY[reservation.source]) : ""} disabled />
-          </Field>
-          <Field label={t("reservations.form.reference")}>
-            <Input value={`#${reservation?.ref ?? ""}`} readOnly />
-          </Field>
-        </div>
-      )}
-
-      <div className="border-t border-[var(--octo-divider)] pt-4">
-        <div className="flex items-center justify-between">
-          <p className="text-[13px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.deposit")}</p>
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between px-2">
+          <p className={`text-[18px] font-bold leading-[18px] ${TEXT_PRIMARY}`}>{t("reservations.form.deposit")}</p>
           <DepositSwitch
             checked={draft.depositEnabled}
             onChange={() => update("depositEnabled", !draft.depositEnabled)}
@@ -498,11 +515,11 @@ export function ReservationDetailsFields({
         </div>
 
         {draft.depositEnabled && (
-          <div className="mt-4 space-y-4">
-            <div className={clsx("grid grid-cols-1 gap-4 sm:grid-cols-2", mode === "edit" && "sm:grid-cols-3")}>
+          <div className="flex flex-col gap-4">
+            <div className={clsx("grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2", mode === "edit" && "sm:grid-cols-3")}>
               <Field label={t("reservations.form.depositAmount")}>
-                <div className="flex items-stretch rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
-                  <span className="flex items-center border-e border-[var(--octo-divider)] px-3 text-[12.5px] font-semibold text-[var(--octo-text-secondary)]">
+                <div className={`gap-2 p-2 ${CONTROL_SHELL}`}>
+                  <span className={`flex shrink-0 items-center justify-center rounded-[4px] ${SURFACE_100} p-1 text-[14px] leading-[14px] ${TEXT_PRIMARY}`}>
                     SAR
                   </span>
                   <input
@@ -510,18 +527,18 @@ export function ReservationDetailsFields({
                     min={0}
                     value={draft.depositAmount}
                     onChange={(e) => update("depositAmount", e.target.value)}
-                    className="w-full flex-1 rounded-e-[9px] bg-transparent px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] outline-none"
+                    className={`w-full min-w-0 flex-1 bg-transparent text-[14px] leading-[14px] ${TEXT_PRIMARY} outline-none`}
                   />
                 </div>
               </Field>
               <Field label={t("reservations.form.depositType")}>
-                <Select value={draft.depositType} onChange={(e) => update("depositType", e.target.value as DepositType)}>
+                <FieldSelect value={draft.depositType} onChange={(e) => update("depositType", e.target.value as DepositType)}>
                   {DEPOSIT_TYPE_OPTIONS.map((type) => (
                     <option key={type} value={type}>
                       {t(DEPOSIT_TYPE_LABEL_KEY[type])}
                     </option>
                   ))}
-                </Select>
+                </FieldSelect>
               </Field>
               {mode === "edit" && (
                 <Field label={t("reservations.form.depositStatus")}>
@@ -546,9 +563,9 @@ export function ReservationDetailsFields({
             </div>
 
             {mode === "edit" && reservation?.deposit?.paidOn && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[9px] bg-[#0D6EFD]/[0.06] px-3 py-2.5 text-[12px] text-[#0D6EFD]">
-                <span className="inline-flex items-center gap-2">
-                  <Info size={14} className="shrink-0" />
+              <div className={`flex flex-wrap items-center justify-between gap-3 rounded-[8px] ${SURFACE_INFO} px-3 py-2 text-[14px] font-medium leading-[1.3] ${TEXT_BRAND_DEEP}`}>
+                <span className="inline-flex items-center gap-1">
+                  <ShellIcon name="ord-refund-info-circle.svg" />
                   {t("reservations.form.paidOn").replace("{when}", reservation.deposit.paidOn)}
                 </span>
                 <Button
@@ -567,34 +584,34 @@ export function ReservationDetailsFields({
       </div>
 
       {mode === "add" && (
-        <div>
-          <div className="mb-2 flex items-baseline gap-1.5">
-            <span className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.tag")}</span>
-            <span className="text-[12px] text-[var(--octo-text-faint)]">{t("reservations.form.optional")}</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-3">
+          <p className={SECTION_LABEL}>
+            {t("reservations.form.tag")}{" "}
+            <span className={`text-[14px] font-normal leading-[14px] ${TEXT_SECONDARY}`}>{t("reservations.form.optional")}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={() => remainingTagPresets.length > 0 && update("tags", [...draft.tags, remainingTagPresets[0]])}
               disabled={remainingTagPresets.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-[9px] border border-[#0D6EFD] px-3 py-[7px] text-[12px] font-medium text-[#0D6EFD] transition-colors hover:bg-[#0D6EFD]/5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+              className={`inline-flex h-10 items-center gap-1 whitespace-nowrap rounded-[12px] border border-[#0d6efd] ${SURFACE_BRAND_LIGHT} px-3 py-2 text-[14px] font-semibold leading-[14px] ${TEXT_BRAND} transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              <Plus size={13} />
+              <ShellIcon name="crm-plus.svg" />
               {t("reservations.form.addTag")}
             </button>
             {draft.tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--octo-border-input)] px-3 py-[7px] text-[12px] font-medium text-[var(--octo-text-primary)]"
+                className={`inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-[12px] border ${BORDER_300} px-3 py-2 text-[14px] font-semibold leading-[14px] ${TEXT_PRIMARY}`}
               >
                 {tag}
                 <button
                   type="button"
                   onClick={() => update("tags", draft.tags.filter((existing) => existing !== tag))}
                   aria-label={tag}
-                  className="text-[var(--octo-text-muted)] transition-colors hover:text-[var(--octo-text-primary)]"
+                  className="inline-flex transition-opacity hover:opacity-70"
                 >
-                  <X size={12} />
+                  <ShellIcon name="rsv-add-tag-remove.svg" size={16} />
                 </button>
               </span>
             ))}
@@ -606,9 +623,9 @@ export function ReservationDetailsFields({
         <>
           <NoteField draft={draft} update={update} />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[12.5px] font-semibold text-[var(--octo-text-primary)]">
+            <p className={SECTION_LABEL}>
               {t("reservations.form.notifyGuest")}{" "}
-              <span className="font-normal text-[var(--octo-text-faint)]">{t("reservations.form.optional")}</span>
+              <span className={`text-[14px] font-normal leading-[14px] ${TEXT_SECONDARY}`}>{t("reservations.form.optional")}</span>
             </p>
             <Checkbox
               checked={draft.notifyGuest}
@@ -619,12 +636,10 @@ export function ReservationDetailsFields({
         </>
       )}
 
-      <div>
+      <div className="flex flex-col gap-3">
         {/* The Edit frame has only "Notify Guest" over these pills, no heading. */}
-        {mode === "add" && (
-          <p className="mb-2 text-[12.5px] font-semibold text-[var(--octo-text-primary)]">{t("reservations.form.sendLinkWith")}</p>
-        )}
-        <div className="flex flex-wrap gap-2">
+        {mode === "add" && <p className={SECTION_LABEL}>{t("reservations.form.sendLinkWith")}</p>}
+        <div className="flex flex-wrap gap-3">
           {CHANNELS.map((channel) => (
             <ChannelPill
               key={channel}
@@ -635,7 +650,7 @@ export function ReservationDetailsFields({
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -651,51 +666,56 @@ export function GuestDetailsFields({
 }) {
   const { t } = useI18n();
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={t("reservations.form.firstName")} required>
-          <Input
-            value={draft.firstName}
-            onChange={(e) => update("firstName", e.target.value)}
-            placeholder={t("reservations.form.firstNamePlaceholder")}
-          />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          <Field label={t("reservations.form.firstName")} required>
+            <input
+              className={CONTROL}
+              value={draft.firstName}
+              onChange={(e) => update("firstName", e.target.value)}
+              placeholder={t("reservations.form.firstNamePlaceholder")}
+            />
+          </Field>
+          <Field label={t("reservations.form.lastName")} required>
+            <input
+              className={CONTROL}
+              value={draft.lastName}
+              onChange={(e) => update("lastName", e.target.value)}
+              placeholder={t("reservations.form.lastNamePlaceholder")}
+            />
+          </Field>
+        </div>
+
+        <Field label={t("reservations.form.phone")} required>
+          <div className={`gap-1 px-3 ${CONTROL_SHELL}`}>
+            <span dir="ltr" className={`flex shrink-0 items-center gap-2 text-[14px] leading-none ${TEXT_PRIMARY}`}>
+              <SaudiFlag />
+              +966
+            </span>
+            <input
+              dir="ltr"
+              inputMode="tel"
+              value={draft.phoneDigits}
+              onChange={(e) => update("phoneDigits", e.target.value.replace(/\D/g, ""))}
+              placeholder="000 000 000"
+              className={`h-[30px] w-full min-w-0 flex-1 border-s ${BORDER_300} bg-transparent px-2 text-[14px] leading-none ${TEXT_PRIMARY} outline-none placeholder:text-[#58606c] rtl:text-end`}
+            />
+          </div>
         </Field>
-        <Field label={t("reservations.form.lastName")} required>
-          <Input
-            value={draft.lastName}
-            onChange={(e) => update("lastName", e.target.value)}
-            placeholder={t("reservations.form.lastNamePlaceholder")}
+
+        <Field label={t("reservations.form.email")} optional={t("reservations.form.optional")}>
+          <input
+            type="email"
+            className={CONTROL}
+            value={draft.email}
+            onChange={(e) => update("email", e.target.value)}
+            placeholder={t("reservations.form.emailPlaceholder")}
           />
         </Field>
       </div>
 
-      <Field label={t("reservations.form.phone")} required>
-        <div className="flex items-stretch rounded-[9px] border border-[var(--octo-border-input)] bg-[var(--octo-card)] transition-colors focus-within:border-[#0D6EFD] focus-within:ring-2 focus-within:ring-[#0D6EFD]/30">
-          <span dir="ltr" className="flex items-center gap-1.5 border-e border-[var(--octo-border-input)] px-3 text-[12.5px] text-[var(--octo-text-primary)]">
-            <SaudiFlag />
-            +966
-          </span>
-          <input
-            dir="ltr"
-            inputMode="tel"
-            value={draft.phoneDigits}
-            onChange={(e) => update("phoneDigits", e.target.value.replace(/\D/g, ""))}
-            placeholder="000 000 000"
-            className="w-full flex-1 rounded-e-[9px] bg-transparent px-3 py-2 text-[12.5px] text-[var(--octo-text-primary)] outline-none placeholder:text-[var(--octo-text-faint)] rtl:text-end"
-          />
-        </div>
-      </Field>
-
-      <Field label={t("reservations.form.email")} optional={t("reservations.form.optional")}>
-        <Input
-          type="email"
-          value={draft.email}
-          onChange={(e) => update("email", e.target.value)}
-          placeholder={t("reservations.form.emailPlaceholder")}
-        />
-      </Field>
-
       {withNote && <NoteField draft={draft} update={update} />}
-    </>
+    </div>
   );
 }

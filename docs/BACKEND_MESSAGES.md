@@ -299,3 +299,25 @@ UpdatePageLayoutRequest.Header بيقبل أي نص والتوثيق بيقول 
 فالـ Frontend مش عارض أي اختيار ليه وبيحافظ على القيمة المحفوظة بس
 
 المطلوب قايمة variants للـ header في كل theme جوه الـ catalogue (مفتاح + labelKey) و validation على القيمة أو نشيل الحقل لو مش مستخدم
+
+---
+
+## 26. الطاولة المحجوزة بتظهر متاحة في الـ Live Board
+
+فيه مشكلة في الربط بين الحجوزات والـ Floor Plan
+
+لما بعمل حجز مؤكد على طاولة (مثلًا T19 الساعة 8:30 PM النهارده) الطاولة بتفضل راجعة Available من
+GET .../floor-plans/{planId}/live
+لحد ما الضيف يقعد فعلًا
+
+السبب إن الـ Floor Plan بيسمع من الحجوزات 4 events بس (ApplyExternalHoldStatus.cs)
+ReservationServiceStarted بيخلّي الطاولة Occupied
+ReservationCompleted و ReservationCancelled و ReservationNoShow بيفضّوها
+ومفيش حاجة بتسمع ReservationCreated أو ReservationConfirmed أو ReservationResourceAssigned فالحالة Reserved عمرها ما بتتحط من حجز
+
+الـ Frontend دلوقتي بيحلها من عنده في شاشة الـ Live Floor Plan بس: بيجيب حجوزات النهارده وبيلوّن الطاولة محجوزة لو عليها حجز Pending أو Confirmed لسه ما خلصش
+ده مش بيظهر في counts بتاعة الـ board ولا في أي شاشة تانية بتقرا الـ board
+
+المطلوب إن الـ board يرجّع Reserved للطاولة اللي عليها حجز جاي (source = System ومعاه partySize و reference للحجز و expiresAtUtc أو وقت الوصول)
+ولازم يتغيّر مع ReservationRescheduled و ReservationResourceAssigned ويتشال مع Expired و Cancelled و NoShow
+ومحتاجين نتفق الطاولة تبقى Reserved من إمتى: طول اليوم ولا قبل الميعاد بمدة معينة من الإعدادات

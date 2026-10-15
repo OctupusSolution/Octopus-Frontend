@@ -10,7 +10,10 @@ import { PlanViewport, type ItemKind, type ZoomSetting } from "@/widgets/floor-p
 import { useI18n } from "@/app/providers/i18n-provider";
 import { PageShell } from "../_shared/page-header";
 import { ToastBanner, useToast } from "../_shared/toast";
-import { useLiveTables } from "../_shared/use-floor-plan";
+import { useLiveTables, type LiveEntry } from "../_shared/use-floor-plan";
+import { dayLabel } from "../../_shared/model";
+import { reservationTableId } from "../../_shared/reservations-api";
+import { useReservations } from "../../_shared/reservations-store";
 import { SendMessageModal, UpdateTableForm, ViewOrderModal } from "./live-modals";
 import { TableDetailCard } from "./table-detail-card";
 
@@ -41,11 +44,43 @@ export function LiveFloorPlan({ published }: { published: PublishedFloorPlan }) 
     else void frameRef.current?.requestFullscreen();
   }
 
-  const selected = selectedId ? live.byId.get(selectedId) ?? null : null;
+  // The server's board only turns a table Occupied once its reservation is
+  // seated and frees it when the visit ends — a booking that is still to come
+  // leaves the spot "Available". So today's upcoming reservations are laid
+  // over the board here: a table the server calls available, but that holds a
+  // pending or confirmed booking which hasn't ended yet, draws as reserved.
+  // Anything a person or the server set on the table still wins.
+  const [reservations] = useReservations();
+  const byId = useMemo(() => {
+    const upcoming = new Map<string, { start: number; guests: number; guest: string }>();
+    for (const r of reservations) {
+      if (r.status !== "Pending" && r.status !== "Confirmed") continue;
+      if (dayLabel(r.date) !== "today") continue;
+      const tableId = reservationTableId(r.id);
+      if (!tableId) continue;
+      const start = new Date(`${r.date}T00:00:00`).getTime() + r.startMinutes * 60_000;
+      if (start + r.durationMinutes * 60_000 <= live.now) continue;
+      const known = upcoming.get(tableId);
+      if (!known || start < known.start) upcoming.set(tableId, { start, guests: r.partySize, guest: r.guest });
+    }
+    if (upcoming.size === 0) return live.byId;
+    const next = new Map<string, LiveEntry>(live.byId);
+    for (const [tableId, booking] of upcoming) {
+      const entry = next.get(tableId);
+      if (!entry || entry.state.status !== "available") continue;
+      next.set(tableId, {
+        ...entry,
+        state: { ...entry.state, status: "reserved", guests: booking.guests, guestName: booking.guest, since: booking.start },
+      });
+    }
+    return next;
+  }, [reservations, live.byId, live.now]);
+
+  const selected = selectedId ? byId.get(selectedId) ?? null : null;
   const selectedZone = selected ? zoneForTable(doc, selected.table) : undefined;
   const selectedIds = useMemo(() => new Set(selectedId ? [selectedId] : []), [selectedId]);
   const toneFor = (table: FloorTable): LiveStatus =>
-    live.byId.get(table.id)?.state.status ?? (table.blocked ? "blocked" : "available");
+    byId.get(table.id)?.state.status ?? (table.blocked ? "blocked" : "available");
 
   return (
     <PageShell fill>

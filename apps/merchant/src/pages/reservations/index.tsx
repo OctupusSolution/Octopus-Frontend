@@ -6,11 +6,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
-import { Plus, Printer, Search, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { getReservationContactLink, getReservationDaySummary, type ReservationCancellationPreviewResponse } from "@octopus/api-client";
-import { Button, EmptyState, Input, Select } from "@ui/primitives";
+import { EmptyState } from "@ui/primitives";
 import { useAuth } from "@/app/providers/auth-provider";
 import { useI18n } from "@/app/providers/i18n-provider";
+import { ShellIcon } from "@/shared/ui/shell-icon";
 import { TODAY, type Reservation, type ReservationStatus } from "@/shared/api/mock-reservations";
 import { useReservationActions, useReservations, useReservationsStatus } from "./_shared/reservations-store";
 import { describeReservationError, isExpiredReservation, isSlotTakenError } from "./_shared/reservations-api";
@@ -38,6 +39,11 @@ import { CancelReservationModal } from "./modals/cancel-reservation-modal";
 import { ReservationSettingsModal } from "./modals/reservation-settings-modal";
 import { buildIcs, reminderMessage, whatsappHref } from "./_shared/guest-actions";
 import { downloadFile } from "./_shared/download";
+import { BORDER_200, BORDER_300, SURFACE_WHITE, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_TITLE } from "./_shared/theme";
+
+// The header's two 48px buttons, as the frame draws them.
+const HEADER_BUTTON =
+  "inline-flex h-12 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[8px] px-3 py-2 text-[18px] font-bold leading-[18px] transition-colors";
 
 const SORT_OPTIONS: readonly { value: SortKey; labelKey: string }[] = [
   { value: "time-asc", labelKey: "reservations.list.sort.timeEarliest" },
@@ -306,24 +312,39 @@ export function ReservationsPage() {
         );
 
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[26px] sm:pt-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[19px] font-bold leading-tight text-[var(--octo-text-primary)] sm:text-[21px]">
-            {t("reservations.title")}
-          </h1>
-          <p className="mt-1 text-[12px] text-[var(--octo-text-muted)] sm:text-[12.5px]">
-            {t("reservations.subtitle")}
-          </p>
+    <div className="px-4 pb-6 pt-6 sm:px-6 sm:pt-8">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
+          <h1 className={clsx("text-[24px] font-bold leading-[24px]", TEXT_TITLE)}>{t("reservations.title")}</h1>
+          <p className={clsx("text-[14px] font-medium leading-[14px]", TEXT_SECONDARY)}>{t("reservations.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" icon={<Settings size={14} />} onClick={() => setSettingsOpen(true)} aria-label={t("reservations.settings.title")} />
-          <Button variant="secondary" icon={<Printer size={14} />} onClick={() => window.print()}>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Not in the frame — the module's own settings entry point, drawn
+              as a square sibling of the frame's outlined Print button. */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label={t("reservations.settings.title")}
+            className={clsx(HEADER_BUTTON, "w-12 border hover:bg-[var(--octo-hover)]", BORDER_300, SURFACE_WHITE, TEXT_PRIMARY)}
+          >
+            <Settings size={24} strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className={clsx(HEADER_BUTTON, "border hover:bg-[var(--octo-hover)]", BORDER_300, SURFACE_WHITE, TEXT_PRIMARY)}
+          >
+            <ShellIcon name="rsv-print.svg" size={24} />
             {t("reservations.list.print")}
-          </Button>
-          <Button variant="primary" icon={<Plus size={14} />} onClick={openAddReservation}>
+          </button>
+          <button
+            type="button"
+            onClick={openAddReservation}
+            className={clsx(HEADER_BUTTON, "bg-[#0d6efd] text-white hover:bg-[#0b5ed7]")}
+          >
+            <ShellIcon name="rsv-plus.svg" size={24} />
             {t("reservations.list.addNew")}
-          </Button>
+          </button>
         </div>
       </header>
 
@@ -340,52 +361,75 @@ export function ReservationsPage() {
         </div>
       )}
 
-      <div className="mt-4">
+      <div className="mt-10">
         <KpiCards kpis={kpis} totalLabel={kpiTotalLabel} />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-10">
         <FilterBar filters={filters} onChange={setFilters} areas={areas} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[13.5px] font-semibold text-[var(--octo-text-primary)]">{allCountText}</p>
-        <div className="order-3 w-full sm:order-none sm:max-w-[360px] sm:flex-1 sm:px-6">
-          <Input
-            icon={<Search size={14} />}
-            placeholder={t("common.search")}
-            value={filters.query}
-            onChange={(e) => setFilters({ ...filters, query: e.target.value })}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-[var(--octo-text-muted)]">{t("reservations.list.sortedBy")}</span>
-          <Select
-            value={filters.sort}
-            onChange={(e) => setFilters({ ...filters, sort: e.target.value as SortKey })}
-            className="!w-auto !py-[7px]"
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
+        <p className={clsx("whitespace-nowrap text-[16px] font-medium leading-[16px]", TEXT_PRIMARY)}>{allCountText}</p>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-4">
+          <label
+            className={clsx(
+              "flex h-10 w-full items-center gap-2 rounded-[12px] border px-4 py-2 focus-within:border-[#0d6efd] sm:w-[409px]",
+              BORDER_200,
+              SURFACE_WHITE,
+              TEXT_SECONDARY
+            )}
           >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {t(option.labelKey)}
-              </option>
-            ))}
-          </Select>
+            <ShellIcon name="rsv-search.svg" size={24} />
+            <input
+              type="search"
+              placeholder={t("common.search")}
+              value={filters.query}
+              onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+              className={clsx(
+                "min-w-0 flex-1 bg-transparent text-[14px] font-medium leading-[14px] outline-none placeholder:text-[#687280] [[data-theme=dark]_&]:placeholder:text-[var(--octo-text-secondary)]",
+                TEXT_PRIMARY
+              )}
+            />
+          </label>
+          <div className={clsx("flex items-center gap-3", TEXT_SECONDARY)}>
+            <span className="whitespace-nowrap text-[14px] font-medium leading-[14px]">{t("reservations.list.sortedBy")}</span>
+            <span className="relative inline-flex">
+              <select
+                value={filters.sort}
+                onChange={(e) => setFilters({ ...filters, sort: e.target.value as SortKey })}
+                aria-label={t("reservations.list.sortedBy")}
+                className={clsx(
+                  "h-10 cursor-pointer appearance-none rounded-[8px] border py-2 pe-10 ps-2 text-[12px] leading-[12px] outline-none [field-sizing:content] hover:bg-[var(--octo-hover)] focus-visible:border-[#0d6efd]",
+                  BORDER_200,
+                  SURFACE_WHITE
+                )}
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {t(option.labelKey)}
+                  </option>
+                ))}
+              </select>
+              <ShellIcon name="rsv-arrow-down.svg" size={24} className="pointer-events-none absolute end-2 top-2" />
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-6">
         {visible.length === 0 ? (
           <EmptyState title={t("reservations.list.empty")} />
         ) : (
           // Rows are a fixed-column grid (see reservation-row.tsx) so they
-          // scan as a table. Below ~1420px the grid's floor no longer fits
+          // scan as a table. Below ~1400px the grid's floor no longer fits
           // beside the sidebar, so the list scrolls horizontally instead of
           // squeezing columns out of alignment. Wider than that there is no
           // scroll container at all: overflow-x:auto forces overflow-y to
-          // auto too, which clipped the row menus that open downward.
-          <div className="max-[1419px]:overflow-x-auto">
-            <div className={clsx("flex flex-col gap-2.5", ROW_LIST_MIN_WIDTH)}>
+          // auto too, which clipped the row menus that open downward. The
+          // padding keeps the rows' soft shadow from being cut off by it.
+          <div className="max-[1399px]:-m-2 max-[1399px]:overflow-x-auto max-[1399px]:p-2">
+            <div className={clsx("flex flex-col gap-4", ROW_LIST_MIN_WIDTH)}>
               {visible.map((reservation) => (
                 <ReservationRow
                   key={reservation.id}

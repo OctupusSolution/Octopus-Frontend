@@ -38,6 +38,10 @@ const SOURCE_BY_CODE: Record<string, OrderSource> = {
   kiosk: "KIOSK Order",
 };
 
+function paidKindOf(order: OrderResponse): PaymentStatus {
+  return order.capturedTotal.amount > 0 && order.gratuityTotal.amount === 0 ? "Paid Cash" : "Paid Online";
+}
+
 function paymentStatusOf(order: OrderResponse): PaymentStatus {
   // Calling an order off zeroes its total, which the backend reports as
   // "Paid" (nothing owed) even when no money was ever taken.
@@ -47,10 +51,13 @@ function paymentStatusOf(order: OrderResponse): PaymentStatus {
   switch (order.paymentState) {
     case "Paid":
     case "Overpaid":
-      return order.capturedTotal.amount > 0 && order.gratuityTotal.amount === 0 ? "Paid Cash" : "Paid Online";
+      return paidKindOf(order);
     case "PartiallyPaid":
-    case "PartiallyRefunded":
       return "Partially Paid";
+    case "PartiallyRefunded":
+      // Part of the money went back, yet what is left may still cover the
+      // order (a refund after wastage, say) — then nothing is owed.
+      return order.balanceDue.amount > 0 ? "Partially Paid" : paidKindOf(order);
     default:
       return "Unpaid";
   }
@@ -74,6 +81,7 @@ export function mapRealOrderToRecord(order: OrderResponse): OrderRecord {
     table: order.resource ? order.resource.displayName || order.resource.code : null,
     guests: order.attendeeCount,
     totalSar: order.totals.grandTotal.amount,
+    balanceDueSar: order.balanceDue.amount,
     source: SOURCE_BY_CODE[order.sourceCode] ?? "POS Order",
     payment: paymentStatusOf(order),
     state,

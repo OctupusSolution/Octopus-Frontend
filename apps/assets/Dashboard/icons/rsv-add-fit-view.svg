@@ -1,0 +1,10 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="fluent-mdl2:zoom-to-fit" clip-path="url(#clip0_0_34)">
+<path id="Vector" d="M8.77734 5.34375L7.72266 4.27734L12 0L16.2773 4.27734L15.2227 5.34375L12 2.12109L8.77734 5.34375ZM15.2227 18.6562L16.2773 19.7227L12 24L7.72266 19.7227L8.77734 18.6562L12 21.8789L15.2227 18.6562ZM5.34375 8.77734L2.12109 12L5.34375 15.2227L4.27734 16.2773L0 12L4.27734 7.72266L5.34375 8.77734ZM24 12L19.7227 16.2773L18.6562 15.2227L21.8789 12L18.6562 8.77734L19.7227 7.72266L24 12ZM7.5 7.5H16.5V16.5H7.5V7.5ZM9 15H15V9H9V15Z" fill="#58606C"/>
+</g>
+<defs>
+<clipPath id="clip0_0_34">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg>

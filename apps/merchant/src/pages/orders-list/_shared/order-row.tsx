@@ -71,6 +71,7 @@ const ACTION_BUTTONS: readonly {
 // offers it just for orders that still owe money, which keeps a paid row at
 // the frame's four buttons.
 function owesPayment(order: OrderRecord): boolean {
+  if (order.balanceDueSar != null) return order.balanceDueSar > 0;
   return order.payment === "Unpaid" || order.payment === "Partially Paid";
 }
 

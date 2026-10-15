@@ -21,7 +21,7 @@ import {
   RefundFieldLabel,
   RefundSummaryBar,
 } from "./refund-controls";
-import { clampAmountSar, maxRefundableSar } from "./refund-amount";
+import { amountDueSar, clampAmountSar } from "./refund-amount";
 import { ResultModal } from "./result-modal";
 import type { OrderRecord } from "./types";
 
@@ -48,8 +48,8 @@ export function RecordPaymentFlow({
   const [submitting, setSubmitting] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
 
-  const max = order ? maxRefundableSar(order) : 0;
-  const isFullyPaid = order?.payment === "Paid Online" || order?.payment === "Paid Cash";
+  const max = order ? amountDueSar(order) : 0;
+  const isFullyPaid = order?.payment === "Paid Online" || order?.payment === "Paid Cash" || max <= 0;
 
   useEffect(() => {
     if (order) {
@@ -143,7 +143,7 @@ export function RecordPaymentFlow({
 
         <div className="flex flex-col gap-3">
           <RefundSummaryBar
-            label={t("orders.payment.maxAmount").replace("{amount}", "").trim()}
+            label={t("orders.payment.amountDue")}
             value={formatSar(max)}
             strongLabel
           />

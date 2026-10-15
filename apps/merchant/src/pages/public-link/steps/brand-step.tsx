@@ -131,7 +131,7 @@ function ColorField({
 /** Module scope for the same reason as `ColorField`. The font select; the
  *  example set in the chosen face is drawn separately by `FontExample`, on the
  *  row below both selects as the frame lays them out. Options come from the
- *  API font catalogue (`GET /public-link/fonts`, via publicLinkSync.fonts). */
+ *  API font catalogue (`GET /public-link/catalogues` → `fonts`, via publicLinkSync.fonts). */
 function FontSelect({
   label,
   value,

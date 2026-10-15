@@ -1121,7 +1121,11 @@ export interface PublicSectionResponse {
   anchor: string | null;
   styleVariant: string | null;
   style: SectionStyle;
-  fields: SectionFields;
+  /** Resolved values, not the draft's typed `{kind, …}` union: text → string, media →
+   *  `{url, kind, width?, height?, alt?}`, link → `{href, kind, label?, openInNewTab?}`, choice →
+   *  key, toggle/number → plain values, color → `{token, hex}`, list → `[{id, fields}]`, rich
+   *  text → blocks (backend PublicProjector). The storefront reads them through public-read.ts. */
+  fields: Record<string, unknown>;
   source: PublicSourceResponse | null;
 }
 

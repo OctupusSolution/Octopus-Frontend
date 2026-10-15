@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SAMPLE_STOREFRONT_HEADER, SAMPLE_TENANT_SLUG, TENANT_SLUG_HEADER } from "@/entities/tenant";
 import { applyPreviewHeaders, handlePreviewRoute } from "@/shared/lib/preview-middleware";
+import { TABLE_FLOW_HEADER, isMobileFlowPath } from "@/shared/lib/table-flow";
 import { BUILDER_CANVAS_HEADER, builderCanvasResponseHeaders, currentMerchantOrigins, isBareDocumentPath, isCanvasPath } from "@/shared/lib/merchant-origins";
 
 /** A host with no subdomain (plain `localhost`, an IP address) is local development
@@ -38,6 +39,9 @@ export function middleware(request: NextRequest) {
   requestHeaders.delete(BUILDER_CANVAS_HEADER);
   if (sample) requestHeaders.set(SAMPLE_STOREFRONT_HEADER, "1");
   else requestHeaders.delete(SAMPLE_STOREFRONT_HEADER);
+  // The table and pickup flows draw their own mobile chrome; the root layout reads this.
+  if (isMobileFlowPath(request.nextUrl.pathname)) requestHeaders.set(TABLE_FLOW_HEADER, "1");
+  else requestHeaders.delete(TABLE_FLOW_HEADER);
 
   return applyPreviewHeaders(request, NextResponse.next({ request: { headers: requestHeaders } }));
 }

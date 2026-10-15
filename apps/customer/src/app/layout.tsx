@@ -9,6 +9,7 @@ import { themeStyle } from "@/shared/api/brand-theme";
 import type { PublishedShell } from "@/shared/api/public-api";
 import { createTranslator } from "@/shared/i18n/translate";
 import { BUILDER_CANVAS_HEADER } from "@/shared/lib/merchant-origins";
+import { TABLE_FLOW_HEADER } from "@/shared/lib/table-flow";
 import { navLinks, SiteHeader } from "@/widgets/site-header";
 import { SiteFooter } from "@/widgets/site-footer";
 import { ClearPreviewCookie, PreviewBanner } from "@/widgets/preview-banner";
@@ -28,7 +29,8 @@ const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfa
 // metrics are what keep the card copy on the line counts the frames show.
 const plexArabic = IBM_Plex_Sans_Arabic({
   subsets: ["arabic", "latin"],
-  weight: ["400", "500", "700"],
+  // 300 and 600 are the table flow's: its currency word is Light, its labels SemiBold.
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-arabic-loaded",
   display: "swap",
 });
@@ -106,6 +108,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {preview && <ClearPreviewCookie />}
           <StoreI18nProvider locale={locale}>
             <main>{children}</main>
+          </StoreI18nProvider>
+        </body>
+      </html>
+    );
+  }
+
+  // The dine-in table flow (/table/*) has its own mobile chrome — the table bar and
+  // its footer, drawn by its screens — so the site header and footer stay off it.
+  if (headers().get(TABLE_FLOW_HEADER) === "1") {
+    return (
+      <html lang={language} dir={direction} className={FONT_CLASSES} style={themeStyle(shell)}>
+        <body>
+          <StoreI18nProvider locale={locale}>
+            <OrderingSessionProvider>
+              <main>{children}</main>
+            </OrderingSessionProvider>
           </StoreI18nProvider>
         </body>
       </html>

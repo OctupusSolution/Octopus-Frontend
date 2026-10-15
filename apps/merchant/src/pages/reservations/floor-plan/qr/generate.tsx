@@ -1,7 +1,8 @@
 // "Generate QR Code": pick tables on the plan, design the printed card, then
 // review and print (Figma 2012:186918, 2012:188670, 2012:190398).
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
+import { generatePlaceCodes } from "@octopus/api-client";
 import { zoneForTable, type FloorPlanDoc, type FloorTable } from "@/entities/floor-plan";
 import { ShellIcon } from "@/shared/ui/shell-icon";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -9,11 +10,15 @@ import { QrCode } from "../../../public-link/ui/qr-code";
 import { BORDER_200, TEXT_PRIMARY, TEXT_SECONDARY } from "../../_shared/theme";
 import { PageShell } from "../_shared/page-header";
 import { Switch } from "../_shared/switch";
-import { byNumber, DetailRow, formatDate, tableMeta, useZoneDimmed, ZoneSelect } from "./parts";
-import { DEFAULT_DESIGN, QR_SIZE_PX, printTents, type QrDesign } from "./print";
+import { byNumber, DetailRow, ServerSymbol, tableMeta, useZoneDimmed, ZoneSelect } from "./parts";
+import { chunkGuard, planGenerate } from "./place-codes-model";
+import { QR_SIZE_PX, type QrDesign } from "./print";
+import { exportCodes, printCodes } from "./print-codes";
 import { QrLegend, QrPlan } from "./qr-plan";
-import { QR_STATUSES, downloadFile, qrSvgMarkup, qrValue, statusOf, type QrStatus, type useTableQr } from "./qr-store";
-import { BTN_MODAL_OUTLINE, BTN_MODAL_PRIMARY, BTN_MODAL_WARNING, QR_STATUS_TEXT } from "./theme";
+import { QR_STATUSES, type QrStatus } from "./qr-store";
+import { BTN_MODAL_OUTLINE, BTN_MODAL_PRIMARY, QR_STATUS_TEXT } from "./theme";
+import type { PrintDesign } from "./use-print-design";
+import type { Notify, PlaceCodesState } from "./use-place-codes";
 
 type SelectMode = "individual" | "zone" | "range" | "all";
 const SELECT_MODES: readonly SelectMode[] = ["individual", "zone", "range", "all"];
@@ -27,36 +32,79 @@ const LABEL = clsx("text-[14px] font-medium leading-[14px]", TEXT_PRIMARY);
 
 export function GenerateFlow({
   doc,
-  qr,
+  pc,
+  printDesign,
   preselect,
+  notify,
   onExit,
 }: {
   doc: FloorPlanDoc;
-  qr: ReturnType<typeof useTableQr>;
+  pc: PlaceCodesState;
+  printDesign: PrintDesign;
   preselect: string[];
+  notify: Notify;
   onExit: (message?: string) => void;
 }) {
   const { t } = useI18n();
+  const { design, setDesign } = printDesign;
   const [step, setStep] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(preselect));
-  const [design, setDesign] = useState<QrDesign>(DEFAULT_DESIGN);
+  const [replaceExisting, setReplaceExisting] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [failedAt, setFailedAt] = useState<number | null>(null);
+  // One batch id per request of this choice, so a retry replays instead of duplicating.
+  const batchIds = useRef<string[]>([]);
   const tables = useMemo(() => doc.tables.filter((tb) => tb.visible).sort(byNumber), [doc.tables]);
   const chosen = tables.filter((tb) => selected.has(tb.id));
+  const alreadyCoded = chosen.filter((tb) => pc.statusOf(tb) !== "notGenerated").length;
+
+  useEffect(() => {
+    batchIds.current = [];
+    setFailedAt(null);
+  }, [selected, replaceExisting]);
 
   // Selected tables draw as active on steps 2-3: that is what they become.
-  const preview = (table: FloorTable): QrStatus =>
-    step > 1 && selected.has(table.id) ? "active" : statusOf(qr.record[table.id]);
+  const preview = (table: FloorTable): QrStatus => (step > 1 && selected.has(table.id) ? "active" : pc.statusOf(table));
 
-  function finish() {
-    const record = qr.generate(chosen);
-    const codes = chosen.map((tb) => ({ table: tb, code: record[tb.id]?.code }));
-    const missing = codes.some((c) => !c.code);
-    const items = missing ? null : (codes as { table: FloorTable; code: string }[]);
-    if (items) {
-      printTents(doc, items, design, t);
-      qr.markPrinted(chosen.map((tb) => tb.id));
+  async function finish() {
+    if (pending || !pc.floorId) return;
+    if (!chunkGuard(chosen.length)) return notify(t("floorPlan.qr.error.selectionTooLarge"), "error");
+    const selections = planGenerate({ selectedIds: selected, tables, rows: pc.rows, doc });
+    if (selections.length === 0) return;
+    setPending(true);
+    setFailedAt(null);
+    let done = 0;
+    try {
+      // A design changed elsewhere reloads; the codes are still generated.
+      await printDesign.save().catch(() => notify(t("floorPlan.qr.error.designStale"), "info"));
+      for (let i = 0; i < selections.length; i++) {
+        const selection = selections[i];
+        batchIds.current[i] ??= crypto.randomUUID();
+        const replacing = !replaceExisting
+          ? 0
+          : selection.mode === "one"
+            ? chosen.some((tb) => pc.rows.get(tb.id)?.resourceId === selection.resourceId && pc.statusOf(tb) !== "notGenerated") ? 1 : 0
+            : alreadyCoded;
+        setProgress({ done: i, total: selections.length });
+        await pc.run((b) =>
+          generatePlaceCodes(b, {
+            batchId: batchIds.current[i],
+            floorId: pc.floorId!,
+            selection,
+            existing: replaceExisting ? "regenerate" : "keep",
+            ...(replacing ? { confirmReplaceCount: replacing } : {}),
+          })
+        );
+        done = i + 1;
+      }
+      onExit(t("floorPlan.qr.generatedDone").replace("{n}", String(chosen.length)));
+    } catch {
+      // run() said why; Retry re-sends the same batch ids, so finished ones replay.
+      if (selections.length > 1) setFailedAt(done);
+    } finally {
+      setPending(false);
     }
-    onExit(t("floorPlan.qr.generatedDone").replace("{n}", String(chosen.length)));
   }
 
   return (
@@ -71,9 +119,27 @@ export function GenerateFlow({
         <SelectStep doc={doc} tables={tables} selected={selected} setSelected={setSelected} statusOf={preview} />
       )}
       {step === 2 && (
-        <DesignStep doc={doc} tables={tables} selected={selected} setSelected={setSelected} statusOf={preview} design={design} setDesign={setDesign} qr={qr} chosen={chosen} />
+        <DesignStep doc={doc} tables={tables} selected={selected} setSelected={setSelected} statusOf={preview} design={design} setDesign={setDesign} pc={pc} notify={notify} chosen={chosen} />
       )}
-      {step === 3 && <ReviewStep doc={doc} chosen={chosen} design={design} setDesign={setDesign} qr={qr} onEdit={() => setStep(1)} />}
+      {step === 3 && (
+        <ReviewStep
+          doc={doc}
+          chosen={chosen}
+          design={design}
+          setDesign={setDesign}
+          pc={pc}
+          notify={notify}
+          onEdit={() => setStep(1)}
+          replace={alreadyCoded > 0 ? { on: replaceExisting, set: setReplaceExisting } : null}
+        />
+      )}
+      {step === 3 && (pending || failedAt !== null) && progress.total > 1 && (
+        <p className={clsx("mt-4 text-center text-[14px] font-medium", failedAt !== null ? "text-[#b91c1c] [[data-theme=dark]_&]:text-[#fca5a5]" : TEXT_SECONDARY)} role="status">
+          {failedAt !== null
+            ? t("floorPlan.qr.generateStopped").replace("{n}", String(failedAt))
+            : t("floorPlan.qr.generatingProgress").replace("{done}", String(progress.done + 1)).replace("{total}", String(progress.total))}
+        </p>
+      )}
 
       {step === 2 && (
         <div className="mt-6 flex items-center gap-2 rounded-t-[12px] bg-[#f0f4ff] px-3 py-3 text-[14px] font-medium text-[#0d6efd] [[data-theme=dark]_&]:bg-[var(--octo-selected)]">
@@ -89,11 +155,11 @@ export function GenerateFlow({
         ) : null}
         <button
           type="button"
-          disabled={chosen.length === 0}
-          onClick={() => (step < 3 ? setStep(step + 1) : finish())}
+          disabled={chosen.length === 0 || pending}
+          onClick={() => (step < 3 ? setStep(step + 1) : void finish())}
           className={BTN_MODAL_PRIMARY}
         >
-          {step < 3 ? t("floorPlan.common.next") : t("floorPlan.qr.printAll")}
+          {step < 3 ? t("floorPlan.common.next") : failedAt !== null ? t("floorPlan.qr.retry") : t("floorPlan.qr.generateCodes")}
         </button>
       </div>
       {step === 1 && (
@@ -237,20 +303,20 @@ function DesignStep({
   design,
   setDesign,
   chosen,
-  qr,
+  pc,
+  notify,
   doc,
   ...picker
-}: PlanPickerProps & { design: QrDesign; setDesign: (d: QrDesign) => void; chosen: FloorTable[]; qr: ReturnType<typeof useTableQr> }) {
+}: PlanPickerProps & { design: QrDesign; setDesign: (d: QrDesign) => void; chosen: FloorTable[]; pc: PlaceCodesState; notify: Notify }) {
   const { t } = useI18n();
-  const exportSvgs = () =>
-    chosen.forEach((tb, i) =>
-      setTimeout(() => downloadFile(`table-${tb.number}-qr.svg`, qrSvgMarkup(qr.record[tb.id]?.code ?? `QR-T${tb.number}`)), i * 150)
-    );
+  // Only tables that already have a code can be exported before generating.
+  const coded = chosen.filter((tb) => pc.rows.get(tb.id)?.codeId);
+  const zip = () => void exportCodes(pc, coded, t, notify);
   const exports = [
-    { label: t("floorPlan.qr.export.pdf"), run: () => printTents(doc, chosen.map((tb) => ({ table: tb, code: qr.record[tb.id]?.code ?? `QR-T${tb.number}` })), design, t) },
-    { label: t("floorPlan.qr.export.png"), run: exportSvgs },
-    { label: t("floorPlan.qr.export.svg"), run: exportSvgs },
-    { label: t("floorPlan.qr.export.zip"), run: exportSvgs },
+    { label: t("floorPlan.qr.export.pdf"), run: () => void printCodes(pc, doc, coded, design, t, notify) },
+    { label: t("floorPlan.qr.export.png"), run: () => void exportCodes(pc, coded, t, notify, "png") },
+    { label: t("floorPlan.qr.export.svg"), run: zip },
+    { label: t("floorPlan.qr.export.zip"), run: zip },
   ];
   return (
     <div className="mt-8 flex flex-col gap-4">
@@ -259,7 +325,7 @@ function DesignStep({
           <button
             key={e.label}
             type="button"
-            disabled={chosen.length === 0}
+            disabled={coded.length === 0}
             onClick={e.run}
             className={clsx("inline-flex h-10 items-center gap-2 rounded-[8px] border px-3 text-[16px] font-medium disabled:opacity-50", BORDER_300, TEXT_PRIMARY)}
           >
@@ -371,7 +437,7 @@ function DesignPanel({ design, setDesign }: { design: QrDesign; setDesign: (d: Q
           {(["classic", "modern", "minimal", "rounded"] as const).map((style) => (
             <button key={style} type="button" onClick={() => set("qrStyle", style)} className="flex w-[52px] flex-col items-center gap-1">
               <span className={clsx("grid h-12 w-full place-items-center rounded-[8px] border", design.qrStyle === style ? "border-[#0d6efd]" : BORDER_300)}>
-                <QrCode value={qrValue(style)} size={40} />
+                <QrCode value={`octopus:${style}`} size={40} />
               </span>
               <span className={clsx("text-[10px] font-medium leading-[10px]", TEXT_PRIMARY)}>{t(`floorPlan.qr.style.${style}`)}</span>
             </button>
@@ -422,7 +488,7 @@ function DesignPanel({ design, setDesign }: { design: QrDesign; setDesign: (d: Q
         <Field label={t("floorPlan.qr.design.message")}>
           <textarea
             value={design.message}
-            onChange={(e) => set("message", e.target.value.slice(0, 80))}
+            onChange={(e) => set("message", e.target.value.slice(0, 60))}
             placeholder={t("floorPlan.qr.design.messagePlaceholder")}
             className={clsx("h-[72px] resize-none rounded-[8px] border bg-transparent p-2 text-[12px] outline-none placeholder:text-[#94a3b8]", BORDER_300, TEXT_PRIMARY)}
           />
@@ -437,8 +503,10 @@ function DesignPanel({ design, setDesign }: { design: QrDesign; setDesign: (d: Q
 }
 
 /** One printed card at preview scale (Figma 2012:190398 grid). */
-function TentCard({ doc, table, code, design }: { doc: FloorPlanDoc; table: FloorTable; code: string; design: QrDesign }) {
+function TentCard({ doc, table, pc, design }: { doc: FloorPlanDoc; table: FloorTable; pc: PlaceCodesState; design: QrDesign }) {
   const { t } = useI18n();
+  const row = pc.rows.get(table.id);
+  const qrPx = Math.round(QR_SIZE_PX[design.qrSize] * 0.85);
   return (
     <div className="flex aspect-[2/3] flex-col items-center gap-1 overflow-hidden rounded-[2px] pt-2" style={{ background: design.background === "#FFFFFF" ? "#EAE4D9" : design.background }}>
       {design.showNumber && (
@@ -451,7 +519,12 @@ function TentCard({ doc, table, code, design }: { doc: FloorPlanDoc; table: Floo
       )}
       {design.logo && <img alt="" src={design.logo} className="h-4 max-w-[70%] object-contain" />}
       <span className="px-1 text-center text-[8px] font-bold uppercase leading-tight" style={{ color: design.primary }}>{doc.name}</span>
-      <QrCode value={qrValue(code)} size={Math.round(QR_SIZE_PX[design.qrSize] * 0.85)} />
+      {row?.codeId ? (
+        <ServerSymbol businessId={pc.businessId} codeId={row.codeId} version={row.version} size={qrPx} />
+      ) : (
+        // Not generated yet: the code exists once the server answers.
+        <span className="block rounded-[4px] border border-dashed border-[#94a3b8]" style={{ width: qrPx, height: qrPx }} />
+      )}
       <span className="px-1 text-center text-[7px] font-semibold leading-tight text-[#0f172a]">{t("floorPlan.qr.card.cta")}</span>
       {design.showMessage && design.message && <span className="px-1 text-center text-[7px] leading-tight text-[#0f172a]">{design.message}</span>}
       <span className="mt-auto w-full bg-[#16213e] py-0.5 text-center text-[7px] italic text-white">{t("floorPlan.qr.card.thanks")}</span>
@@ -465,26 +538,30 @@ function ReviewStep({
   chosen,
   design,
   setDesign,
-  qr,
+  pc,
+  notify,
   onEdit,
+  replace,
 }: {
   doc: FloorPlanDoc;
   chosen: FloorTable[];
   design: QrDesign;
   setDesign: (d: QrDesign) => void;
-  qr: ReturnType<typeof useTableQr>;
+  pc: PlaceCodesState;
+  notify: Notify;
   onEdit: () => void;
+  /** Shown when some chosen tables already have a code. */
+  replace: { on: boolean; set: (v: boolean) => void } | null;
 }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [page, setPage] = useState(0);
   const [singleId, setSingleId] = useState("");
   const pages = Math.max(1, Math.ceil(chosen.length / design.perPage));
   const current = Math.min(page, pages - 1);
   const shown = chosen.slice(current * design.perPage, (current + 1) * design.perPage);
-  const codeOf = (tb: FloorTable) => qr.record[tb.id]?.code ?? `QR-T${tb.number}`;
   const single = chosen.find((tb) => tb.id === singleId) ?? null;
-  const singleQr = single ? qr.record[single.id] : undefined;
-  const singleStatus = statusOf(singleQr);
+  const singleRow = single ? pc.rows.get(single.id) : undefined;
+  const singleStatus = single ? pc.statusOf(single) : "notGenerated";
   const card = clsx("rounded-[20px] border p-2", BORDER_300);
   const pager = clsx("grid h-10 w-10 place-items-center rounded-[8px] border text-[18px] disabled:opacity-40", BORDER_300, TEXT_PRIMARY);
 
@@ -502,7 +579,7 @@ function ReviewStep({
         </div>
         <div className="grid grid-cols-4 gap-3">
           {shown.map((tb) => (
-            <TentCard key={tb.id} doc={doc} table={tb} code={codeOf(tb)} design={design} />
+            <TentCard key={tb.id} doc={doc} table={tb} pc={pc} design={design} />
           ))}
         </div>
         <div className="flex items-center justify-center gap-3">
@@ -524,6 +601,12 @@ function ReviewStep({
             {t("floorPlan.qr.review.edit")}
           </button>
         </section>
+        {replace && (
+          <section className={clsx(card, "flex flex-col gap-2")}>
+            <Switch checked={replace.on} onChange={replace.set} label={t("floorPlan.qr.replaceExisting")} />
+            <span className={clsx("text-[12px]", replace.on ? "text-[#b45309] [[data-theme=dark]_&]:text-[#fbbf24]" : TEXT_SECONDARY)}>{t("floorPlan.qr.replaceExistingHint")}</span>
+          </section>
+        )}
         <section className={clsx(card, "flex flex-col gap-3")}>
           <span className={clsx("text-[16px] font-semibold", TEXT_PRIMARY)}>{t("floorPlan.qr.review.summary")}</span>
           <div className={clsx("flex flex-col gap-2 rounded-[8px] border p-2", BORDER_300)}>
@@ -550,32 +633,29 @@ function ReviewStep({
             <>
               <span className={clsx("text-[12px] font-medium", TEXT_SECONDARY)}>{tableMeta(doc, single, t)}</span>
               <div className="flex justify-center">
-                <QrCode value={qrValue(codeOf(single))} size={120} />
+                {singleRow?.codeId ? (
+                  <ServerSymbol businessId={pc.businessId} codeId={singleRow.codeId} version={singleRow.version} size={120} dimmed={singleStatus === "disabled"} />
+                ) : (
+                  <span className={clsx("grid h-[120px] place-items-center text-center text-[14px] font-medium", TEXT_SECONDARY)}>{t("floorPlan.qr.noCode")}</span>
+                )}
               </div>
               <div className={clsx("flex flex-col gap-2 rounded-[8px] border p-2", BORDER_300)}>
                 <DetailRow label={t("floorPlan.qr.field.status")} valueClassName={QR_STATUS_TEXT[singleStatus]}>{t(`floorPlan.qr.status.${singleStatus}`)}</DetailRow>
-                <DetailRow label={t("floorPlan.qr.field.id")}>{singleQr?.code ?? "—"}</DetailRow>
-                <DetailRow label={t("floorPlan.qr.field.lastPrinted")}>{formatDate(singleQr?.lastPrintedAt ?? null, locale, true)}</DetailRow>
+                <DetailRow label={t("floorPlan.qr.field.version")}>{singleRow?.version ?? "—"}</DetailRow>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => downloadFile(`table-${single.number}-qr.svg`, qrSvgMarkup(codeOf(single)))} className={BTN_MODAL_OUTLINE}>
+                <button type="button" disabled={!singleRow?.codeId} onClick={() => void exportCodes(pc, [single], t, notify)} className={BTN_MODAL_OUTLINE}>
                   {t("floorPlan.qr.download")}
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const code = qr.generate([single])[single.id]?.code;
-                    if (code) printTents(doc, [{ table: single, code }], design, t);
-                    qr.markPrinted([single.id]);
-                  }}
+                  disabled={!singleRow?.codeId || singleStatus === "disabled"}
+                  onClick={() => void printCodes(pc, doc, [single], design, t, notify)}
                   className={BTN_MODAL_PRIMARY}
                 >
                   {t("floorPlan.qr.printThis")}
                 </button>
               </div>
-              <button type="button" onClick={() => qr.generate([single], true)} className={BTN_MODAL_WARNING}>
-                {t("floorPlan.qr.regenerate")}
-              </button>
             </>
           )}
         </section>

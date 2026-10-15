@@ -1,8 +1,8 @@
 // The printed card (Figma 2012:190398 preview): table number badge, the
 // restaurant's name, the code, the call to action and a "Thank you!" band.
-// Printing opens the cards in their own window, laid out per the design step.
+// Printing opens the cards in their own window, laid out per the design step;
+// the symbols are the server's own SVGs (print-codes.ts fetches them).
 import type { FloorPlanDoc, FloorTable } from "@/entities/floor-plan";
-import { qrSvgMarkup } from "./qr-store";
 
 export type TemplateType = "tent" | "sticker" | "square" | "custom";
 export type QrStyle = "classic" | "modern" | "minimal" | "rounded";
@@ -46,24 +46,28 @@ export const QR_SIZE_PX: Record<QrDesign["qrSize"], number> = { small: 64, mediu
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
-export function printTents(
+/** Opened before any request is awaited, so a popup blocker allows it. */
+export function openPrintWindow(): Window | null {
+  return window.open("", "_blank", "width=900,height=1100");
+}
+
+export function writeTents(
+  win: Window,
   doc: FloorPlanDoc,
-  items: { table: FloorTable; code: string }[],
+  items: { table: FloorTable; svg: string }[],
   design: QrDesign,
   t: (k: string) => string
 ) {
-  const win = window.open("", "_blank", "width=900,height=1100");
-  if (!win) return;
   const m = design.margins;
   const qrPx = QR_SIZE_PX[design.qrSize] * 2;
   const cards = items
-    .map(({ table, code }) => {
+    .map(({ table, svg }) => {
       const number = design.showNumber
         ? `<div class="num ${design.numberStyle}">${esc(`T${table.number}`)}</div>`
         : "";
       const logo = design.logo ? `<img class="logo" src="${design.logo}" alt="">` : "";
       const msg = design.showMessage && design.message ? `<p class="msg">${esc(design.message)}</p>` : "";
-      return `<div class="card">${number}${logo}<h2>${esc(doc.name)}</h2><div class="qr">${qrSvgMarkup(code, qrPx)}</div><p class="cta">${esc(t("floorPlan.qr.card.cta"))}</p>${msg}<div class="thanks">${esc(t("floorPlan.qr.card.thanks"))}</div></div>`;
+      return `<div class="card">${number}${logo}<h2>${esc(doc.name)}</h2><div class="qr">${svg}</div><p class="cta">${esc(t("floorPlan.qr.card.cta"))}</p>${msg}<div class="thanks">${esc(t("floorPlan.qr.card.thanks"))}</div></div>`;
     })
     .join("");
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(doc.name)} QR</title><style>

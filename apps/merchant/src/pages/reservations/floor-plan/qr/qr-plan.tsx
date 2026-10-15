@@ -46,11 +46,25 @@ function Badge({ status, cx, cy, r }: { status: QrStatus; cx: number; cy: number
   );
 }
 
+/** An eye with a slash: the place is hidden from customers' table choice. */
+function HiddenMark({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  const w = r * 0.62;
+  const line = { stroke: "#fff", strokeWidth: r * 0.18, strokeLinecap: "round" as const, fill: "none" };
+  return (
+    <g pointerEvents="none">
+      <circle cx={cx} cy={cy} r={r} fill="#475569" stroke="#fff" strokeWidth={r * 0.18} />
+      <path d={`M${cx - w} ${cy} Q${cx} ${cy - w * 0.9} ${cx + w} ${cy} Q${cx} ${cy + w * 0.9} ${cx - w} ${cy} Z`} {...line} />
+      <path d={`M${cx - w} ${cy + w} L${cx + w} ${cy - w}`} {...line} />
+    </g>
+  );
+}
+
 export function QrPlan({
   doc,
   statusOf,
   selectedIds,
   dimmedIds,
+  hiddenIds,
   onTable,
   className,
 }: {
@@ -58,6 +72,8 @@ export function QrPlan({
   statusOf: (table: FloorTable) => QrStatus;
   selectedIds?: ReadonlySet<string>;
   dimmedIds?: ReadonlySet<string>;
+  /** Tables hidden from customers, marked on their top corner. */
+  hiddenIds?: ReadonlySet<string>;
   onTable?: (table: FloorTable) => void;
   className?: string;
 }) {
@@ -68,9 +84,14 @@ export function QrPlan({
         .map((t) => {
           const rect = tableRect(t);
           const r = Math.max(0.28, Math.min(rect.w, rect.h) * 0.16);
-          return <Badge key={t.id} status={statusOf(t)} cx={rect.x + rect.w - r * 0.6} cy={rect.y + rect.h - r * 0.6} r={r} />;
+          return (
+            <g key={t.id}>
+              <Badge status={statusOf(t)} cx={rect.x + rect.w - r * 0.6} cy={rect.y + rect.h - r * 0.6} r={r} />
+              {hiddenIds?.has(t.id) && <HiddenMark cx={rect.x + rect.w - r * 0.6} cy={rect.y + r * 0.6} r={r} />}
+            </g>
+          );
         }),
-    [doc.tables, statusOf, dimmedIds]
+    [doc.tables, statusOf, dimmedIds, hiddenIds]
   );
   return (
     <div className={clsx("relative min-h-0 overflow-hidden rounded-[2px] border border-[#e2e8f0] bg-white", className)}>

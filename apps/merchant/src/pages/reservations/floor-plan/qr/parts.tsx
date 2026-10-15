@@ -1,6 +1,7 @@
 // Small pieces shared by the Table QR Codes page and its Generate flow.
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import clsx from "clsx";
+import { getPlaceCodeSymbol } from "@octopus/api-client";
 import { zoneForTable, type FloorPlanDoc, type FloorTable } from "@/entities/floor-plan";
 import { ShellIcon } from "@/shared/ui/shell-icon";
 import { useI18n } from "@/app/providers/i18n-provider";
@@ -71,4 +72,54 @@ export function DetailBox({ title, children }: { title: string; children: ReactN
 /** Tables in the order a person reads them: by number, numerically where possible. */
 export function byNumber(a: FloorTable, b: FloorTable): number {
   return a.number.localeCompare(b.number, undefined, { numeric: true });
+}
+
+/** Blob URLs of fetched symbols, by business, code and version: paging back
+ *  or reopening a table does not spend the symbol rate limit (30/min) again. */
+const symbolCache = new Map<string, Promise<string>>();
+
+function symbolUrl(businessId: string, codeId: string, version: number | null | undefined): Promise<string> {
+  const key = `${businessId}:${codeId}:${version ?? ""}`;
+  let hit = symbolCache.get(key);
+  if (!hit) {
+    hit = getPlaceCodeSymbol(businessId, codeId, "svg").then(({ blob }) => URL.createObjectURL(blob));
+    hit.catch(() => symbolCache.delete(key));
+    symbolCache.set(key, hit);
+  }
+  return hit;
+}
+
+/** A place code's symbol, fetched from the server with the bearer token. */
+export function ServerSymbol({
+  businessId,
+  codeId,
+  version,
+  size,
+  dimmed,
+}: {
+  businessId: string;
+  codeId: string;
+  version?: number | null;
+  size: number;
+  dimmed?: boolean;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setUrl(null);
+    symbolUrl(businessId, codeId, version)
+      .then((u) => alive && setUrl(u))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [businessId, codeId, version]);
+  return url ? (
+    <img src={url} width={size} height={size} alt="" className={clsx("block bg-white", dimmed && "opacity-40")} />
+  ) : (
+    <span
+      className="block animate-pulse rounded-[8px] bg-[#e2e8f0] [[data-theme=dark]_&]:bg-[var(--octo-border-card)]"
+      style={{ width: size, height: size }}
+    />
+  );
 }

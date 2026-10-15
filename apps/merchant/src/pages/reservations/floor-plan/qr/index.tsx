@@ -1,6 +1,7 @@
 // "Table QR Codes": every table's code at a glance on the restaurant's own
 // published plan (Figma 2012:185145), a modal per table, and the Generate flow.
-import { useCallback, useMemo, useState } from "react";
+// The codes are the backend's place codes (Menu module, US-020).
+import { useMemo, useState } from "react";
 import clsx from "clsx";
 import type { FloorPlanDoc, FloorTable } from "@/entities/floor-plan";
 import { ShellIcon } from "@/shared/ui/shell-icon";
@@ -12,61 +13,94 @@ import { ToastBanner, useToast } from "../_shared/toast";
 import { useFloorPlan } from "../_shared/use-floor-plan";
 import { GenerateFlow } from "./generate";
 import { formatDate, useZoneDimmed, ZoneSelect } from "./parts";
-import { DEFAULT_DESIGN, printTents } from "./print";
+import { exportCodes, printCodes } from "./print-codes";
 import { QrLegend, QrPlan } from "./qr-plan";
-import { QR_STATUSES, downloadFile, qrSvgMarkup, statusOf, useTableQr, type QrStatus } from "./qr-store";
+import { QR_STATUSES, type QrStatus } from "./qr-store";
 import { TableQrModal } from "./table-qr-modal";
 import { BTN_OUTLINE, BTN_PRIMARY, QR_CARD, TEXT_SUBTEXT } from "./theme";
+import { usePlaceCodes, type PlaceCodesState } from "./use-place-codes";
+import { usePrintDesign } from "./use-print-design";
 
 export function TableQrPage() {
   const { published } = useFloorPlan();
   return published ? <TableQrCodes doc={published.doc} /> : <FloorPlanHub />;
 }
 
+/** Loading, add-on missing, no permission, no published floor, or a failed read. */
+function PhaseScreen({ pc }: { pc: PlaceCodesState }) {
+  const { t } = useI18n();
+  return (
+    <PageShell>
+      <div className="grid min-h-[50vh] place-items-center">
+        <div className="flex max-w-[420px] flex-col items-center gap-3 text-center" role={pc.phase === "loading" ? "status" : undefined}>
+          <h1 className={clsx("text-[20px] font-semibold leading-[1.2]", TEXT_PRIMARY)}>{t(`floorPlan.qr.phase.${pc.phase}.title`)}</h1>
+          <p className={clsx("text-[14px] leading-[1.5]", TEXT_SECONDARY)}>{t(`floorPlan.qr.phase.${pc.phase}.body`)}</p>
+          {pc.phase === "failed" && (
+            <button type="button" onClick={() => void pc.refresh()} className={BTN_PRIMARY}>
+              {t("floorPlan.qr.retry")}
+            </button>
+          )}
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
   const { t, locale } = useI18n();
   const { toast, notify } = useToast();
-  const qr = useTableQr();
+  const pc = usePlaceCodes(doc, notify);
+  const printDesign = usePrintDesign(pc.businessId);
   const [mode, setMode] = useState<"overview" | "generate">("overview");
   const [preselect, setPreselect] = useState<string[]>([]);
   const [zoneId, setZoneId] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const dimmed = useZoneDimmed(doc, zoneId);
 
   const tables = useMemo(() => doc.tables.filter((tb) => tb.visible), [doc.tables]);
-  const tableStatus = useCallback((table: FloorTable): QrStatus => statusOf(qr.record[table.id]), [qr.record]);
   const counts = useMemo(() => {
     const c = Object.fromEntries(QR_STATUSES.map((s) => [s, 0])) as Record<QrStatus, number>;
-    for (const tb of tables) c[tableStatus(tb)] += 1;
+    for (const tb of tables) c[pc.statusOf(tb)] += 1;
     return c;
-  }, [tables, tableStatus]);
-  const lastPrinted = useMemo(
-    () => Math.max(0, ...tables.map((tb) => qr.record[tb.id]?.lastPrintedAt ?? 0)) || null,
-    [tables, qr.record]
+  }, [tables, pc.statusOf]);
+  const hiddenIds = useMemo(
+    () => new Set([...pc.rows].filter(([, r]) => r.hiddenFromCustomers).map(([id]) => id)),
+    [pc.rows]
   );
-  const printable = tables.filter((tb) => qr.record[tb.id] && !qr.record[tb.id].disabled);
+  const lastPrinted = pc.lastPrint ? Date.parse(pc.lastPrint.printedAtUtc) : null;
+  const printable = tables.filter((tb) => {
+    const s = pc.statusOf(tb);
+    return s === "active" || s === "reprint";
+  });
   const open = openId ? tables.find((tb) => tb.id === openId) ?? null : null;
+
+  if (pc.phase !== "ready") return <PhaseScreen pc={pc} />;
 
   function startGenerate(ids: string[] = []) {
     setPreselect(ids);
     setOpenId(null);
     setMode("generate");
   }
-  function print(list: FloorTable[]) {
-    if (list.length === 0) return;
-    printTents(doc, list.map((tb) => ({ table: tb, code: qr.record[tb.id].code })), DEFAULT_DESIGN, t);
-    qr.markPrinted(list.map((tb) => tb.id));
+  async function withBusy(fn: () => Promise<void>) {
+    setBusy(true);
+    try {
+      await fn();
+    } finally {
+      setBusy(false);
+    }
   }
-  function download(list: FloorTable[]) {
-    list.forEach((tb, i) => setTimeout(() => downloadFile(`table-${tb.number}-qr.svg`, qrSvgMarkup(qr.record[tb.id].code)), i * 150));
-  }
+  const print = (list: FloorTable[]) => withBusy(() => printCodes(pc, doc, list, printDesign.design, t, notify));
+  const download = (list: FloorTable[]) => withBusy(() => exportCodes(pc, list, t, notify));
 
   if (mode === "generate") {
     return (
       <GenerateFlow
         doc={doc}
-        qr={qr}
+        pc={pc}
+        printDesign={printDesign}
         preselect={preselect}
+        notify={notify}
         onExit={(message) => {
           setMode("overview");
           if (message) notify(message);
@@ -114,11 +148,11 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
             <ShellIcon name="fp-qr-generate.svg" size={24} />
             {t("floorPlan.qr.generate")}
           </button>
-          <button type="button" disabled={printable.length === 0} onClick={() => print(printable)} className={BTN_OUTLINE}>
+          <button type="button" disabled={printable.length === 0 || busy} onClick={() => void print(printable)} className={BTN_OUTLINE}>
             <ShellIcon name="fp-qr-print.svg" size={24} />
             {t("floorPlan.qr.printAll")}
           </button>
-          <button type="button" disabled={printable.length === 0} onClick={() => download(printable)} className={BTN_OUTLINE}>
+          <button type="button" disabled={printable.length === 0 || busy} onClick={() => void download(printable)} className={BTN_OUTLINE}>
             <ShellIcon name="fp-qr-download.svg" size={24} />
             {t("floorPlan.qr.downloadAll")}
           </button>
@@ -131,8 +165,9 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
         </div>
         <QrPlan
           doc={doc}
-          statusOf={tableStatus}
+          statusOf={pc.statusOf}
           dimmedIds={dimmed}
+          hiddenIds={hiddenIds}
           selectedIds={openId ? new Set([openId]) : undefined}
           onTable={(tb) => setOpenId(tb.id)}
           className="h-[calc(100vh-200px)] min-h-[420px]"
@@ -142,22 +177,11 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
       <TableQrModal
         doc={doc}
         table={open}
-        qr={open ? qr.record[open.id] : undefined}
+        pc={pc}
+        design={printDesign.design}
+        notify={notify}
         onClose={() => setOpenId(null)}
         onGenerate={() => open && startGenerate([open.id])}
-        onPrint={() => open && print([open])}
-        onDownload={() => open && download([open])}
-        onToggleDisabled={() => {
-          if (!open) return;
-          const disabled = !qr.record[open.id]?.disabled;
-          qr.setDisabled(open.id, disabled);
-          notify(t(disabled ? "floorPlan.qr.disabledDone" : "floorPlan.qr.enabledDone").replace("{number}", open.number), disabled ? "info" : undefined);
-        }}
-        onRegenerate={() => {
-          if (!open) return;
-          qr.generate([open], true);
-          notify(t("floorPlan.qr.regeneratedDone").replace("{number}", open.number));
-        }}
       />
       <ToastBanner toast={toast} />
     </PageShell>

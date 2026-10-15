@@ -5009,6 +5009,8 @@ export const en = {
   "store.place.unavailable.code.title": "This code isn't working",
   "store.place.unavailable.code.body": "Ask a member of staff for a new one.",
   "store.place.retry": "Try again",
+  "store.preview.opening": "Opening the preview…",
+  "store.preview.linkInvalid": "This preview link is incomplete. Ask for a new one.",
   "store.place.cartUpdated": "The menu changed — your cart was updated.",
   "store.place.dismiss": "OK",
   "store.place.backToMenu": "Back to the menu",

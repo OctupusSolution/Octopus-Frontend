@@ -1,5 +1,5 @@
 // Public Link typography: the draft stores the API's font catalogue codes
-// (`GET /public-link/fonts`). Drafts saved before the catalogue was wired — and
+// (`GET /public-link/catalogues` → `fonts`). Drafts saved before the catalogue was wired — and
 // the menu Theme step, which still offers shared/lib/brand-tokens FONTS ids —
 // hold the older ids (inter, readex, georgia, tahoma); they are read as the
 // nearest catalogue face.

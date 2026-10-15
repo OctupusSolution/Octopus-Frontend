@@ -7,7 +7,9 @@
 
 **الحالات:** 🔴 ناقص، بيوقفنا | 🟡 ناقص، عملنا حل مؤقت | 🟢 مش مشكلة (اتحلت من جهتنا) | ⏸️ محتاج قرار/تأكيد، مش عيب في الـ backend | ✅ اتعمل في الـ backend
 
-**آخر تحديث:** 2026-09-22 — جولة رابعة: وصّلنا تلاتة كمان من ليستة الـ endpoints الجاهزة والمش مستخدمة: **Public Link** `listVersions`+`restoreSiteVersionToDraft` (1b.11 — سجل إصدارات زي بتاع Floor Plan، زرار جنب Unpublish)، **Staff** `getStaffSettings`/`updateStaffSettings` (مودال صغير: يوم بداية الأسبوع + مدة صلاحية دعوة الموظف)، و**Reservation** `updateReservationSettings`+`getReservationChannels`+`updateReservationChannels` (بند جديد 4.16 — مودال إعدادات؛ لاحظنا إن `UpdateReservationSettingsRequest` هو شكل الإعدادات الكامل مش patch جزئي، فالمودال بيحافظ على كل الحقول اللي مالهاش شاشة زي ما هي بدل ما يفقدها). الجداول الأسبوعية وتواريخ الإغلاق في إعدادات الحجوزات سبناها برة لأنها محتاجة تقويم مش موصوف في أي فريم.
+**آخر تحديث:** 2026-10-15 — ضفنا 1b.12 (`hiddenOn` مش في القراءة العامة)، 1b.13 (رابط المعاينة، اتحل عندنا)، و6b.19 (حد الطلبات بالـ IP ورا الـ proxy).
+
+**قبل كده:** 2026-09-22 — جولة رابعة: وصّلنا تلاتة كمان من ليستة الـ endpoints الجاهزة والمش مستخدمة: **Public Link** `listVersions`+`restoreSiteVersionToDraft` (1b.11 — سجل إصدارات زي بتاع Floor Plan، زرار جنب Unpublish)، **Staff** `getStaffSettings`/`updateStaffSettings` (مودال صغير: يوم بداية الأسبوع + مدة صلاحية دعوة الموظف)، و**Reservation** `updateReservationSettings`+`getReservationChannels`+`updateReservationChannels` (بند جديد 4.16 — مودال إعدادات؛ لاحظنا إن `UpdateReservationSettingsRequest` هو شكل الإعدادات الكامل مش patch جزئي، فالمودال بيحافظ على كل الحقول اللي مالهاش شاشة زي ما هي بدل ما يفقدها). الجداول الأسبوعية وتواريخ الإغلاق في إعدادات الحجوزات سبناها برة لأنها محتاجة تقويم مش موصوف في أي فريم.
 
 **قبل كده، جولة تالتة:** حل باجين حقيقيين لقيناهم بالصدفة وإحنا بنجرب شاشة المنيو على بيزنس جديد (`hgj`) — راجع 0.10 و2.27 للتفاصيل الكاملة؛ الاتنين اتأكدوا من الـ admin-api logs نفسها مش تخمين. باختصار: توكن منتهي كان بيرجّع 403 `authorization.forbidden` بدل 401 فمكانش بيتجدد تلقائيًا، وبعد ما صلحنا ده لقينا إن `menu.settings.not-initialized` بترجع 409 مش 404 زي ما `ensureMenuSettings` كانت مفترضة، فبيزنس جديد كان بيتقفل عليه المنيو نهائيًا. الاتنين اتصلحوا في الفرونت إند (`http.ts` و`menu-api.ts`) و`npx tsc --noEmit` عدّى نضيف.
 
@@ -67,6 +69,8 @@
 | 1b.9 | قراءة الموقع العام (`GET /v1/public-site`) | 🟡 | بتعتمد على الـ Host (`slug.<suffix>`)، فمش شغالة على localhost. محتاجين نعرف نختبرها محليًا (host header أو dev override). |
 | 1b.10 | الـ hero image داخل إعدادات الـ hero (imageDataUrl) | 🟡 | بنشيل الـ data URLs من `content`. صورة الـ hero الفعلية بتتربط عن طريق `brand.heroBackground` بس. |
 | 1b.11 | الـ versions والـ rollback | 🟢 مش على الـ backend (اتحل 2026-09-22) | ضفنا زرار "Version History" وشاشة في `publish-step.tsx` (جنب Unpublish)، بيسترجع نسخة قديمة كمسودة جديدة (`restoreSiteVersionToDraft`) مش نشر مباشر — نفس منطق Floor Plan (3.8). `rollbackSiteToVersion` (نشر مباشر) سبناه من غير ربط لنفس السبب. |
+| 1b.12 | إخفاء قسم على الموبايل أو الكمبيوتر (`hiddenOn`) مش بيوصل للموقع المنشور | 🔴 | البلدر بيحفظ `hiddenOn` على القسم في المسودة، لكن القراءة العامة (`GET /v1/public-site/pages` و`/preview/pages`) مش بترجّعه: `PublicSectionResponse` في `PublicReadContracts.cs` مافيهوش `HiddenOn`. النتيجة إن الإخفاء شغال في معاينة البلدر بس، والموقع المنشور والمعاينة بالرابط بيعرضوا القسم على كل الأجهزة. المطلوب: نضيف `hiddenOn: string[]` لـ `PublicSectionResponse`. الواجهة (`page-sections.tsx`) بتقراه أصلًا لو وصل. |
+| 1b.13 | رابط المعاينة اللي الـ backend بيبنيه (`previewUrl`) | 🟢 اتحل عندنا (2026-10-15) | الافتراضي `https://{host}/preview#t={token}` (`PublicLink:Preview:PageUrlTemplate`)، والمتجر كان بيفهم `/_preview?token=` بس. ضفنا صفحة `/preview` بتقرا الرمز من بعد `#` وتحوّله لـ `/_preview`. مش مطلوب حاجة من الـ backend. |
 
 ---
 
@@ -234,6 +238,7 @@
 | 6b.16 | `GET /{id}/payments` و`GET /{id}/refunds` بيرجعوا Array عادي، مش `ListEnvelope` زي باقي القوايم في الموديول | 🟢 | صححناها في `order-admin.ts`. |
 | 6b.17 | تسمية `kind` غير متسقة بين الطلب والرد في الدفع | 🟢 | الطلب `kind` بيتبعت بحروف صغيرة-مفصولة (`"cash"`, `"card-present"`)، والرد بيرجعه PascalCase (`"Cash"`, `"CardPresent"`, `"OnlineLink"`). للعلم بس، اتعاملنا معاه في الكود. |
 | 6b.18 | مفيش شاشة لتحصيل الدفع من الواجهة أصلاً | 🟢 مش على الـ backend (اتحل 2026-09-22) | مكانش عيب backend — الـ API (`recordCashTender`) كان مربوط بالفعل من غير زرار يستدعيه. ضفنا زرار "تسجيل دفعة" جديد (خامس بجانب Void/Refund/Wastage/Cancel) وشاشة بسيطة (مبلغ + تأكيد) مبنية على نفس مكونات الصفحة المشتركة (`FieldLabel`, `PrimaryButton`, `ResultModal`) بما إن مفيش تصميم جاهز لها. الملف: `record-payment-flow.tsx`. |
+| 6b.19 | حد الطلبات من الكود المطبوع محسوب على الـ IP، والطلبات بتوصل من سيرفر واحد | 🔴 قبل الإطلاق | `POST /v1/public/place-codes/{key}/orders` محدود بـ 60/دقيقة لكل IP و10/دقيقة لكل (IP، كود)، وقراءة الكود 600/دقيقة لكل IP. الطلب بيعدّي على سيرفر Next.js (عشان CORS وعشان عنوان الـ API ما يظهرش)، فكل العملاء بيبانوا كـ IP واحد: يعني 60 طلب في الدقيقة لكل المطاعم مع بعض لكل instance، و10 لكل ترابيزة. المطلوب: الـ backend يثق في `X-Forwarded-For` من الـ proxy بتاعنا (`ForwardedHeadersOptions` مع KnownProxies)، وإحنا نبعته. |
 
 ---
 

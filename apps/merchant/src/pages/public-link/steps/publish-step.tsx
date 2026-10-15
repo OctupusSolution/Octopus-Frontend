@@ -564,7 +564,8 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
             </div>
           </div>
 
-          {/* Custom domain */}
+          {/* Custom domain: no backend yet (no route sets or verifies a domain), so a connected site does not offer one. */}
+          {!connected && (
           <div className={CARD}>
             <CardHeader
               title={tx("pl.publish.domainTitle")}
@@ -649,6 +650,7 @@ export function PublishStep({ draft, dispatch, publicLinkSync }: StepProps) {
               )}
             </div>
           </div>
+          )}
 
           {/* Share your link */}
           <div className={CARD}>

@@ -69,7 +69,8 @@ describe("bare documents", () => {
     expect(isBareDocumentPath("/p/")).toBe(false);
     expect(isBareDocumentPath("/pickup")).toBe(false);
     expect(isBareDocumentPath("/pickup/menu")).toBe(false);
-    expect(isBareDocumentPath("/api/place-orders/ABC")).toBe(true);
+    // Static on purpose: next.config's /api/:path* rewrite runs before dynamic routes.
+    expect(isBareDocumentPath("/api/place-orders")).toBe(true);
     expect(isBareDocumentPath("/api/public-site")).toBe(false);
   });
 });

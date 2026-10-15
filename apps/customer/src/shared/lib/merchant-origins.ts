@@ -42,7 +42,7 @@ export const isBareDocumentPath = (pathname: string): boolean =>
   isCanvasPath(pathname) ||
   /^\/c\/[^/]+/.test(pathname) ||
   /^\/p\/[^/]+/.test(pathname) ||
-  /^\/api\/place-orders\/[^/]+/.test(pathname);
+  /^\/api\/place-orders\/?$/.test(pathname);
 
 export function builderCanvasResponseHeaders(origins: readonly string[]): Record<string, string> {
   return {

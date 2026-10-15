@@ -213,6 +213,12 @@ export interface OrderResponse {
   version: number;
   createdAtUtc: string;
   capacityWarning: OrderCapacityWarningDto | null;
+  /** The table session the order belongs to, when it was taken at a place (US-020). */
+  occupancyId?: string | null;
+  /** "self-service" when the customer placed it from a place code; empty for staff-taken orders. */
+  intakeKind?: string | null;
+  /** The place code a self-service order came through. */
+  intakeCodeId?: string | null;
 }
 
 /** One row of GET /orders (ListEnvelope). No lines — only a count. */
@@ -231,6 +237,9 @@ export interface OrderSummaryResponse {
   balanceDue: MoneyDto;
   placedAtUtc: string;
   version: number;
+  occupancyId?: string | null;
+  intakeKind?: string | null;
+  intakeCodeId?: string | null;
 }
 
 /** Query of GET /orders. Array filters repeat the key (`statuses=New&statuses=Ready`).
@@ -257,6 +266,12 @@ export interface ListOrdersParams {
   sortDirection?: "asc" | "desc";
   page?: number;
   pageSize?: number;
+  /** Only orders a customer placed through a place code (`true`) or only staff-taken ones (`false`). */
+  selfService?: boolean;
+  /** Only orders that came through this place code. */
+  intakeCodeId?: string;
+  /** Only orders of this table session. */
+  occupancyId?: string;
 }
 
 // ---- Orders: requests -----------------------------------------------------------

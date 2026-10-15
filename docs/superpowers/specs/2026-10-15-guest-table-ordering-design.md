@@ -75,8 +75,8 @@ Language: `?lang=` or the browser's `Accept-Language`, both locales, RTL for Ara
 ## 5. Staff side (`apps/merchant`, `packages/api-client`)
 
 - **api-client:** order list query gains `selfService`, `intakeCodeId`, `occupancyId`; order DTO gains `intakeKind`, `intakeCodeId`, `occupancyId`; new occupancy contract + client (`getOpenOccupancy(resourceId)`, `getOccupancy(id)`, `closeOccupancy(id, expectedVersion)`, `reopenOccupancy(id, expectedVersion)`).
-- **Orders list:** a "QR orders" filter pill (`selfService=true`); a small QR badge with the table number on rows whose `intakeKind === "self-service"`.
-- **Cancel / decline:** the cancel flow tries without a PIN first; it asks for the PIN only when the server answers `order.approval.needed`. (Today it always asks.) The server alone decides when a PIN is needed.
+- **Orders list:** already has a source filter and a "QR Code" source chip (self-service orders arrive with `sourceCode: "qr"`), so no new filter is added. Rows whose `intakeKind === "self-service"` get a second chip, "Ordered by customer", to tell them from QR-source orders staff entered.
+- **Cancel / decline:** no change needed. The existing cancel flow (`use-order-action-confirm.ts`) already sends the cancel without an approval first and asks for the PIN only when the server answers `order.approval.needed`, so a self-service order nobody accepted is declined without a PIN. (Corrected 2026-10-15 after reading the code; the first draft assumed it always asked.)
 - **Table session card** in the order details when the order has an `occupancyId`: open/closed, order count, unanswered count, opened at; **Close** (409 `has-unaccepted-orders` lists the order codes to answer first) and **Reopen** (409 `place-already-open` names the open one). Stale `expectedVersion` → reload the card. Permissions: reading needs `order.orders.read`; close/reopen need `order.orders.operate`; 403 shows a toast.
 
 ## 6. Testing

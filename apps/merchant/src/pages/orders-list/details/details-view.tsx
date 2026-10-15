@@ -14,6 +14,7 @@ import {
 import { useI18n } from "@/app/providers/i18n-provider";
 import { AuditTable, ItemsCard, MetadataCard, SplitCard } from "./bottom-cards";
 import { CardTitle, LINE_COLOR } from "./parts";
+import { SessionCard } from "./session-card";
 import { PaymentCard, RefundCard, SummaryCard, TimelineCard, TotalsCard, type SummaryActions } from "./top-cards";
 
 export function OrderDetailsView({
@@ -65,6 +66,8 @@ export function OrderDetailsView({
         <SplitCard ws={ws} order={order} />
         <MetadataCard order={order} />
       </div>
+
+      {order.occupancyId && <SessionCard order={order} />}
 
       <AuditTable ws={ws} />
 

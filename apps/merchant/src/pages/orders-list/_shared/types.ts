@@ -61,6 +61,8 @@ export interface OrderRecord {
   id: string;
   /** See RealOrderRef's own doc. */
   real?: RealOrderRef;
+  /** The customer placed it themselves from a table's QR code (not staff entering a QR-source order). */
+  selfService?: boolean;
   date: string;
   table: string | null;
   guests: number | null;

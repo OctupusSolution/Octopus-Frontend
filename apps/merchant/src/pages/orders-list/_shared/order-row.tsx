@@ -176,6 +176,9 @@ export function OrderActionButtons({
   );
 }
 
+/** An order the customer sent from their phone: worth a second look before it is accepted. */
+const CUSTOMER_TINT: Tint = { text: "#B45309", bg: "#FFF7ED" };
+
 function Chip({ tint, children }: { tint: Tint; children: string }) {
   return (
     <span
@@ -202,6 +205,7 @@ function OrderIdBlock({ order, onOpenDetails }: { order: OrderRecord; onOpenDeta
       <div className="flex flex-col items-start gap-1">
         <div className="whitespace-nowrap text-[14px] font-medium leading-[14px] text-[var(--octo-text-secondary)]">{order.date}</div>
         <Chip tint={SOURCE_TINT}>{t(SOURCE_LABEL_KEY[order.source])}</Chip>
+        {order.selfService && <Chip tint={CUSTOMER_TINT}>{t("orders.session.byCustomer")}</Chip>}
       </div>
     </div>
   );

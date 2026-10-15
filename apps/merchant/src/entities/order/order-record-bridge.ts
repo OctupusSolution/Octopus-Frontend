@@ -83,6 +83,7 @@ export function mapRealOrderToRecord(order: OrderResponse): OrderRecord {
     totalSar: order.totals.grandTotal.amount,
     balanceDueSar: order.balanceDue.amount,
     source: SOURCE_BY_CODE[order.sourceCode] ?? "POS Order",
+    selfService: order.intakeKind === "self-service",
     payment: paymentStatusOf(order),
     state,
     lastStage,

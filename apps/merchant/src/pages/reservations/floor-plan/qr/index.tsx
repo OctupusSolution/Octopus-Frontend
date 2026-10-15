@@ -11,11 +11,13 @@ import { FloorPlanHub } from "../_shared/floor-plan-hub";
 import { PageShell } from "../_shared/page-header";
 import { ToastBanner, useToast } from "../_shared/toast";
 import { useFloorPlan } from "../_shared/use-floor-plan";
+import { AttentionPanel } from "./attention-panel";
 import { GenerateFlow } from "./generate";
 import { formatDate, useZoneDimmed, ZoneSelect } from "./parts";
 import { exportCodes, printCodes } from "./print-codes";
 import { QrLegend, QrPlan } from "./qr-plan";
 import { QR_STATUSES, type QrStatus } from "./qr-store";
+import { RelinkModal } from "./relink-modal";
 import { TableQrModal } from "./table-qr-modal";
 import { BTN_OUTLINE, BTN_PRIMARY, QR_CARD, TEXT_SUBTEXT } from "./theme";
 import { usePlaceCodes, type PlaceCodesState } from "./use-place-codes";
@@ -55,6 +57,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
   const [preselect, setPreselect] = useState<string[]>([]);
   const [zoneId, setZoneId] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [relink, setRelink] = useState<{ codeId: string; revision?: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const dimmed = useZoneDimmed(doc, zoneId);
 
@@ -157,6 +160,7 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
             {t("floorPlan.qr.downloadAll")}
           </button>
         </div>
+        <AttentionPanel pc={pc} notify={notify} onRelink={(codeId, revision) => setRelink({ codeId, revision })} />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <ZoneSelect doc={doc} value={zoneId} onChange={setZoneId} />
           <div className="lg:flex-1">
@@ -182,7 +186,12 @@ function TableQrCodes({ doc }: { doc: FloorPlanDoc }) {
         notify={notify}
         onClose={() => setOpenId(null)}
         onGenerate={() => open && startGenerate([open.id])}
+        onRelink={(codeId) => {
+          setRelink({ codeId, revision: open ? pc.rows.get(open.id)?.revision ?? undefined : undefined });
+          setOpenId(null);
+        }}
       />
+      {relink && <RelinkModal doc={doc} pc={pc} codeId={relink.codeId} revision={relink.revision} notify={notify} onClose={() => setRelink(null)} />}
       <ToastBanner toast={toast} />
     </PageShell>
   );
